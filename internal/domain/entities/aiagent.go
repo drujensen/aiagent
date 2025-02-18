@@ -1,4 +1,4 @@
-package models
+package entities
 
 // AIAgent represents an AI agent that can be configured
 // with a prompt and a list of available tools

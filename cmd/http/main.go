@@ -4,7 +4,7 @@ import (
     "log"
     "net/http"
 
-    customhttp "AIAgent/internal/api/http"
+    customhttp "aiagent/internal/api/http"
 )
 
 func main() {

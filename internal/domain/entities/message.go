@@ -1,4 +1,4 @@
-package models
+package entities
 
 // IMessage defines the interface for messages
 // It provides methods to access common message properties

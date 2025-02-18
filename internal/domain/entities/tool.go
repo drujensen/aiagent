@@ -1,4 +1,4 @@
-package models
+package entities
 
 type Tool struct {
     ID           string
