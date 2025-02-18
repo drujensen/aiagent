@@ -1,7 +1,6 @@
-version: '3.8'
-
 services:
   http:
+    container_name: http
     build: .
     ports:
       - "8080:8080"
@@ -9,14 +8,16 @@ services:
       - .env
 
   redis:
+    container_name: redis
     image: "redis:alpine"
     ports:
       - "6379:6379"
 
   mongo:
+    container_name: mongo
     image: "mongo:latest"
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
