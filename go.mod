@@ -42,7 +42,10 @@ require (
 
 require github.com/google/uuid v1.6.0
 
-require github.com/aymerick/raymond v2.0.2+incompatible // indirect
+require (
+	github.com/aymerick/raymond v2.0.2+incompatible
+	gopkg.in/yaml.v2 v2.4.0 // indirect
+)
 
 // Notes:
 // - Versions are specified for consistency; `go mod tidy` will resolve the latest compatible versions.

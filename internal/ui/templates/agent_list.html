@@ -1,0 +1,9 @@
+{{! agent_list.html: Content partial for listing agents }}
+<main class="content">
+    <h1>Agents</h1>
+    <ul class="agent-list">
+        {{#agents}}
+        <li class="agent-item">{{name}} - {{prompt}}</li>
+        {{/agents}}
+    </ul>
+</main>
