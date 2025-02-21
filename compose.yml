@@ -5,7 +5,7 @@ services:
     ports:
       - "8080:8080"  # Expose port 8080 for the HTTP server
     env_file:
-      - .env  # Load environment variables from .env file
+      - .env.docker  # Load environment variables from .env.docker file
 
   mongo:
     container_name: mongo
