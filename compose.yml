@@ -1,0 +1,23 @@
+services:
+  http:
+    container_name: http
+    build: .
+    ports:
+      - "8080:8080"  # Expose port 8080 for the HTTP server
+    env_file:
+      - .env  # Load environment variables from .env file
+
+  mongo:
+    container_name: mongo
+    image: "mongo:latest"  # Use the latest MongoDB image
+    ports:
+      - "27017:27017"  # Expose MongoDB port for local access
+    volumes:
+      - mongo_data:/data/db  # Persist MongoDB data in a named volume
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin  # Default username for MongoDB
+      MONGO_INITDB_ROOT_PASSWORD: password  # Default password for MongoDB
+      MONGO_INITDB_DATABASE: aiagent  # Database name for the application
+
+volumes:
+  mongo_data:  # Named volume for MongoDB data persistence

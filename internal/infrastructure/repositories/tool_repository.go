@@ -10,6 +10,20 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const (
+	// TimeoutDuration is the duration for context timeouts
+	TimeoutDuration = 10 * time.Second
+)
+
+// Tool represents the structure of a tool document in MongoDB
+type Tool struct {
+	ID        string    `bson:"_id,omitempty"`
+	Name      string    `bson:"name"`
+	Category  string    `bson:"category"`
+	CreatedAt time.Time `bson:"created_at"`
+	UpdatedAt time.Time `bson:"updated_at"`
+}
+
 // ToolRepository manages CRUD operations for Tools in MongoDB
 type ToolRepository struct {
 	client *mongo.Client
@@ -19,13 +33,16 @@ type ToolRepository struct {
 // NewToolRepository creates a new ToolRepository instance
 func NewToolRepository(connectionString string, databaseName string) (*ToolRepository, error) {
 	clientOptions := options.Client().ApplyURI(connectionString)
-	client, err := mongo.Connect(context.TODO(), clientOptions)
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutDuration)
+	defer cancel()
+
+	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
 		return nil, err
 	}
 
 	// Check the connection
-	err = client.Ping(context.TODO(), nil)
+	err = client.Ping(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +63,10 @@ func (r *ToolRepository) CreateTool(tool Tool) (string, error) {
 	tool.CreatedAt = time.Now()
 	tool.UpdatedAt = time.Now()
 
-	result, err := collection.InsertOne(context.TODO(), tool)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := collection.InsertOne(ctx, tool)
 	if err != nil {
 		return "", err
 	}
@@ -59,7 +79,10 @@ func (r *ToolRepository) GetTool(id string) (*Tool, error) {
 	collection := r.db.Collection("tools")
 
 	var tool Tool
-	err := collection.FindOne(context.TODO(), bson.M{"_id": id}).Decode(&tool)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err := collection.FindOne(ctx, bson.M{"_id": id}).Decode(&tool)
 	if err != nil {
 		return nil, err
 	}
@@ -73,17 +96,21 @@ func (r *ToolRepository) UpdateTool(id string, updatedTool Tool) error {
 
 	updatedTool.UpdatedAt = time.Now()
 
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	result, err := collection.UpdateOne(
-		context.TODO(),
+		ctx,
 		bson.M{"_id": id},
 		bson.D{
-			{"$set", bson.D{
-				{"name", updatedTool.Name},
-				{"category", updatedTool.Category},
-				{"updated_at", updatedTool.UpdatedAt},
+			{Key: "$set", Value: bson.D{
+				{Key: "name", Value: updatedTool.Name},
+				{Key: "category", Value: updatedTool.Category},
+				{Key: "updated_at", Value: updatedTool.UpdatedAt},
 			}},
 		},
 	)
+
 	if err != nil {
 		return err
 	}
@@ -99,7 +126,10 @@ func (r *ToolRepository) UpdateTool(id string, updatedTool Tool) error {
 func (r *ToolRepository) DeleteTool(id string) error {
 	collection := r.db.Collection("tools")
 
-	result, err := collection.DeleteOne(context.TODO(), bson.M{"_id": id})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := collection.DeleteOne(ctx, bson.M{"_id": id})
 	if err != nil {
 		return err
 	}
