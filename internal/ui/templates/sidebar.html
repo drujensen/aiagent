@@ -2,7 +2,37 @@
 <aside class="sidebar">
     <h2>Agent Hierarchy</h2>
     <ul class="agent-hierarchy">
-        <!-- Placeholder for agent hierarchy -->
+        {{range .RootAgents}}
+        <!-- Render each root agent using the agent_node template -->
+        {{template "agent_node" .}}
+        {{end}}
     </ul>
 </aside>
+{{end}}
+
+{{define "agent_node"}}
+/**
+ * @description
+ * Recursively renders an agent node and its children in the hierarchy tree.
+ *
+ * Parameters:
+ * - .ID: Agent’s unique identifier for linking.
+ * - .Name: Agent’s display name.
+ * - .Children: Slice of child AgentNodes for recursion.
+ *
+ * Returns:
+ * - HTML LI element with nested UL for children if present.
+ */
+<li>
+    <!-- Link to load agent details via HTMX into #main-content -->
+    <a href="#" hx-get="/agents/{{.ID}}" hx-target="#main-content">{{.Name}}</a>
+    {{if .Children}}
+    <ul>
+        {{range .Children}}
+        <!-- Recursively render child nodes -->
+        {{template "agent_node" .}}
+        {{end}}
+    </ul>
+    {{end}}
+</li>
 {{end}}

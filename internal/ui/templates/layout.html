@@ -11,7 +11,16 @@
     {{template "header" .}}
     <div class="container">
         {{template "sidebar" .}}
-        {{template "home" .}}
+        <main id="main-content">
+            <!-- Conditionally include the content template based on .ContentTemplate -->
+            {{if eq .ContentTemplate "home_content"}}
+                {{template "home_content" .}}
+            {{else if eq .ContentTemplate "agent_list_content"}}
+                {{template "agent_list_content" .}}
+            {{else if eq .ContentTemplate "agent_form_content"}}
+                {{template "agent_form_content" .}}
+            {{end}}
+        </main>
     </div>
     <script src="/static/js/htmx.min.js"></script>
 </body>

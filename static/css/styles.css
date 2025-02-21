@@ -5,3 +5,6 @@
 .home-content {
     font-family: 'Roboto', sans-serif;
 }
+
+.agent-hierarchy ul { margin-left: 20px; }
+.agent-hierarchy li { list-style-type: none; }
