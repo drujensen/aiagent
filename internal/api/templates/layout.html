@@ -1,0 +1,42 @@
+/**
+ * @description 
+ * layout.html serves as the base Mustache template for the AI Workflow Automation Platform's UI.
+ * It provides a consistent structure across all pages, incorporating a header, sidebar, and main content area,
+ * rendered server-side with the Raymond library.
+ * 
+ * Key features:
+ * - Header Inclusion: Uses {{> header}} partial for navigation links (Agents, Workflows, Chat, Monitoring).
+ * - Sidebar Inclusion: Uses {{> sidebar}} partial for the agent hierarchy placeholder.
+ * - Content Placeholder: Uses {{> content}} partial for page-specific content.
+ * - HTMX Integration: Loads htmx.min.js for dynamic UI updates via server-side triggers.
+ * 
+ * @dependencies
+ * - /static/css/styles.css: External stylesheet for layout and visual styling.
+ * - /static/js/htmx.min.js: HTMX library for client-side interactivity.
+ * - Raymond (github.com/aymerick/raymond): Go library for Mustache templating, assumed in project dependencies.
+ * 
+ * @notes
+ * - The {{title}} variable allows dynamic page titles set during rendering.
+ * - Assumes static assets are served from /static/, requiring server configuration in later steps.
+ * - No inline styles; relies on styles.css for positioning (e.g., fixed header/sidebar, flexible content).
+ * - Edge case: If partials are missing, rendering will fail; handled by providing all required partials here.
+ * - Limitation: Static structure; dynamic data (e.g., agent hierarchy) will be populated in later steps.
+ */
+{{! layout.html: Base layout template for the AI Workflow Automation Platform }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{title}}</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    {{> header}}
+    <div class="container">
+        {{> sidebar}}
+        {{> content}}
+    </div>
+    <script src="/static/js/htmx.min.js"></script>
+</body>
+</html>

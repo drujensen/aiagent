@@ -1,0 +1,28 @@
+/**
+ * @description 
+ * agent_list.html is a Mustache partial template for the main content area, displaying a list of agents.
+ * It iterates over an 'agents' context variable to render agent details, serving as the UI foundation
+ * for agent management in the application.
+ * 
+ * Key features:
+ * - Agent Listing: Uses {{#agents}} to loop through agents, displaying name and prompt.
+ * - Styling Classes: Applies 'content', 'agent-list', and 'agent-item' for CSS styling.
+ * 
+ * @dependencies
+ * - /static/css/styles.css: Assumed to style the content area (flexible width, 24px padding).
+ * 
+ * @notes
+ * - Expects 'agents' to be an array of objects with 'name' and 'prompt' fields, passed during rendering.
+ * - Edge case: If 'agents' is empty, renders an empty UL; UI remains valid but shows no items.
+ * - Assumption: Controllers (e.g., agent_controller.go) will fetch agents and pass data to Raymond.
+ * - Limitation: Basic listing; Step 13 may enhance with edit/delete actions or detailed views.
+ */
+{{! agent_list.html: Content partial for listing agents }}
+<main class="content">
+    <h1>Agents</h1>
+    <ul class="agent-list">
+        {{#agents}}
+        <li class="agent-item">{{name}} - {{prompt}}</li>
+        {{/agents}}
+    </ul>
+</main>
