@@ -3,6 +3,7 @@ module aiagent
 go 1.23.2
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3 // Added for WebSocket support
 	github.com/spf13/viper v1.19.0
 	go.mongodb.org/mongo-driver v1.17.2
@@ -24,7 +25,6 @@ require (
 	github.com/spf13/afero v1.11.0 // indirect; Dependency for Viper
 	github.com/spf13/cast v1.7.0 // indirect; Dependency for Viper
 	github.com/spf13/pflag v1.0.5 // indirect; Dependency for Viper
-	github.com/stretchr/testify v1.10.0 // indirect; Testing dependency
 	github.com/subosito/gotenv v1.6.0 // indirect; Dependency for Viper
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect; Dependency for MongoDB driver
 	github.com/xdg-go/scram v1.1.2 // indirect; Dependency for MongoDB driver
@@ -39,14 +39,3 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect; Dependency for Viper
 	gopkg.in/yaml.v3 v3.0.1 // indirect; Dependency for Viper
 )
-
-require github.com/google/uuid v1.6.0
-
-require (
-	github.com/aymerick/raymond v2.0.2+incompatible
-	gopkg.in/yaml.v2 v2.4.0 // indirect
-)
-
-// Notes:
-// - Versions are specified for consistency; `go mod tidy` will resolve the latest compatible versions.
-// - Indirect dependencies are included as they will be populated by `go mod tidy` based on the direct dependencies.

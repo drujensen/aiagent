@@ -1,24 +1,23 @@
 /**
  * @description
  * This file defines the HomeController for the AI Workflow Automation Platform within the internal/ui package.
- * It handles rendering the main home page, serving as the entry point for the web UI. The controller uses Mustache
- * templating via the raymond library to render server-side HTML, supporting both full page loads and HTMX-driven
+ * It handles rendering the main home page, serving as the entry point for the web UI. The controller uses Go's
+ * built-in html/template package for server-side HTML rendering, supporting both full page loads and HTMX-driven
  * partial rendering for dynamic updates.
  *
  * Key features:
  * - Home Page Rendering: Displays a welcoming message and navigation instructions.
- * - HTMX Support: Returns full HTML (layout + content) for initial loads or just the content partial for HTMX requests.
- * - Template Integration: Leverages layout.html with header.html, sidebar.html, and home.html partials.
+ * - HTMX Support: Returns full HTML (layout + partials) for initial loads or just the home partial for HTMX requests.
+ * - Template Integration: Leverages layout.html with header, sidebar, and home partials.
  *
  * @dependencies
- * - github.com/aymerick/raymond: Mustache templating library for server-side rendering.
+ * - html/template: Standard Go package for templating.
  * - net/http: Standard Go package for HTTP handling.
- * - os: For manual file reading of partials.
  * - go.uber.org/zap: Structured logging for errors.
  *
  * @notes
- * - Template paths are relative to the project root with ./ prefix (e.g., ./internal/ui/templates/).
- * - Assumes layout.html exists with {{> header}}, {{> sidebar}}, and {{> content}} partials.
+ * - Template paths are relative to the project root (e.g., ./internal/ui/templates/).
+ * - Assumes layout.html exists with {{template "header" .}}, {{template "sidebar" .}}, and {{template "home" .}}.
  * - Edge case: If templates fail to load or render, an HTTP 500 error is returned with a logged message.
  * - Assumption: Static assets (e.g., htmx.min.js, styles.css) are served via main.go.
  */
@@ -26,110 +25,110 @@
 package ui
 
 import (
+	"html/template"
 	"net/http"
-	"os"
 
-	"github.com/aymerick/raymond"
 	"go.uber.org/zap"
 )
 
 // HomeController manages UI-related requests for the home page.
 type HomeController struct {
-	logger *zap.Logger // Logger for error reporting
+	logger *zap.Logger        // Logger for error reporting
+	tmpl   *template.Template // Pre-parsed templates for rendering
 }
 
-// NewHomeController creates a new HomeController instance with the provided logger.
+// NewHomeController creates a new HomeController instance with pre-parsed templates.
 //
 // Parameters:
-// - logger: A zap.Logger instance for logging errors and events.
+// - logger: A zap.Logger instance for logging errors.
 //
 // Returns:
-// - *HomeController: A new instance of HomeController.
+// - *HomeController: A new instance of HomeController with loaded templates.
 func NewHomeController(logger *zap.Logger) *HomeController {
+	tmpl, err := template.ParseFiles(
+		"./internal/ui/templates/layout.html",
+		"./internal/ui/templates/header.html",
+		"./internal/ui/templates/sidebar.html",
+		"./internal/ui/templates/home.html",
+		"./internal/ui/templates/agent_list.html",
+		"./internal/ui/templates/agent_form.html",
+	)
+	if err != nil {
+		logger.Fatal("Failed to parse templates", zap.Error(err))
+	}
 	return &HomeController{
 		logger: logger,
+		tmpl:   tmpl,
 	}
 }
 
 // HomeHandler handles requests to the root path ("/"), rendering the home page.
-// It supports both full page rendering (initial load) and partial rendering (HTMX requests).
 //
 // Parameters:
 // - w: HTTP response writer for sending the rendered HTML.
 // - r: HTTP request containing headers (e.g., HX-Request) and context.
 //
 // Behavior:
-// - If HX-Request header is present, renders only the home.html partial.
-// - Otherwise, renders the full page using layout.html with registered partials (header, sidebar, content).
-// - Logs and returns errors if template loading or rendering fails.
+// - If HX-Request header is present, renders only the "home" template.
+// - Otherwise, renders the full "layout" template with embedded partials.
+// - Logs and returns errors if rendering fails.
 func (c *HomeController) HomeHandler(w http.ResponseWriter, r *http.Request) {
-	// Data to pass to the template
 	data := map[string]interface{}{
-		"title": "AI Workflow Automation Platform", // Page title
+		"Title": "AI Workflow Automation Platform",
 	}
-
-	// Check if this is an HTMX request
 	isHtmxRequest := r.Header.Get("HX-Request") == "true"
-
+	tmplName := "layout"
 	if isHtmxRequest {
-		// Render only the content partial for HTMX
-		tmpl, err := raymond.ParseFile("./internal/ui/templates/home.html")
-		if err != nil {
-			c.logger.Error("Failed to parse home.html template", zap.Error(err))
-			http.Error(w, "Internal server error: template parsing failed", http.StatusInternalServerError)
-			return
-		}
-		rendered, err := tmpl.Exec(data)
-		if err != nil {
-			c.logger.Error("Failed to render home.html template", zap.Error(err))
-			http.Error(w, "Internal server error: template rendering failed", http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(rendered))
-		return
-	}
-
-	// Render the full page with layout
-	tmpl, err := raymond.ParseFile("./internal/ui/templates/layout.html")
-	if err != nil {
-		c.logger.Error("Failed to parse layout.html template", zap.Error(err))
-		http.Error(w, "Internal server error: template parsing failed", http.StatusInternalServerError)
-		return
-	}
-
-	// Manually register partials
-	headerContent, err := os.ReadFile("./internal/ui/templates/header.html")
-	if err != nil {
-		c.logger.Error("Failed to read header.html", zap.Error(err))
-		http.Error(w, "Internal server error: failed to read header partial", http.StatusInternalServerError)
-		return
-	}
-	tmpl.RegisterPartial("header", string(headerContent))
-
-	sidebarContent, err := os.ReadFile("./internal/ui/templates/sidebar.html")
-	if err != nil {
-		c.logger.Error("Failed to read sidebar.html", zap.Error(err))
-		http.Error(w, "Internal server error: failed to read sidebar partial", http.StatusInternalServerError)
-		return
-	}
-	tmpl.RegisterPartial("sidebar", string(sidebarContent))
-
-	contentContent, err := os.ReadFile("./internal/ui/templates/home.html")
-	if err != nil {
-		c.logger.Error("Failed to read home.html for content partial", zap.Error(err))
-		http.Error(w, "Internal server error: failed to read content partial", http.StatusInternalServerError)
-		return
-	}
-	tmpl.RegisterPartial("content", string(contentContent))
-
-	// Render the template with registered partials
-	rendered, err := tmpl.Exec(data)
-	if err != nil {
-		c.logger.Error("Failed to render layout.html template", zap.Error(err))
-		http.Error(w, "Internal server error: template rendering failed", http.StatusInternalServerError)
-		return
+		tmplName = "home"
 	}
 	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(rendered))
+	if err := c.tmpl.ExecuteTemplate(w, tmplName, data); err != nil {
+		c.logger.Error("Failed to render template", zap.String("template", tmplName), zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func (c *HomeController) AgentListHandler(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"Title": "Agents",
+		"Agents": []struct{ Name, Prompt string }{
+			{"Agent1", "Do task 1"},
+			{"Agent2", "Do task 2"},
+		},
+	}
+	w.Header().Set("Content-Type", "text/html")
+	if err := c.tmpl.ExecuteTemplate(w, "agent_list", data); err != nil {
+		c.logger.Error("Failed to render agent_list", zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func (c *HomeController) AgentFormHandler(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"Title": "Agent Form",
+		"Agent": struct {
+			ID            string
+			Name          string
+			Prompt        string
+			Configuration struct {
+				APIKey, LocalURL string
+				Temperature      float64
+				ThinkingTime     int
+			}
+			HumanInteractionEnabled bool
+		}{},
+		"Tools": []struct {
+			ID, Name string
+			Selected bool
+		}{{ID: "1", Name: "Tool1"}},
+		"Providers": []struct {
+			Value, Label string
+			Selected     bool
+		}{{Value: "openai", Label: "OpenAI"}},
+	}
+	w.Header().Set("Content-Type", "text/html")
+	if err := c.tmpl.ExecuteTemplate(w, "agent_form", data); err != nil {
+		c.logger.Error("Failed to render agent_form", zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }

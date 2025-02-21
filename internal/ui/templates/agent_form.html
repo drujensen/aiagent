@@ -1,36 +1,33 @@
+{{define "agent_form"}}
 <div class="agent-form">
   <!-- Dynamic heading based on whether editing or creating an agent -->
-  <h2>{{#agent}}Edit Agent{{/agent}}{{^agent}}Create Agent{{/agent}}</h2>
+  <h2>{{if .Agent}}Edit Agent{{else}}Create Agent{{end}}</h2>
   
   <!-- Form with HTMX attributes for dynamic submission; action toggles based on agent ID -->
-  <form hx-{{#agent}}put="/agents/{{id}}"{{/agent}}{{^agent}}post="/agents"{{/agent}} hx-target="#response-message">
+  <form {{if .Agent}}hx-put="/agents/{{.Agent.ID}}"{{else}}hx-post="/agents"{{end}} hx-target="#response-message">
     <!-- Hidden ID field for updates; empty for new agents -->
-    <input type="hidden" name="id" value="{{agent.id}}">
+    <input type="hidden" name="id" value="{{.Agent.ID}}">
 
     <!-- Agent Name -->
     <div class="form-group">
       <label for="name">Agent Name:</label>
-      <input type="text" id="name" name="name" class="form-control" value="{{agent.name}}" required>
-      <!-- Required field for human-readable agent identifier -->
+      <input type="text" id="name" name="name" class="form-control" value="{{.Agent.Name}}" required>
     </div>
 
     <!-- Custom Prompt -->
     <div class="form-group">
       <label for="prompt">Prompt:</label>
-      <textarea id="prompt" name="prompt" class="form-control" required>{{agent.prompt}}</textarea>
-      <!-- Textarea for defining agent behavior, required per spec -->
+      <textarea id="prompt" name="prompt" class="form-control" required>{{.Agent.Prompt}}</textarea>
     </div>
 
     <!-- Tool Selection -->
     <div class="form-group">
       <label for="tools">Tools:</label>
       <select id="tools" name="tools" class="form-control" multiple>
-        <!-- Iterate over available tools, pre-selecting those assigned to the agent -->
-        {{#tools}}
-          <option value="{{id}}" {{#selected}}selected{{/selected}}>{{name}}</option>
-        {{/tools}}
+        {{range .Tools}}
+          <option value="{{.ID}}" {{if .Selected}}selected{{end}}>{{.Name}}</option>
+        {{end}}
       </select>
-      <!-- Multi-select for choosing tools from predefined library -->
     </div>
 
     <!-- AI Model Settings Group -->
@@ -41,57 +38,49 @@
       <div class="form-group">
         <label for="provider">Provider:</label>
         <select id="provider" name="provider" class="form-control">
-          <!-- Iterate over providers, selecting the current one for editing -->
-          {{#providers}}
-            <option value="{{value}}" {{#selected}}selected{{/selected}}>{{label}}</option>
-          {{/providers}}
+          {{range .Providers}}
+            <option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>
+          {{end}}
         </select>
-        <!-- Dropdown with supported providers (OpenAI, Together.ai, Grok/xAI) -->
       </div>
 
       <!-- API Key Input -->
       <div class="form-group">
         <label for="api_key">API Key:</label>
-        <input type="text" id="api_key" name="api_key" class="form-control" value="{{agent.configuration.api_key}}">
+        <input type="text" id="api_key" name="api_key" class="form-control" value="{{.Agent.Configuration.APIKey}}">
         <small class="form-text text-muted">Use #{VAR_NAME}# to reference an environment variable.</small>
-        <!-- Supports direct keys or env var references, with guidance text -->
       </div>
 
       <!-- Local Model URL (Optional) -->
       <div class="form-group">
         <label for="local_url">Local Model URL (optional):</label>
-        <input type="text" id="local_url" name="local_url" class="form-control" value="{{agent.configuration.local_url}}">
-        <!-- Optional field for locally running AI models -->
+        <input type="text" id="local_url" name="local_url" class="form-control" value="{{.Agent.Configuration.LocalURL}}">
       </div>
 
       <!-- Temperature Setting -->
       <div class="form-group">
         <label for="temperature">Temperature:</label>
-        <input type="number" id="temperature" name="temperature" class="form-control" step="0.1" value="{{agent.configuration.temperature}}">
-        <!-- Numeric input with 0.1 step; defaults set by server (e.g., 0.7) -->
+        <input type="number" id="temperature" name="temperature" class="form-control" step="0.1" value="{{.Agent.Configuration.Temperature}}">
       </div>
 
       <!-- Thinking Time Setting -->
       <div class="form-group">
         <label for="thinking_time">Thinking Time (ms):</label>
-        <input type="number" id="thinking_time" name="thinking_time" class="form-control" value="{{agent.configuration.thinking_time}}">
-        <!-- Numeric input for thinking time; defaults set by server (e.g., 1000) -->
+        <input type="number" id="thinking_time" name="thinking_time" class="form-control" value="{{.Agent.Configuration.ThinkingTime}}">
       </div>
     </fieldset>
 
     <!-- Human Interaction Toggle -->
     <div class="form-group">
       <label for="human_interaction">Enable Human Interaction:</label>
-      <input type="checkbox" id="human_interaction" name="human_interaction" {{#agent.human_interaction_enabled}}checked{{/agent.human_interaction_enabled}}>
-      <!-- Checkbox defaults to checked for new agents or reflects existing setting -->
+      <input type="checkbox" id="human_interaction" name="human_interaction" {{if .Agent.HumanInteractionEnabled}}checked{{end}}>
     </div>
 
     <!-- Submit Button -->
     <button type="submit" class="btn btn-primary">Save Agent</button>
-    <!-- Triggers form submission via HTMX to create or update the agent -->
   </form>
 
   <!-- Response Area -->
   <div id="response-message"></div>
-  <!-- HTMX updates this div with server responses (e.g., success or error messages) -->
 </div>
+{{end}}

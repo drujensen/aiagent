@@ -102,6 +102,9 @@ func main() {
 	// Set up HTTP handlers
 	// UI routes
 	http.HandleFunc("/", homeController.HomeHandler) // Home page rendering
+	http.HandleFunc("/agents", homeController.AgentListHandler)
+	http.HandleFunc("/agents/new", homeController.AgentFormHandler)
+	http.HandleFunc("/agents/edit/", homeController.AgentFormHandler) // With ID parsing
 
 	// API routes (prefixed with /api/)
 	http.HandleFunc("/api/agents", agentController.AgentsHandler)
