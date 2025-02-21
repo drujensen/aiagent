@@ -39,6 +39,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect; Dependency for Viper
 )
 
+require github.com/google/uuid v1.6.0
+
 // Notes:
 // - Versions are specified for consistency; `go mod tidy` will resolve the latest compatible versions.
 // - Indirect dependencies are included as they will be populated by `go mod tidy` based on the direct dependencies.
