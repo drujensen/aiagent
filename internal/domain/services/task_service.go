@@ -13,16 +13,17 @@ import (
 
 /**
  * @description
- * This file implements the TaskService for the AI Workflow Automation Platform.
- * It manages task creation, processing, delegation, and human interaction notifications,
- * enabling workflow execution by AI agents. The service integrates with repositories for
- * persistence and prepares for AI model and chat service integrations.
+ * TaskService manages the lifecycle of tasks in the AI Workflow Automation Platform.
+ * It handles task creation, processing, delegation, and retrieval, enabling workflow execution
+ * by AI agents. This service integrates with repositories for persistence and prepares for
+ * integrations with AI models and chat services.
  *
  * Key features:
  * - Workflow Management: Starts workflows by assigning tasks to agents.
  * - Task Processing: Processes tasks with a loop handling tool execution, subtask delegation, and results.
  * - Human Interaction: Notifies for human input when required, pausing processing.
  * - Concurrency: Uses goroutines for concurrent subtask execution with synchronization.
+ * - Task Retrieval: Allows fetching tasks by ID for status checks and monitoring.
  *
  * @dependencies
  * - aiagent/internal/domain/entities: Provides Task and AIAgent entity definitions.
@@ -42,6 +43,7 @@ type TaskService interface {
 	ProcessTask(ctx context.Context, task *entities.Task) error
 	DelegateSubtasks(ctx context.Context, parentTask *entities.Task, subtasks []*entities.Task) error
 	NotifyHumanInteraction(ctx context.Context, task *entities.Task) error
+	GetTask(ctx context.Context, id string) (*entities.Task, error) // Added for task retrieval
 }
 
 type taskService struct {
@@ -56,6 +58,27 @@ func NewTaskService(taskRepo repositories.TaskRepository, agentRepo repositories
 		taskRepo:  taskRepo,
 		agentRepo: agentRepo,
 	}
+}
+
+// GetTask retrieves a task by its ID from the repository.
+// It performs a simple validation on the ID and delegates to the repository.
+//
+// Parameters:
+// - ctx: Context for managing request lifecycle.
+// - id: The string ID of the task to retrieve.
+//
+// Returns:
+// - *entities.Task: The retrieved task, or nil if not found.
+// - error: Nil on success, repositories.ErrNotFound if task doesn't exist, or another error.
+func (s *taskService) GetTask(ctx context.Context, id string) (*entities.Task, error) {
+	if id == "" {
+		return nil, fmt.Errorf("task ID is required")
+	}
+	task, err := s.taskRepo.GetTask(ctx, id)
+	if err != nil {
+		return nil, err // ErrNotFound or other errors from repository
+	}
+	return task, nil
 }
 
 func (s *taskService) StartWorkflow(ctx context.Context, task *entities.Task) error {
