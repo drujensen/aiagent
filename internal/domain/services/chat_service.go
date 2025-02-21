@@ -16,12 +16,14 @@ import (
  * This file implements the ChatService for the AI Workflow Automation Platform.
  * It manages conversations for human interaction with AI agents, including message sending,
  * conversation creation, and listing active conversations. The service interacts with the
- * ConversationRepository and TaskRepository to persist and retrieve data.
+ * ConversationRepository and TaskRepository to persist and retrieve data, and supports
+ * real-time message notifications via listeners for WebSocket integration.
  *
  * Key features:
  * - Conversation Management: Creates and updates conversations tied to tasks.
  * - Message Handling: Validates and appends messages to conversations with unique IDs.
- * - Active Conversation Listing: Filters conversations based on task status (requires human interaction and not completed).
+ * - Active Conversation Listing: Filters conversations based on task status.
+ * - Real-time Notifications: Supports message listeners for WebSocket broadcasting.
  *
  * @dependencies
  * - aiagent/internal/domain/entities: Provides Conversation, Message, and Task entities.
@@ -32,14 +34,22 @@ import (
  * - time: For timestamp handling.
  *
  * @notes
- * - Messages are validated based on their type (chat or tool) to ensure required fields are present.
- * - Conversations are only created for tasks that require human interaction, verified via TaskRepository.
- * - Active conversations are determined by task status, fetching task details for filtering.
- * - WebSocket integration for real-time messaging is deferred to Step 11; this focuses on domain logic.
+ * - Messages are validated based on their type (chat or tool) to ensure required fields.
+ * - Conversations are only created for tasks requiring human interaction, verified via TaskRepository.
+ * - Active conversations are filtered by task status, fetching task details for accuracy.
+ * - Message listeners enable WebSocket integration, notifying the hub of new messages.
  * - Error handling wraps repository errors with context for better debugging.
  * - Assumption: TaskRepository and ConversationRepository are properly implemented and injected.
  * - Limitation: ListActiveConversations may be inefficient for large datasets; pagination could be added later.
  */
+
+// MessageListener is a callback function type for notifying when a new message is added to a conversation.
+// It is used to broadcast messages to connected WebSocket clients in real-time.
+//
+// Parameters:
+// - conversationID: The ID of the conversation the message belongs to.
+// - message: The Message entity that was added.
+type MessageListener func(conversationID string, message entities.Message)
 
 // ChatService defines the interface for managing conversations and messages in the domain layer.
 // It supports human oversight by enabling message exchange and conversation tracking.
@@ -60,6 +70,10 @@ type ChatService interface {
 	// ListActiveConversations retrieves conversations awaiting human input.
 	// Filters based on task status (RequiresHumanInteraction=true and Status!=TaskCompleted).
 	ListActiveConversations(ctx context.Context) ([]*entities.Conversation, error)
+
+	// AddMessageListener registers a listener to be notified of new messages.
+	// Used for real-time updates via WebSocket.
+	AddMessageListener(listener MessageListener)
 }
 
 // chatService implements the ChatService interface.
@@ -67,6 +81,7 @@ type ChatService interface {
 type chatService struct {
 	conversationRepo repositories.ConversationRepository
 	taskRepo         repositories.TaskRepository
+	messageListeners []MessageListener
 }
 
 // NewChatService creates a new instance of chatService with the given repositories.
@@ -81,11 +96,21 @@ func NewChatService(conversationRepo repositories.ConversationRepository, taskRe
 	return &chatService{
 		conversationRepo: conversationRepo,
 		taskRepo:         taskRepo,
+		messageListeners: []MessageListener{},
 	}
 }
 
+// AddMessageListener registers a listener to be notified when new messages are added.
+// It appends the listener to the service's list, ensuring thread safety in the caller.
+//
+// Parameters:
+// - listener: The callback function to invoke for new messages.
+func (s *chatService) AddMessageListener(listener MessageListener) {
+	s.messageListeners = append(s.messageListeners, listener)
+}
+
 // SendMessage appends a validated message to a conversation and updates the repository.
-// Generates a unique ID and sets the timestamp for the message.
+// Generates a unique ID, sets the timestamp, and notifies listeners for real-time updates.
 //
 // Parameters:
 // - ctx: Context for timeout and cancellation.
@@ -143,7 +168,11 @@ func (s *chatService) SendMessage(ctx context.Context, conversationID string, me
 		return fmt.Errorf("failed to update conversation: %w", err)
 	}
 
-	// Note: WebSocket notification deferred to Step 11
+	// Notify listeners for real-time updates
+	for _, listener := range s.messageListeners {
+		listener(conversationID, message)
+	}
+
 	return nil
 }
 

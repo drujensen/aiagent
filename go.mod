@@ -3,9 +3,10 @@ module aiagent
 go 1.23.2
 
 require (
-	github.com/spf13/viper v1.19.0 // Viper for configuration management
-	go.mongodb.org/mongo-driver v1.17.2 // MongoDB driver for data storage
-	go.uber.org/zap v1.27.0 // Structured logging
+	github.com/gorilla/websocket v1.5.3 // Added for WebSocket support
+	github.com/spf13/viper v1.19.0
+	go.mongodb.org/mongo-driver v1.17.2
+	go.uber.org/zap v1.27.0
 )
 
 require (
