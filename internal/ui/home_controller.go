@@ -1,14 +1,15 @@
 /**
  * @description
  * HomeController manages UI-related requests for the AI Workflow Automation Platform within the internal/ui package.
- * It handles rendering pages like home, agent list, agent form, workflows, and task lists with server-side HTML rendering
+ * It handles rendering pages like home, agent list, agent form, workflows, task lists, and chat with server-side HTML rendering
  * using Go's html/template package. It supports full page loads and HTMX-driven partial updates, including agent hierarchy
- * data for the sidebar, workflow initiation, and task monitoring for workflows.
+ * data for the sidebar, workflow initiation, task monitoring, and chat interactions.
  *
  * Key features:
  * - Page Rendering: Renders multiple UI pages with dynamic data.
  * - HTMX Support: Handles both full layout and partial template rendering for HTMX requests.
- * - Workflow UI: Provides workflow initiation forms and task monitoring interfaces, including HTMX form submissions.
+ * - Workflow UI: Provides workflow initiation forms and task monitoring interfaces.
+ * - Chat UI: Renders chat interface and message history for human-agent interaction.
  * - Hierarchy Integration: Fetches and builds agent hierarchy for sidebar display.
  *
  * @dependencies
@@ -16,12 +17,12 @@
  * - net/http: For HTTP request handling.
  * - go.uber.org/zap: For structured logging.
  * - aiagent/internal/domain/entities: For AIAgent and Task entity definitions.
- * - aiagent/internal/domain/services: For AgentService and TaskService interfaces.
+ * - aiagent/internal/domain/services: For AgentService, TaskService, and ChatService interfaces.
  *
  * @notes
  * - Template paths are relative to the project root (./internal/ui/templates/).
  * - Assumes layout.html includes header, sidebar, and content templates dynamically.
- * - Edge cases: Handles missing agents, tasks, or template errors with HTTP 500 and logs.
+ * - Edge cases: Handles missing agents, tasks, conversations, or template errors with HTTP 500 and logs.
  * - Assumption: Static assets (htmx.min.js, styles.css) are served via main.go.
  */
 
@@ -31,8 +32,10 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strings"
 
 	"aiagent/internal/domain/entities"
+	"aiagent/internal/domain/repositories"
 	"aiagent/internal/domain/services"
 
 	"go.uber.org/zap"
@@ -52,6 +55,7 @@ type HomeController struct {
 	tmpl         *template.Template    // Pre-parsed templates for rendering
 	agentService services.AgentService // Service for fetching agent data
 	taskService  services.TaskService  // Service for fetching task data
+	chatService  services.ChatService  // Service for fetching conversation data
 }
 
 // NewHomeController creates a new HomeController instance with pre-parsed templates and services.
@@ -61,10 +65,11 @@ type HomeController struct {
 // - logger: Zap logger for error logging.
 // - agentService: Service interface for agent operations.
 // - taskService: Service interface for task operations.
+// - chatService: Service interface for chat operations.
 //
 // Returns:
 // - *HomeController: Initialized controller instance.
-func NewHomeController(logger *zap.Logger, agentService services.AgentService, taskService services.TaskService) *HomeController {
+func NewHomeController(logger *zap.Logger, agentService services.AgentService, taskService services.TaskService, chatService services.ChatService) *HomeController {
 	tmpl, err := template.ParseFiles(
 		"./internal/ui/templates/layout.html",
 		"./internal/ui/templates/header.html",
@@ -72,7 +77,9 @@ func NewHomeController(logger *zap.Logger, agentService services.AgentService, t
 		"./internal/ui/templates/home.html",
 		"./internal/ui/templates/agent_list.html",
 		"./internal/ui/templates/agent_form.html",
-		"./internal/ui/templates/workflow.html", // Added for workflow UI
+		"./internal/ui/templates/workflow.html",
+		"./internal/ui/templates/chat.html",            // Added for chat UI
+		"./internal/ui/templates/message_history.html", // Added for message history partial
 	)
 	if err != nil {
 		logger.Fatal("Failed to parse templates", zap.Error(err))
@@ -82,6 +89,7 @@ func NewHomeController(logger *zap.Logger, agentService services.AgentService, t
 		tmpl:         tmpl,
 		agentService: agentService,
 		taskService:  taskService,
+		chatService:  chatService,
 	}
 }
 
@@ -343,7 +351,7 @@ func (c *HomeController) WorkflowSubmitHandler(w http.ResponseWriter, r *http.Re
 	// Return HTML for HTMX update
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, `<div id="response-message">Workflow started successfully. Task ID: %s</div>`)
+	fmt.Fprintf(w, `<div id="response-message">Workflow started successfully. Task ID: %s</div>`, task.ID)
 }
 
 // TaskListHandler handles GET requests to /tasks, rendering the task list partial.
@@ -399,6 +407,90 @@ func (c *HomeController) TaskListHandler(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "text/html")
 	if err := c.tmpl.ExecuteTemplate(w, "task_list", taskViews); err != nil {
 		c.logger.Error("Failed to render task_list", zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+// ChatHandler handles GET requests to /chat, rendering the chat page.
+// It fetches active conversations and the agent hierarchy for the sidebar.
+//
+// Parameters:
+// - w: HTTP response writer for sending rendered HTML.
+// - r: HTTP request with context for fetching data.
+//
+// Returns:
+// - None; writes directly to the response writer with HTML or error responses.
+func (c *HomeController) ChatHandler(w http.ResponseWriter, r *http.Request) {
+	// Fetch active conversations
+	conversations, err := c.chatService.ListActiveConversations(r.Context())
+	if err != nil {
+		c.logger.Error("Failed to list active conversations", zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Fetch agents for sidebar hierarchy
+	agents, err := c.agentService.ListAgents(r.Context())
+	if err != nil {
+		c.logger.Error("Failed to list agents", zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	rootAgents := buildHierarchy(agents)
+
+	// Prepare template data
+	data := map[string]interface{}{
+		"Title":           "Chat",
+		"ContentTemplate": "chat_content",
+		"Conversations":   conversations,
+		"RootAgents":      rootAgents,
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	if err := c.tmpl.ExecuteTemplate(w, "layout", data); err != nil {
+		c.logger.Error("Failed to render chat", zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+// ChatConversationHandler handles GET requests to /chat/{id}, rendering the message history partial.
+// It fetches the conversation by ID and renders it for HTMX updates.
+//
+// Parameters:
+// - w: HTTP response writer for sending rendered HTML.
+// - r: HTTP request with path containing conversation ID.
+//
+// Returns:
+// - None; writes directly to the response writer with HTML or error responses.
+func (c *HomeController) ChatConversationHandler(w http.ResponseWriter, r *http.Request) {
+	// Extract conversation ID from URL path
+	id := strings.TrimPrefix(r.URL.Path, "/chat/")
+	if id == "" {
+		http.Error(w, "Conversation ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch conversation
+	conversation, err := c.chatService.GetConversation(r.Context(), id)
+	if err != nil {
+		if err == repositories.ErrNotFound {
+			http.Error(w, "Conversation not found", http.StatusNotFound)
+		} else {
+			c.logger.Error("Failed to get conversation", zap.Error(err))
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Prepare data for template
+	data := map[string]interface{}{
+		"ConversationID": id,
+		"Messages":       conversation.Messages,
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	if err := c.tmpl.ExecuteTemplate(w, "message_history", data); err != nil {
+		c.logger.Error("Failed to render message_history", zap.Error(err))
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }

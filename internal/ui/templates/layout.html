@@ -19,8 +19,10 @@
                 {{template "agent_list_content" .}}
             {{else if eq .ContentTemplate "agent_form_content"}}
                 {{template "agent_form_content" .}}
-            {{else if eq .ContentTemplate "workflow_content"}}  <!-- Add this condition -->
+            {{else if eq .ContentTemplate "workflow_content"}}
                 {{template "workflow_content" .}}
+            {{else if eq .ContentTemplate "chat_content"}}  <!-- Added for chat UI -->
+                {{template "chat_content" .}}
             {{end}}
         </main>
     </div>

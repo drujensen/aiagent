@@ -15,12 +15,12 @@ import (
  * @description
  * This file implements the ChatService for the AI Workflow Automation Platform.
  * It manages conversations for human interaction with AI agents, including message sending,
- * conversation creation, and listing active conversations. The service interacts with the
- * ConversationRepository and TaskRepository to persist and retrieve data, and supports
- * real-time message notifications via listeners for WebSocket integration.
+ * conversation creation, listing active conversations, and retrieving specific conversations.
+ * The service interacts with the ConversationRepository and TaskRepository to persist and retrieve data,
+ * and supports real-time message notifications via listeners for WebSocket integration.
  *
  * Key features:
- * - Conversation Management: Creates and updates conversations tied to tasks.
+ * - Conversation Management: Creates, updates, and retrieves conversations tied to tasks.
  * - Message Handling: Validates and appends messages to conversations with unique IDs.
  * - Active Conversation Listing: Filters conversations based on task status.
  * - Real-time Notifications: Supports message listeners for WebSocket broadcasting.
@@ -70,6 +70,10 @@ type ChatService interface {
 	// ListActiveConversations retrieves conversations awaiting human input.
 	// Filters based on task status (RequiresHumanInteraction=true and Status!=TaskCompleted).
 	ListActiveConversations(ctx context.Context) ([]*entities.Conversation, error)
+
+	// GetConversation retrieves a conversation by its ID.
+	// Returns the conversation or an error if it doesn’t exist or retrieval fails.
+	GetConversation(ctx context.Context, id string) (*entities.Conversation, error)
 
 	// AddMessageListener registers a listener to be notified of new messages.
 	// Used for real-time updates via WebSocket.
@@ -288,4 +292,28 @@ func (s *chatService) ListActiveConversations(ctx context.Context) ([]*entities.
 	}
 
 	return activeConversations, nil
+}
+
+// GetConversation retrieves a specific conversation by its ID.
+// Used by the UI to fetch message history for display.
+//
+// Parameters:
+// - ctx: Context for timeout and cancellation.
+// - id: The ID of the conversation to retrieve.
+//
+// Returns:
+// - *entities.Conversation: The retrieved conversation, or nil if not found.
+// - error: Nil on success, ErrNotFound if conversation doesn’t exist, or another error otherwise.
+func (s *chatService) GetConversation(ctx context.Context, id string) (*entities.Conversation, error) {
+	if id == "" {
+		return nil, fmt.Errorf("conversation ID is required")
+	}
+	conversation, err := s.conversationRepo.GetConversation(ctx, id)
+	if err != nil {
+		if err == repositories.ErrNotFound {
+			return nil, fmt.Errorf("conversation not found: %s", id)
+		}
+		return nil, fmt.Errorf("failed to retrieve conversation: %w", err)
+	}
+	return conversation, nil
 }

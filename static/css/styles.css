@@ -52,3 +52,54 @@
 .task-table th {
     background-color: #f2f2f2;
 }
+
+/* Chat UI Styles */
+.conversation-list ul {
+    list-style: none;
+    padding: 0;
+}
+.conversation-list li {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+.conversation-list li:hover {
+    background-color: #f0f0f0;
+}
+.message-history {
+    height: 400px;
+    overflow-y: scroll;
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin-top: 10px;
+}
+.message {
+    margin-bottom: 10px;
+}
+.user-message {
+    text-align: right;
+    color: #007bff; /* Blue for user messages */
+}
+.agent-message {
+    text-align: left;
+    color: #28a745; /* Green for agent messages */
+}
+.message-input {
+    margin-top: 10px;
+}
+.message-input input {
+    width: 80%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+.message-input button {
+    padding: 8px 16px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.message-input button:hover {
+    background-color: #0056b3;
+}
