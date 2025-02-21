@@ -19,7 +19,7 @@ import (
  * managing CRUD operations for Task entities stored in MongoDB's 'tasks' collection.
  *
  * Key features:
- * - MongoDB Integration: Persists and retrieves Task data with status and hierarchy support.
+ * - MongoDB Integration: Persists and retrieves Task data with status, hierarchy, and message history.
  * - Domain Alignment: Operates on entities.Task and matches the TaskRepository interface.
  *
  * @dependencies
@@ -29,8 +29,8 @@ import (
  *
  * @notes
  * - Status is stored as a string enum (e.g., "pending") per the TaskStatus type.
+ * - Messages field stores task context (tool outputs, AI responses), updated explicitly in UpdateTask.
  * - ParentTaskID links to another Task, assumed valid by the service layer.
- * - RequiresHumanInteraction triggers conversation creation elsewhere.
  */
 
 // MongoTaskRepository is the MongoDB implementation of the TaskRepository interface.
@@ -64,7 +64,6 @@ func NewMongoTaskRepository(collection *mongo.Collection) *MongoTaskRepository {
 func (r *MongoTaskRepository) CreateTask(ctx context.Context, task *entities.Task) error {
 	task.CreatedAt = time.Now()
 	task.UpdatedAt = time.Now()
-	// Ensure ID is empty to let MongoDB generate it
 	task.ID = ""
 
 	result, err := r.collection.InsertOne(ctx, task)
@@ -72,7 +71,6 @@ func (r *MongoTaskRepository) CreateTask(ctx context.Context, task *entities.Tas
 		return err
 	}
 
-	// Set the generated ObjectID as a hex string on the task
 	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
 		task.ID = oid.Hex()
 	} else {
@@ -110,7 +108,7 @@ func (r *MongoTaskRepository) GetTask(ctx context.Context, id string) (*entities
 }
 
 // UpdateTask updates an existing task in the MongoDB collection.
-// It sets UpdatedAt to the current time and updates all fields.
+// It sets UpdatedAt to the current time and updates all fields, including Messages.
 //
 // Parameters:
 // - ctx: Context for timeout and cancellation.
@@ -134,6 +132,7 @@ func (r *MongoTaskRepository) UpdateTask(ctx context.Context, task *entities.Tas
 			"status":                     task.Status,
 			"result":                     task.Result,
 			"requires_human_interaction": task.RequiresHumanInteraction,
+			"messages":                   task.Messages,
 			"updated_at":                 task.UpdatedAt,
 		},
 	}

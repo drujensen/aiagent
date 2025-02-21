@@ -16,12 +16,13 @@ const (
 
 // Task represents a unit of work assigned to an AI agent in the workflow automation platform.
 // It is stored in MongoDB as a document in the 'tasks' collection and tracks the task's
-// description, assignment, status, and human interaction requirements.
+// description, assignment, status, human interaction requirements, and processing history.
 //
 // Key features:
 // - Hierarchical tasks: Supports subtasks via ParentTaskID.
 // - Status tracking: Uses TaskStatus enum for consistent state management.
 // - Human oversight: Allows flagging tasks for human input.
+// - Context history: Stores Messages to preserve tool outputs and AI responses.
 //
 // Relationships:
 // - One-to-one with AIAgent via AssignedTo.
@@ -35,13 +36,14 @@ type Task struct {
 	Status                   TaskStatus `bson:"status"`                     // Current state of the task, required
 	Result                   string     `bson:"result,omitempty"`           // Outcome of the task, optional
 	RequiresHumanInteraction bool       `bson:"requires_human_interaction"` // Flag indicating if human input is needed, defaults to false
+	Messages                 []Message  `bson:"messages"`                   // History of interactions for the task, including tool executions and AI responses
 	CreatedAt                time.Time  `bson:"created_at"`                 // Timestamp of creation, set on insert
 	UpdatedAt                time.Time  `bson:"updated_at"`                 // Timestamp of last update, updated on modification
 }
 
 // Notes:
-// - Status transitions are managed by the TaskService, ensuring valid changes (e.g., pending -> in_progress).
-// - Result is optional and populated only on completion or failure.
-// - Edge cases: Tasks with RequiresHumanInteraction=true must have an associated Conversation.
-// - Assumption: AssignedTo references a valid AIAgent ID, validated in the service layer.
-// - Limitation: No explicit timeout field; timeouts can be implemented in the service layer if needed.
+// - Status transitions are managed by TaskService (e.g., pending -> in_progress -> completed).
+// - Messages is initialized as an empty slice and populated during processing; used for AI context.
+// - Edge cases: Tasks with RequiresHumanInteraction=true require a Conversation, managed externally.
+// - Assumption: AssignedTo references a valid AIAgent, validated in TaskService.
+// - Limitation: No explicit timeout; handled in TaskService via context or future enhancements.
