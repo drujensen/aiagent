@@ -1,32 +1,34 @@
 /**
  * @description
- * This file defines the HomeController for the AI Workflow Automation Platform within the internal/ui package.
- * It handles rendering UI pages, including the home page, agent list, and agent form, with server-side HTML rendering
- * using Go's html/template package. It supports full page loads and HTMX-driven partial updates, now including
- * agent hierarchy data for the sidebar.
+ * HomeController manages UI-related requests for the AI Workflow Automation Platform within the internal/ui package.
+ * It handles rendering pages like home, agent list, agent form, workflows, and task lists with server-side HTML rendering
+ * using Go's html/template package. It supports full page loads and HTMX-driven partial updates, including agent hierarchy
+ * data for the sidebar, workflow initiation, and task monitoring for workflows.
  *
  * Key features:
- * - Page Rendering: Renders home, agent list, and form pages with dynamic data.
- * - HTMX Support: Handles both full layout and partial template rendering.
+ * - Page Rendering: Renders multiple UI pages with dynamic data.
+ * - HTMX Support: Handles both full layout and partial template rendering for HTMX requests.
+ * - Workflow UI: Provides workflow initiation forms and task monitoring interfaces, including HTMX form submissions.
  * - Hierarchy Integration: Fetches and builds agent hierarchy for sidebar display.
  *
  * @dependencies
  * - html/template: For server-side templating.
  * - net/http: For HTTP request handling.
  * - go.uber.org/zap: For structured logging.
- * - aiagent/internal/domain/entities: For AIAgent entity definitions.
- * - aiagent/internal/domain/services: For AgentService interface.
+ * - aiagent/internal/domain/entities: For AIAgent and Task entity definitions.
+ * - aiagent/internal/domain/services: For AgentService and TaskService interfaces.
  *
  * @notes
  * - Template paths are relative to the project root (./internal/ui/templates/).
  * - Assumes layout.html includes header, sidebar, and content templates dynamically.
- * - Edge case: Handles missing agents or template errors with HTTP 500 and logs.
+ * - Edge cases: Handles missing agents, tasks, or template errors with HTTP 500 and logs.
  * - Assumption: Static assets (htmx.min.js, styles.css) are served via main.go.
  */
 
 package ui
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 
@@ -49,18 +51,20 @@ type HomeController struct {
 	logger       *zap.Logger           // Logger for error reporting
 	tmpl         *template.Template    // Pre-parsed templates for rendering
 	agentService services.AgentService // Service for fetching agent data
+	taskService  services.TaskService  // Service for fetching task data
 }
 
-// NewHomeController creates a new HomeController instance with pre-parsed templates and agent service.
+// NewHomeController creates a new HomeController instance with pre-parsed templates and services.
 // It initializes the template set and ensures all dependencies are provided.
 //
 // Parameters:
 // - logger: Zap logger for error logging.
 // - agentService: Service interface for agent operations.
+// - taskService: Service interface for task operations.
 //
 // Returns:
 // - *HomeController: Initialized controller instance.
-func NewHomeController(logger *zap.Logger, agentService services.AgentService) *HomeController {
+func NewHomeController(logger *zap.Logger, agentService services.AgentService, taskService services.TaskService) *HomeController {
 	tmpl, err := template.ParseFiles(
 		"./internal/ui/templates/layout.html",
 		"./internal/ui/templates/header.html",
@@ -68,6 +72,7 @@ func NewHomeController(logger *zap.Logger, agentService services.AgentService) *
 		"./internal/ui/templates/home.html",
 		"./internal/ui/templates/agent_list.html",
 		"./internal/ui/templates/agent_form.html",
+		"./internal/ui/templates/workflow.html", // Added for workflow UI
 	)
 	if err != nil {
 		logger.Fatal("Failed to parse templates", zap.Error(err))
@@ -76,6 +81,7 @@ func NewHomeController(logger *zap.Logger, agentService services.AgentService) *
 		logger:       logger,
 		tmpl:         tmpl,
 		agentService: agentService,
+		taskService:  taskService,
 	}
 }
 
@@ -219,6 +225,180 @@ func (c *HomeController) AgentFormHandler(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", "text/html")
 	if err := c.tmpl.ExecuteTemplate(w, "layout", data); err != nil {
 		c.logger.Error("Failed to render agent_form", zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+// WorkflowHandler handles GET requests to /workflows, rendering the workflow page.
+// It fetches agents for the dropdown and tasks for the initial list, enriching tasks with agent names.
+//
+// Parameters:
+// - w: HTTP response writer for sending rendered HTML.
+// - r: HTTP request with context for fetching data.
+//
+// Returns:
+// - None; writes directly to the response writer with HTML or error responses.
+func (c *HomeController) WorkflowHandler(w http.ResponseWriter, r *http.Request) {
+	// Fetch agents for the dropdown
+	agents, err := c.agentService.ListAgents(r.Context())
+	if err != nil {
+		c.logger.Error("Failed to list agents", zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Fetch tasks for initial display
+	tasks, err := c.taskService.ListTasks(r.Context())
+	if err != nil {
+		c.logger.Error("Failed to list tasks", zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Create agent name map for enrichment
+	agentMap := make(map[string]string)
+	for _, agent := range agents {
+		agentMap[agent.ID] = agent.Name
+	}
+
+	// Prepare task views as a slice of maps for template rendering
+	var taskViews []map[string]interface{}
+	for _, task := range tasks {
+		agentName, ok := agentMap[task.AssignedTo]
+		if !ok {
+			agentName = "Unknown" // Fallback for missing agents
+		}
+		taskViews = append(taskViews, map[string]interface{}{
+			"ID":          task.ID,
+			"Description": task.Description,
+			"AssignedTo":  task.AssignedTo,
+			"AgentName":   agentName,
+			"Status":      string(task.Status),
+			"Result":      task.Result,
+		})
+	}
+
+	// Template data
+	data := map[string]interface{}{
+		"Title":           "Workflows",
+		"ContentTemplate": "workflow_content",
+		"Agents":          agents,
+		"Tasks":           taskViews,
+		"RootAgents":      buildHierarchy(agents),
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	if err := c.tmpl.ExecuteTemplate(w, "layout", data); err != nil {
+		c.logger.Error("Failed to render workflow", zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+// WorkflowSubmitHandler handles POST requests to /workflows (HTMX form submission).
+// It processes the form data, starts a workflow, and returns HTML for HTMX updates.
+//
+// Parameters:
+// - w: HTTP response writer for sending rendered HTML.
+// - r: HTTP request containing method, headers, and form data.
+//
+// Returns:
+// - None; writes directly to the response writer with HTML or error responses.
+func (c *HomeController) WorkflowSubmitHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse form data for HTMX
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	description := r.FormValue("description")
+	assignedTo := r.FormValue("assigned_to")
+
+	// Validate required fields
+	if description == "" || assignedTo == "" {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, `<div id="response-message">Error: description and assigned_to are required</div>`)
+		return
+	}
+
+	// Create and start the task using TaskService
+	task := &entities.Task{
+		Description: description,
+		AssignedTo:  assignedTo,
+		Status:      entities.TaskPending,
+	}
+
+	if err := c.taskService.StartWorkflow(r.Context(), task); err != nil {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `<div id="response-message">Error: %s</div>`, err.Error())
+		return
+	}
+
+	// Return HTML for HTMX update
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, `<div id="response-message">Workflow started successfully. Task ID: %s</div>`)
+}
+
+// TaskListHandler handles GET requests to /tasks, rendering the task list partial.
+// It fetches tasks, enriches with agent names, and renders the "task_list" template for HTMX updates.
+//
+// Parameters:
+// - w: HTTP response writer for sending rendered HTML.
+// - r: HTTP request with context for fetching data.
+//
+// Returns:
+// - None; writes directly to the response writer with HTML or error responses.
+func (c *HomeController) TaskListHandler(w http.ResponseWriter, r *http.Request) {
+	// Fetch all tasks
+	tasks, err := c.taskService.ListTasks(r.Context())
+	if err != nil {
+		c.logger.Error("Failed to list tasks", zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Fetch all agents for name enrichment
+	agents, err := c.agentService.ListAgents(r.Context())
+	if err != nil {
+		c.logger.Error("Failed to list agents", zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Create agent name map
+	agentMap := make(map[string]string)
+	for _, agent := range agents {
+		agentMap[agent.ID] = agent.Name
+	}
+
+	// Prepare task views for template
+	var taskViews []map[string]interface{}
+	for _, task := range tasks {
+		agentName, ok := agentMap[task.AssignedTo]
+		if !ok {
+			agentName = "Unknown" // Fallback for missing agents
+		}
+		taskViews = append(taskViews, map[string]interface{}{
+			"ID":          task.ID,
+			"Description": task.Description,
+			"AssignedTo":  task.AssignedTo,
+			"AgentName":   agentName,
+			"Status":      string(task.Status),
+			"Result":      task.Result,
+		})
+	}
+
+	// Render the task_list partial
+	w.Header().Set("Content-Type", "text/html")
+	if err := c.tmpl.ExecuteTemplate(w, "task_list", taskViews); err != nil {
+		c.logger.Error("Failed to render task_list", zap.Error(err))
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }

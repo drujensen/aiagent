@@ -5,7 +5,7 @@
  * and starts an HTTP server to handle UI and API requests.
  *
  * Key features:
- * - UI Routing: Handles home page and agent-related routes via HomeController.
+ * - UI Routing: Handles home page, agent-related, and workflow-related routes via HomeController.
  * - API Routing: Manages REST and WebSocket endpoints under /api/.
  * - Static File Serving: Serves assets from /static/ (e.g., htmx.min.js, styles.css).
  *
@@ -39,6 +39,20 @@ import (
 
 	"go.uber.org/zap"
 )
+
+// WorkflowHandlerFunc creates a handler function for /workflows that routes based on HTTP method.
+func WorkflowHandlerFunc(homeController *ui.HomeController) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			homeController.WorkflowHandler(w, r)
+		case http.MethodPost:
+			homeController.WorkflowSubmitHandler(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}
+}
 
 func main() {
 	// Initialize zap logger
@@ -87,10 +101,11 @@ func main() {
 		Config:      cfg,
 	}
 	taskController := &controllers.TaskController{
-		TaskService: taskService,
-		Config:      cfg,
+		TaskService:  taskService,
+		AgentService: agentService, // Added for task list enrichment
+		Config:       cfg,
 	}
-	homeController := ui.NewHomeController(logger, agentService)
+	homeController := ui.NewHomeController(logger, agentService, taskService)
 
 	// Set up HTTP handlers
 	// UI routes
@@ -98,13 +113,16 @@ func main() {
 	http.HandleFunc("/agents", homeController.AgentListHandler)
 	http.HandleFunc("/agents/new", homeController.AgentFormHandler)
 	http.HandleFunc("/agents/edit/", homeController.AgentFormHandler)
+	http.HandleFunc("/workflows", WorkflowHandlerFunc(homeController)) // Use custom handler for method routing
+	http.HandleFunc("/tasks", homeController.TaskListHandler)          // GET for task list partial
 
 	// API routes (prefixed with /api/)
 	http.HandleFunc("/api/agents", agentController.AgentsHandler)
 	http.HandleFunc("/api/agents/", agentController.AgentDetailHandler)
 	http.HandleFunc("/api/tools", toolController.ListTools)
-	http.HandleFunc("/api/workflows", taskController.StartWorkflow)
-	http.HandleFunc("/api/tasks/", taskController.TaskDetailHandler)
+	http.HandleFunc("/api/workflows", taskController.StartWorkflow)  // JSON API endpoint
+	http.HandleFunc("/api/tasks", taskController.ListTasks)          // JSON API endpoint
+	http.HandleFunc("/api/tasks/", taskController.TaskDetailHandler) // JSON API endpoint
 	http.HandleFunc("/api/ws/chat", websocket.ChatHandler(hub, chatService, cfg))
 
 	// Serve static files

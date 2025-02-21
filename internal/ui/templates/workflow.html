@@ -1,0 +1,55 @@
+{{define "workflow_content"}}
+<main class="content">
+    <h1>Workflows</h1>
+    <section class="start-workflow">
+        <h2>Start New Workflow</h2>
+        <form hx-post="/workflows" hx-target="#response-message">
+            <div class="form-group">
+                <label for="description">Task Description:</label>
+                <input type="text" id="description" name="description" required>
+            </div>
+            <div class="form-group">
+                <label for="assigned_to">Assign to Agent:</label>
+                <select id="assigned_to" name="assigned_to" required>
+                    {{range .Agents}}
+                    <option value="{{.ID}}">{{.Name}}</option>
+                    {{end}}
+                </select>
+            </div>
+            <button type="submit">Start Workflow</button>
+        </form>
+        <div id="response-message"></div>
+    </section>
+    <section class="task-dashboard">
+        <h2>Task Progress</h2>
+        <div id="task-list" hx-get="/tasks" hx-trigger="every 5s" hx-target="#task-list">
+            {{template "task_list" .Tasks}}
+        </div>
+    </section>
+</main>
+{{end}}
+
+{{define "task_list"}}
+<table class="task-table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Description</th>
+            <th>Assigned To</th>
+            <th>Status</th>
+            <th>Result</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .}}
+        <tr>
+            <td>{{.ID}}</td>
+            <td>{{.Description}}</td>
+            <td>{{.AgentName}} ({{.AssignedTo}})</td>
+            <td>{{.Status}}</td>
+            <td>{{.Result}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{end}}

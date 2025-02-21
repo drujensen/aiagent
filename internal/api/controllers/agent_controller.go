@@ -51,8 +51,8 @@ type AgentController struct {
 // Returns:
 // - None; writes directly to response writer with status codes and JSON.
 func (c *AgentController) AgentsHandler(w http.ResponseWriter, r *http.Request) {
-	// Ensure exact path match for /agents
-	if r.URL.Path != "/agents" {
+	// Ensure exact path match for /api/agents
+	if r.URL.Path != "/api/agents" {
 		http.NotFound(w, r)
 		return
 	}
@@ -79,14 +79,14 @@ func (c *AgentController) AgentsHandler(w http.ResponseWriter, r *http.Request) 
 // Returns:
 // - None; writes directly to response writer with status codes and JSON.
 func (c *AgentController) AgentDetailHandler(w http.ResponseWriter, r *http.Request) {
-	// Ensure path starts with /agents/
-	if !strings.HasPrefix(r.URL.Path, "/agents/") {
+	// Ensure path starts with /api/agents/
+	if !strings.HasPrefix(r.URL.Path, "/api/agents/") {
 		http.NotFound(w, r)
 		return
 	}
 
-	// Extract ID from path (e.g., /agents/123 -> 123)
-	id := strings.TrimPrefix(r.URL.Path, "/agents/")
+	// Extract ID from path (e.g., /api/agents/123 -> 123)
+	id := strings.TrimPrefix(r.URL.Path, "/api/agents/")
 	if id == "" {
 		http.NotFound(w, r)
 		return

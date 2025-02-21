@@ -11,18 +11,6 @@
 {{end}}
 
 {{define "agent_node"}}
-/**
- * @description
- * Recursively renders an agent node and its children in the hierarchy tree.
- *
- * Parameters:
- * - .ID: Agent’s unique identifier for linking.
- * - .Name: Agent’s display name.
- * - .Children: Slice of child AgentNodes for recursion.
- *
- * Returns:
- * - HTML LI element with nested UL for children if present.
- */
 <li>
     <!-- Link to load agent details via HTMX into #main-content -->
     <a href="#" hx-get="/agents/{{.ID}}" hx-target="#main-content">{{.Name}}</a>

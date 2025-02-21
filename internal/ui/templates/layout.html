@@ -19,6 +19,8 @@
                 {{template "agent_list_content" .}}
             {{else if eq .ContentTemplate "agent_form_content"}}
                 {{template "agent_form_content" .}}
+            {{else if eq .ContentTemplate "workflow_content"}}  <!-- Add this condition -->
+                {{template "workflow_content" .}}
             {{end}}
         </main>
     </div>
