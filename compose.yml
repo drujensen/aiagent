@@ -6,6 +6,8 @@ services:
       - "8080:8080"  # Expose port 8080 for the HTTP server
     env_file:
       - .env.docker  # Load environment variables from .env.docker file
+    volumes:
+      - ./workspace:/workspace  # Mount local ./workspace directory to /workspace in the container
 
   mongo:
     container_name: mongo
