@@ -10,25 +10,31 @@ import (
 /**
  * @description
  * ToolService provides business logic for managing tools in the AI Workflow Automation Platform.
- * It acts as an intermediary between the API controllers and the data repository, encapsulating
- * any necessary logic or validation for tool-related operations.
+ * It acts as an intermediary between API controllers, UI controllers, and the data repository,
+ * encapsulating tool-related operations like listing available tools.
  *
  * Key features:
- * - Listing Tools: Retrieves the list of available tools from the repository.
+ * - Listing Tools: Retrieves all tools from the repository for use in API responses and UI displays.
  *
  * @dependencies
  * - aiagent/internal/domain/entities: For the Tool entity definition.
  * - aiagent/internal/domain/repositories: For the ToolRepository interface.
+ * - context: For managing request timeouts and cancellations.
  *
  * @notes
- * - Currently, the service only provides a ListTools method, which directly calls the repository.
- * - Future enhancements could include tool validation, categorization, or custom tool management.
- * - Error handling is minimal, relying on the repository's error responses.
+ * - Currently provides only ListTools; future enhancements could include tool validation or categorization.
+ * - Errors from the repository (e.g., database failures) are propagated to the caller for handling.
+ * - Used by AgentFormHandler in the UI to populate the tools dropdown dynamically.
+ * - Assumes tools are pre-registered via the tool registry (Step 18).
  */
 
 type ToolService interface {
 	// ListTools retrieves all available tools from the repository.
 	// Returns a slice of Tool pointers and an error if the operation fails.
+	//
+	// Returns:
+	// - []*entities.Tool: List of tools, empty if none exist.
+	// - error: Nil on success, or repository-specific error (e.g., database connection lost).
 	ListTools(ctx context.Context) ([]*entities.Tool, error)
 }
 
