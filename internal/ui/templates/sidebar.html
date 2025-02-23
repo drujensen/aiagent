@@ -1,26 +1,12 @@
 {{define "sidebar"}}
 <aside class="sidebar">
-    <h2>Agent Hierarchy</h2>
+    <h2>Agents</h2>
     <ul class="agent-hierarchy">
         {{range .RootAgents}}
-        <!-- Render each root agent using the agent_node template -->
-        {{template "agent_node" .}}
+        <li>
+            <a href="#" hx-get="/agents/edit/{{.ID.Hex}}" hx-target="#main-content">{{.Name}}</a>
+        </li>
         {{end}}
     </ul>
 </aside>
-{{end}}
-
-{{define "agent_node"}}
-<li>
-    <!-- Link to load agent details via HTMX into #main-content -->
-    <a href="#" hx-get="/agents/{{.ID}}" hx-target="#main-content">{{.Name}}</a>
-    {{if .Children}}
-    <ul>
-        {{range .Children}}
-        <!-- Recursively render child nodes -->
-        {{template "agent_node" .}}
-        {{end}}
-    </ul>
-    {{end}}
-</li>
 {{end}}

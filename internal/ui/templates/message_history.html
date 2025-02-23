@@ -1,9 +1,0 @@
-{{define "message_history"}}
-<div class="messages" data-conversation-id="{{.ConversationID}}">
-    {{range .Messages}}
-    <div class="message {{if eq .Sender "user"}}user-message{{else}}agent-message{{end}}">
-        <strong>{{.Sender}} ({{.Timestamp}}):</strong> {{.Content}}
-    </div>
-    {{end}}
-</div>
-{{end}}

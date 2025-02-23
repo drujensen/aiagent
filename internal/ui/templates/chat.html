@@ -6,21 +6,18 @@
         <ul>
             {{range .Conversations}}
             <li>
-                <!-- Use HTMX to fetch message history dynamically when clicked -->
-                <a href="#" hx-get="/chat/{{.ID}}" hx-target="#message-history" hx-swap="innerHTML">
-                    Conversation for Task {{.TaskID}}
+                <a href="#" hx-get="/chat/{{.ID.Hex}}" hx-target="#message-history" hx-swap="innerHTML">
+                    Conversation with Agent {{.AgentID.Hex}}
                 </a>
             </li>
             {{end}}
         </ul>
     </section>
     <section class="message-history" id="message-history">
-        <!-- Initial placeholder; replaced by HTMX with message_history.html -->
         <p>Select a conversation to view messages.</p>
     </section>
     <section class="message-input">
         <form id="message-form">
-            <!-- Hidden input to store selected conversation ID -->
             <input type="hidden" id="conversation-id" value="">
             <input type="text" id="message-input" placeholder="Type your message..." required>
             <button type="submit">Send</button>
@@ -28,21 +25,14 @@
     </section>
 </main>
 <script>
-// Global WebSocket variable to manage connection
 let socket = null;
 let currentConversationId = null;
 
-/**
- * Connects to the WebSocket for the specified conversation ID.
- * Closes existing connection if present before establishing a new one.
- * @param {string} conversationId - The ID of the conversation to connect to.
- */
 function connectWebSocket(conversationId) {
     if (socket) {
         socket.close();
     }
-    // Placeholder API key; replace with secure retrieval in production
-    const apiKey = 'YOUR_LOCAL_API_KEY';
+    const apiKey = 'default-api-key'; // Replace with secure retrieval
     const url = `ws://localhost:8080/api/ws/chat?conversation_id=${conversationId}&api_key=${apiKey}`;
     socket = new WebSocket(url);
 
@@ -60,23 +50,16 @@ function connectWebSocket(conversationId) {
     };
 }
 
-/**
- * Appends a message to the message history DOM.
- * Formats based on sender type (user or agent).
- * @param {Object} message - The message object with sender, content, timestamp.
- */
 function appendMessage(message) {
     const messagesDiv = document.querySelector('.messages');
-    if (!messagesDiv) return; // Exit if no message history div (not yet loaded)
+    if (!messagesDiv) return;
     const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${message.sender === 'user' ? 'user-message' : 'agent-message'}`;
-    messageDiv.innerHTML = `<strong>${message.sender} (${message.timestamp}):</strong> ${message.content}`;
+    messageDiv.className = `message ${message.role === 'user' ? 'user-message' : 'agent-message'}`;
+    messageDiv.innerHTML = `<strong>${message.role} (${message.timestamp}):</strong> ${message.content}`;
     messagesDiv.appendChild(messageDiv);
-    // Scroll to the latest message
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-// Update conversation ID and connect WebSocket when message history is loaded via HTMX
 document.addEventListener('htmx:afterSwap', function(event) {
     if (event.target.id === 'message-history') {
         const messagesDiv = event.target.querySelector('.messages');
@@ -84,13 +67,11 @@ document.addEventListener('htmx:afterSwap', function(event) {
             currentConversationId = messagesDiv.dataset.conversationId;
             document.getElementById('conversation-id').value = currentConversationId;
             connectWebSocket(currentConversationId);
-            // Scroll to the bottom of the message history
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
     }
 });
 
-// Handle form submission to send messages via WebSocket
 document.getElementById('message-form').addEventListener('submit', function(event) {
     event.preventDefault();
     const input = document.getElementById('message-input');
@@ -102,14 +83,13 @@ document.getElementById('message-form').addEventListener('submit', function(even
     const payload = {
         conversation_id: currentConversationId,
         message: {
-            type: 'chat',
+            role: 'user',
             content: message,
-            sender: 'user',
             timestamp: new Date().toISOString()
         }
     };
     socket.send(JSON.stringify(payload));
-    input.value = ''; // Clear input after sending
+    input.value =='';
 });
 </script>
 {{end}}

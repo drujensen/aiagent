@@ -1,11 +1,10 @@
 {{define "agent_list_content"}}
 <main class="content">
     <h1>Agents</h1>
-    <!-- Button to trigger form display via HTMX -->
     <button hx-get="/agents/new" hx-target="#main-content" class="btn btn-primary">Create New Agent</button>
     <ul class="agent-list">
         {{range .Agents}}
-        <li class="agent-item">{{.Name}} - {{.Prompt}}</li>
+        <li class="agent-item">{{.Name}} - {{.SystemPrompt}}</li>
         {{end}}
     </ul>
 </main>

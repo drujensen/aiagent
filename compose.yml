@@ -3,23 +3,23 @@ services:
     container_name: http
     build: .
     ports:
-      - "8080:8080"  # Expose port 8080 for the HTTP server
+      - "8080:8080"
     env_file:
-      - .env.docker  # Load environment variables from .env.docker file
+      - .env
     volumes:
-      - ./workspace:/workspace  # Mount local ./workspace directory to /workspace in the container
+      - ./workspace:/workspace
 
   mongo:
     container_name: mongo
-    image: "mongo:latest"  # Use the latest MongoDB image
+    image: "mongo:latest"
     ports:
-      - "27017:27017"  # Expose MongoDB port for local access
+      - "27017:27017"
     volumes:
-      - mongo_data:/data/db  # Persist MongoDB data in a named volume
+      - mongo_data:/data/db
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin  # Default username for MongoDB
-      MONGO_INITDB_ROOT_PASSWORD: password  # Default password for MongoDB
-      MONGO_INITDB_DATABASE: aiagent  # Database name for the application
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: aiagent
 
 volumes:
-  mongo_data:  # Named volume for MongoDB data persistence
+  mongo_data:

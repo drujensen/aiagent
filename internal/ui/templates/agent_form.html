@@ -1,56 +1,36 @@
 {{define "agent_form_content"}}
 <div class="agent-form">
     <h2>{{if .Agent.ID}}Edit Agent{{else}}Create Agent{{end}}</h2>
-    <form {{if .Agent.ID}}hx-put="/agents/{{.Agent.ID}}"{{else}}hx-post="/agents"{{end}} hx-target="#response-message">
+    <form {{if .Agent.ID}}hx-put="/api/agents/{{.Agent.ID}}"{{else}}hx-post="/api/agents"{{end}} hx-target="#response-message">
         <input type="hidden" name="id" value="{{.Agent.ID}}">
         <div class="form-group">
             <label for="name">Agent Name:</label>
             <input type="text" id="name" name="name" class="form-control" value="{{.Agent.Name}}" required>
         </div>
         <div class="form-group">
-            <label for="prompt">Prompt:</label>
-            <textarea id="prompt" name="prompt" class="form-control" required>{{.Agent.Prompt}}</textarea>
+            <label for="endpoint">Endpoint:</label>
+            <input type="text" id="endpoint" name="endpoint" class="form-control" value="{{.Agent.Endpoint}}" required>
         </div>
         <div class="form-group">
-            <label for="tools">Tools:</label>
-            <select id="tools" name="tools" class="form-control" multiple>
-                {{range .Tools}}
-                <!-- Check if this tool is selected by looking in Agent.Tools -->
-                <option value="{{.ID}}" {{range $.Agent.Tools}}{{if eq . $.ID}}selected{{end}}{{end}}>{{.Name}}</option>
-                {{end}}
-            </select>
+            <label for="model">Model:</label>
+            <input type="text" id="model" name="model" class="form-control" value="{{.Agent.Model}}" required>
         </div>
-        <fieldset class="form-group">
-            <legend>AI Model Settings</legend>
-            <div class="form-group">
-                <label for="provider">Provider:</label>
-                <select id="provider" name="provider" class="form-control">
-                    {{range .Providers}}
-                    <option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>
-                    {{end}}
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="api_key">API Key:</label>
-                <input type="text" id="api_key" name="api_key" class="form-control" value="{{if .Agent.Configuration.api_key}}{{.Agent.Configuration.api_key}}{{end}}">
-                <small class="form-text text-muted">Use #{VAR_NAME}# to reference an environment variable.</small>
-            </div>
-            <div class="form-group">
-                <label for="local_url">Local Model URL (optional):</label>
-                <input type="text" id="local_url" name="local_url" class="form-control" value="{{if .Agent.Configuration.local_url}}{{.Agent.Configuration.local_url}}{{end}}">
-            </div>
-            <div class="form-group">
-                <label for="temperature">Temperature:</label>
-                <input type="number" id="temperature" name="temperature" class="form-control" step="0.1" value="{{if .Agent.Configuration.temperature}}{{.Agent.Configuration.temperature}}{{end}}">
-            </div>
-            <div class="form-group">
-                <label for="thinking_time">Thinking Time (ms):</label>
-                <input type="number" id="thinking_time" name="thinking_time" class="form-control" value="{{if .Agent.Configuration.thinking_time}}{{.Agent.Configuration.thinking_time}}{{end}}">
-            </div>
-        </fieldset>
         <div class="form-group">
-            <label for="human_interaction">Enable Human Interaction:</label>
-            <input type="checkbox" id="human_interaction" name="human_interaction" {{if .Agent.HumanInteractionEnabled}}checked{{end}}>
+            <label for="api_key">API Key:</label>
+            <input type="text" id="api_key" name="api_key" class="form-control" value="{{.Agent.APIKey}}" required>
+            <small class="form-text text-muted">Use #{VAR_NAME}# to reference an environment variable.</small>
+        </div>
+        <div class="form-group">
+            <label for="system_prompt">System Prompt:</label>
+            <textarea id="system_prompt" name="system_prompt" class="form-control" required>{{.Agent.SystemPrompt}}</textarea>
+        </div>
+        <div class="form-group">
+            <label for="temperature">Temperature (optional):</label>
+            <input type="number" id="temperature" name="temperature" class="form-control" step="0.1" value="{{if .Agent.Temperature}}{{.Agent.Temperature}}{{end}}">
+        </div>
+        <div class="form-group">
+            <label for="max_tokens">Max Tokens (optional):</label>
+            <input type="number" id="max_tokens" name="max_tokens" class="form-control" value="{{if .Agent.MaxTokens}}{{.Agent.MaxTokens}}{{end}}">
         </div>
         <button type="submit" class="btn btn-primary">Save Agent</button>
     </form>

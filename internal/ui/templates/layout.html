@@ -12,16 +12,13 @@
     <div class="container">
         {{template "sidebar" .}}
         <main id="main-content">
-            <!-- Conditionally include the content template based on .ContentTemplate -->
             {{if eq .ContentTemplate "home_content"}}
                 {{template "home_content" .}}
             {{else if eq .ContentTemplate "agent_list_content"}}
                 {{template "agent_list_content" .}}
             {{else if eq .ContentTemplate "agent_form_content"}}
                 {{template "agent_form_content" .}}
-            {{else if eq .ContentTemplate "workflow_content"}}
-                {{template "workflow_content" .}}
-            {{else if eq .ContentTemplate "chat_content"}}  <!-- Added for chat UI -->
+            {{else if eq .ContentTemplate "chat_content"}}
                 {{template "chat_content" .}}
             {{end}}
         </main>
