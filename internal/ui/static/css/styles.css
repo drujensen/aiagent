@@ -1,105 +1,147 @@
-.content {
-    padding: 24px;
-    flex: 1;
-}
-.home-content {
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
     font-family: 'Roboto', sans-serif;
+    background-color: #1a1a1a;
+    color: #fff;
 }
 
-.agent-hierarchy ul { margin-left: 20px; }
-.agent-hierarchy li { list-style-type: none; }
+.dark-theme {
+    background-color: #1a1a1a;
+    color: #fff;
+}
 
-.start-workflow, .task-dashboard {
+.header {
+    background-color: #333;
+    padding: 10px;
+    border-bottom: 1px solid #444;
+}
+
+.logo {
+    font-size: 24px;
+    font-weight: bold;
+    color: #fff;
+}
+
+.container {
+    display: flex;
+    height: calc(100vh - 60px);
+}
+
+.sidebar {
+    width: 300px;
+    background-color: #2c2c2c;
+    padding: 20px;
+    border-right: 1px solid #444;
+    overflow-y: auto;
+}
+
+.sidebar h2 {
     margin-top: 20px;
-    padding: 15px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-}
-.form-group {
-    margin-bottom: 15px;
-}
-.form-group label {
-    display: block;
-    margin-bottom: 5px;
-}
-.form-group input, .form-group select {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-.form-group button {
-    padding: 10px 20px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-.form-group button:hover {
-    background-color: #0056b3;
-}
-.task-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-}
-.task-table th, .task-table td {
-    padding: 8px;
-    border: 1px solid #ddd;
-    text-align: left;
-}
-.task-table th {
-    background-color: #f2f2f2;
+    margin-bottom: 10px;
+    font-size: 18px;
+    color: #fff;
+    display: flex;
+    align-items: center;
 }
 
-/* Chat UI Styles */
-.conversation-list ul {
+.sidebar h2 i {
+    margin-right: 8px;
+}
+
+.conversation-list, .agent-list {
     list-style: none;
     padding: 0;
 }
-.conversation-list li {
+
+.conversation-list li, .agent-list li {
     padding: 10px;
-    border-bottom: 1px solid #ddd;
-}
-.conversation-list li:hover {
-    background-color: #f0f0f0;
-}
-.message-history {
-    height: 400px;
-    overflow-y: scroll;
-    border: 1px solid #ddd;
-    padding: 10px;
-    margin-top: 10px;
-}
-.message {
-    margin-bottom: 10px;
-}
-.user-message {
-    text-align: right;
-    color: #007bff; /* Blue for user messages */
-}
-.agent-message {
-    text-align: left;
-    color: #28a745; /* Green for agent messages */
-}
-.message-input {
-    margin-top: 10px;
-}
-.message-input input {
-    width: 80%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-.message-input button {
-    padding: 8px 16px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
+    border-bottom: 1px solid #444;
     cursor: pointer;
 }
+
+.conversation-list li:hover, .agent-list li:hover {
+    background-color: #3c3c3c;
+}
+
+.conversation-list li a, .agent-list li a {
+    color: #fff;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+}
+
+.conversation-list li i, .agent-list li i {
+    margin-right: 8px;
+    color: #007bff;
+}
+
+.content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.message-history {
+    height: 70vh;
+    overflow-y: scroll;
+    background-color: #2c2c2c;
+    border: 1px solid #444;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+}
+
+.message {
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.user-message {
+    background-color: #007bff;
+    color: #fff;
+    text-align: right;
+    margin-left: 20%;
+}
+
+.agent-message {
+    background-color: #444;
+    color: #fff;
+    text-align: left;
+    margin-right: 20%;
+}
+
+.message-input {
+    display: flex;
+    align-items: center;
+}
+
+.message-input textarea {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #444;
+    border-radius: 5px;
+    background-color: #2c2c2c;
+    color: #fff;
+    resize: none;
+}
+
+.message-input button {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-left: 10px;
+}
+
 .message-input button:hover {
     background-color: #0056b3;
+}
+
+.message-input button i {
+    margin-right: 5px;
 }

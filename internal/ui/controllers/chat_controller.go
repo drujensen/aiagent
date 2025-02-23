@@ -1,6 +1,7 @@
 package uicontrollers
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 	"strings"
@@ -55,6 +56,22 @@ func (c *ChatController) ChatHandler(w http.ResponseWriter, r *http.Request) {
 		c.logger.Error("Failed to render chat", zap.Error(err))
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
+}
+
+func (c *ChatController) NewConversationHandler(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/chat/new/")
+	if id == "" {
+		http.Error(w, "Agent ID is required", http.StatusBadRequest)
+		return
+	}
+	conversation, err := c.chatService.CreateConversation(r.Context(), id)
+	if err != nil {
+		c.logger.Error("Failed to create conversation", zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, conversation.ID.Hex())
 }
 
 func (c *ChatController) ChatConversationHandler(w http.ResponseWriter, r *http.Request) {

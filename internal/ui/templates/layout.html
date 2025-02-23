@@ -6,12 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}}</title>
     <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
-<body>
-    {{template "header" .}}
+<body class="dark-theme">
+    <header class="header">
+        <div class="logo">
+            <i class="fas fa-robot"></i> AI Agents
+        </div>
+    </header>
     <div class="container">
         {{template "sidebar" .}}
-        <main id="main-content">
+        <main id="main-content" class="chat-content">
             {{if eq .ContentTemplate "home_content"}}
                 {{template "home_content" .}}
             {{else if eq .ContentTemplate "agent_list_content"}}
@@ -24,6 +29,7 @@
         </main>
     </div>
     <script src="/static/js/htmx.min.js"></script>
+    <script src="/static/js/chat.js"></script>
 </body>
 </html>
 {{end}}
