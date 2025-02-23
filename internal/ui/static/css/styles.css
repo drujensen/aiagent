@@ -46,33 +46,49 @@ body, html {
     align-items: center;
 }
 
-.sidebar h2 i {
-    margin-right: 8px;
+.sidebar h2 {
+    position: relative;
 }
 
-.conversation-list, .agent-list {
+.add-icon-wrapper {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.add-icon {
+    color: #FFFFFF;
+    text-decoration: none;
+}
+
+.add-icon:hover {
+    color: #E6E6E6;
+}
+
+.conversation-list, .agent-list, .tool-list {
     list-style: none;
     padding: 0;
 }
 
-.conversation-list li, .agent-list li {
+.conversation-list li, .agent-list li, .tool-list li {
     padding: 10px;
     border-bottom: 1px solid #444;
     cursor: pointer;
 }
 
-.conversation-list li:hover, .agent-list li:hover {
+.conversation-list li:hover, .agent-list li:hover, .tool-list li:hover {
     background-color: #3c3c3c;
 }
 
-.conversation-list li a, .agent-list li a {
+.conversation-list li a, .agent-list li a, .tool-list li a {
     color: #fff;
     text-decoration: none;
     display: flex;
     align-items: center;
 }
 
-.conversation-list li i, .agent-list li i {
+.conversation-list li i, .agent-list li i, .tool-list li i {
     margin-right: 8px;
     color: #007bff;
 }
@@ -81,6 +97,9 @@ body, html {
     flex: 1;
     padding: 20px;
     overflow-y: auto;
+    display: flex; /* Use flexbox to center the form */
+    justify-content: center; /* Center horizontally */
+    align-items: flex-start; /* Align items at the top with space below */
 }
 
 .message-history {
@@ -144,4 +163,101 @@ body, html {
 
 .message-input button i {
     margin-right: 5px;
+}
+
+/* Existing styles remain, but we’ll add or modify these for the agent form */
+
+/* Form container styling */
+.agent-form {
+    max-width: 500px; /* Limit form width for centering */
+    margin: 40px auto 0; /* Add 40px gap at the top, center horizontally, no bottom margin */
+    padding: 20px;
+    background-color: #2c2c2c; /* Dark background similar to Grok */
+    border-radius: 10px; /* Rounded corners */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
+    color: #fff; /* White text for contrast */
+    width: 100%; /* Ensure it takes full width of the content area if needed */
+}
+
+.agent-form h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #fff; /* Ensure header text is white */
+}
+
+.agent-form form {
+    width: 100%;
+}
+
+/* Form group styling for labels and inputs */
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block; /* Stack labels above inputs */
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #e6e6e6; /* Light gray for contrast */
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #444; /* Dark border for inputs */
+    border-radius: 8px; /* Rounded corners for inputs */
+    background-color: #1a1a1a; /* Darker background for inputs */
+    color: #fff; /* White text in inputs */
+    font-size: 14px;
+    box-sizing: border-box; /* Ensure padding doesn’t affect width */
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #007bff; /* Blue outline on focus for interactivity */
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.3); /* Subtle glow on focus */
+}
+
+/* Textarea styling (for System Prompt) */
+.form-control[textarea] {
+    resize: vertical; /* Allow vertical resizing only */
+    min-height: 100px; /* Minimum height for better usability */
+}
+
+/* Small text for hints (e.g., API Key hint) */
+.form-text {
+    font-size: 12px;
+    color: #999; /* Gray for secondary text */
+    margin-top: 5px;
+}
+
+/* Save button with icon */
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: #007bff; /* Blue button like Grok */
+    color: #fff;
+    border: none;
+    border-radius: 8px; /* Rounded corners */
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 20px;
+    justify-content: center;
+    width: 100%; /* Full width for consistency */
+}
+
+.btn-primary i {
+    margin-right: 8px; /* Space between icon and text */
+}
+
+.btn-primary:hover {
+    background-color: #0056b3; /* Darker blue on hover */
+}
+
+/* Response message area for feedback */
+#response-message {
+    margin-top: 15px;
+    text-align: center;
+    color: #fff;
 }

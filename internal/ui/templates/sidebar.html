@@ -1,24 +1,55 @@
 {{define "sidebar"}}
 <aside class="sidebar">
-    <h2><i class="fas fa-comment"></i> Conversations</h2>
-    <ul class="conversation-list">
-        {{range .Conversations}}
-        <li>
-            <a href="#" hx-get="/chat/{{.ID.Hex}}" hx-target="#message-history" hx-swap="innerHTML">
-                <i class="fas fa-comment-dots"></i> Conversation with Agent {{.AgentID.Hex}}
-            </a>
-        </li>
-        {{end}}
-    </ul>
-    <h2><i class="fas fa-robot"></i> AI Agents</h2>
-    <ul class="agent-list">
-        {{range .RootAgents}}
-        <li>
-            <a href="#" hx-get="/chat/new/{{.ID.Hex}}" hx-target="#message-history" hx-swap="innerHTML">
-                <i class="fas fa-user-robot"></i> {{.Name}}
-            </a>
-        </li>
-        {{end}}
-    </ul>
+   <h2>
+       <i class="fas fa-comment"></i> Conversations
+       <span class="add-icon-wrapper">
+           <a href="/chats/new" class="add-icon">
+               <i class="fas fa-plus"></i>
+           </a>
+       </span>
+   </h2>
+   <ul class="conversation-list">
+       {{range .Conversations}}
+       <li>
+           <a href="#" hx-get="/chat/{{.ID.Hex}}" hx-target="#content" hx-swap="innerHTML">
+               <i class="fas fa-comment-dots"></i> Conversation with Agent {{.AgentID.Hex}}
+           </a>
+       </li>
+       {{end}}
+   </ul>
+   <h2>
+       <i class="fas fa-robot"></i> AI Agents
+       <span class="add-icon-wrapper">
+           <a href="/agents/new" class="add-icon">
+               <i class="fas fa-plus"></i>
+           </a>
+       </span>
+   </h2>
+   <ul class="agent-list">
+       {{range .Agents}}
+       <li>
+           <a href="/agents/edit/{{.ID.Hex}}">
+               <i class="fas fa-user-robot"></i> {{.Name}}
+           </a>
+       </li>
+       {{end}}
+   </ul>
+   <h2>
+       <i class="fas fa-tools"></i> Tools
+       <span class="add-icon-wrapper">
+           <a href="/tools/new" class="add-icon">
+               <i class="fas fa-plus"></i>
+           </a>
+       </span>
+   </h2>
+   <ul class="tool-list">
+       {{range .Tools}}
+       <li>
+           <a href="/tools/edit/{{.ID.Hex}}">
+               <i class="fas fa-wrench"></i> {{.Name}}
+           </a>
+       </li>
+       {{end}}
+   </ul>
 </aside>
 {{end}}

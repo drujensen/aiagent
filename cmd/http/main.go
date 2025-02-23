@@ -64,7 +64,7 @@ func main() {
 		logger.Fatal("Failed to parse templates", zap.Error(err))
 	}
 
-	homeController := uicontrollers.NewHomeController(logger, tmpl)
+	homeController := uicontrollers.NewHomeController(logger, tmpl, chatService, agentService, toolService)
 	agentController := uicontrollers.NewAgentController(logger, tmpl, agentService, toolService)
 	chatController := uicontrollers.NewChatController(logger, tmpl, chatService, agentService)
 
