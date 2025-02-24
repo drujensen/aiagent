@@ -1,8 +1,6 @@
 package controllers
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -10,6 +8,7 @@ import (
 	"aiagent/internal/domain/services"
 	"aiagent/internal/infrastructure/config"
 
+	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -19,161 +18,127 @@ type AgentController struct {
 	Config  *config.Config
 }
 
-func (c *AgentController) AgentsHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/api/agents" {
-		http.NotFound(w, r)
-		return
+func (c *AgentController) AgentsHandler(eCtx echo.Context) error {
+	if !strings.HasPrefix(eCtx.Request().URL.Path, "/api/agents") {
+		return eCtx.NoContent(http.StatusNotFound)
 	}
 
-	switch r.Method {
+	switch eCtx.Request().Method {
 	case http.MethodGet:
-		c.ListAgents(w, r)
+		return c.ListAgents(eCtx)
 	case http.MethodPost:
-		c.CreateAgent(w, r)
+		return c.CreateAgent(eCtx)
 	default:
-		w.Header().Set("Allow", "GET, POST")
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		eCtx.Response().Header().Set("Allow", "GET, POST")
+		return eCtx.String(http.StatusMethodNotAllowed, "Method not allowed")
 	}
 }
 
-func (c *AgentController) AgentDetailHandler(w http.ResponseWriter, r *http.Request) {
-	if !strings.HasPrefix(r.URL.Path, "/api/agents/") {
-		http.NotFound(w, r)
-		return
-	}
-
-	id := strings.TrimPrefix(r.URL.Path, "/api/agents/")
+func (c *AgentController) AgentDetailHandler(eCtx echo.Context) error {
+	id := eCtx.Param("id") // Using Echo's param
 	if id == "" {
-		http.NotFound(w, r)
-		return
+		return eCtx.NoContent(http.StatusNotFound)
 	}
 
-	switch r.Method {
+	switch eCtx.Request().Method {
 	case http.MethodGet:
-		c.GetAgent(w, r, id)
+		return c.GetAgent(eCtx, id)
 	case http.MethodPut:
-		c.UpdateAgent(w, r, id)
+		return c.UpdateAgent(eCtx, id)
 	case http.MethodDelete:
-		c.DeleteAgent(w, r, id)
+		return c.DeleteAgent(eCtx, id)
 	default:
-		w.Header().Set("Allow", "GET, PUT, DELETE")
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		eCtx.Response().Header().Set("Allow", "GET, PUT, DELETE")
+		return eCtx.String(http.StatusMethodNotAllowed, "Method not allowed")
 	}
 }
 
-func (c *AgentController) ListAgents(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("X-API-Key") != c.Config.LocalAPIKey {
-		http.Error(w, `{"error": "Unauthorized"}`, http.StatusUnauthorized)
-		return
+func (c *AgentController) ListAgents(eCtx echo.Context) error {
+	if eCtx.Request().Header.Get("X-API-Key") != c.Config.LocalAPIKey {
+		return eCtx.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 	}
 
-	agents, err := c.Service.ListAgents(r.Context())
+	agents, err := c.Service.ListAgents(eCtx.Request().Context())
 	if err != nil {
-		http.Error(w, `{"error": "failed to list agents"}`, http.StatusInternalServerError)
-		return
+		return eCtx.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to list agents"})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(agents); err != nil {
-		http.Error(w, `{"error": "failed to encode response"}`, http.StatusInternalServerError)
-	}
+	return eCtx.JSON(http.StatusOK, agents)
 }
 
-func (c *AgentController) CreateAgent(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("X-API-Key") != c.Config.LocalAPIKey {
-		http.Error(w, `{"error": "Unauthorized"}`, http.StatusUnauthorized)
-		return
+func (c *AgentController) CreateAgent(eCtx echo.Context) error {
+	if eCtx.Request().Header.Get("X-API-Key") != c.Config.LocalAPIKey {
+		return eCtx.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 	}
 
 	var agent entities.Agent
-	if err := json.NewDecoder(r.Body).Decode(&agent); err != nil {
-		http.Error(w, `{"error": "invalid request body"}`, http.StatusBadRequest)
-		return
+	if err := eCtx.Bind(&agent); err != nil {
+		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 	}
 
-	if err := c.Service.CreateAgent(r.Context(), &agent); err != nil {
-		http.Error(w, fmt.Sprintf(`{"error": "%s"}`, err.Error()), http.StatusBadRequest)
-		return
+	if err := c.Service.CreateAgent(eCtx.Request().Context(), &agent); err != nil {
+		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(agent); err != nil {
-		http.Error(w, `{"error": "failed to encode response"}`, http.StatusInternalServerError)
-	}
+	eCtx.Response().Header().Set("Content-Type", "application/json")
+	eCtx.Response().WriteHeader(http.StatusCreated)
+	return eCtx.JSON(http.StatusCreated, agent)
 }
 
-func (c *AgentController) GetAgent(w http.ResponseWriter, r *http.Request, id string) {
-	if r.Header.Get("X-API-Key") != c.Config.LocalAPIKey {
-		http.Error(w, `{"error": "Unauthorized"}`, http.StatusUnauthorized)
-		return
+func (c *AgentController) GetAgent(eCtx echo.Context, id string) error {
+	if eCtx.Request().Header.Get("X-API-Key") != c.Config.LocalAPIKey {
+		return eCtx.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 	}
 
-	agent, err := c.Service.GetAgent(r.Context(), id)
+	agent, err := c.Service.GetAgent(eCtx.Request().Context(), id)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			http.Error(w, `{"error": "agent not found"}`, http.StatusNotFound)
-		} else {
-			http.Error(w, `{"error": "failed to get agent"}`, http.StatusInternalServerError)
+			return eCtx.JSON(http.StatusNotFound, map[string]string{"error": "agent not found"})
 		}
-		return
+		return eCtx.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get agent"})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(agent); err != nil {
-		http.Error(w, `{"error": "failed to encode response"}`, http.StatusInternalServerError)
-	}
+	return eCtx.JSON(http.StatusOK, agent)
 }
 
-func (c *AgentController) UpdateAgent(w http.ResponseWriter, r *http.Request, id string) {
-	if r.Header.Get("X-API-Key") != c.Config.LocalAPIKey {
-		http.Error(w, `{"error": "Unauthorized"}`, http.StatusUnauthorized)
-		return
+func (c *AgentController) UpdateAgent(eCtx echo.Context, id string) error {
+	if eCtx.Request().Header.Get("X-API-Key") != c.Config.LocalAPIKey {
+		return eCtx.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 	}
 
 	var agent entities.Agent
-	if err := json.NewDecoder(r.Body).Decode(&agent); err != nil {
-		http.Error(w, `{"error": "invalid request body"}`, http.StatusBadRequest)
-		return
+	if err := eCtx.Bind(&agent); err != nil {
+		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 	}
 
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		http.Error(w, `{"error": "invalid agent ID"}`, http.StatusBadRequest)
-		return
+		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid agent ID"})
 	}
 	agent.ID = oid
 
-	if err := c.Service.UpdateAgent(r.Context(), &agent); err != nil {
+	if err := c.Service.UpdateAgent(eCtx.Request().Context(), &agent); err != nil {
 		if err == mongo.ErrNoDocuments {
-			http.Error(w, `{"error": "agent not found"}`, http.StatusNotFound)
-		} else {
-			http.Error(w, fmt.Sprintf(`{"error": "%s"}`, err.Error()), http.StatusBadRequest)
+			return eCtx.JSON(http.StatusNotFound, map[string]string{"error": "agent not found"})
 		}
-		return
+		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(agent); err != nil {
-		http.Error(w, `{"error": "failed to encode response"}`, http.StatusInternalServerError)
-	}
+	return eCtx.JSON(http.StatusOK, agent)
 }
 
-func (c *AgentController) DeleteAgent(w http.ResponseWriter, r *http.Request, id string) {
-	if r.Header.Get("X-API-Key") != c.Config.LocalAPIKey {
-		http.Error(w, `{"error": "Unauthorized"}`, http.StatusUnauthorized)
-		return
+func (c *AgentController) DeleteAgent(eCtx echo.Context, id string) error {
+	if eCtx.Request().Header.Get("X-API-Key") != c.Config.LocalAPIKey {
+		return eCtx.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 	}
 
-	err := c.Service.DeleteAgent(r.Context(), id)
+	err := c.Service.DeleteAgent(eCtx.Request().Context(), id)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			http.Error(w, `{"error": "agent not found"}`, http.StatusNotFound)
-		} else {
-			http.Error(w, fmt.Sprintf(`{"error": "%s"}`, err.Error()), http.StatusBadRequest)
+			return eCtx.JSON(http.StatusNotFound, map[string]string{"error": "agent not found"})
 		}
-		return
+		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	return eCtx.NoContent(http.StatusNoContent)
 }

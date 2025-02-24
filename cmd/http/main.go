@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"html/template"
-	"net/http"
 
 	"aiagent/internal/api/controllers"
 	"aiagent/internal/api/websocket"
@@ -14,6 +13,8 @@ import (
 	"aiagent/internal/infrastructure/repositories"
 	uicontrollers "aiagent/internal/ui/controllers"
 
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
 )
 
@@ -77,22 +78,49 @@ func main() {
 		Config:      cfg,
 	}
 
-	http.HandleFunc("/", homeController.HomeHandler)
-	http.HandleFunc("/agents", agentController.AgentListHandler)
-	http.HandleFunc("/agents/new", agentController.AgentFormHandler)
-	http.HandleFunc("/agents/edit/", agentController.AgentFormHandler)
-	http.HandleFunc("/chat", chatController.ChatHandler)
-	http.HandleFunc("/chat/", chatController.ChatConversationHandler)
+	// Initialize Echo
+	e := echo.New()
 
-	http.HandleFunc("/api/agents", apiAgentController.AgentsHandler)
-	http.HandleFunc("/api/agents/", apiAgentController.AgentDetailHandler)
-	http.HandleFunc("/api/tools", apiToolController.ListTools)
-	http.HandleFunc("/api/ws/chat", websocket.ChatHandler(hub, chatService, cfg))
+	// Middleware
+	e.Use(middleware.Logger())    // Logs requests
+	e.Use(middleware.Recover())   // Recovers from panics
+	e.Use(middleware.RequestID()) // Adds a unique request ID
+	e.Use(middleware.CORS())      // Enables CORS for UI
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			c.Set("logger", logger) // Pass logger to context
+			return next(c)
+		}
+	})
 
-	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("internal/ui/static"))))
+	// Static file serving
+	e.Static("/static", "internal/ui/static")
 
+	// UI Routes
+	e.GET("/", homeController.HomeHandler)
+	e.GET("/agents", agentController.AgentListHandler)
+	e.GET("/agents/new", agentController.AgentFormHandler)
+	e.GET("/agents/edit/:id", agentController.AgentFormHandler)
+	e.GET("/chat", chatController.ChatHandler)
+	e.GET("/chat/:id", chatController.ChatConversationHandler)
+
+	// API Routes
+	e.GET("/api/agents", apiAgentController.AgentsHandler)
+	e.POST("/api/agents", apiAgentController.AgentsHandler)
+	e.GET("/api/agents/:id", apiAgentController.AgentDetailHandler)
+	e.PUT("/api/agents/:id", apiAgentController.AgentDetailHandler)
+	e.DELETE("/api/agents/:id", apiAgentController.AgentDetailHandler)
+	e.GET("/api/tools", apiToolController.ListTools)
+
+	// WebSocket Route
+	e.GET("/api/ws/chat", func(c echo.Context) error {
+		websocket.ChatHandler(hub, chatService, cfg)(c.Response().Writer, c.Request())
+		return nil
+	})
+
+	// Start server
 	logger.Info("Starting HTTP server on :8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	if err := e.Start(":8080"); err != nil {
 		logger.Fatal("Failed to start server", zap.Error(err))
 	}
 }

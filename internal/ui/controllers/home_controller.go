@@ -6,6 +6,7 @@ import (
 
 	"aiagent/internal/domain/services"
 
+	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )
 
@@ -27,26 +28,23 @@ func NewHomeController(logger *zap.Logger, tmpl *template.Template, chatService 
 	}
 }
 
-func (c *HomeController) HomeHandler(w http.ResponseWriter, r *http.Request) {
-	conversations, err := c.chatService.ListActiveConversations(r.Context())
+func (c *HomeController) HomeHandler(eCtx echo.Context) error {
+	conversations, err := c.chatService.ListActiveConversations(eCtx.Request().Context())
 	if err != nil {
 		c.logger.Error("Failed to list active conversations", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		return eCtx.String(http.StatusInternalServerError, "Internal server error")
 	}
 
-	agents, err := c.agentService.ListAgents(r.Context())
+	agents, err := c.agentService.ListAgents(eCtx.Request().Context())
 	if err != nil {
 		c.logger.Error("Failed to list agents", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		return eCtx.String(http.StatusInternalServerError, "Internal server error")
 	}
 
-	tools, err := c.toolService.ListTools(r.Context())
+	tools, err := c.toolService.ListTools(eCtx.Request().Context())
 	if err != nil {
 		c.logger.Error("Failed to list tools", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		return eCtx.String(http.StatusInternalServerError, "Internal server error")
 	}
 
 	data := map[string]interface{}{
@@ -56,9 +54,6 @@ func (c *HomeController) HomeHandler(w http.ResponseWriter, r *http.Request) {
 		"Agents":          agents,
 		"Tools":           tools,
 	}
-	w.Header().Set("Content-Type", "text/html")
-	if err := c.tmpl.ExecuteTemplate(w, "layout", data); err != nil {
-		c.logger.Error("Failed to render template", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+
+	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)
 }

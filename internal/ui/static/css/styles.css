@@ -18,9 +18,22 @@ body, html {
     border-bottom: 1px solid #444;
 }
 
+.header a {
+    color: #fff;
+    text-decoration: none;
+}
+
+.header a:hover {
+    color: #E6E6E6;
+    text-decoration: none;
+}
+
 .logo {
     font-size: 24px;
     font-weight: bold;
+}
+
+.logo a {
     color: #fff;
 }
 
@@ -164,8 +177,6 @@ body, html {
 .message-input button i {
     margin-right: 5px;
 }
-
-/* Existing styles remain, but we’ll add or modify these for the agent form */
 
 /* Form container styling */
 .agent-form {

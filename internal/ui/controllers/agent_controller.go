@@ -8,6 +8,7 @@ import (
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/services"
 
+	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
@@ -28,12 +29,11 @@ func NewAgentController(logger *zap.Logger, tmpl *template.Template, agentServic
 	}
 }
 
-func (c *AgentController) AgentListHandler(w http.ResponseWriter, r *http.Request) {
-	agents, err := c.agentService.ListAgents(r.Context())
+func (c *AgentController) AgentListHandler(eCtx echo.Context) error {
+	agents, err := c.agentService.ListAgents(eCtx.Request().Context())
 	if err != nil {
 		c.logger.Error("Failed to list agents", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		return eCtx.String(http.StatusInternalServerError, "Internal server error")
 	}
 	data := map[string]interface{}{
 		"Title":           "Agents",
@@ -41,46 +41,38 @@ func (c *AgentController) AgentListHandler(w http.ResponseWriter, r *http.Reques
 		"Agents":          agents,
 		"RootAgents":      agents, // Simplified for chat app
 	}
-	w.Header().Set("Content-Type", "text/html")
-	if err := c.tmpl.ExecuteTemplate(w, "layout", data); err != nil {
-		c.logger.Error("Failed to render agent_list", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	eCtx.Response().Header().Set("Content-Type", "text/html")
+	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)
 }
 
-func (c *AgentController) AgentFormHandler(w http.ResponseWriter, r *http.Request) {
-	agents, err := c.agentService.ListAgents(r.Context())
+func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
+	agents, err := c.agentService.ListAgents(eCtx.Request().Context())
 	if err != nil {
 		c.logger.Error("Failed to list agents", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		return eCtx.String(http.StatusInternalServerError, "Internal server error")
 	}
 
-	tools, err := c.toolService.ListTools(r.Context())
+	tools, err := c.toolService.ListTools(eCtx.Request().Context())
 	if err != nil {
 		c.logger.Error("Failed to list tools", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		return eCtx.String(http.StatusInternalServerError, "Internal server error")
 	}
 
 	var agent *entities.Agent
-	path := r.URL.Path
+	path := eCtx.Request().URL.Path
 	isEdit := strings.HasPrefix(path, "/agents/edit/")
 	if isEdit {
-		id := strings.TrimPrefix(path, "/agents/edit/")
+		id := eCtx.Param("id") // Using Echo's param instead of manual path parsing
 		if id == "" {
-			http.Error(w, "Agent ID is required for editing", http.StatusBadRequest)
-			return
+			return eCtx.String(http.StatusBadRequest, "Agent ID is required for editing")
 		}
-		agent, err = c.agentService.GetAgent(r.Context(), id)
+		agent, err = c.agentService.GetAgent(eCtx.Request().Context(), id)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
-				http.Error(w, "Agent not found", http.StatusNotFound)
-			} else {
-				c.logger.Error("Failed to get agent", zap.String("id", id), zap.Error(err))
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return eCtx.String(http.StatusNotFound, "Agent not found")
 			}
-			return
+			c.logger.Error("Failed to get agent", zap.String("id", id), zap.Error(err))
+			return eCtx.String(http.StatusInternalServerError, "Internal server error")
 		}
 	}
 
@@ -113,9 +105,6 @@ func (c *AgentController) AgentFormHandler(w http.ResponseWriter, r *http.Reques
 		"RootAgents":      agents,
 	}
 
-	w.Header().Set("Content-Type", "text/html")
-	if err := c.tmpl.ExecuteTemplate(w, "layout", data); err != nil {
-		c.logger.Error("Failed to render agent_form", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	eCtx.Response().Header().Set("Content-Type", "text/html")
+	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)
 }

@@ -1,11 +1,12 @@
 package controllers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"aiagent/internal/domain/services"
 	"aiagent/internal/infrastructure/config"
+
+	"github.com/labstack/echo/v4"
 )
 
 type ToolController struct {
@@ -13,25 +14,19 @@ type ToolController struct {
 	Config      *config.Config
 }
 
-func (c *ToolController) ListTools(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+func (c *ToolController) ListTools(eCtx echo.Context) error {
+	if eCtx.Request().Method != http.MethodGet {
+		return eCtx.String(http.StatusMethodNotAllowed, "Method not allowed")
 	}
 
-	if r.Header.Get("X-API-Key") != c.Config.LocalAPIKey {
-		http.Error(w, `{"error": "Unauthorized"}`, http.StatusUnauthorized)
-		return
+	if eCtx.Request().Header.Get("X-API-Key") != c.Config.LocalAPIKey {
+		return eCtx.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 	}
 
-	tools, err := c.ToolService.ListTools(r.Context())
+	tools, err := c.ToolService.ListTools(eCtx.Request().Context())
 	if err != nil {
-		http.Error(w, `{"error": "failed to list tools"}`, http.StatusInternalServerError)
-		return
+		return eCtx.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to list tools"})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(tools); err != nil {
-		http.Error(w, `{"error": "failed to encode response"}`, http.StatusInternalServerError)
-	}
+	return eCtx.JSON(http.StatusOK, tools)
 }

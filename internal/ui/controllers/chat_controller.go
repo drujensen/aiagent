@@ -1,15 +1,13 @@
 package uicontrollers
 
 import (
-	"fmt"
 	"html/template"
 	"net/http"
-	"strings"
 
 	"aiagent/internal/domain/services"
 
+	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/mongo"
-
 	"go.uber.org/zap"
 )
 
@@ -29,19 +27,17 @@ func NewChatController(logger *zap.Logger, tmpl *template.Template, chatService 
 	}
 }
 
-func (c *ChatController) ChatHandler(w http.ResponseWriter, r *http.Request) {
-	conversations, err := c.chatService.ListActiveConversations(r.Context())
+func (c *ChatController) ChatHandler(eCtx echo.Context) error {
+	conversations, err := c.chatService.ListActiveConversations(eCtx.Request().Context())
 	if err != nil {
 		c.logger.Error("Failed to list active conversations", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		return eCtx.String(http.StatusInternalServerError, "Internal server error")
 	}
 
-	agents, err := c.agentService.ListAgents(r.Context())
+	agents, err := c.agentService.ListAgents(eCtx.Request().Context())
 	if err != nil {
 		c.logger.Error("Failed to list agents", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		return eCtx.String(http.StatusInternalServerError, "Internal server error")
 	}
 
 	data := map[string]interface{}{
@@ -51,45 +47,23 @@ func (c *ChatController) ChatHandler(w http.ResponseWriter, r *http.Request) {
 		"RootAgents":      agents,
 	}
 
-	w.Header().Set("Content-Type", "text/html")
-	if err := c.tmpl.ExecuteTemplate(w, "layout", data); err != nil {
-		c.logger.Error("Failed to render chat", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	eCtx.Response().Header().Set("Content-Type", "text/html")
+	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)
 }
 
-func (c *ChatController) NewConversationHandler(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/chat/new/")
+func (c *ChatController) ChatConversationHandler(eCtx echo.Context) error {
+	id := eCtx.Param("id") // Using Echo's param instead of manual path parsing
 	if id == "" {
-		http.Error(w, "Agent ID is required", http.StatusBadRequest)
-		return
-	}
-	conversation, err := c.chatService.CreateConversation(r.Context(), id)
-	if err != nil {
-		c.logger.Error("Failed to create conversation", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, conversation.ID.Hex())
-}
-
-func (c *ChatController) ChatConversationHandler(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/chat/")
-	if id == "" {
-		http.Error(w, "Conversation ID is required", http.StatusBadRequest)
-		return
+		return eCtx.String(http.StatusBadRequest, "Conversation ID is required")
 	}
 
-	conversation, err := c.chatService.GetConversation(r.Context(), id)
+	conversation, err := c.chatService.GetConversation(eCtx.Request().Context(), id)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			http.Error(w, "Conversation not found", http.StatusNotFound)
-		} else {
-			c.logger.Error("Failed to get conversation", zap.Error(err))
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return eCtx.String(http.StatusNotFound, "Conversation not found")
 		}
-		return
+		c.logger.Error("Failed to get conversation", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Internal server error")
 	}
 
 	data := map[string]interface{}{
@@ -97,9 +71,6 @@ func (c *ChatController) ChatConversationHandler(w http.ResponseWriter, r *http.
 		"Messages":       conversation.Messages,
 	}
 
-	w.Header().Set("Content-Type", "text/html")
-	if err := c.tmpl.ExecuteTemplate(w, "messages", data); err != nil {
-		c.logger.Error("Failed to render message_history", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	eCtx.Response().Header().Set("Content-Type", "text/html")
+	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "messages", data)
 }
