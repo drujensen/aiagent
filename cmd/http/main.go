@@ -55,6 +55,9 @@ func main() {
 		"internal/ui/templates/layout.html",
 		"internal/ui/templates/header.html",
 		"internal/ui/templates/sidebar.html",
+		"internal/ui/templates/sidebar_conversations.html",
+		"internal/ui/templates/sidebar_agents.html",
+		"internal/ui/templates/sidebar_tools.html",
 		"internal/ui/templates/home.html",
 		"internal/ui/templates/agent_list.html",
 		"internal/ui/templates/agent_form.html",
@@ -103,6 +106,11 @@ func main() {
 	e.GET("/agents/edit/:id", agentController.AgentFormHandler)
 	e.GET("/chat", chatController.ChatHandler)
 	e.GET("/chat/:id", chatController.ChatConversationHandler)
+
+	// New Sidebar Partial Routes
+	e.GET("/sidebar/conversations", homeController.ConversationsPartialHandler)
+	e.GET("/sidebar/agents", homeController.AgentsPartialHandler)
+	e.GET("/sidebar/tools", homeController.ToolsPartialHandler)
 
 	// API Routes
 	e.GET("/api/agents", apiAgentController.AgentsHandler)

@@ -29,31 +29,46 @@ func NewHomeController(logger *zap.Logger, tmpl *template.Template, chatService 
 }
 
 func (c *HomeController) HomeHandler(eCtx echo.Context) error {
-	conversations, err := c.chatService.ListActiveConversations(eCtx.Request().Context())
-	if err != nil {
-		c.logger.Error("Failed to list active conversations", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Internal server error")
-	}
-
-	agents, err := c.agentService.ListAgents(eCtx.Request().Context())
-	if err != nil {
-		c.logger.Error("Failed to list agents", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Internal server error")
-	}
-
-	tools, err := c.toolService.ListTools(eCtx.Request().Context())
-	if err != nil {
-		c.logger.Error("Failed to list tools", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Internal server error")
-	}
-
+	// No longer fetch data here; let HTMX handle it
 	data := map[string]interface{}{
 		"Title":           "AI Chat Application",
 		"ContentTemplate": "home_content",
-		"Conversations":   conversations,
-		"Agents":          agents,
-		"Tools":           tools,
 	}
-
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)
+}
+
+func (c *HomeController) ConversationsPartialHandler(eCtx echo.Context) error {
+	conversations, err := c.chatService.ListActiveConversations(eCtx.Request().Context())
+	if err != nil {
+		c.logger.Error("Failed to list active conversations", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to load conversations")
+	}
+	data := map[string]interface{}{
+		"Conversations": conversations,
+	}
+	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_conversations", data)
+}
+
+func (c *HomeController) AgentsPartialHandler(eCtx echo.Context) error {
+	agents, err := c.agentService.ListAgents(eCtx.Request().Context())
+	if err != nil {
+		c.logger.Error("Failed to list agents", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to load agents")
+	}
+	data := map[string]interface{}{
+		"Agents": agents,
+	}
+	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_agents", data)
+}
+
+func (c *HomeController) ToolsPartialHandler(eCtx echo.Context) error {
+	tools, err := c.toolService.ListTools(eCtx.Request().Context())
+	if err != nil {
+		c.logger.Error("Failed to list tools", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to load tools")
+	}
+	data := map[string]interface{}{
+		"Tools": tools,
+	}
+	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_tools", data)
 }

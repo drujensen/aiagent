@@ -1,0 +1,19 @@
+{{define "sidebar_conversations"}}
+<h2>
+    <i class="fas fa-comment"></i> Conversations
+    <span class="add-icon-wrapper">
+        <a href="/chat" class="add-icon">
+            <i class="fas fa-plus"></i>
+        </a>
+    </span>
+</h2>
+<ul class="conversation-list">
+    {{range .Conversations}}
+    <li>
+        <a href="#" hx-get="/chat/{{.ID.Hex}}" hx-target="#message-history" hx-swap="innerHTML">
+            <i class="fas fa-comment-dots"></i> Conversation with Agent {{.AgentID.Hex}}
+        </a>
+    </li>
+    {{end}}
+</ul>
+{{end}}
