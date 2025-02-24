@@ -76,6 +76,7 @@ func (r *MongoAgentRepository) UpdateAgent(ctx context.Context, agent *entities.
 			"system_prompt": agent.SystemPrompt,
 			"temperature":   agent.Temperature,
 			"max_tokens":    agent.MaxTokens,
+			"tools":         agent.Tools,
 			"updated_at":    agent.UpdatedAt,
 		},
 	}

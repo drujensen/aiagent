@@ -32,9 +32,11 @@ var predefinedTools = []struct {
 }
 
 var toolInstancesByID map[string]interfaces.ToolIntegration
+var toolInstancesByName map[string]interfaces.ToolIntegration
 
 func InitializeTools(ctx context.Context, repo interfaces.ToolRepository, workspace string) error {
 	toolInstancesByID = make(map[string]interfaces.ToolIntegration)
+	toolInstancesByName = make(map[string]interfaces.ToolIntegration)
 
 	for _, pt := range predefinedTools {
 		existingTools, err := repo.ListTools(ctx)
@@ -64,6 +66,7 @@ func InitializeTools(ctx context.Context, repo interfaces.ToolRepository, worksp
 
 		toolInstance := pt.factory(workspace)
 		toolInstancesByID[toolEntity.ID.Hex()] = toolInstance
+		toolInstancesByName[toolEntity.Name] = toolInstance
 	}
 
 	return nil
@@ -71,4 +74,8 @@ func InitializeTools(ctx context.Context, repo interfaces.ToolRepository, worksp
 
 func GetToolByID(id string) interfaces.ToolIntegration {
 	return toolInstancesByID[id]
+}
+
+func GetToolByName(name string) interfaces.ToolIntegration {
+	return toolInstancesByName[name]
 }

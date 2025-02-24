@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"html/template"
+	"net/http"
 
 	"aiagent/internal/api/controllers"
 	"aiagent/internal/api/websocket"
@@ -51,7 +52,20 @@ func main() {
 
 	chatService.AddMessageListener(hub.MessageListener)
 
-	tmpl, err := template.ParseFiles(
+	// Define custom template functions
+	funcMap := template.FuncMap{
+		"inArray": func(value string, array []string) bool {
+			for _, item := range array {
+				if item == value {
+					return true
+				}
+			}
+			return false
+		},
+	}
+
+	// Parse templates with custom function map
+	tmpl, err := template.New("").Funcs(funcMap).ParseFiles(
 		"internal/ui/templates/layout.html",
 		"internal/ui/templates/header.html",
 		"internal/ui/templates/sidebar.html",
@@ -85,13 +99,13 @@ func main() {
 	e := echo.New()
 
 	// Middleware
-	e.Use(middleware.Logger())    // Logs requests
-	e.Use(middleware.Recover())   // Recovers from panics
-	e.Use(middleware.RequestID()) // Adds a unique request ID
-	e.Use(middleware.CORS())      // Enables CORS for UI
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
+	e.Use(middleware.RequestID())
+	e.Use(middleware.CORS())
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			c.Set("logger", logger) // Pass logger to context
+			c.Set("logger", logger)
 			return next(c)
 		}
 	})
@@ -103,11 +117,13 @@ func main() {
 	e.GET("/", homeController.HomeHandler)
 	e.GET("/agents", agentController.AgentListHandler)
 	e.GET("/agents/new", agentController.AgentFormHandler)
+	e.POST("/agents/new", agentController.CreateAgentHandler)
 	e.GET("/agents/edit/:id", agentController.AgentFormHandler)
+	e.PUT("/agents/edit/:id", agentController.UpdateAgentHandler)
 	e.GET("/chat", chatController.ChatHandler)
 	e.GET("/chat/:id", chatController.ChatConversationHandler)
 
-	// New Sidebar Partial Routes
+	// Sidebar Partial Routes
 	e.GET("/sidebar/conversations", homeController.ConversationsPartialHandler)
 	e.GET("/sidebar/agents", homeController.AgentsPartialHandler)
 	e.GET("/sidebar/tools", homeController.ToolsPartialHandler)
@@ -119,6 +135,22 @@ func main() {
 	e.PUT("/api/agents/:id", apiAgentController.AgentDetailHandler)
 	e.DELETE("/api/agents/:id", apiAgentController.AgentDetailHandler)
 	e.GET("/api/tools", apiToolController.ListTools)
+	e.POST("/api/conversations", func(c echo.Context) error {
+		if c.Request().Header.Get("X-API-Key") != cfg.LocalAPIKey {
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		}
+		var req struct {
+			AgentID string `json:"agent_id"`
+		}
+		if err := c.Bind(&req); err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		}
+		conversation, err := chatService.CreateConversation(c.Request().Context(), req.AgentID)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
+		return c.JSON(http.StatusCreated, map[string]string{"id": conversation.ID.Hex()})
+	})
 
 	// WebSocket Route
 	e.GET("/api/ws/chat", func(c echo.Context) error {

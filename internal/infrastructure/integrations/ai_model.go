@@ -38,76 +38,161 @@ func NewGenericAIModel(baseURL, apiKey, modelName string) (*GenericAIModel, erro
 	}, nil
 }
 
+type ToolCall struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	Function struct {
+		Name      string `json:"name"`
+		Arguments string `json:"arguments"`
+	} `json:"function"`
+}
+
 func (m *GenericAIModel) GenerateResponse(messages []map[string]string, options map[string]interface{}) (string, error) {
+	// Prepare tool definitions
+	var tools []map[string]interface{}
+	if toolList, ok := options["tools"].([]map[string]string); ok && len(toolList) > 0 {
+		tools = make([]map[string]interface{}, len(toolList))
+		for i, tool := range toolList {
+			tools[i] = map[string]interface{}{
+				"type": "function",
+				"function": map[string]interface{}{
+					"name":        tool["name"],
+					"description": fmt.Sprintf("Execute the %s tool", tool["name"]),
+					"parameters": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"input": map[string]interface{}{
+								"type":        "string",
+								"description": "Input for the tool",
+							},
+						},
+						"required": []string{"input"},
+					},
+				},
+			}
+		}
+	}
+
 	reqBody := map[string]interface{}{
 		"model":    m.modelName,
 		"messages": messages,
 	}
+	if len(tools) > 0 {
+		reqBody["tools"] = tools
+	}
 	for key, value := range options {
-		reqBody[key] = value
+		if key != "tools" {
+			reqBody[key] = value
+		}
 	}
 
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("error marshaling request: %v", err)
-	}
-
-	req, err := http.NewRequest("POST", m.baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("error creating request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+m.apiKey)
-
-	var resp *http.Response
-	for attempt := 0; attempt < 3; attempt++ {
-		resp, err = m.httpClient.Do(req)
+	var finalResponse string
+	for {
+		jsonBody, err := json.Marshal(reqBody)
 		if err != nil {
-			if attempt < 2 {
-				time.Sleep(time.Duration(attempt+1) * time.Second)
+			return "", fmt.Errorf("error marshaling request: %v", err)
+		}
+
+		req, err := http.NewRequest("POST", m.baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonBody))
+		if err != nil {
+			return "", fmt.Errorf("error creating request: %v", err)
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+m.apiKey)
+
+		var resp *http.Response
+		for attempt := 0; attempt < 3; attempt++ {
+			resp, err = m.httpClient.Do(req)
+			if err != nil {
+				if attempt < 2 {
+					time.Sleep(time.Duration(attempt+1) * time.Second)
+					continue
+				}
+				return "", fmt.Errorf("error making request: %v", err)
+			}
+			if resp.StatusCode == http.StatusTooManyRequests {
+				if attempt < 2 {
+					time.Sleep(time.Duration(attempt+1) * time.Second)
+					continue
+				}
+				return "", fmt.Errorf("rate limit exceeded")
+			}
+			if resp.StatusCode != http.StatusOK {
+				body, _ := io.ReadAll(resp.Body)
+				return "", fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+			}
+			break
+		}
+		defer resp.Body.Close()
+
+		var responseBody struct {
+			Choices []struct {
+				Message struct {
+					Content   string     `json:"content"`
+					ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+				} `json:"message"`
+			} `json:"choices"`
+			Usage struct {
+				TotalTokens int `json:"total_tokens"`
+			} `json:"usage"`
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&responseBody); err != nil {
+			return "", fmt.Errorf("error decoding response: %v", err)
+		}
+		if len(responseBody.Choices) == 0 {
+			return "", fmt.Errorf("no choices in response")
+		}
+
+		m.lastUsage = responseBody.Usage.TotalTokens
+		choice := responseBody.Choices[0].Message
+
+		if len(choice.ToolCalls) == 0 {
+			// No tool calls, return the content
+			finalResponse = choice.Content
+			break
+		}
+
+		// Handle tool calls
+		for _, toolCall := range choice.ToolCalls {
+			if toolCall.Type != "function" {
 				continue
 			}
-			return "", fmt.Errorf("error making request: %v", err)
-		}
-
-		if resp.StatusCode == http.StatusTooManyRequests {
-			if attempt < 2 {
-				time.Sleep(time.Duration(attempt+1) * time.Second)
-				continue
+			toolName := toolCall.Function.Name
+			var args struct {
+				Input string `json:"input"`
 			}
-			return "", fmt.Errorf("rate limit exceeded")
+			if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
+				return "", fmt.Errorf("error parsing tool arguments: %v", err)
+			}
+
+			tool := GetToolByName(toolName)
+			var toolResult string
+			if tool != nil {
+				result, err := tool.Execute(args.Input)
+				if err != nil {
+					toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
+				} else {
+					toolResult = result
+				}
+			} else {
+				toolResult = fmt.Sprintf("Tool %s not found", toolName)
+			}
+
+			// Append tool response message
+			messages = append(messages, map[string]string{
+				"role":         "tool",
+				"content":      toolResult,
+				"tool_call_id": toolCall.ID,
+			})
 		}
 
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(resp.Body)
-			return "", fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
-		}
-		break
-	}
-	defer resp.Body.Close()
-
-	var responseBody struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-		Usage struct {
-			TotalTokens int `json:"total_tokens"`
-		} `json:"usage"`
+		// Prepare for next iteration
+		reqBody["messages"] = messages
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&responseBody); err != nil {
-		return "", fmt.Errorf("error decoding response: %v", err)
-	}
-
-	if len(responseBody.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
-	}
-
-	m.lastUsage = responseBody.Usage.TotalTokens
-	return responseBody.Choices[0].Message.Content, nil
+	return finalResponse, nil
 }
 
 func (m *GenericAIModel) GetTokenUsage() (int, error) {

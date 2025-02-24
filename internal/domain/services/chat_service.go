@@ -88,9 +88,26 @@ func (s *chatService) SendMessage(ctx context.Context, conversationID string, me
 				"role":    msg.Role,
 				"content": msg.Content,
 			}
+			if msg.Role == "tool" {
+				messages[i]["tool_call_id"] = msg.ID // Assuming ID is used as tool_call_id
+			}
 		}
 
+		// Add available tools to options if any
 		options := map[string]interface{}{}
+		if len(agent.Tools) > 0 {
+			toolList := make([]map[string]string, 0, len(agent.Tools))
+			for _, toolID := range agent.Tools {
+				tool := integrations.GetToolByID(toolID.Hex())
+				if tool != nil {
+					toolList = append(toolList, map[string]string{
+						"name": tool.Name(),
+					})
+				}
+			}
+			options["tools"] = toolList
+		}
+
 		if agent.Temperature != nil {
 			options["temperature"] = *agent.Temperature
 		} else {

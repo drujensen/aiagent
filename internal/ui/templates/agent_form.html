@@ -1,7 +1,10 @@
 {{define "agent_form_content"}}
 <div class="agent-form">
     <h2>{{if .Agent.ID}}Edit Agent{{else}}Create Agent{{end}}</h2>
-    <form {{if .Agent.ID}}hx-put="/api/agents/{{.Agent.ID}}"{{else}}hx-post="/api/agents"{{end}} hx-target="#response-message">
+    <form 
+        {{if .Agent.ID}}hx-put="/agents/edit/{{.Agent.ID}}"{{else}}hx-post="/agents/new"{{end}} 
+        hx-target="#response-message" 
+        hx-swap="innerHTML">
         <input type="hidden" name="id" value="{{.Agent.ID}}">
         <div class="form-group">
             <label for="name">Agent Name:</label>
@@ -31,6 +34,15 @@
         <div class="form-group">
             <label for="max_tokens">Max Tokens (optional):</label>
             <input type="number" id="max_tokens" name="max_tokens" class="form-control" value="{{if .Agent.MaxTokens}}{{.Agent.MaxTokens}}{{end}}">
+        </div>
+        <div class="form-group">
+            <label for="tools">Tools (optional):</label>
+            <select multiple id="tools" name="tools" class="form-control">
+                {{range .Tools}}
+                <option value="{{.ID.Hex}}" {{if (inArray .ID.Hex $.Agent.Tools)}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+            </select>
+            <small class="form-text">Hold Ctrl/Cmd to select multiple tools</small>
         </div>
         <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Save Agent</button>
     </form>

@@ -35,7 +35,7 @@ func (c *AgentController) AgentsHandler(eCtx echo.Context) error {
 }
 
 func (c *AgentController) AgentDetailHandler(eCtx echo.Context) error {
-	id := eCtx.Param("id") // Using Echo's param
+	id := eCtx.Param("id")
 	if id == "" {
 		return eCtx.NoContent(http.StatusNotFound)
 	}
@@ -74,6 +74,17 @@ func (c *AgentController) CreateAgent(eCtx echo.Context) error {
 	var agent entities.Agent
 	if err := eCtx.Bind(&agent); err != nil {
 		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+	}
+
+	// Convert tool IDs from strings to ObjectIDs
+	if len(agent.Tools) > 0 {
+		toolIDs := make([]primitive.ObjectID, 0, len(agent.Tools))
+		for _, toolID := range agent.Tools {
+			if oid, err := primitive.ObjectIDFromHex(toolID.Hex()); err == nil {
+				toolIDs = append(toolIDs, oid)
+			}
+		}
+		agent.Tools = toolIDs
 	}
 
 	if err := c.Service.CreateAgent(eCtx.Request().Context(), &agent); err != nil {
@@ -116,6 +127,17 @@ func (c *AgentController) UpdateAgent(eCtx echo.Context, id string) error {
 		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid agent ID"})
 	}
 	agent.ID = oid
+
+	// Convert tool IDs from strings to ObjectIDs
+	if len(agent.Tools) > 0 {
+		toolIDs := make([]primitive.ObjectID, 0, len(agent.Tools))
+		for _, toolID := range agent.Tools {
+			if oid, err := primitive.ObjectIDFromHex(toolID.Hex()); err == nil {
+				toolIDs = append(toolIDs, oid)
+			}
+		}
+		agent.Tools = toolIDs
+	}
 
 	if err := c.Service.UpdateAgent(eCtx.Request().Context(), &agent); err != nil {
 		if err == mongo.ErrNoDocuments {

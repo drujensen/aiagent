@@ -1,7 +1,7 @@
 {{define "messages"}}
 <div class="messages" data-conversation-id="{{.ConversationID}}">
     {{range .Messages}}
-    <div class="message {{if eq .Role "user"}}user-message{{else}}agent-message{{end}}">
+    <div class="message {{if eq .Role "user"}}user-message{{else if eq .Role "assistant"}}agent-message{{else}}tool-message{{end}}">
         <strong>{{.Role}} ({{.Timestamp}}):</strong> {{.Content}}
     </div>
     {{end}}
