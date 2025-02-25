@@ -3,7 +3,7 @@
    <h2>
        <i class="fas fa-comment"></i> Conversations
        <span class="add-icon-wrapper">
-           <a href="/chats/new" class="add-icon">
+           <a href="/chat" class="add-icon">
                <i class="fas fa-plus"></i>
            </a>
        </span>
@@ -12,7 +12,7 @@
        {{range .Conversations}}
        <li>
            <a href="#" hx-get="/chat/{{.ID.Hex}}" hx-target="#content" hx-swap="innerHTML">
-               <i class="fas fa-comment-dots"></i> Conversation with Agent {{.AgentID.Hex}}
+               <i class="fas fa-comment-dots"></i> {{.Name}} (with Agent {{.AgentID.Hex}})
            </a>
        </li>
        {{end}}

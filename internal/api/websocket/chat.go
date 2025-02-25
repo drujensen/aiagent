@@ -85,12 +85,6 @@ func (h *ChatHub) MessageListener(conversationID string, message entities.Messag
 
 func ChatHandler(hub *ChatHub, chatService services.ChatService, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		apiKey := r.URL.Query().Get("api_key")
-		if apiKey != cfg.LocalAPIKey {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-
 		conversationID := r.URL.Query().Get("conversation_id")
 		if conversationID == "" {
 			http.Error(w, "Missing conversation_id", http.StatusBadRequest)

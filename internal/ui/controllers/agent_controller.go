@@ -39,23 +39,6 @@ func NewAgentController(logger *zap.Logger, tmpl *template.Template, agentServic
 	}
 }
 
-func (c *AgentController) AgentListHandler(eCtx echo.Context) error {
-	agents, err := c.agentService.ListAgents(eCtx.Request().Context())
-	if err != nil {
-		c.logger.Error("Failed to list agents", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Internal server error")
-	}
-	data := map[string]interface{}{
-		"Title":           "Agents",
-		"ContentTemplate": "agent_list_content",
-		"Agents":          agents,
-		"RootAgents":      agents,
-		"APIKey":          c.config.LocalAPIKey,
-	}
-	eCtx.Response().Header().Set("Content-Type", "text/html")
-	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)
-}
-
 func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 	agents, err := c.agentService.ListAgents(eCtx.Request().Context())
 	if err != nil {
@@ -119,7 +102,7 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 		"ContentTemplate": "agent_form_content",
 		"Agent":           agentData,
 		"Tools":           tools,
-		"RootAgents":      agents,
+		"Agents":          agents,
 		"APIKey":          c.config.LocalAPIKey,
 	}
 

@@ -37,12 +37,12 @@
        <main id="main-content" class="content">
            {{if eq .ContentTemplate "home_content"}}
                {{template "home_content" .}}
-           {{else if eq .ContentTemplate "agent_list_content"}}
-               {{template "agent_list_content" .}}
            {{else if eq .ContentTemplate "agent_form_content"}}
                {{template "agent_form_content" .}}
            {{else if eq .ContentTemplate "chat_content"}}
                {{template "chat_content" .}}
+           {{else if eq .ContentTemplate "chat_form_content"}}
+               {{template "chat_form_content" .}}
            {{end}}
        </main>
    </div>

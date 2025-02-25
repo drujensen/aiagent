@@ -109,15 +109,16 @@ body, html {
 .content {
     flex: 1;
     padding: 20px;
-    overflow-y: auto;
     display: flex;
-    justify-content: center;
+    justify-content: center; /* Center the form horizontally */
+    flex-direction: column; /* Change to column direction */
     align-items: flex-start;
+    background-color: #1a1a1a; /* Ensure the background matches the dark theme */
 }
 
 .message-history {
     height: 70vh;
-    overflow-y: scroll;
+    width: 100%;
     background-color: #2c2c2c;
     border: 1px solid #444;
     padding: 10px;
@@ -146,12 +147,15 @@ body, html {
 }
 
 .message-input {
+    width: 70vw;
     display: flex;
     align-items: center;
+    margin-top: 10px;
 }
 
 .message-input textarea {
     flex: 1;
+    width: 60vw;
     padding: 10px;
     border: 1px solid #444;
     border-radius: 5px;
@@ -265,6 +269,56 @@ body, html {
     margin-top: 15px;
     text-align: center;
     color: #fff;
+}
+
+/* New Conversation Form Styling */
+#conversation-starter {
+    width: 400px; /* Fixed width to match the image */
+    padding: 20px;
+    background-color: #2c2c2c;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    color: #fff;
+    overflow: hidden; /* Ensure no overflow or scrollbar */
+    border: none; /* Remove any border that might cause the white strip */
+    margin: 0 auto; /* Center the form */
+    outline: none; /* Remove any outline */
+}
+
+#conversation-starter h3 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #fff;
+}
+
+#conversation-starter .form-group {
+    margin-bottom: 15px;
+}
+
+#conversation-starter .form-control {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #444;
+    border-radius: 8px;
+    background-color: #1a1a1a;
+    color: #fff;
+    font-size: 14px;
+    box-sizing: border-box;
+    overflow: hidden; /* Prevent overflow within inputs */
+    white-space: nowrap; /* Prevent text wrapping that could cause overflow */
+    outline: none; /* Remove any outline that might cause the white strip */
+}
+
+#conversation-starter .form-control:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+}
+
+#conversation-starter .btn-primary {
+    display: block;
+    width: 100%;
+    margin-top: 20px;
 }
 
 /* Spinner for loading states */

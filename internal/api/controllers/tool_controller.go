@@ -1,4 +1,4 @@
-package controllers
+package apicontrollers
 
 import (
 	"net/http"
@@ -12,6 +12,13 @@ import (
 type ToolController struct {
 	ToolService services.ToolService
 	Config      *config.Config
+}
+
+func NewToolController(toolService services.ToolService, cfg *config.Config) *ToolController {
+	return &ToolController{
+		ToolService: toolService,
+		Config:      cfg,
+	}
 }
 
 func (c *ToolController) ListTools(eCtx echo.Context) error {

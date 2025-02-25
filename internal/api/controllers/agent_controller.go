@@ -1,4 +1,4 @@
-package controllers
+package apicontrollers
 
 import (
 	"net/http"
@@ -16,6 +16,13 @@ import (
 type AgentController struct {
 	Service services.AgentService
 	Config  *config.Config
+}
+
+func NewAgentController(agentService services.AgentService, cfg *config.Config) *AgentController {
+	return &AgentController{
+		Service: agentService,
+		Config:  cfg,
+	}
 }
 
 func (c *AgentController) AgentsHandler(eCtx echo.Context) error {

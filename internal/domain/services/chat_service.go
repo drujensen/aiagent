@@ -19,7 +19,7 @@ type MessageListener func(conversationID string, message entities.Message)
 
 type ChatService interface {
 	SendMessage(ctx context.Context, conversationID string, message entities.Message) error
-	CreateConversation(ctx context.Context, agentID string) (*entities.Conversation, error)
+	CreateConversation(ctx context.Context, agentID, name string) (*entities.Conversation, error) // Updated to accept name
 	ListActiveConversations(ctx context.Context) ([]*entities.Conversation, error)
 	GetConversation(ctx context.Context, id string) (*entities.Conversation, error)
 	AddMessageListener(listener MessageListener)
@@ -152,7 +152,7 @@ func (s *chatService) SendMessage(ctx context.Context, conversationID string, me
 	return nil
 }
 
-func (s *chatService) CreateConversation(ctx context.Context, agentID string) (*entities.Conversation, error) {
+func (s *chatService) CreateConversation(ctx context.Context, agentID, name string) (*entities.Conversation, error) {
 	if agentID == "" {
 		return nil, fmt.Errorf("agent ID is required")
 	}
@@ -162,7 +162,7 @@ func (s *chatService) CreateConversation(ctx context.Context, agentID string) (*
 		return nil, fmt.Errorf("invalid agent ID: %v", err)
 	}
 
-	conversation := entities.NewConversation(agentObjID)
+	conversation := entities.NewConversation(agentObjID, name) // Use new constructor with name
 	if err := s.conversationRepo.CreateConversation(ctx, conversation); err != nil {
 		return nil, fmt.Errorf("failed to create conversation: %v", err)
 	}

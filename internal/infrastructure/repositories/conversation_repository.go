@@ -70,6 +70,7 @@ func (r *MongoConversationRepository) UpdateConversation(ctx context.Context, co
 	update := bson.M{
 		"$set": bson.M{
 			"agent_id":   conversation.AgentID,
+			"name":       conversation.Name, // Update the name in MongoDB
 			"messages":   conversation.Messages,
 			"updated_at": conversation.UpdatedAt,
 			"active":     conversation.Active,

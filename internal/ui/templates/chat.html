@@ -1,27 +1,14 @@
 {{define "chat_content"}}
 <main class="content">
-    <section class="message-history" id="message-history">
-        <div id="conversation-starter" {{if .Conversations}}style="display: none;"{{end}}>
-            <h3>Start a New Conversation</h3>
-            <select id="agent-select" class="form-control">
-                <option value="">Select an AI Agent</option>
-                {{range .RootAgents}}
-                <option value="{{.ID.Hex}}">{{.Name}}</option>
-                {{end}}
-            </select>
-            <button id="start-conversation" class="btn-primary">Start Conversation</button>
-        </div>
-        <div id="messages-container" {{if not .Conversations}}style="display: none;"{{end}}>
-            <p>Select a conversation from the sidebar or start a new one.</p>
-        </div>
-    </section>
-    <section class="message-input" id="message-input-section" style="display: none;">
-        <form id="message-form">
-            <input type="hidden" id="conversation-id" value="">
-            <textarea id="message-input" placeholder="Type your message..." rows="3"></textarea>
-            <button type="submit"><i class="fas fa-paper-plane"></i> Send</button>
-        </form>
-    </section>
+  <section class="message-history" id="message-history">
+      <div id="messages-container"></div>
+  </section>
+  <section class="message-input" id="message-input-section">
+      <form id="message-form">
+        <input type="hidden" id="conversation-id" value="{{.ConversationID}}">
+          <textarea id="message-input" placeholder="Type your message..." rows="3"></textarea>
+          <button type="submit"><i class="fas fa-paper-plane"></i> Send</button>
+      </form>
+  </section>
 </main>
-<script src="/static/js/chat.js"></script>
 {{end}}
