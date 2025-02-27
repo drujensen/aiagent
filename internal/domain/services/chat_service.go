@@ -19,9 +19,10 @@ type MessageListener func(chatID string, message entities.Message)
 
 type ChatService interface {
 	SendMessage(ctx context.Context, chatID string, message entities.Message) error
-	CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error) // Updated to accept name
+	CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error)
 	ListActiveChats(ctx context.Context) ([]*entities.Chat, error)
 	GetChat(ctx context.Context, id string) (*entities.Chat, error)
+	UpdateChat(ctx context.Context, id, name string) (*entities.Chat, error)
 	AddMessageListener(listener MessageListener)
 }
 
@@ -170,25 +171,31 @@ func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*en
 	return chat, nil
 }
 
-func (s *chatService) UpdateChate(ctx context.Context, id, name string) (*entities.Chat, error) {
+func (s *chatService) UpdateChat(ctx context.Context, id, name string) (*entities.Chat, error) {
 	if id == "" {
-		return nil, fmt.Errorf("agent ID is required")
+		return nil, fmt.Errorf("chat ID is required")
 	}
 
-	chat := entities.UpdateChat(id, name)
-
-	if chat.Name == "" {
-		return fmt.Errorf("chat name is required")
+	if name == "" {
+		return nil, fmt.Errorf("chat name is required")
 	}
 
-	chat.CreatedAt = existing.CreatedAt
-	chat.UpdatedAt = time.Now()
-
-	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
-		return fmt.Errorf("failed to update chat: %v", err)
+	existingChat, err := s.chatRepo.GetChat(ctx, id)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, fmt.Errorf("chat not found: %s", id)
+		}
+		return nil, fmt.Errorf("failed to get existing chat: %v", err)
 	}
 
-	return nil
+	existingChat.Name = name
+	existingChat.UpdatedAt = time.Now()
+
+	if err := s.chatRepo.UpdateChat(ctx, existingChat); err != nil {
+		return nil, fmt.Errorf("failed to update chat: %v", err)
+	}
+
+	return existingChat, nil
 }
 
 func (s *chatService) ListActiveChats(ctx context.Context) ([]*entities.Chat, error) {

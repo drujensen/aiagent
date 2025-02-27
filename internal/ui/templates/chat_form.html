@@ -1,11 +1,10 @@
 {{define "chat_form_content"}}
-<main class="content">
-  <div id="conversation-starter">
-      <h3>Start a New Conversation</h3>
-      <form id="new-conversation-form" hx-post="/chat" hx-target="#message-history" hx-swap="innerHTML">
+  <div id="agent-form">
+      <h2>Start a New Conversation</h2>
+      <form id="new-chat-form" hx-post="/chat" hx-target="#response-message" hx-swap="innerHTML">
           <div class="form-group">
-              <label for="conversation-name">Conversation Name:</label>
-              <input type="text" id="conversation-name" name="conversation-name" class="form-control" placeholder="Enter conversation name" required>
+              <label for="chat-name">Conversation Name:</label>
+              <input type="text" id="chat-name" name="chat-name" class="form-control" placeholder="Enter conversation name" required>
           </div>
           <div class="form-group">
               <label for="agent-select">Select an AI Agent:</label>
@@ -16,9 +15,8 @@
                   {{end}}
               </select>
           </div>
-          <button type="submit" class="btn-primary">Start Conversation</button>
+          <button type="submit" class="btn-primary">Start Chat</button>
       </form>
+      <div id="response-message"></div>
   </div>
-</main>
-<script src="/static/js/chat.js"></script>
 {{end}}

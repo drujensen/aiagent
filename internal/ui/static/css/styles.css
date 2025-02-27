@@ -79,29 +79,29 @@ body, html {
     color: #E6E6E6;
 }
 
-.conversation-list, .agent-list, .tool-list {
+.chat-list, .agent-list, .tool-list {
     list-style: none;
     padding: 0;
 }
 
-.conversation-list li, .agent-list li, .tool-list li {
+.chat-list li, .agent-list li, .tool-list li {
     padding: 10px;
     border-bottom: 1px solid #444;
     cursor: pointer;
 }
 
-.conversation-list li:hover, .agent-list li:hover, .tool-list li:hover {
+.chat-list li:hover, .agent-list li:hover, .tool-list li:hover {
     background-color: #3c3c3c;
 }
 
-.conversation-list li a, .agent-list li a, .tool-list li a {
+.chat-list li a, .agent-list li a, .tool-list li a {
     color: #fff;
     text-decoration: none;
     display: flex;
     align-items: center;
 }
 
-.conversation-list li i, .agent-list li i, .tool-list li i {
+.chat-list li i, .agent-list li i, .tool-list li i {
     margin-right: 8px;
     color: #007bff;
 }
@@ -271,8 +271,8 @@ body, html {
     color: #fff;
 }
 
-/* New Conversation Form Styling */
-#conversation-starter {
+/* New Chat Form Styling */
+#chat-starter {
     width: 400px; /* Fixed width to match the image */
     padding: 20px;
     background-color: #2c2c2c;
@@ -285,17 +285,17 @@ body, html {
     outline: none; /* Remove any outline */
 }
 
-#conversation-starter h3 {
+#chat-starter h3 {
     text-align: center;
     margin-bottom: 20px;
     color: #fff;
 }
 
-#conversation-starter .form-group {
+#chat-starter .form-group {
     margin-bottom: 15px;
 }
 
-#conversation-starter .form-control {
+#chat-starter .form-control {
     width: 100%;
     padding: 10px;
     border: 1px solid #444;
@@ -309,13 +309,13 @@ body, html {
     outline: none; /* Remove any outline that might cause the white strip */
 }
 
-#conversation-starter .form-control:focus {
+#chat-starter .form-control:focus {
     outline: none;
     border-color: #007bff;
     box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
 }
 
-#conversation-starter .btn-primary {
+#chat-starter .btn-primary {
     display: block;
     width: 100%;
     margin-top: 20px;

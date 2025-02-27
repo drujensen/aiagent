@@ -1,6 +1,6 @@
 {{define "messages"}}
-  <div class="messages" data-conversation-id="{{.ConversationID}}">
-      <h3>Conversation: {{.ConversationName}}</h3> <!-- Display conversation name -->
+  <div class="messages" data-Chat-id="{{.ChatID}}">
+      <h3>Chat: {{.ChatName}}</h3> <!-- Display Chat name -->
       {{range .Messages}}
       <div class="message {{if eq .Role "user"}}user-message{{else if eq .Role "assistant"}}agent-message{{else}}tool-message{{end}}">
           <strong>{{.Role}} ({{.Timestamp}}):</strong> {{.Content}}

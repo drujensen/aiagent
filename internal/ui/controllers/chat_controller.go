@@ -62,7 +62,7 @@ func (c *ChatController) CreateChatHandler(eCtx echo.Context) error {
 	// Render messages template for the new chat
 	messagesData := map[string]interface{}{
 		"Title":           "Chat",
-		"ContentTemplate": "chat_content",
+		"ContentTemplate": "chat_form_content",
 		"ChatID":          chat.ID.Hex(),
 		"ChatName":        chat.Name,
 		"Messages":        chat.Messages,
@@ -106,13 +106,27 @@ func (c *ChatController) UpdateChatHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusBadRequest, "Chat name is required")
 	}
 
-	chat, err := c.chatService.UpdateChat(eCtx.Request().Context(), id, name)
+	// Render updated sidebar_chats template after updating chat
+	chats, err := c.chatService.ListActiveChats(eCtx.Request().Context())
 	if err != nil {
-		c.logger.Error("Failed to update chat", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to update chat")
+		c.logger.Error("Failed to list chats", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to list chats")
 	}
 
-	return eCtx.String(http.StatusOK, "Chat updated successfully")
+	sidebarData := map[string]interface{}{
+		"Chats": chats,
+	}
+	var sidebarBuf bytes.Buffer
+	if err := c.tmpl.ExecuteTemplate(&sidebarBuf, "sidebar_chats", sidebarData); err != nil {
+		c.logger.Error("Failed to render sidebar template", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to render template")
+	}
+
+	// Return the updated sidebar HTML with OOB swap
+	response := fmt.Sprintf(`<div id="sidebar-chats" hx-swap-oob="innerHTML">%s</div>`, sidebarBuf.String())
+
+	eCtx.Response().Header().Set("Content-Type", "text/html")
+	return eCtx.String(http.StatusOK, response)
 }
 
 func (c *ChatController) ChatHandler(eCtx echo.Context) error {

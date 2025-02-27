@@ -1,10 +1,10 @@
 let socket = null;
 
-function connectWebSocket(conversationId) {
+function connectWebSocket(ChatId) {
     if (socket) {
         socket.close();
     }
-    const url = `ws://localhost:8080/api/ws/chat?conversation_id=${conversationId}`;
+    const url = `ws://localhost:8080/api/ws/chat?Chat_id=${ChatId}`;
     socket = new WebSocket(url);
 
     socket.onopen = function() {
@@ -29,10 +29,10 @@ document.body.addEventListener('htmx:load', function(event) {
     if (event.target.id === 'message-history') {
         const messagesContainer = event.target.querySelector('.messages');
         if (messagesContainer) {
-            const conversationId = messagesContainer.dataset.conversationId;
-            document.getElementById('conversation-id').value = conversationId;
+            const ChatId = messagesContainer.dataset.ChatId;
+            document.getElementById('Chat-id').value = ChatId;
             document.getElementById('message-input-section').style.display = 'block';
-            connectWebSocket(conversationId);
+            connectWebSocket(ChatId);
         }
     }
 });

@@ -1,5 +1,5 @@
-{{define "sidebar_conversations"}}
-<div id="sidebar-conversations">
+{{define "sidebar_chats"}}
+<div id="sidebar-chats">
     <h2><i class="fas fa-comment"></i> Conversations 
         <span class="add-icon-wrapper">
             <a href="/chat/new" class="add-icon">
@@ -7,15 +7,15 @@
             </a>
         </span>
     </h2>
-    <ul class="conversation-list" id="conversation-list">
-        {{range .Conversations}}
+    <ul class="Chat-list" id="Chat-list">
+        {{range .Chats}}
         <li>
             <a href="/chat/{{.ID.Hex}}">
               <i class="fas fa-comment-dots"></i> {{.Name}}
             </a>
         </li>
         {{else}}
-        <li>No active conversations</li>
+        <li>No active chats</li>
         {{end}}
     </ul>
 </div>

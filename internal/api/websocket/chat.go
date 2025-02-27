@@ -25,18 +25,18 @@ type ChatHub struct {
 }
 
 type registration struct {
-	conversationID string
-	conn           *websocket.Conn
+	ChatID string
+	conn   *websocket.Conn
 }
 
 type unregistration struct {
-	conversationID string
-	conn           *websocket.Conn
+	ChatID string
+	conn   *websocket.Conn
 }
 
 type broadcastMessage struct {
-	conversationID string
-	message        entities.Message
+	ChatID  string
+	message entities.Message
 }
 
 func NewChatHub() *ChatHub {
@@ -52,26 +52,26 @@ func (h *ChatHub) Run() {
 	for {
 		select {
 		case reg := <-h.register:
-			h.connections[reg.conversationID] = append(h.connections[reg.conversationID], reg.conn)
+			h.connections[reg.ChatID] = append(h.connections[reg.ChatID], reg.conn)
 		case unreg := <-h.unregister:
-			if conns, ok := h.connections[unreg.conversationID]; ok {
+			if conns, ok := h.connections[unreg.ChatID]; ok {
 				for i, conn := range conns {
 					if conn == unreg.conn {
-						h.connections[unreg.conversationID] = append(conns[:i], conns[i+1:]...)
+						h.connections[unreg.ChatID] = append(conns[:i], conns[i+1:]...)
 						break
 					}
 				}
-				if len(h.connections[unreg.conversationID]) == 0 {
-					delete(h.connections, unreg.conversationID)
+				if len(h.connections[unreg.ChatID]) == 0 {
+					delete(h.connections, unreg.ChatID)
 				}
 			}
 		case msg := <-h.broadcast:
-			if conns, ok := h.connections[msg.conversationID]; ok {
+			if conns, ok := h.connections[msg.ChatID]; ok {
 				for _, conn := range conns {
 					err := conn.WriteJSON(msg.message)
 					if err != nil {
 						log.Println("Write error:", err)
-						h.unregister <- unregistration{msg.conversationID, conn}
+						h.unregister <- unregistration{msg.ChatID, conn}
 					}
 				}
 			}
@@ -79,15 +79,15 @@ func (h *ChatHub) Run() {
 	}
 }
 
-func (h *ChatHub) MessageListener(conversationID string, message entities.Message) {
-	h.broadcast <- broadcastMessage{conversationID, message}
+func (h *ChatHub) MessageListener(ChatID string, message entities.Message) {
+	h.broadcast <- broadcastMessage{ChatID, message}
 }
 
 func ChatHandler(hub *ChatHub, chatService services.ChatService, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		conversationID := r.URL.Query().Get("conversation_id")
-		if conversationID == "" {
-			http.Error(w, "Missing conversation_id", http.StatusBadRequest)
+		ChatID := r.URL.Query().Get("Chat_id")
+		if ChatID == "" {
+			http.Error(w, "Missing Chat_id", http.StatusBadRequest)
 			return
 		}
 
@@ -98,16 +98,16 @@ func ChatHandler(hub *ChatHub, chatService services.ChatService, cfg *config.Con
 		}
 		defer conn.Close()
 
-		hub.register <- registration{conversationID, conn}
+		hub.register <- registration{ChatID, conn}
 
 		defer func() {
-			hub.unregister <- unregistration{conversationID, conn}
+			hub.unregister <- unregistration{ChatID, conn}
 		}()
 
 		for {
 			var msg struct {
-				ConversationID string           `json:"conversation_id"`
-				Message        entities.Message `json:"message"`
+				ChatID  string           `json:"Chat_id"`
+				Message entities.Message `json:"message"`
 			}
 			err := conn.ReadJSON(&msg)
 			if err != nil {
@@ -115,12 +115,12 @@ func ChatHandler(hub *ChatHub, chatService services.ChatService, cfg *config.Con
 				break
 			}
 
-			if msg.ConversationID != conversationID {
-				log.Println("Mismatched conversation ID")
+			if msg.ChatID != ChatID {
+				log.Println("Mismatched Chat ID")
 				continue
 			}
 
-			err = chatService.SendMessage(r.Context(), conversationID, msg.Message)
+			err = chatService.SendMessage(r.Context(), ChatID, msg.Message)
 			if err != nil {
 				log.Println("SendMessage error:", err)
 				conn.WriteJSON(map[string]string{"error": err.Error()})
