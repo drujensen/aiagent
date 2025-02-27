@@ -15,25 +15,25 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type MessageListener func(conversationID string, message entities.Message)
+type MessageListener func(chatID string, message entities.Message)
 
 type ChatService interface {
-	SendMessage(ctx context.Context, conversationID string, message entities.Message) error
-	CreateConversation(ctx context.Context, agentID, name string) (*entities.Conversation, error) // Updated to accept name
-	ListActiveConversations(ctx context.Context) ([]*entities.Conversation, error)
-	GetConversation(ctx context.Context, id string) (*entities.Conversation, error)
+	SendMessage(ctx context.Context, chatID string, message entities.Message) error
+	CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error) // Updated to accept name
+	ListActiveChats(ctx context.Context) ([]*entities.Chat, error)
+	GetChat(ctx context.Context, id string) (*entities.Chat, error)
 	AddMessageListener(listener MessageListener)
 }
 
 type chatService struct {
-	conversationRepo interfaces.ConversationRepository
+	chatRepo         interfaces.ChatRepository
 	agentRepo        interfaces.AgentRepository
 	messageListeners []MessageListener
 }
 
-func NewChatService(conversationRepo interfaces.ConversationRepository, agentRepo interfaces.AgentRepository) *chatService {
+func NewChatService(chatRepo interfaces.ChatRepository, agentRepo interfaces.AgentRepository) *chatService {
 	return &chatService{
-		conversationRepo: conversationRepo,
+		chatRepo:         chatRepo,
 		agentRepo:        agentRepo,
 		messageListeners: []MessageListener{},
 	}
@@ -43,32 +43,32 @@ func (s *chatService) AddMessageListener(listener MessageListener) {
 	s.messageListeners = append(s.messageListeners, listener)
 }
 
-func (s *chatService) SendMessage(ctx context.Context, conversationID string, message entities.Message) error {
-	if conversationID == "" {
-		return fmt.Errorf("conversation ID is required")
+func (s *chatService) SendMessage(ctx context.Context, chatID string, message entities.Message) error {
+	if chatID == "" {
+		return fmt.Errorf("chat ID is required")
 	}
 	if message.Role == "" || message.Content == "" {
 		return fmt.Errorf("message role and content are required")
 	}
 
-	conversation, err := s.conversationRepo.GetConversation(ctx, conversationID)
+	chat, err := s.chatRepo.GetChat(ctx, chatID)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return fmt.Errorf("conversation not found: %s", conversationID)
+			return fmt.Errorf("chat not found: %s", chatID)
 		}
-		return fmt.Errorf("failed to retrieve conversation: %w", err)
+		return fmt.Errorf("failed to retrieve chat: %w", err)
 	}
 
 	message.ID = uuid.New().String()
 	message.Timestamp = time.Now()
-	conversation.Messages = append(conversation.Messages, message)
-	conversation.UpdatedAt = time.Now()
+	chat.Messages = append(chat.Messages, message)
+	chat.UpdatedAt = time.Now()
 
-	if err := s.conversationRepo.UpdateConversation(ctx, conversation); err != nil {
-		return fmt.Errorf("failed to update conversation: %w", err)
+	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
+		return fmt.Errorf("failed to update chat: %w", err)
 	}
 
-	go func(conv *entities.Conversation) {
+	go func(conv *entities.Chat) {
 		bgCtx := context.Background()
 		agent, err := s.agentRepo.GetAgent(bgCtx, conv.AgentID.Hex())
 		if err != nil {
@@ -135,24 +135,24 @@ func (s *chatService) SendMessage(ctx context.Context, conversationID string, me
 		conv.Messages = append(conv.Messages, aiMessage)
 		conv.UpdatedAt = time.Now()
 
-		if err := s.conversationRepo.UpdateConversation(bgCtx, conv); err != nil {
-			log.Printf("Failed to update conversation with AI response: %v", err)
+		if err := s.chatRepo.UpdateChat(bgCtx, conv); err != nil {
+			log.Printf("Failed to update chat with AI response: %v", err)
 			return
 		}
 
 		for _, listener := range s.messageListeners {
-			listener(conversationID, aiMessage)
+			listener(chatID, aiMessage)
 		}
-	}(conversation)
+	}(chat)
 
 	for _, listener := range s.messageListeners {
-		listener(conversationID, message)
+		listener(chatID, message)
 	}
 
 	return nil
 }
 
-func (s *chatService) CreateConversation(ctx context.Context, agentID, name string) (*entities.Conversation, error) {
+func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error) {
 	if agentID == "" {
 		return nil, fmt.Errorf("agent ID is required")
 	}
@@ -162,40 +162,61 @@ func (s *chatService) CreateConversation(ctx context.Context, agentID, name stri
 		return nil, fmt.Errorf("invalid agent ID: %v", err)
 	}
 
-	conversation := entities.NewConversation(agentObjID, name) // Use new constructor with name
-	if err := s.conversationRepo.CreateConversation(ctx, conversation); err != nil {
-		return nil, fmt.Errorf("failed to create conversation: %v", err)
+	chat := entities.NewChat(agentObjID, name) // Use new constructor with name
+	if err := s.chatRepo.CreateChat(ctx, chat); err != nil {
+		return nil, fmt.Errorf("failed to create chat: %v", err)
 	}
 
-	return conversation, nil
+	return chat, nil
 }
 
-func (s *chatService) ListActiveConversations(ctx context.Context) ([]*entities.Conversation, error) {
-	conversations, err := s.conversationRepo.ListConversations(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list conversations: %v", err)
+func (s *chatService) UpdateChate(ctx context.Context, id, name string) (*entities.Chat, error) {
+	if id == "" {
+		return nil, fmt.Errorf("agent ID is required")
 	}
 
-	var activeConversations []*entities.Conversation
-	for _, conv := range conversations {
+	chat := entities.UpdateChat(id, name)
+
+	if chat.Name == "" {
+		return fmt.Errorf("chat name is required")
+	}
+
+	chat.CreatedAt = existing.CreatedAt
+	chat.UpdatedAt = time.Now()
+
+	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
+		return fmt.Errorf("failed to update chat: %v", err)
+	}
+
+	return nil
+}
+
+func (s *chatService) ListActiveChats(ctx context.Context) ([]*entities.Chat, error) {
+	chats, err := s.chatRepo.ListChats(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list chats: %v", err)
+	}
+
+	var activeChats []*entities.Chat
+	for _, conv := range chats {
 		if conv.Active {
-			activeConversations = append(activeConversations, conv)
+			activeChats = append(activeChats, conv)
 		}
 	}
-	return activeConversations, nil
+	return activeChats, nil
 }
 
-func (s *chatService) GetConversation(ctx context.Context, id string) (*entities.Conversation, error) {
+func (s *chatService) GetChat(ctx context.Context, id string) (*entities.Chat, error) {
 	if id == "" {
-		return nil, fmt.Errorf("conversation ID is required")
+		return nil, fmt.Errorf("chat ID is required")
 	}
 
-	conversation, err := s.conversationRepo.GetConversation(ctx, id)
+	chat, err := s.chatRepo.GetChat(ctx, id)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, fmt.Errorf("conversation not found: %s", id)
+			return nil, fmt.Errorf("chat not found: %s", id)
 		}
-		return nil, fmt.Errorf("failed to retrieve conversation: %v", err)
+		return nil, fmt.Errorf("failed to retrieve chat: %v", err)
 	}
-	return conversation, nil
+	return chat, nil
 }

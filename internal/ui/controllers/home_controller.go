@@ -37,16 +37,16 @@ func (c *HomeController) HomeHandler(eCtx echo.Context) error {
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)
 }
 
-func (c *HomeController) ConversationsPartialHandler(eCtx echo.Context) error {
-	conversations, err := c.chatService.ListActiveConversations(eCtx.Request().Context())
+func (c *HomeController) ChatsPartialHandler(eCtx echo.Context) error {
+	chats, err := c.chatService.ListActiveChats(eCtx.Request().Context())
 	if err != nil {
-		c.logger.Error("Failed to list active conversations", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to load conversations")
+		c.logger.Error("Failed to list active chats", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to load chats")
 	}
 	data := map[string]interface{}{
-		"Conversations": conversations,
+		"Chats": chats,
 	}
-	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_conversations", data)
+	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_chats", data)
 }
 
 func (c *HomeController) AgentsPartialHandler(eCtx echo.Context) error {

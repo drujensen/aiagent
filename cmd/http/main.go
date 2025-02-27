@@ -35,7 +35,7 @@ func main() {
 
 	agentRepo := repositories.NewMongoAgentRepository(db.Collection("agents"))
 	toolRepo := repositories.NewMongoToolRepository(db.Collection("tools"))
-	conversationRepo := repositories.NewMongoConversationRepository(db.Collection("conversations"))
+	chatRepo := repositories.NewMongoChatRepository(db.Collection("chats"))
 
 	workspace := "/workspace"
 	if err := integrations.InitializeTools(context.Background(), toolRepo, workspace); err != nil {
@@ -44,7 +44,7 @@ func main() {
 
 	agentService := services.NewAgentService(agentRepo)
 	toolService := services.NewToolService(toolRepo)
-	chatService := services.NewChatService(conversationRepo, agentRepo)
+	chatService := services.NewChatService(chatRepo, agentRepo)
 
 	hub := websocket.NewChatHub()
 	go hub.Run()
@@ -68,7 +68,7 @@ func main() {
 		"internal/ui/templates/layout.html",
 		"internal/ui/templates/header.html",
 		"internal/ui/templates/sidebar.html",
-		"internal/ui/templates/sidebar_conversations.html",
+		"internal/ui/templates/sidebar_chats.html",
 		"internal/ui/templates/sidebar_agents.html",
 		"internal/ui/templates/sidebar_tools.html",
 		"internal/ui/templates/home.html",
@@ -87,7 +87,7 @@ func main() {
 
 	apiAgentController := apicontrollers.NewAgentController(agentService, cfg)
 	apiToolController := apicontrollers.NewToolController(toolService, cfg)
-	apiConversationController := apicontrollers.NewConversationController(chatService, cfg)
+	apiChatController := apicontrollers.NewChatController(chatService, cfg)
 
 	// Initialize Echo
 	e := echo.New()
@@ -115,12 +115,14 @@ func main() {
 	e.GET("/agents/edit/:id", agentController.AgentFormHandler)
 	e.PUT("/agents/edit/:id", agentController.UpdateAgentHandler)
 
-	e.GET("/chat/new", chatController.ConversationFormHandler)
-	e.POST("/chat/new", chatController.CreateConversationHandler)
-	e.GET("/chat/:id", chatController.ChatConversationHandler)
+	e.GET("/chat/new", chatController.ChatFormHandler)
+	e.POST("/chat/new", chatController.CreateChatHandler)
+	e.GET("/chat/:id", chatController.ChatHandler)
+	e.GET("/chat/edit/:id", chatController.ChatFormHandler)
+	e.PUT("/chat/edit/:id", chatController.UpdateChatHandler)
 
 	// Sidebar Partial Routes
-	e.GET("/sidebar/conversations", homeController.ConversationsPartialHandler)
+	e.GET("/sidebar/chats", homeController.ChatsPartialHandler)
 	e.GET("/sidebar/agents", homeController.AgentsPartialHandler)
 	e.GET("/sidebar/tools", homeController.ToolsPartialHandler)
 
@@ -131,7 +133,7 @@ func main() {
 	e.PUT("/api/agents/:id", apiAgentController.AgentDetailHandler)
 	e.DELETE("/api/agents/:id", apiAgentController.AgentDetailHandler)
 	e.GET("/api/tools", apiToolController.ListTools)
-	e.POST("/api/conversations", apiConversationController.CreateConversation)
+	e.POST("/api/chats", apiChatController.CreateChat)
 	// WebSocket Route
 	e.GET("/api/ws/chat", func(c echo.Context) error {
 		websocket.ChatHandler(hub, chatService, cfg)(c.Response().Writer, c.Request())
