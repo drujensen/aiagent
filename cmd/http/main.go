@@ -111,15 +111,15 @@ func main() {
 	e.GET("/", homeController.HomeHandler)
 
 	e.GET("/agents/new", agentController.AgentFormHandler)
-	e.POST("/agents/new", agentController.CreateAgentHandler)
-	e.GET("/agents/edit/:id", agentController.AgentFormHandler)
-	e.PUT("/agents/edit/:id", agentController.UpdateAgentHandler)
+	e.POST("/agents", agentController.CreateAgentHandler)
+	e.GET("/agents/:id/edit", agentController.AgentFormHandler)
+	e.PUT("/agents/:id", agentController.UpdateAgentHandler)
 
-	e.GET("/chat/new", chatController.ChatFormHandler)
-	e.POST("/chat/new", chatController.CreateChatHandler)
-	e.GET("/chat/:id", chatController.ChatHandler)
-	e.GET("/chat/edit/:id", chatController.ChatFormHandler)
-	e.PUT("/chat/edit/:id", chatController.UpdateChatHandler)
+	e.GET("/chats/new", chatController.ChatFormHandler)
+	e.POST("/chats", chatController.CreateChatHandler)
+	e.GET("/chats/:id", chatController.ChatHandler)
+	e.GET("/chats/:id/edit", chatController.ChatFormHandler)
+	e.PUT("/chats/:id", chatController.UpdateChatHandler)
 
 	// Sidebar Partial Routes
 	e.GET("/sidebar/chats", homeController.ChatsPartialHandler)
@@ -134,6 +134,7 @@ func main() {
 	e.DELETE("/api/agents/:id", apiAgentController.AgentDetailHandler)
 	e.GET("/api/tools", apiToolController.ListTools)
 	e.POST("/api/chats", apiChatController.CreateChat)
+
 	// WebSocket Route
 	e.GET("/api/ws/chat", func(c echo.Context) error {
 		websocket.ChatHandler(hub, chatService, cfg)(c.Response().Writer, c.Request())

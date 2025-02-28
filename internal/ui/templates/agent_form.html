@@ -2,7 +2,7 @@
 <div class="agent-form">
     <h2>{{if .Agent.ID}}Edit Agent{{else}}Create Agent{{end}}</h2>
     <form 
-        {{if .Agent.ID}}hx-put="/agents/edit/{{.Agent.ID}}"{{else}}hx-post="/agents/new"{{end}} 
+        {{if .Agent.ID}}hx-put="/agents/{{.Agent.ID}}"{{else}}hx-post="/agents"{{end}} 
         hx-target="#response-message" 
         hx-swap="innerHTML">
         <input type="hidden" name="id" value="{{.Agent.ID}}">

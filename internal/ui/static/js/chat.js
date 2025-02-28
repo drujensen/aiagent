@@ -1,38 +1,131 @@
-let socket = null;
+class ChatWebSocket {
+   constructor() {
+       this.socket = null;
+       this.reconnectTimeout = null;
+       this.chatId = null;
+   }
 
-function connectWebSocket(ChatId) {
-    if (socket) {
-        socket.close();
-    }
-    const url = `ws://localhost:8080/api/ws/chat?Chat_id=${ChatId}`;
-    socket = new WebSocket(url);
+   connect(chatId) {
+       this.chatId = chatId;
+       if (this.socket) {
+           this.socket.close();
+       }
 
-    socket.onopen = function() {
-        console.log('WebSocket connection established');
-    };
+       const url = `ws://${window.location.host}/api/ws/chat?chat_id=${chatId}`;
+       this.socket = new WebSocket(url);
 
-    socket.onmessage = function(event) {
-        const message = JSON.parse(event.data);
-        console.log('WebSocket message received:', message);
-    };
+       this.socket.onopen = this.onOpen.bind(this);
+       this.socket.onmessage = this.onMessage.bind(this);
+       this.socket.onclose = this.onClose.bind(this);
+       this.socket.onerror = this.onError.bind(this);
+   }
 
-    socket.onclose = function() {
-        console.log('WebSocket connection closed');
-    };
+   onOpen() {
+       console.log('WebSocket connection established');
+       this.clearReconnectTimeout();
+   }
 
-    socket.onerror = function(error) {
-        console.error('WebSocket error:', error);
-    };
+   onMessage(event) {
+       try {
+           const message = JSON.parse(event.data);
+           console.log('WebSocket message received:', message);
+           const messagesContainer = document.getElementById('messages-container');
+           if (messagesContainer) {
+               const messageElement = document.createElement('div');
+               messageElement.classList.add('message');
+               if (message.role === 'user') {
+                   messageElement.classList.add('user-message');
+               } else if (message.role === 'assistant') {
+                   messageElement.classList.add('agent-message');
+               } else {
+                   messageElement.classList.add('tool-message');
+               }
+               messageElement.innerHTML = `<strong>${message.role} (${message.timestamp}):</strong> ${message.content}`;
+               messagesContainer.appendChild(messageElement);
+               // Scroll to the bottom
+               messagesContainer.scrollTop = messagesContainer.scrollHeight;
+           }
+       } catch (error) {
+           console.error('Error parsing message:', error);
+       }
+   }
+
+   onClose() {
+       console.log('WebSocket connection closed');
+       this.scheduleReconnect();
+   }
+
+   onError(error) {
+       console.error('WebSocket error:', error);
+       this.scheduleReconnect();
+   }
+
+   scheduleReconnect() {
+       if (!this.reconnectTimeout) {
+           this.reconnectTimeout = setTimeout(() => {
+               this.connect(this.chatId);
+           }, 5000); // Reconnect after 5 seconds
+       }
+   }
+
+   clearReconnectTimeout() {
+       if (this.reconnectTimeout) {
+           clearTimeout(this.reconnectTimeout);
+           this.reconnectTimeout = null;
+       }
+   }
+
+   sendMessage(message) {
+       if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+           // Append the user's message to the UI immediately
+           const messagesContainer = document.getElementById('messages-container');
+           if (messagesContainer) {
+               const messageElement = document.createElement('div');
+               messageElement.classList.add('message', 'user-message');
+               messageElement.innerHTML = `<strong>user (${new Date().toISOString()}):</strong> ${message}`;
+               messagesContainer.appendChild(messageElement);
+               // Scroll to the bottom
+               messagesContainer.scrollTop = messagesContainer.scrollHeight;
+           }
+           this.socket.send(JSON.stringify({
+               Chat_id: this.chatId,
+               message: {
+                   role: 'user',
+                   content: message
+               }
+           }));
+       } else {
+           console.error('WebSocket not connected. Cannot send message.');
+       }
+   }
 }
 
+const chatWebSocket = new ChatWebSocket();
+
 document.body.addEventListener('htmx:load', function(event) {
-    if (event.target.id === 'message-history') {
-        const messagesContainer = event.target.querySelector('.messages');
-        if (messagesContainer) {
-            const ChatId = messagesContainer.dataset.ChatId;
-            document.getElementById('Chat-id').value = ChatId;
-            document.getElementById('message-input-section').style.display = 'block';
-            connectWebSocket(ChatId);
-        }
-    }
+   if (event.target.id === 'message-history') {
+       const messagesContainer = event.target.querySelector('.messages-container');
+       if (messagesContainer) {
+           const chatId = messagesContainer.dataset.chatId;
+           if (chatId && !isNaN(parseInt(chatId, 16))) { // Validate hexadecimal chat ID
+               document.getElementById('chat-id').value = chatId;
+               document.getElementById('message-input-section').style.display = 'block';
+               chatWebSocket.connect(chatId);
+
+               // Set up form submission
+               const messageForm = document.getElementById('message-form');
+               messageForm.addEventListener('submit', function(event) {
+                   event.preventDefault();
+                   const messageInput = document.getElementById('message-input');
+                   const message = messageInput.value.trim();
+                   if (message) {
+                       chatWebSocket.sendMessage(message);
+                       messageInput.value = ''; // Clear the input after sending
+                   }
+               });
+           } else {
+               console.error('Invalid chat ID');
+           }
+       }
+   }
 });

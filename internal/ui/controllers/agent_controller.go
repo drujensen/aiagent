@@ -54,7 +54,7 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 
 	var agent *entities.Agent
 	path := eCtx.Request().URL.Path
-	isEdit := strings.HasPrefix(path, "/agents/edit/")
+	isEdit := strings.HasSuffix(path, "/edit")
 	if isEdit {
 		id := eCtx.Param("id")
 		if id == "" {
@@ -103,7 +103,6 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 		"Agent":           agentData,
 		"Tools":           tools,
 		"Agents":          agents,
-		"APIKey":          c.config.LocalAPIKey,
 	}
 
 	eCtx.Response().Header().Set("Content-Type", "text/html")

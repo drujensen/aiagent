@@ -108,22 +108,21 @@ body, html {
 
 .content {
     flex: 1;
-    padding: 20px;
     display: flex;
-    justify-content: center; /* Center the form horizontally */
-    flex-direction: column; /* Change to column direction */
-    align-items: flex-start;
-    background-color: #1a1a1a; /* Ensure the background matches the dark theme */
+    flex-direction: column;
+    background-color: #1a1a1a;
+    padding: 20px; /* Added padding around the content */
 }
 
 .message-history {
-    height: 70vh;
+    flex: 1;
     width: 100%;
     background-color: #2c2c2c;
     border: 1px solid #444;
-    padding: 10px;
-    margin-bottom: 10px;
-    border-radius: 5px;
+    border-radius: 5px 5px 0 0;
+    overflow-y: auto;
+    padding: 10px; /* Added internal padding */
+    margin-bottom: 0; /* Removed margin to ensure full use of space */
 }
 
 .message {
@@ -147,18 +146,22 @@ body, html {
 }
 
 .message-input {
-    width: 70vw;
+    width: 100%;
     display: flex;
-    align-items: center;
-    margin-top: 10px;
+    align-items: stretch;
+    border-top: 1px solid #444;
+    background-color: #2c2c2c;
+    border-radius: 0 0 5px 5px;
+    padding: 10px; /* Added internal padding */
 }
 
 .message-input textarea {
     flex: 1;
-    width: 60vw;
+    width: 100%;
     padding: 10px;
-    border: 1px solid #444;
-    border-radius: 5px;
+    border: none;
+    border-right: 1px solid #444;
+    border-radius: 0;
     background-color: #2c2c2c;
     color: #fff;
     resize: none;
@@ -169,9 +172,8 @@ body, html {
     background-color: #007bff;
     color: #fff;
     border: none;
-    border-radius: 5px;
+    border-radius: 0 0 5px 0;
     cursor: pointer;
-    margin-left: 10px;
 }
 
 .message-input button:hover {
@@ -273,16 +275,16 @@ body, html {
 
 /* New Chat Form Styling */
 #chat-starter {
-    width: 400px; /* Fixed width to match the image */
+    width: 400px;
     padding: 20px;
     background-color: #2c2c2c;
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     color: #fff;
-    overflow: hidden; /* Ensure no overflow or scrollbar */
-    border: none; /* Remove any border that might cause the white strip */
-    margin: 0 auto; /* Center the form */
-    outline: none; /* Remove any outline */
+    overflow: hidden;
+    border: none;
+    margin: 0 auto;
+    outline: none;
 }
 
 #chat-starter h3 {
@@ -304,9 +306,9 @@ body, html {
     color: #fff;
     font-size: 14px;
     box-sizing: border-box;
-    overflow: hidden; /* Prevent overflow within inputs */
-    white-space: nowrap; /* Prevent text wrapping that could cause overflow */
-    outline: none; /* Remove any outline that might cause the white strip */
+    overflow: hidden;
+    white-space: nowrap;
+    outline: none;
 }
 
 #chat-starter .form-control:focus {

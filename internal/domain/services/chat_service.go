@@ -146,10 +146,6 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		}
 	}(chat)
 
-	for _, listener := range s.messageListeners {
-		listener(chatID, message)
-	}
-
 	return nil
 }
 
@@ -163,7 +159,7 @@ func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*en
 		return nil, fmt.Errorf("invalid agent ID: %v", err)
 	}
 
-	chat := entities.NewChat(agentObjID, name) // Use new constructor with name
+	chat := entities.NewChat(agentObjID, name)
 	if err := s.chatRepo.CreateChat(ctx, chat); err != nil {
 		return nil, fmt.Errorf("failed to create chat: %v", err)
 	}
