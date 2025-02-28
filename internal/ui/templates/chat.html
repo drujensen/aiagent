@@ -1,10 +1,16 @@
 {{define "chat_content"}}
 <main class="content">
  <section class="message-history" id="message-history">
-     <div id="messages-container" class="messages-container" data-chat-id="{{.ChatID}}"></div>
+     <div id="messages-container" class="messages-container" data-chat-id="{{.ChatID}}">
+    {{range .Messages}}
+         <div class="message {{if eq .Role "user"}}user-message{{else if eq .Role "assistant"}}agent-message{{else}}tool-message{{end}}">
+             {{renderMarkdown .Content}}
+         </div>
+    {{end}}
+     </div>
  </section>
  <section class="message-input" id="message-input-section">
-     <form id="message-form">
+     <form id="message-form" class="message-form">
          <input type="hidden" id="chat-id" value="{{.ChatID}}">
          <textarea id="message-input" placeholder="Type your message..." rows="3"></textarea>
          <button type="submit"><i class="fas fa-paper-plane"></i> Send</button>

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"html/template"
 
@@ -15,6 +16,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/yuin/goldmark"
+	gfmext "github.com/yuin/goldmark/extension"
 	"go.uber.org/zap"
 )
 
@@ -53,6 +56,7 @@ func main() {
 
 	// Define custom template functions
 	funcMap := template.FuncMap{
+		"renderMarkdown": renderMarkdown,
 		"inArray": func(value string, array []string) bool {
 			for _, item := range array {
 				if item == value {
@@ -146,4 +150,12 @@ func main() {
 	if err := e.Start(":8080"); err != nil {
 		logger.Fatal("Failed to start server", zap.Error(err))
 	}
+}
+
+func renderMarkdown(markdown string) (template.HTML, error) {
+	var buf bytes.Buffer
+	if err := goldmark.New(goldmark.WithExtensions(gfmext.GFM)).Convert([]byte(markdown), &buf); err != nil {
+		return "", err
+	}
+	return template.HTML(buf.String()), nil
 }

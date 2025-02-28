@@ -231,5 +231,6 @@ func (s *chatService) GetChat(ctx context.Context, id string) (*entities.Chat, e
 		}
 		return nil, fmt.Errorf("failed to retrieve chat: %v", err)
 	}
+
 	return chat, nil
 }

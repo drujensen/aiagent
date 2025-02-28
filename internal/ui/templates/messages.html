@@ -3,7 +3,7 @@
       <h3>Chat: {{.ChatName}}</h3> <!-- Display Chat name -->
       {{range .Messages}}
       <div class="message {{if eq .Role "user"}}user-message{{else if eq .Role "assistant"}}agent-message{{else}}tool-message{{end}}">
-          <strong>{{.Role}} ({{.Timestamp}}):</strong> {{.Content}}
+          {{.Content}}
       </div>
       {{end}}
   </div>
