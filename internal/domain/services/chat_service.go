@@ -8,6 +8,7 @@ import (
 
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/interfaces"
+	"aiagent/internal/infrastructure/config"
 	"aiagent/internal/infrastructure/integrations"
 
 	"github.com/google/uuid"
@@ -29,13 +30,15 @@ type ChatService interface {
 type chatService struct {
 	chatRepo         interfaces.ChatRepository
 	agentRepo        interfaces.AgentRepository
+	config           *config.Config
 	messageListeners []MessageListener
 }
 
-func NewChatService(chatRepo interfaces.ChatRepository, agentRepo interfaces.AgentRepository) *chatService {
+func NewChatService(chatRepo interfaces.ChatRepository, agentRepo interfaces.AgentRepository, cfg *config.Config) *chatService {
 	return &chatService{
 		chatRepo:         chatRepo,
 		agentRepo:        agentRepo,
+		config:           cfg, // Store the config
 		messageListeners: []MessageListener{},
 	}
 }
@@ -77,7 +80,14 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 			return
 		}
 
-		aiModel, err := integrations.NewGenericAIModel(agent.Endpoint, agent.APIKey, agent.Model)
+		// Resolve the API key before initializing the AI model
+		resolvedAPIKey, err := s.config.ResolveAPIKey(agent.APIKey)
+		if err != nil {
+			log.Printf("Failed to resolve API key for agent %s: %v", agent.ID.Hex(), err)
+			return
+		}
+
+		aiModel, err := integrations.NewGenericAIModel(agent.Endpoint, resolvedAPIKey, agent.Model)
 		if err != nil {
 			log.Printf("Failed to initialize AI model: %v", err)
 			return

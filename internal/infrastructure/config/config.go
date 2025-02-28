@@ -13,6 +13,7 @@ type Config struct {
 	MongoURI    string `mapstructure:"MONGO_URI"`
 	LocalAPIKey string `mapstructure:"LOCAL_API_KEY"`
 	logger      *zap.Logger
+	viper       *viper.Viper // Add this field to store the Viper instance
 }
 
 var (
@@ -51,6 +52,7 @@ func InitConfig() (*Config, error) {
 
 		configInstance = &Config{
 			logger: logger,
+			viper:  v,
 		}
 
 		if err := v.Unmarshal(configInstance); err != nil {
@@ -91,7 +93,7 @@ func (c *Config) ResolveAPIKey(apiKey string) (string, error) {
 			return "", fmt.Errorf("empty variable name in API key reference: %s", apiKey)
 		}
 
-		resolved := viper.GetString(varName)
+		resolved := c.viper.GetString(varName) // Use c.viper instead of viper
 		if resolved == "" {
 			c.logger.Warn("Environment variable not found for API key reference",
 				zap.String("reference", apiKey),

@@ -1,11 +1,11 @@
 {{define "chat_content"}}
 <main class="content">
  <section class="message-history" id="message-history">
-     <div id="messages-container" class="messages-container" data-chat-id="{{.Chat.ID.Hex}}"></div>
+     <div id="messages-container" class="messages-container" data-chat-id="{{.ChatID}}"></div>
  </section>
  <section class="message-input" id="message-input-section">
      <form id="message-form">
-         <input type="hidden" id="chat-id" value="{{.Chat.ID.Hex}}">
+         <input type="hidden" id="chat-id" value="{{.ChatID}}">
          <textarea id="message-input" placeholder="Type your message..." rows="3"></textarea>
          <button type="submit"><i class="fas fa-paper-plane"></i> Send</button>
      </form>

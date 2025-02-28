@@ -44,7 +44,7 @@ func main() {
 
 	agentService := services.NewAgentService(agentRepo)
 	toolService := services.NewToolService(toolRepo)
-	chatService := services.NewChatService(chatRepo, agentRepo)
+	chatService := services.NewChatService(chatRepo, agentRepo, cfg)
 
 	hub := websocket.NewChatHub()
 	go hub.Run()

@@ -79,15 +79,15 @@ func (h *ChatHub) Run() {
 	}
 }
 
-func (h *ChatHub) MessageListener(ChatID string, message entities.Message) {
-	h.broadcast <- broadcastMessage{ChatID, message}
+func (h *ChatHub) MessageListener(chatID string, message entities.Message) {
+	h.broadcast <- broadcastMessage{chatID, message}
 }
 
 func ChatHandler(hub *ChatHub, chatService services.ChatService, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ChatID := r.URL.Query().Get("Chat_id")
-		if ChatID == "" {
-			http.Error(w, "Missing Chat_id", http.StatusBadRequest)
+		chatID := r.URL.Query().Get("chat_id") // Changed from "Chat_id" to "chat_id"
+		if chatID == "" {
+			http.Error(w, "Missing chat_id", http.StatusBadRequest)
 			return
 		}
 
@@ -98,10 +98,10 @@ func ChatHandler(hub *ChatHub, chatService services.ChatService, cfg *config.Con
 		}
 		defer conn.Close()
 
-		hub.register <- registration{ChatID, conn}
+		hub.register <- registration{chatID, conn}
 
 		defer func() {
-			hub.unregister <- unregistration{ChatID, conn}
+			hub.unregister <- unregistration{chatID, conn}
 		}()
 
 		for {
@@ -115,12 +115,12 @@ func ChatHandler(hub *ChatHub, chatService services.ChatService, cfg *config.Con
 				break
 			}
 
-			if msg.ChatID != ChatID {
-				log.Println("Mismatched Chat ID")
+			if msg.ChatID != chatID {
+				log.Println("Mismatched chat ID")
 				continue
 			}
 
-			err = chatService.SendMessage(r.Context(), ChatID, msg.Message)
+			err = chatService.SendMessage(r.Context(), chatID, msg.Message)
 			if err != nil {
 				log.Println("SendMessage error:", err)
 				conn.WriteJSON(map[string]string{"error": err.Error()})
