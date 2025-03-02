@@ -40,7 +40,7 @@ class ChatWebSocket {
                 } else {
                     messageElement.classList.add('tool-message');
                 }
-                messageElement.innerHTML = `<strong>${message.role} (${message.timestamp}):</strong> ${message.content}`;
+                messageElement.innerHTML = `${message.content}`;
                 messagesContainer.appendChild(messageElement);
                 // Scroll to the bottom
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -82,9 +82,8 @@ class ChatWebSocket {
             if (messagesContainer) {
                 const messageElement = document.createElement('div');
                 messageElement.classList.add('message', 'user-message');
-                messageElement.innerHTML = `<strong>user (${new Date().toISOString()}):</strong> ${message}`;
+                messageElement.innerHTML = `${message}`;
                 messagesContainer.appendChild(messageElement);
-                // Scroll to the bottom
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
             this.socket.send(JSON.stringify({

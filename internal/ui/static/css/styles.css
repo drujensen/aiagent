@@ -135,13 +135,13 @@ body, html {
 .user-message {
     background-color: #444;
     color: #fff;
-    text-align: right;
-    margin-left: 20%;
+    text-align: center;
+    margin-left: 50%;
 }
 
 .agent-message {
     text-align: left;
-    margin-right: 20%;
+    margin-right: 0%;
 }
 
 .message-input {

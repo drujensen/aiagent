@@ -85,7 +85,7 @@ func (h *ChatHub) MessageListener(chatID string, message entities.Message) {
 
 func ChatHandler(hub *ChatHub, chatService services.ChatService, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		chatID := r.URL.Query().Get("chat_id") // Changed from "Chat_id" to "chat_id"
+		chatID := r.URL.Query().Get("chat_id")
 		if chatID == "" {
 			http.Error(w, "Missing chat_id", http.StatusBadRequest)
 			return

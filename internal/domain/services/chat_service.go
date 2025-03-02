@@ -87,7 +87,7 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 			return
 		}
 
-		aiModel, err := integrations.NewGenericAIModel(agent.Endpoint, resolvedAPIKey, agent.Model)
+		aiModel, err := integrations.NewAIModelIntegration(agent.Endpoint, resolvedAPIKey, agent.Model)
 		if err != nil {
 			log.Printf("Failed to initialize AI model: %v", err)
 			return

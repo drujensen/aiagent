@@ -11,7 +11,7 @@ import (
 	"aiagent/internal/domain/interfaces"
 )
 
-type GenericAIModel struct {
+type AIModelIntegration struct {
 	baseURL    string
 	apiKey     string
 	httpClient *http.Client
@@ -19,7 +19,7 @@ type GenericAIModel struct {
 	modelName  string
 }
 
-func NewGenericAIModel(baseURL, apiKey, modelName string) (*GenericAIModel, error) {
+func NewAIModelIntegration(baseURL, apiKey, modelName string) (*AIModelIntegration, error) {
 	if baseURL == "" {
 		return nil, fmt.Errorf("baseURL cannot be empty")
 	}
@@ -29,7 +29,7 @@ func NewGenericAIModel(baseURL, apiKey, modelName string) (*GenericAIModel, erro
 	if modelName == "" {
 		return nil, fmt.Errorf("modelName cannot be empty")
 	}
-	return &GenericAIModel{
+	return &AIModelIntegration{
 		baseURL:    baseURL,
 		apiKey:     apiKey,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
@@ -47,7 +47,7 @@ type ToolCall struct {
 	} `json:"function"`
 }
 
-func (m *GenericAIModel) GenerateResponse(messages []map[string]string, options map[string]interface{}) (string, error) {
+func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, options map[string]interface{}) (string, error) {
 	// Prepare tool definitions
 	var tools []map[string]interface{}
 	if toolList, ok := options["tools"].([]map[string]string); ok && len(toolList) > 0 {
@@ -195,8 +195,8 @@ func (m *GenericAIModel) GenerateResponse(messages []map[string]string, options 
 	return finalResponse, nil
 }
 
-func (m *GenericAIModel) GetTokenUsage() (int, error) {
+func (m *AIModelIntegration) GetTokenUsage() (int, error) {
 	return m.lastUsage, nil
 }
 
-var _ interfaces.AIModelIntegration = (*GenericAIModel)(nil)
+var _ interfaces.AIModelIntegration = (*AIModelIntegration)(nil)
