@@ -72,11 +72,11 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		return fmt.Errorf("failed to update chat: %w", err)
 	}
 
-	go func(conv *entities.Chat) {
+	go func(chat *entities.Chat) {
 		bgCtx := context.Background()
-		agent, err := s.agentRepo.GetAgent(bgCtx, conv.AgentID.Hex())
+		agent, err := s.agentRepo.GetAgent(bgCtx, chat.AgentID.Hex())
 		if err != nil {
-			log.Printf("Failed to get agent %s: %v", conv.AgentID.Hex(), err)
+			log.Printf("Failed to get agent %s: %v", chat.AgentID.Hex(), err)
 			return
 		}
 
@@ -93,14 +93,14 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 			return
 		}
 
-		messages := make([]map[string]string, len(conv.Messages))
-		for i, msg := range conv.Messages {
+		messages := make([]map[string]string, len(chat.Messages))
+		for i, msg := range chat.Messages {
 			messages[i] = map[string]string{
 				"role":    msg.Role,
 				"content": msg.Content,
 			}
 			if msg.Role == "tool" {
-				messages[i]["tool_call_id"] = msg.ID // Assuming ID is used as tool_call_id
+				messages[i]["tool_call_id"] = msg.ID
 			}
 		}
 
@@ -122,12 +122,12 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		if agent.Temperature != nil {
 			options["temperature"] = *agent.Temperature
 		} else {
-			options["temperature"] = 0.7 // Default
+			options["temperature"] = 0.7
 		}
 		if agent.MaxTokens != nil {
 			options["max_tokens"] = *agent.MaxTokens
 		} else {
-			options["max_tokens"] = 1024 // Default
+			options["max_tokens"] = 1024
 		}
 
 		response, err := aiModel.GenerateResponse(messages, options)
