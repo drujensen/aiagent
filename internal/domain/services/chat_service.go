@@ -143,10 +143,10 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 			Timestamp: time.Now(),
 		}
 
-		conv.Messages = append(conv.Messages, aiMessage)
-		conv.UpdatedAt = time.Now()
+		chat.Messages = append(chat.Messages, aiMessage)
+		chat.UpdatedAt = time.Now()
 
-		if err := s.chatRepo.UpdateChat(bgCtx, conv); err != nil {
+		if err := s.chatRepo.UpdateChat(bgCtx, chat); err != nil {
 			log.Printf("Failed to update chat with AI response: %v", err)
 			return
 		}
