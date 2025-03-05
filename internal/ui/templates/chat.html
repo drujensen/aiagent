@@ -14,7 +14,7 @@
               hx-post="/chats/{{.ChatID}}/messages"
               hx-target="#messages-container"
               hx-swap="beforeend"
-              hx-trigger="submit"
+              hx-trigger="submit, keydown[ctrlKey || metaKey && key == 'Enter']"
               hx-on-htmx-before-request="handleBeforeRequest(this)"
               hx-on-htmx-after-request="handleAfterRequest(this)">
             <input type="hidden" name="chat_id" value="{{.ChatID}}">
@@ -61,7 +61,7 @@ function handleAfterRequest(form) {
     // Clear the ids for the next submission
     document.getElementById('temp-user-message').id = '';
     document.getElementById('temp-thinking-message').id = '';
-    
+
    let messageHistory = document.getElementById('message-history');
     messageHistory.scrollTop = messageHistory.scrollHeight;
 }
