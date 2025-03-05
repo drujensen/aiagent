@@ -18,10 +18,10 @@
    </header>
    <div class="container">
        <aside class="sidebar">
-           <!-- chats Section -->
+           <!-- Chats Section -->
            <div id="sidebar-chats" hx-get="/sidebar/chats" hx-trigger="load" hx-swap="innerHTML">
-               <h2><i class="fas fa-comment"></i> chats <span class="spinner"></span></h2>
-               <ul class="Chat-list"><li>Loading...</li></ul>
+               <h2><i class="fas fa-comment"></i> Chats <span class="spinner"></span></h2>
+               <ul class="chat-list"><li>Loading...</li></ul>
            </div>
            <!-- Agents Section -->
            <div id="sidebar-agents" hx-get="/sidebar/agents" hx-trigger="load" hx-swap="innerHTML">
@@ -47,7 +47,6 @@
        </main>
    </div>
    <script src="/static/js/htmx.min.js"></script>
-   <script src="/static/js/chat.js"></script>
 </body>
 </html>
 {{end}}

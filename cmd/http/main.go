@@ -6,7 +6,6 @@ import (
 	"html/template"
 
 	apicontrollers "aiagent/internal/api/controllers"
-	"aiagent/internal/api/websocket"
 	"aiagent/internal/domain/services"
 	"aiagent/internal/infrastructure/config"
 	"aiagent/internal/infrastructure/database"
@@ -40,7 +39,7 @@ func main() {
 	toolRepo := repositories.NewMongoToolRepository(db.Collection("tools"))
 	chatRepo := repositories.NewMongoChatRepository(db.Collection("chats"))
 
-	workspace := "/workspace"
+	workspace := "/Users/drujensen/workspace"
 	if err := integrations.InitializeTools(context.Background(), toolRepo, workspace); err != nil {
 		logger.Fatal("Failed to initialize tools", zap.Error(err))
 	}
@@ -48,11 +47,6 @@ func main() {
 	agentService := services.NewAgentService(agentRepo)
 	toolService := services.NewToolService(toolRepo)
 	chatService := services.NewChatService(chatRepo, agentRepo, cfg)
-
-	hub := websocket.NewChatHub()
-	go hub.Run()
-
-	chatService.AddMessageListener(hub.MessageListener)
 
 	// Define custom template functions
 	funcMap := template.FuncMap{
@@ -79,7 +73,7 @@ func main() {
 		"internal/ui/templates/agent_form.html",
 		"internal/ui/templates/chat.html",
 		"internal/ui/templates/chat_form.html",
-		"internal/ui/templates/messages.html",
+		"internal/ui/templates/messages_partial.html",
 	)
 	if err != nil {
 		logger.Fatal("Failed to parse templates", zap.Error(err))
@@ -124,6 +118,7 @@ func main() {
 	e.GET("/chats/:id", chatController.ChatHandler)
 	e.GET("/chats/:id/edit", chatController.ChatFormHandler)
 	e.PUT("/chats/:id", chatController.UpdateChatHandler)
+	e.POST("/chats/:id/messages", chatController.SendMessageHandler) // New UI route
 
 	// Sidebar Partial Routes
 	e.GET("/sidebar/chats", homeController.ChatsPartialHandler)
@@ -138,12 +133,6 @@ func main() {
 	e.DELETE("/api/agents/:id", apiAgentController.AgentDetailHandler)
 	e.GET("/api/tools", apiToolController.ListTools)
 	e.POST("/api/chats", apiChatController.CreateChat)
-
-	// WebSocket Route
-	e.GET("/api/ws/chat", func(c echo.Context) error {
-		websocket.ChatHandler(hub, chatService, cfg)(c.Response().Writer, c.Request())
-		return nil
-	})
 
 	// Start server
 	logger.Info("Starting HTTP server on :8080")

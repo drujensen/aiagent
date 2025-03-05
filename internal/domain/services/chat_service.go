@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"aiagent/internal/domain/entities"
@@ -19,7 +18,7 @@ import (
 type MessageListener func(chatID string, message entities.Message)
 
 type ChatService interface {
-	SendMessage(ctx context.Context, chatID string, message entities.Message) error
+	SendMessage(ctx context.Context, chatID string, message entities.Message) (*entities.Message, error)
 	CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error)
 	ListActiveChats(ctx context.Context) ([]*entities.Chat, error)
 	GetChat(ctx context.Context, id string) (*entities.Chat, error)
@@ -38,7 +37,7 @@ func NewChatService(chatRepo interfaces.ChatRepository, agentRepo interfaces.Age
 	return &chatService{
 		chatRepo:         chatRepo,
 		agentRepo:        agentRepo,
-		config:           cfg, // Store the config
+		config:           cfg,
 		messageListeners: []MessageListener{},
 	}
 }
@@ -47,20 +46,20 @@ func (s *chatService) AddMessageListener(listener MessageListener) {
 	s.messageListeners = append(s.messageListeners, listener)
 }
 
-func (s *chatService) SendMessage(ctx context.Context, chatID string, message entities.Message) error {
+func (s *chatService) SendMessage(ctx context.Context, chatID string, message entities.Message) (*entities.Message, error) {
 	if chatID == "" {
-		return fmt.Errorf("chat ID is required")
+		return nil, fmt.Errorf("chat ID is required")
 	}
 	if message.Role == "" || message.Content == "" {
-		return fmt.Errorf("message role and content are required")
+		return nil, fmt.Errorf("message role and content are required")
 	}
 
 	chat, err := s.chatRepo.GetChat(ctx, chatID)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return fmt.Errorf("chat not found: %s", chatID)
+			return nil, fmt.Errorf("chat not found: %s", chatID)
 		}
-		return fmt.Errorf("failed to retrieve chat: %w", err)
+		return nil, fmt.Errorf("failed to retrieve chat: %w", err)
 	}
 
 	message.ID = uuid.New().String()
@@ -69,94 +68,79 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 	chat.UpdatedAt = time.Now()
 
 	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
-		return fmt.Errorf("failed to update chat: %w", err)
+		return nil, fmt.Errorf("failed to update chat: %w", err)
 	}
 
-	go func(chat *entities.Chat) {
-		bgCtx := context.Background()
-		agent, err := s.agentRepo.GetAgent(bgCtx, chat.AgentID.Hex())
-		if err != nil {
-			log.Printf("Failed to get agent %s: %v", chat.AgentID.Hex(), err)
-			return
-		}
+	// Generate AI response synchronously
+	agent, err := s.agentRepo.GetAgent(ctx, chat.AgentID.Hex())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get agent %s: %v", chat.AgentID.Hex(), err)
+	}
 
-		// Resolve the API key before initializing the AI model
-		resolvedAPIKey, err := s.config.ResolveAPIKey(agent.APIKey)
-		if err != nil {
-			log.Printf("Failed to resolve API key for agent %s: %v", agent.ID.Hex(), err)
-			return
-		}
+	resolvedAPIKey, err := s.config.ResolveAPIKey(agent.APIKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve API key for agent %s: %v", agent.ID.Hex(), err)
+	}
 
-		aiModel, err := integrations.NewAIModelIntegration(agent.Endpoint, resolvedAPIKey, agent.Model)
-		if err != nil {
-			log.Printf("Failed to initialize AI model: %v", err)
-			return
-		}
+	aiModel, err := integrations.NewAIModelIntegration(agent.Endpoint, resolvedAPIKey, agent.Model)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize AI model: %v", err)
+	}
 
-		messages := make([]map[string]string, len(chat.Messages))
-		for i, msg := range chat.Messages {
-			messages[i] = map[string]string{
-				"role":    msg.Role,
-				"content": msg.Content,
+	messages := make([]map[string]string, len(chat.Messages))
+	for i, msg := range chat.Messages {
+		messages[i] = map[string]string{
+			"role":    msg.Role,
+			"content": msg.Content,
+		}
+		if msg.Role == "tool" {
+			messages[i]["tool_call_id"] = msg.ID
+		}
+	}
+
+	options := map[string]interface{}{}
+	if len(agent.Tools) > 0 {
+		toolList := make([]map[string]string, 0, len(agent.Tools))
+		for _, toolID := range agent.Tools {
+			tool := integrations.GetToolByID(toolID.Hex())
+			if tool != nil {
+				toolList = append(toolList, map[string]string{
+					"name": tool.Name(),
+				})
 			}
-			if msg.Role == "tool" {
-				messages[i]["tool_call_id"] = msg.ID
-			}
 		}
+		options["tools"] = toolList
+	}
+	if agent.Temperature != nil {
+		options["temperature"] = *agent.Temperature
+	} else {
+		options["temperature"] = 0.7
+	}
+	if agent.MaxTokens != nil {
+		options["max_tokens"] = *agent.MaxTokens
+	} else {
+		options["max_tokens"] = 1024
+	}
 
-		// Add available tools to options if any
-		options := map[string]interface{}{}
-		if len(agent.Tools) > 0 {
-			toolList := make([]map[string]string, 0, len(agent.Tools))
-			for _, toolID := range agent.Tools {
-				tool := integrations.GetToolByID(toolID.Hex())
-				if tool != nil {
-					toolList = append(toolList, map[string]string{
-						"name": tool.Name(),
-					})
-				}
-			}
-			options["tools"] = toolList
-		}
+	response, err := aiModel.GenerateResponse(messages, options)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate AI response: %v", err)
+	}
 
-		if agent.Temperature != nil {
-			options["temperature"] = *agent.Temperature
-		} else {
-			options["temperature"] = 0.7
-		}
-		if agent.MaxTokens != nil {
-			options["max_tokens"] = *agent.MaxTokens
-		} else {
-			options["max_tokens"] = 1024
-		}
+	aiMessage := entities.NewMessage("assistant", response)
+	chat.Messages = append(chat.Messages, *aiMessage)
+	chat.UpdatedAt = time.Now()
 
-		response, err := aiModel.GenerateResponse(messages, options)
-		if err != nil {
-			log.Printf("Failed to generate AI response: %v", err)
-			return
-		}
+	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
+		return nil, fmt.Errorf("failed to update chat with AI response: %v", err)
+	}
 
-		aiMessage := entities.Message{
-			ID:        uuid.New().String(),
-			Role:      "assistant",
-			Content:   response,
-			Timestamp: time.Now(),
-		}
+	// Notify listeners (if any)
+	for _, listener := range s.messageListeners {
+		listener(chatID, *aiMessage)
+	}
 
-		chat.Messages = append(chat.Messages, aiMessage)
-		chat.UpdatedAt = time.Now()
-
-		if err := s.chatRepo.UpdateChat(bgCtx, chat); err != nil {
-			log.Printf("Failed to update chat with AI response: %v", err)
-			return
-		}
-
-		for _, listener := range s.messageListeners {
-			listener(chatID, aiMessage)
-		}
-	}(chat)
-
-	return nil
+	return aiMessage, nil
 }
 
 func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error) {

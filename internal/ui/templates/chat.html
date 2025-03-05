@@ -1,20 +1,66 @@
 {{define "chat_content"}}
 <main class="content">
- <section class="message-history" id="message-history">
-     <div id="messages-container" class="messages-container" data-chat-id="{{.ChatID}}">
-    {{range .Messages}}
-         <div class="message {{if eq .Role "user"}}user-message{{else if eq .Role "assistant"}}agent-message{{else}}tool-message{{end}}">
-             {{renderMarkdown .Content}}
-         </div>
-    {{end}}
-     </div>
- </section>
- <section class="message-input" id="message-input-section">
-     <form id="message-form" class="message-form">
-         <input type="hidden" id="chat-id" value="{{.ChatID}}">
-         <textarea id="message-input" placeholder="Type your message..." rows="3"></textarea>
-         <button type="submit"><i class="fas fa-paper-plane"></i> Send</button>
-     </form>
- </section>
+    <section class="message-history" id="message-history">
+        <div id="messages-container" class="messages-container" data-chat-id="{{.ChatID}}">
+            {{range .Messages}}
+            <div class="message {{if eq .Role "user"}}user-message{{else if eq .Role "assistant"}}agent-message{{else}}tool-message{{end}}">
+                {{renderMarkdown .Content}}
+            </div>
+            {{end}}
+        </div>
+    </section>
+    <section class="message-input" id="message-input-section">
+        <form id="message-form"
+              hx-post="/chats/{{.ChatID}}/messages"
+              hx-target="#messages-container"
+              hx-swap="beforeend"
+              hx-trigger="submit"
+              hx-on-htmx-before-request="handleBeforeRequest(this)"
+              hx-on-htmx-after-request="handleAfterRequest(this)">
+            <input type="hidden" name="chat_id" value="{{.ChatID}}">
+            <textarea name="message" id="message-input" placeholder="Type your message..." rows="3"></textarea>
+            <button type="submit" id="send-button"><i class="fas fa-paper-plane"></i> Send</button>
+        </form>
+    </section>
 </main>
+<script>
+let messageCounter = 0;
+
+function handleBeforeRequest(form) {
+    console.log("Before request triggered"); // Debug log
+    let msg = form.querySelector('textarea').value.trim();
+    if (msg === '') return; // Prevent empty submissions
+
+    // Append user message with unique ID
+    let userDiv = document.createElement('div');
+    userDiv.id = 'temp-user-message';
+    userDiv.className = 'message user-message';
+    userDiv.textContent = msg;
+    document.getElementById('messages-container').appendChild(userDiv);
+
+    // Append "Thinking..." bubble with unique ID
+    let thinkingDiv = document.createElement('div');
+    thinkingDiv.id = 'temp-thinking-message';
+    thinkingDiv.className = 'message agent-message';
+    thinkingDiv.textContent = 'Thinking...';
+    document.getElementById('messages-container').appendChild(thinkingDiv);
+
+    // Scroll to bottom
+    let messageHistory = document.getElementById('message-history');
+    messageHistory.scrollTop = messageHistory.scrollHeight;
+
+    // Disable send button
+    document.getElementById('send-button').disabled = true;
+}
+
+function handleAfterRequest(form) {
+    // Re-enable send button and clear textarea
+    document.getElementById('send-button').disabled = false;
+    form.querySelector('textarea').value = '';
+
+    // Clear the ids for the next submission
+    document.getElementById('temp-user-message').id = '';
+    document.getElementById('temp-thinking-message').id = '';
+}
+</script>
 {{end}}
