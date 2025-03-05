@@ -157,6 +157,11 @@ body, html {
     color: #fff;
 }
 
+.message-form {
+    display: flex;
+    width: 100%;
+}
+
 .message-input textarea {
     flex-grow: 1;
     width: 90%;

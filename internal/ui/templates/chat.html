@@ -10,7 +10,7 @@
         </div>
     </section>
     <section class="message-input" id="message-input-section">
-        <form id="message-form"
+        <form id="message-form" class="message-form"
               hx-post="/chats/{{.ChatID}}/messages"
               hx-target="#messages-container"
               hx-swap="beforeend"
@@ -61,6 +61,9 @@ function handleAfterRequest(form) {
     // Clear the ids for the next submission
     document.getElementById('temp-user-message').id = '';
     document.getElementById('temp-thinking-message').id = '';
+    
+   let messageHistory = document.getElementById('message-history');
+    messageHistory.scrollTop = messageHistory.scrollHeight;
 }
 </script>
 {{end}}
