@@ -54,16 +54,17 @@ function handleBeforeRequest(form) {
 }
 
 function handleAfterRequest(form) {
-    // Re-enable send button and clear textarea
-    document.getElementById('send-button').disabled = false;
-    form.querySelector('textarea').value = '';
-
     // Clear the ids for the next submission
     document.getElementById('temp-user-message').id = '';
     document.getElementById('temp-thinking-message').id = '';
 
-   let messageHistory = document.getElementById('message-history');
+    // Scroll to bottom
+    let messageHistory = document.getElementById('message-history');
     messageHistory.scrollTop = messageHistory.scrollHeight;
+
+    // Re-enable send button and clear textarea
+    document.getElementById('send-button').disabled = false;
+    form.querySelector('textarea').value = '';
 }
 </script>
 {{end}}

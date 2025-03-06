@@ -15,35 +15,26 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type MessageListener func(chatID string, message entities.Message)
-
 type ChatService interface {
 	SendMessage(ctx context.Context, chatID string, message entities.Message) (*entities.Message, error)
 	CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error)
 	ListActiveChats(ctx context.Context) ([]*entities.Chat, error)
 	GetChat(ctx context.Context, id string) (*entities.Chat, error)
 	UpdateChat(ctx context.Context, id, name string) (*entities.Chat, error)
-	AddMessageListener(listener MessageListener)
 }
 
 type chatService struct {
-	chatRepo         interfaces.ChatRepository
-	agentRepo        interfaces.AgentRepository
-	config           *config.Config
-	messageListeners []MessageListener
+	chatRepo  interfaces.ChatRepository
+	agentRepo interfaces.AgentRepository
+	config    *config.Config
 }
 
 func NewChatService(chatRepo interfaces.ChatRepository, agentRepo interfaces.AgentRepository, cfg *config.Config) *chatService {
 	return &chatService{
-		chatRepo:         chatRepo,
-		agentRepo:        agentRepo,
-		config:           cfg,
-		messageListeners: []MessageListener{},
+		chatRepo:  chatRepo,
+		agentRepo: agentRepo,
+		config:    cfg,
 	}
-}
-
-func (s *chatService) AddMessageListener(listener MessageListener) {
-	s.messageListeners = append(s.messageListeners, listener)
 }
 
 func (s *chatService) SendMessage(ctx context.Context, chatID string, message entities.Message) (*entities.Message, error) {
@@ -114,12 +105,12 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 	if agent.Temperature != nil {
 		options["temperature"] = *agent.Temperature
 	} else {
-		options["temperature"] = 0.7
+		options["temperature"] = 0.0
 	}
 	if agent.MaxTokens != nil {
 		options["max_tokens"] = *agent.MaxTokens
 	} else {
-		options["max_tokens"] = 1024
+		options["max_tokens"] = 128000
 	}
 
 	response, err := aiModel.GenerateResponse(messages, options)
@@ -133,11 +124,6 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 
 	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
 		return nil, fmt.Errorf("failed to update chat with AI response: %v", err)
-	}
-
-	// Notify listeners (if any)
-	for _, listener := range s.messageListeners {
-		listener(chatID, *aiMessage)
 	}
 
 	return aiMessage, nil
