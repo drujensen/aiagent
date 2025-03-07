@@ -30,7 +30,7 @@ func (c *ToolController) ListTools(eCtx echo.Context) error {
 		return eCtx.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 	}
 
-	tools, err := c.ToolService.ListTools(eCtx.Request().Context())
+	tools, err := c.ToolService.ListTools()
 	if err != nil {
 		return eCtx.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to list tools"})
 	}

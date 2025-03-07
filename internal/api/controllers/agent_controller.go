@@ -85,11 +85,9 @@ func (c *AgentController) CreateAgent(eCtx echo.Context) error {
 
 	// Convert tool IDs from strings to ObjectIDs
 	if len(agent.Tools) > 0 {
-		toolIDs := make([]primitive.ObjectID, 0, len(agent.Tools))
-		for _, toolID := range agent.Tools {
-			if oid, err := primitive.ObjectIDFromHex(toolID.Hex()); err == nil {
-				toolIDs = append(toolIDs, oid)
-			}
+		toolIDs := make([]string, 0, len(agent.Tools))
+		for _, tool := range agent.Tools {
+			toolIDs = append(toolIDs, tool)
 		}
 		agent.Tools = toolIDs
 	}
@@ -137,11 +135,9 @@ func (c *AgentController) UpdateAgent(eCtx echo.Context, id string) error {
 
 	// Convert tool IDs from strings to ObjectIDs
 	if len(agent.Tools) > 0 {
-		toolIDs := make([]primitive.ObjectID, 0, len(agent.Tools))
-		for _, toolID := range agent.Tools {
-			if oid, err := primitive.ObjectIDFromHex(toolID.Hex()); err == nil {
-				toolIDs = append(toolIDs, oid)
-			}
+		toolIDs := make([]string, 0, len(agent.Tools))
+		for _, tool := range agent.Tools {
+			toolIDs = append(toolIDs, tool)
 		}
 		agent.Tools = toolIDs
 	}

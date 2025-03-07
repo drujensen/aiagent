@@ -46,7 +46,7 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusInternalServerError, "Internal server error")
 	}
 
-	tools, err := c.toolService.ListTools(eCtx.Request().Context())
+	tools, err := c.toolService.ListTools()
 	if err != nil {
 		c.logger.Error("Failed to list tools", zap.Error(err))
 		return eCtx.String(http.StatusInternalServerError, "Internal server error")
@@ -92,8 +92,8 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 		agentData.SystemPrompt = agent.SystemPrompt
 		agentData.Temperature = agent.Temperature
 		agentData.MaxTokens = agent.MaxTokens
-		for _, toolID := range agent.Tools {
-			agentData.Tools = append(agentData.Tools, toolID.Hex())
+		for _, tool := range agent.Tools {
+			agentData.Tools = append(agentData.Tools, tool)
 		}
 	}
 
@@ -131,11 +131,9 @@ func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 	}
 
 	tools := eCtx.Request().Form["tools"]
-	agent.Tools = make([]primitive.ObjectID, 0, len(tools))
-	for _, toolID := range tools {
-		if oid, err := primitive.ObjectIDFromHex(toolID); err == nil {
-			agent.Tools = append(agent.Tools, oid)
-		}
+	agent.Tools = make([]string, 0, len(tools))
+	for _, tool := range tools {
+		agent.Tools = append(agent.Tools, tool)
 	}
 
 	if err := c.agentService.CreateAgent(context.Background(), agent); err != nil {
@@ -183,11 +181,9 @@ func (c *AgentController) UpdateAgentHandler(eCtx echo.Context) error {
 	}
 
 	tools := eCtx.Request().Form["tools"]
-	agent.Tools = make([]primitive.ObjectID, 0, len(tools))
-	for _, toolID := range tools {
-		if oid, err := primitive.ObjectIDFromHex(toolID); err == nil {
-			agent.Tools = append(agent.Tools, oid)
-		}
+	agent.Tools = make([]string, 0, len(tools))
+	for _, tool := range tools {
+		agent.Tools = append(agent.Tools, tool)
 	}
 
 	if err := c.agentService.UpdateAgent(context.Background(), agent); err != nil {

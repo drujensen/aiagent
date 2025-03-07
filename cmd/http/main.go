@@ -36,17 +36,21 @@ func main() {
 	defer db.Disconnect(context.Background())
 
 	agentRepo := repositories.NewMongoAgentRepository(db.Collection("agents"))
-	toolRepo := repositories.NewMongoToolRepository(db.Collection("tools"))
 	chatRepo := repositories.NewMongoChatRepository(db.Collection("chats"))
 
-	workspace := "/Users/drujensen/workspace"
-	if err := integrations.InitializeTools(context.Background(), toolRepo, workspace); err != nil {
+	configurations := map[string]string{
+		"baseURL":   "https://api.duckduckgo.com",
+		"workspace": "/Users/drujensen/workspace",
+	}
+
+	toolRepo, err := integrations.NewToolRegistry(configurations)
+	if err != nil {
 		logger.Fatal("Failed to initialize tools", zap.Error(err))
 	}
 
 	agentService := services.NewAgentService(agentRepo)
 	toolService := services.NewToolService(toolRepo)
-	chatService := services.NewChatService(chatRepo, agentRepo, cfg)
+	chatService := services.NewChatService(chatRepo, agentRepo, toolRepo, cfg)
 
 	// Define custom template functions
 	funcMap := template.FuncMap{

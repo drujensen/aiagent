@@ -17,9 +17,10 @@ type AIModelIntegration struct {
 	httpClient *http.Client
 	lastUsage  int
 	modelName  string
+	toolRepo   interfaces.ToolRepository
 }
 
-func NewAIModelIntegration(baseURL, apiKey, modelName string) (*AIModelIntegration, error) {
+func NewAIModelIntegration(baseURL, apiKey, modelName string, toolRepo interfaces.ToolRepository) (*AIModelIntegration, error) {
 	if baseURL == "" {
 		return nil, fmt.Errorf("baseURL cannot be empty")
 	}
@@ -35,6 +36,7 @@ func NewAIModelIntegration(baseURL, apiKey, modelName string) (*AIModelIntegrati
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		lastUsage:  0,
 		modelName:  modelName,
+		toolRepo:   toolRepo,
 	}, nil
 }
 
@@ -47,29 +49,46 @@ type ToolCall struct {
 	} `json:"function"`
 }
 
-func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, options map[string]interface{}) (string, error) {
+func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, toolList []*interfaces.ToolIntegration, options map[string]interface{}) (string, error) {
+
 	// Prepare tool definitions
-	var tools []map[string]interface{}
-	if toolList, ok := options["tools"].([]map[string]string); ok && len(toolList) > 0 {
-		tools = make([]map[string]interface{}, len(toolList))
-		for i, tool := range toolList {
-			tools[i] = map[string]interface{}{
-				"type": "function",
-				"function": map[string]interface{}{
-					"name":        tool["name"],
-					"description": fmt.Sprintf("Execute the %s tool", tool["name"]),
-					"parameters": map[string]interface{}{
-						"type": "object",
-						"properties": map[string]interface{}{
-							"input": map[string]interface{}{
-								"type":        "string",
-								"description": "Input for the tool",
-							},
-						},
-						"required": []string{"input"},
-					},
+	tools := make([]map[string]interface{}, len(toolList))
+	for i, tool := range toolList {
+		requiredFields := make([]string, 0)
+		for _, param := range (*tool).Parameters() {
+			if param.Required {
+				requiredFields = append(requiredFields, param.Name)
+			}
+		}
+
+		properties := make([]map[string]interface{}, len(toolList))
+		for i, param := range (*tool).Parameters() {
+			property := map[string]interface{}{
+				param.Name: map[string]interface{}{
+					"type":        param.Type,
+					"description": param.Description,
 				},
 			}
+
+			// Only add enum if it has values
+			if len(param.Enum) > 0 {
+				property[param.Name].(map[string]interface{})["enum"] = param.Enum
+			}
+
+			properties[i] = property
+		}
+
+		tools[i] = map[string]interface{}{
+			"type": "function",
+			"function": map[string]interface{}{
+				"name":        (*tool).Name(),
+				"description": (*tool).Description(),
+				"parameters": map[string]interface{}{
+					"type":       "object",
+					"properties": properties,
+				},
+				"required": requiredFields,
+			},
 		}
 	}
 
@@ -160,17 +179,15 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, opti
 				continue
 			}
 			toolName := toolCall.Function.Name
-			var args struct {
-				Input string `json:"input"`
-			}
-			if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
-				return "", fmt.Errorf("error parsing tool arguments: %v", err)
+
+			tool, err := m.toolRepo.GetToolByName(toolName)
+			if err != nil {
+				return "", fmt.Errorf("failed to get tool %s: %v", toolName, err)
 			}
 
-			tool := GetToolByName(toolName)
 			var toolResult string
 			if tool != nil {
-				result, err := tool.Execute(args.Input)
+				result, err := (*tool).Execute(toolCall.Function.Arguments)
 				if err != nil {
 					toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
 				} else {

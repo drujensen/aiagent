@@ -1,14 +1,11 @@
 package services
 
 import (
-	"context"
-
-	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/interfaces"
 )
 
 type ToolService interface {
-	ListTools(ctx context.Context) ([]*entities.Tool, error)
+	ListTools() ([]*interfaces.ToolIntegration, error)
 }
 
 type toolService struct {
@@ -21,6 +18,6 @@ func NewToolService(toolRepo interfaces.ToolRepository) *toolService {
 	}
 }
 
-func (s *toolService) ListTools(ctx context.Context) ([]*entities.Tool, error) {
-	return s.toolRepo.ListTools(ctx)
+func (s *toolService) ListTools() ([]*interfaces.ToolIntegration, error) {
+	return s.toolRepo.ListTools()
 }

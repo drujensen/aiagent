@@ -1,81 +1,63 @@
 package integrations
 
 import (
-	"context"
-	"time"
-
-	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/interfaces"
 	"aiagent/internal/infrastructure/integrations/tools"
+	"fmt"
 )
 
 var predefinedTools = []struct {
-	name     string
-	category string
-	factory  func(workspace string) interfaces.ToolIntegration
+	name    string
+	factory func(configuration map[string]string) interfaces.ToolIntegration
 }{
 	{
-		name:     "Search",
-		category: "search",
-		factory:  func(_ string) interfaces.ToolIntegration { return tools.NewSearchTool() },
+		name: "Search",
+		factory: func(configuration map[string]string) interfaces.ToolIntegration {
+			return tools.NewSearchTool(configuration)
+		},
 	},
 	{
-		name:     "Bash",
-		category: "bash",
-		factory:  func(workspace string) interfaces.ToolIntegration { return tools.NewBashTool(workspace) },
+		name: "Bash",
+		factory: func(configuration map[string]string) interfaces.ToolIntegration {
+			return tools.NewBashTool(configuration)
+		},
 	},
 	{
-		name:     "File",
-		category: "file",
-		factory:  func(workspace string) interfaces.ToolIntegration { return tools.NewFileTool(workspace) },
+		name: "File",
+		factory: func(configuration map[string]string) interfaces.ToolIntegration {
+			return tools.NewFileTool(configuration)
+		},
 	},
 }
 
-var toolInstancesByID map[string]interfaces.ToolIntegration
-var toolInstancesByName map[string]interfaces.ToolIntegration
+type ToolRegistry struct {
+	toolInstancesByName map[string]*interfaces.ToolIntegration
+}
 
-func InitializeTools(ctx context.Context, repo interfaces.ToolRepository, workspace string) error {
-	toolInstancesByID = make(map[string]interfaces.ToolIntegration)
-	toolInstancesByName = make(map[string]interfaces.ToolIntegration)
+func NewToolRegistry(configuration map[string]string) (*ToolRegistry, error) {
+	toolRegistry := &ToolRegistry{}
+	toolRegistry.toolInstancesByName = make(map[string]*interfaces.ToolIntegration)
 
 	for _, pt := range predefinedTools {
-		existingTools, err := repo.ListTools(ctx)
-		if err != nil {
-			return err
-		}
-
-		var toolEntity *entities.Tool
-		for _, t := range existingTools {
-			if t.Name == pt.name {
-				toolEntity = t
-				break
-			}
-		}
-
-		if toolEntity == nil {
-			toolEntity = &entities.Tool{
-				Name:        pt.name,
-				Description: pt.category,
-				CreatedAt:   time.Now(),
-				UpdatedAt:   time.Now(),
-			}
-			if err := repo.CreateTool(ctx, toolEntity); err != nil {
-				return err
-			}
-		}
-
-		toolInstance := pt.factory(workspace)
-		toolInstancesByID[toolEntity.ID.Hex()] = toolInstance
-		toolInstancesByName[toolEntity.Name] = toolInstance
+		toolInstance := pt.factory(configuration)
+		toolRegistry.toolInstancesByName[toolInstance.Name()] = &toolInstance
 	}
 
-	return nil
+	return toolRegistry, nil
 }
 
-func GetToolByID(id string) interfaces.ToolIntegration {
-	return toolInstancesByID[id]
+func (t *ToolRegistry) ListTools() ([]*interfaces.ToolIntegration, error) {
+	var tools []*interfaces.ToolIntegration
+	for _, tool := range t.toolInstancesByName {
+		tools = append(tools, tool)
+	}
+	return tools, nil
 }
 
-func GetToolByName(name string) interfaces.ToolIntegration {
-	return toolInstancesByName[name]
+func (t *ToolRegistry) GetToolByName(name string) (*interfaces.ToolIntegration, error) {
+	tool, exists := t.toolInstancesByName[name]
+	if !exists {
+		return nil, fmt.Errorf("tool with name %s not found", name)
+	}
+	return tool, nil
 }

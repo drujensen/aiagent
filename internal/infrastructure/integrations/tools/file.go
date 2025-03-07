@@ -2,40 +2,92 @@ package tools
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"aiagent/internal/domain/interfaces"
 )
 
 type FileTool struct {
-	workspace string
+	configuration map[string]string
 }
 
-func NewFileTool(workspace string) *FileTool {
-	return &FileTool{workspace: workspace}
+func NewFileTool(configuration map[string]string) *FileTool {
+	return &FileTool{configuration: configuration}
 }
 
 func (t *FileTool) Name() string {
 	return "File"
 }
 
-func (t *FileTool) Execute(input string) (string, error) {
-	parts := strings.SplitN(input, ":", 3)
-	if len(parts) < 2 {
-		return "", fmt.Errorf("invalid input format: expected at least 'operation:path'")
+func (t *FileTool) Description() string {
+	return "A tool to read, write or patch files"
+}
+
+func (t *FileTool) Configuration() []string {
+	return []string{
+		"workspace",
+	}
+}
+
+func (t *FileTool) Parameters() []interfaces.Parameter {
+	return []interfaces.Parameter{
+		{
+			Name:        "operation",
+			Type:        "string",
+			Enum:        []string{"read", "write", "patch"},
+			Description: "read, write or patch operation",
+			Required:    true,
+		},
+		{
+			Name:        "path",
+			Type:        "string",
+			Description: "The file path",
+			Required:    true,
+		},
+		{
+			Name:        "content",
+			Type:        "string",
+			Description: "The content to write or the diff to patch",
+			Required:    false,
+		},
+	}
+}
+
+func (t *FileTool) Execute(arguments string) (string, error) {
+	var args struct {
+		operation string `json:"operation"`
+		path      string `json:"path"`
+		content   string `json:"content"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+		return "", fmt.Errorf("error parsing tool arguments: %v", err)
 	}
 
-	operation := parts[0]
-	path := parts[1]
-	var content string
-	if len(parts) == 3 {
-		content = parts[2]
+	operation := args.operation
+	if operation == "" {
+		return "", fmt.Errorf("operation cannot be empty")
+	}
+	path := args.path
+	if path == "" {
+		return "", fmt.Errorf("path cannot be empty")
+	}
+	content := args.content
+	if operation != "read" && content == "" {
+		return "", fmt.Errorf("content cannot be empty for %s operation", operation)
 	}
 
-	fullPath := filepath.Join(t.workspace, path)
-	rel, err := filepath.Rel(t.workspace, fullPath)
+	workspace := t.configuration["workspace"]
+	if workspace == "" {
+		return "", fmt.Errorf("workspace configuration is required")
+	}
+
+	fullPath := filepath.Join(workspace, path)
+	rel, err := filepath.Rel(workspace, fullPath)
 	if err != nil || strings.HasPrefix(rel, "..") {
 		return "", fmt.Errorf("path is outside workspace: %s", path)
 	}
@@ -49,9 +101,6 @@ func (t *FileTool) Execute(input string) (string, error) {
 		return string(data), nil
 
 	case "write":
-		if len(parts) != 3 {
-			return "", fmt.Errorf("write operation requires content")
-		}
 		err := os.WriteFile(fullPath, []byte(content), 0644)
 		if err != nil {
 			return "", fmt.Errorf("failed to write to file %s: %w", fullPath, err)
@@ -59,9 +108,6 @@ func (t *FileTool) Execute(input string) (string, error) {
 		return "File written successfully", nil
 
 	case "patch":
-		if len(parts) != 3 {
-			return "", fmt.Errorf("patch operation requires diff content")
-		}
 		tempFile, err := os.CreateTemp("", "diff-*.txt")
 		if err != nil {
 			return "", fmt.Errorf("failed to create temporary file for diff: %w", err)

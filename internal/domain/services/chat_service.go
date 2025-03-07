@@ -26,13 +26,15 @@ type ChatService interface {
 type chatService struct {
 	chatRepo  interfaces.ChatRepository
 	agentRepo interfaces.AgentRepository
+	toolRepo  interfaces.ToolRepository
 	config    *config.Config
 }
 
-func NewChatService(chatRepo interfaces.ChatRepository, agentRepo interfaces.AgentRepository, cfg *config.Config) *chatService {
+func NewChatService(chatRepo interfaces.ChatRepository, agentRepo interfaces.AgentRepository, toolRepo interfaces.ToolRepository, cfg *config.Config) *chatService {
 	return &chatService{
 		chatRepo:  chatRepo,
 		agentRepo: agentRepo,
+		toolRepo:  toolRepo,
 		config:    cfg,
 	}
 }
@@ -73,7 +75,7 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		return nil, fmt.Errorf("failed to resolve API key for agent %s: %v", agent.ID.Hex(), err)
 	}
 
-	aiModel, err := integrations.NewAIModelIntegration(agent.Endpoint, resolvedAPIKey, agent.Model)
+	aiModel, err := integrations.NewAIModelIntegration(agent.Endpoint, resolvedAPIKey, agent.Model, s.toolRepo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AI model: %v", err)
 	}
@@ -89,19 +91,17 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		}
 	}
 
-	options := map[string]interface{}{}
-	if len(agent.Tools) > 0 {
-		toolList := make([]map[string]string, 0, len(agent.Tools))
-		for _, toolID := range agent.Tools {
-			tool := integrations.GetToolByID(toolID.Hex())
-			if tool != nil {
-				toolList = append(toolList, map[string]string{
-					"name": tool.Name(),
-				})
-			}
+	tools := []*interfaces.ToolIntegration{}
+
+	for _, toolName := range agent.Tools {
+		tool, err := s.toolRepo.GetToolByName(toolName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get tool %s: %v", toolName, err)
 		}
-		options["tools"] = toolList
+		tools = append(tools, tool)
 	}
+
+	options := map[string]interface{}{}
 	if agent.Temperature != nil {
 		options["temperature"] = *agent.Temperature
 	} else {
@@ -113,7 +113,7 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		options["max_tokens"] = 128000
 	}
 
-	response, err := aiModel.GenerateResponse(messages, options)
+	response, err := aiModel.GenerateResponse(messages, tools, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate AI response: %v", err)
 	}
