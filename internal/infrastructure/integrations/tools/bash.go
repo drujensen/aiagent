@@ -3,18 +3,23 @@ package tools
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"os/exec"
 
 	"aiagent/internal/domain/interfaces"
+
+	"go.uber.org/zap"
 )
 
 type BashTool struct {
 	configuration map[string]string
+	logger        *zap.Logger
 }
 
-func NewBashTool(configuration map[string]string) *BashTool {
-	return &BashTool{configuration: configuration}
+func NewBashTool(configuration map[string]string, logger *zap.Logger) *BashTool {
+	return &BashTool{
+		configuration: configuration,
+		logger:        logger,
+	}
 }
 
 func (t *BashTool) Name() string {
@@ -43,21 +48,32 @@ func (t *BashTool) Parameters() []interfaces.Parameter {
 }
 
 func (t *BashTool) Execute(arguments string) (string, error) {
-	var args struct {
-		command string `json:"command"`
-	}
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return "", fmt.Errorf("error parsing tool arguments: %v", err)
+	// Log the arguments being executed
+	t.logger.Debug("Executing bash command", zap.String("arguments", arguments))
+
+	var command string
+	// Try to unmarshal as a plain string
+	if err := json.Unmarshal([]byte(arguments), &command); err != nil {
+		// If that fails, try unmarshaling as a JSON object
+		var args struct {
+			Command string `json:"command"`
+		}
+		if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+			t.logger.Error("Failed to parse arguments", zap.Error(err))
+			return "", err
+		}
+		command = args.Command
 	}
 
-	command := args.command
 	if command == "" {
-		return "", fmt.Errorf("bash command cannot be empty")
+		t.logger.Error("Command cannot be empty")
+		return "", nil
 	}
 
 	workspace := t.configuration["workspace"]
 	if workspace == "" {
-		return "", fmt.Errorf("workspace configuration is required")
+		t.logger.Error("Workspace configuration is missing")
+		return "", nil
 	}
 
 	cmd := exec.Command("bash", "-c", command)
@@ -70,8 +86,13 @@ func (t *BashTool) Execute(arguments string) (string, error) {
 
 	err := cmd.Run()
 	if err != nil {
-		return "", fmt.Errorf("command execution failed: %s\n%s", err, stderr.String())
+		t.logger.Error("Bash command execution failed",
+			zap.Error(err),
+			zap.String("stderr", stderr.String()))
+		return "", err
 	}
 
+	t.logger.Info("Bash command executed successfully",
+		zap.String("output", out.String()))
 	return out.String(), nil
 }

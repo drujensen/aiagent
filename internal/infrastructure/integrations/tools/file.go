@@ -3,21 +3,26 @@ package tools
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"aiagent/internal/domain/interfaces"
+
+	"go.uber.org/zap"
 )
 
 type FileTool struct {
 	configuration map[string]string
+	logger        *zap.Logger
 }
 
-func NewFileTool(configuration map[string]string) *FileTool {
-	return &FileTool{configuration: configuration}
+func NewFileTool(configuration map[string]string, logger *zap.Logger) *FileTool {
+	return &FileTool{
+		configuration: configuration,
+		logger:        logger,
+	}
 }
 
 func (t *FileTool) Name() string {
@@ -59,65 +64,86 @@ func (t *FileTool) Parameters() []interfaces.Parameter {
 }
 
 func (t *FileTool) Execute(arguments string) (string, error) {
+	// Log the file operation arguments
+	t.logger.Debug("Executing file operation", zap.String("arguments", arguments))
+
 	var args struct {
-		operation string `json:"operation"`
-		path      string `json:"path"`
-		content   string `json:"content"`
+		Operation string `json:"operation"`
+		Path      string `json:"path"`
+		Content   string `json:"content"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return "", fmt.Errorf("error parsing tool arguments: %v", err)
+		t.logger.Error("Failed to parse arguments", zap.Error(err))
+		return "", err
 	}
 
-	operation := args.operation
-	if operation == "" {
-		return "", fmt.Errorf("operation cannot be empty")
-	}
-	path := args.path
-	if path == "" {
-		return "", fmt.Errorf("path cannot be empty")
-	}
-	content := args.content
-	if operation != "read" && content == "" {
-		return "", fmt.Errorf("content cannot be empty for %s operation", operation)
+	operation := args.Operation
+	path := args.Path
+	content := args.Content
+
+	if operation == "" || path == "" {
+		t.logger.Error("Operation and path are required")
+		return "", nil
 	}
 
 	workspace := t.configuration["workspace"]
 	if workspace == "" {
-		return "", fmt.Errorf("workspace configuration is required")
+		t.logger.Error("Workspace configuration is missing")
+		return "", nil
 	}
 
 	fullPath := filepath.Join(workspace, path)
 	rel, err := filepath.Rel(workspace, fullPath)
 	if err != nil || strings.HasPrefix(rel, "..") {
-		return "", fmt.Errorf("path is outside workspace: %s", path)
+		t.logger.Error("Path is outside workspace", zap.String("path", path))
+		return "", nil
 	}
 
 	switch operation {
 	case "read":
 		data, err := os.ReadFile(fullPath)
 		if err != nil {
-			return "", fmt.Errorf("failed to read file %s: %w", fullPath, err)
+			t.logger.Error("Failed to read file",
+				zap.String("path", fullPath),
+				zap.Error(err))
+			return "", err
 		}
+		t.logger.Info("File read successfully", zap.String("path", fullPath))
 		return string(data), nil
 
 	case "write":
+		if content == "" {
+			t.logger.Error("Content is required for write operation")
+			return "", nil
+		}
 		err := os.WriteFile(fullPath, []byte(content), 0644)
 		if err != nil {
-			return "", fmt.Errorf("failed to write to file %s: %w", fullPath, err)
+			t.logger.Error("Failed to write file",
+				zap.String("path", fullPath),
+				zap.Error(err))
+			return "", err
 		}
+		t.logger.Info("File written successfully", zap.String("path", fullPath))
 		return "File written successfully", nil
 
 	case "patch":
+		if content == "" {
+			t.logger.Error("Content is required for patch operation")
+			return "", nil
+		}
 		tempFile, err := os.CreateTemp("", "diff-*.txt")
 		if err != nil {
-			return "", fmt.Errorf("failed to create temporary file for diff: %w", err)
+			t.logger.Error("Failed to create temp file for patch", zap.Error(err))
+			return "", err
 		}
-		defer os.Remove(tempFile.Name())
+		//defer os.Remove(tempFile.Name())
+		t.logger.Debug("TEMP: " + tempFile.Name())
 
 		_, err = tempFile.WriteString(content)
 		if err != nil {
 			tempFile.Close()
-			return "", fmt.Errorf("failed to write diff to temporary file: %w", err)
+			t.logger.Error("Failed to write diff to temp file", zap.Error(err))
+			return "", err
 		}
 		tempFile.Close()
 
@@ -128,11 +154,17 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		cmd.Stderr = &stderr
 		err = cmd.Run()
 		if err != nil {
-			return "", fmt.Errorf("patch failed for %s: %s\n%s", fullPath, err, stderr.String())
+			t.logger.Error("Patch operation failed",
+				zap.String("path", fullPath),
+				zap.Error(err),
+				zap.String("stderr", stderr.String()))
+			return "", err
 		}
+		t.logger.Info("File patched successfully", zap.String("path", fullPath))
 		return "File patched successfully", nil
 
 	default:
-		return "", fmt.Errorf("unknown operation: %s", operation)
+		t.logger.Error("Unknown operation", zap.String("operation", operation))
+		return "", nil
 	}
 }

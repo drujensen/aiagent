@@ -21,7 +21,7 @@ import (
 )
 
 func main() {
-	logger, _ := zap.NewProduction()
+	logger, _ := zap.NewDevelopment()
 	defer logger.Sync()
 
 	cfg, err := config.InitConfig()
@@ -42,7 +42,7 @@ func main() {
 		"workspace": "/Users/drujensen/workspace",
 	}
 
-	toolRepo, err := integrations.NewToolRegistry(configurations)
+	toolRepo, err := integrations.NewToolRegistry(configurations, logger)
 	if err != nil {
 		logger.Fatal("Failed to initialize tools", zap.Error(err))
 	}

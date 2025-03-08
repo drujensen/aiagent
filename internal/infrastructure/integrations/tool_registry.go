@@ -3,43 +3,44 @@ package integrations
 import (
 	"aiagent/internal/domain/interfaces"
 	"aiagent/internal/infrastructure/integrations/tools"
-	"fmt"
-)
 
-var predefinedTools = []struct {
-	name    string
-	factory func(configuration map[string]string) interfaces.ToolIntegration
-}{
-	{
-		name: "Search",
-		factory: func(configuration map[string]string) interfaces.ToolIntegration {
-			return tools.NewSearchTool(configuration)
-		},
-	},
-	{
-		name: "Bash",
-		factory: func(configuration map[string]string) interfaces.ToolIntegration {
-			return tools.NewBashTool(configuration)
-		},
-	},
-	{
-		name: "File",
-		factory: func(configuration map[string]string) interfaces.ToolIntegration {
-			return tools.NewFileTool(configuration)
-		},
-	},
-}
+	"go.uber.org/zap"
+)
 
 type ToolRegistry struct {
 	toolInstancesByName map[string]*interfaces.ToolIntegration
 }
 
-func NewToolRegistry(configuration map[string]string) (*ToolRegistry, error) {
+func NewToolRegistry(configuration map[string]string, logger *zap.Logger) (*ToolRegistry, error) {
 	toolRegistry := &ToolRegistry{}
 	toolRegistry.toolInstancesByName = make(map[string]*interfaces.ToolIntegration)
 
+	predefinedTools := []struct {
+		name    string
+		factory func(configuration map[string]string, logger *zap.Logger) interfaces.ToolIntegration
+	}{
+		{
+			name: "Search",
+			factory: func(configuration map[string]string, logger *zap.Logger) interfaces.ToolIntegration {
+				return tools.NewSearchTool(configuration, logger)
+			},
+		},
+		{
+			name: "Bash",
+			factory: func(configuration map[string]string, logger *zap.Logger) interfaces.ToolIntegration {
+				return tools.NewBashTool(configuration, logger)
+			},
+		},
+		{
+			name: "File",
+			factory: func(configuration map[string]string, logger *zap.Logger) interfaces.ToolIntegration {
+				return tools.NewFileTool(configuration, logger)
+			},
+		},
+	}
+
 	for _, pt := range predefinedTools {
-		toolInstance := pt.factory(configuration)
+		toolInstance := pt.factory(configuration, logger)
 		toolRegistry.toolInstancesByName[toolInstance.Name()] = &toolInstance
 	}
 
@@ -57,7 +58,7 @@ func (t *ToolRegistry) ListTools() ([]*interfaces.ToolIntegration, error) {
 func (t *ToolRegistry) GetToolByName(name string) (*interfaces.ToolIntegration, error) {
 	tool, exists := t.toolInstancesByName[name]
 	if !exists {
-		return nil, fmt.Errorf("tool with name %s not found", name)
+		return nil, nil
 	}
 	return tool, nil
 }

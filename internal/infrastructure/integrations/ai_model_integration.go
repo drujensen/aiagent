@@ -50,7 +50,6 @@ type ToolCall struct {
 }
 
 func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, toolList []*interfaces.ToolIntegration, options map[string]interface{}) (string, error) {
-
 	// Prepare tool definitions
 	tools := make([]map[string]interface{}, len(toolList))
 	for i, tool := range toolList {
@@ -61,23 +60,20 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, tool
 			}
 		}
 
-		properties := make([]map[string]interface{}, len(toolList))
-		for i, param := range (*tool).Parameters() {
+		// Define properties as a map with parameter names as keys
+		properties := make(map[string]interface{})
+		for _, param := range (*tool).Parameters() {
 			property := map[string]interface{}{
-				param.Name: map[string]interface{}{
-					"type":        param.Type,
-					"description": param.Description,
-				},
+				"type":        param.Type,
+				"description": param.Description,
 			}
-
-			// Only add enum if it has values
 			if len(param.Enum) > 0 {
-				property[param.Name].(map[string]interface{})["enum"] = param.Enum
+				property["enum"] = param.Enum
 			}
-
-			properties[i] = property
+			properties[param.Name] = property
 		}
 
+		// Include "required" inside "parameters"
 		tools[i] = map[string]interface{}{
 			"type": "function",
 			"function": map[string]interface{}{
@@ -86,8 +82,8 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, tool
 				"parameters": map[string]interface{}{
 					"type":       "object",
 					"properties": properties,
+					"required":   requiredFields,
 				},
-				"required": requiredFields,
 			},
 		}
 	}
