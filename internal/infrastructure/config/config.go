@@ -10,10 +10,11 @@ import (
 )
 
 type Config struct {
-	MongoURI    string `mapstructure:"MONGO_URI"`
-	LocalAPIKey string `mapstructure:"LOCAL_API_KEY"`
-	logger      *zap.Logger
-	viper       *viper.Viper // Add this field to store the Viper instance
+	MongoURI     string `mapstructure:"MONGO_URI"`
+	Workspace    string `mapstructure:"WORKSPACE"`
+	TavilyAPIKey string `mapstructure:"TAVILY_API_KEY"`
+	logger       *zap.Logger
+	viper        *viper.Viper
 }
 
 var (
@@ -66,13 +67,15 @@ func InitConfig() (*Config, error) {
 			logger.Error("Missing required configuration", zap.String("field", "MONGO_URI"))
 			return
 		}
-		if configInstance.LocalAPIKey == "" {
-			configInstance.LocalAPIKey = "default-api-key" // Set a default for development
-			logger.Warn("LOCAL_API_KEY not set, using default", zap.String("default", configInstance.LocalAPIKey))
+
+		if configInstance.TavilyAPIKey == "" {
+			logger.Warn("TAVILY_API_KEY not set. Search tool will not work")
 		}
 
-		logger.Info("Configuration initialized successfully",
-			zap.String("mongo_uri", configInstance.MongoURI))
+		if configInstance.Workspace == "" {
+			logger.Warn("WORKSPACE not set. Search tool will not work")
+		}
+
 	})
 
 	if initErr != nil {

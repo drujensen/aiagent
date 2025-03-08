@@ -1,23 +1,24 @@
 package tools
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 
 	"aiagent/internal/domain/interfaces"
 
 	"go.uber.org/zap"
 )
 
+// SearchTool represents a tool for searching using the Tavily API.
 type SearchTool struct {
 	configuration map[string]string
 	logger        *zap.Logger
 }
 
+// NewSearchTool creates a new instance of SearchTool.
 func NewSearchTool(configuration map[string]string, logger *zap.Logger) *SearchTool {
 	return &SearchTool{
 		configuration: configuration,
@@ -25,18 +26,22 @@ func NewSearchTool(configuration map[string]string, logger *zap.Logger) *SearchT
 	}
 }
 
+// Name returns the name of the tool.
 func (t *SearchTool) Name() string {
 	return "Search"
 }
 
+// Description returns a description of the tool.
 func (t *SearchTool) Description() string {
-	return "A tool to search for information using DuckDuckGo API"
+	return "A tool to search for information using the Tavily API"
 }
 
+// Configuration returns the required configuration keys.
 func (t *SearchTool) Configuration() []string {
-	return []string{}
+	return []string{"tavily_api_key"}
 }
 
+// Parameters returns the parameters required by the tool.
 func (t *SearchTool) Parameters() []interfaces.Parameter {
 	return []interfaces.Parameter{
 		{
@@ -48,44 +53,61 @@ func (t *SearchTool) Parameters() []interfaces.Parameter {
 	}
 }
 
+// Execute performs the search and returns both the answer and results.
 func (t *SearchTool) Execute(arguments string) (string, error) {
 	// Log the search query
 	t.logger.Debug("Executing search", zap.String("arguments", arguments))
 
+	// Parse the arguments to extract the query
+	type args struct {
+		Query string `json:"query"`
+	}
 	var query string
-	// Try to unmarshal as a plain string
-	if err := json.Unmarshal([]byte(arguments), &query); err != nil {
-		// If that fails, try unmarshaling as a JSON object
-		var args struct {
-			Query string `json:"query"`
-		}
-		if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+	var argumentsArgs args
+
+	if err := json.Unmarshal([]byte(arguments), &argumentsArgs); err != nil {
+		// If unmarshaling into struct fails, try as a simple string
+		if err := json.Unmarshal([]byte(arguments), &query); err != nil {
 			t.logger.Error("Failed to parse arguments", zap.Error(err))
 			return "", err
 		}
-		query = args.Query
+	} else {
+		query = argumentsArgs.Query
 	}
+
 	t.logger.Info("Search query", zap.String("query", query))
 	if query == "" {
 		t.logger.Error("Search query cannot be empty")
 		return "", nil
 	}
 
-	apiURL := "https://api.duckduckgo.com/?q=" + url.QueryEscape(query) + "&format=json"
-
-	client := &http.Client{
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
+	// Get the Tavily API key from configuration
+	apiKey, ok := t.configuration["tavily_api_key"]
+	if !ok {
+		t.logger.Error("TAVILY_API_KEY not found in configuration")
+		return "", fmt.Errorf("tavily_api_key not found in configuration")
 	}
 
-	req, err := http.NewRequest("GET", apiURL, nil)
+	// Create JSON payload for Tavily API
+	payload := map[string]string{"query": query}
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		t.logger.Error("Failed to marshal payload", zap.Error(err))
+		return "", err
+	}
+
+	// Set up the HTTP request
+	apiURL := "https://api.tavily.com/search"
+	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		t.logger.Error("Failed to create HTTP request", zap.Error(err))
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
 
+	// Execute the request
+	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		t.logger.Error("Failed to execute search request", zap.Error(err))
@@ -93,67 +115,61 @@ func (t *SearchTool) Execute(arguments string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	// Read the entire response body
+	// Read the response body
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.logger.Error("Failed to read response body", zap.Error(err))
 		return "", err
 	}
+
 	bodyString := string(bodyBytes)
 	t.logger.Debug("Search API response body", zap.String("body", bodyString))
 
-	t.logger.Debug("Search API response", zap.Int("status_code", resp.StatusCode))
-	t.logger.Debug("Search API response headers", zap.Any("headers", resp.Header))
-
-	if resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
-		location, err := resp.Location()
-		if err != nil {
-			t.logger.Error("Failed to get redirect location", zap.Error(err))
-			return "", err
-		}
-		t.logger.Info("Search resulted in redirect", zap.String("location", location.String()))
-		return fmt.Sprintf("Redirect detected to: %s", location), nil
-	}
-
+	// Check the response status
 	if resp.StatusCode != http.StatusOK {
 		t.logger.Error("Search API request failed", zap.Int("status_code", resp.StatusCode))
 		return "", fmt.Errorf("API request failed with status code: %d", resp.StatusCode)
 	}
 
-	// Check Content-Type
-	contentType := resp.Header.Get("Content-Type")
-	if !strings.HasPrefix(contentType, "application/json") {
-		t.logger.Error("Unexpected Content-Type", zap.String("content_type", contentType))
-		return "", fmt.Errorf("unexpected Content-Type: %s", contentType)
+	// Define the structure for Tavily's response
+	type TavilyResponse struct {
+		Answer  string `json:"answer"`
+		Results []struct {
+			Title   string  `json:"title"`
+			URL     string  `json:"url"`
+			Content string  `json:"content"`
+			Score   float64 `json:"score"`
+		} `json:"results"`
 	}
 
-	var result struct {
-		AbstractText  string `json:"AbstractText"`
-		RelatedTopics []struct {
-			Text string `json:"Text"`
-		} `json:"RelatedTopics"`
-	}
-
+	// Parse the response
+	var result TavilyResponse
 	if err := json.Unmarshal(bodyBytes, &result); err != nil {
 		t.logger.Error("Failed to parse search response", zap.Error(err))
 		return "", err
 	}
 
-	if result.AbstractText != "" {
-		t.logger.Info("Search completed with abstract", zap.String("result", result.AbstractText))
-		return result.AbstractText, nil
+	// Build the output string
+	var output string
+	if result.Answer != "" {
+		output = "Answer: " + result.Answer + "\n\n"
 	}
-
-	if len(result.RelatedTopics) > 0 {
-		var topics []string
-		for _, topic := range result.RelatedTopics {
-			topics = append(topics, topic.Text)
+	if len(result.Results) > 0 {
+		if output != "" {
+			output += "Top Results:\n"
+		} else {
+			output = "Top Results:\n"
 		}
-		resultStr := "Related topics: " + fmt.Sprint(topics)
-		t.logger.Info("Search completed with related topics", zap.String("result", resultStr))
-		return resultStr, nil
+		for i, res := range result.Results {
+			if i >= 3 {
+				break
+			}
+			output += fmt.Sprintf("%d. %s - %s\n   %s\n", i+1, res.Title, res.URL, res.Content)
+		}
+	} else if output == "" {
+		output = "No results found"
 	}
 
-	t.logger.Info("Search completed with no results")
-	return "No results found", nil
+	t.logger.Info("Search completed", zap.String("result", output))
+	return output, nil
 }

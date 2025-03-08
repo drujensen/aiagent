@@ -5,7 +5,6 @@ import (
 	"context"
 	"html/template"
 
-	apicontrollers "aiagent/internal/api/controllers"
 	"aiagent/internal/domain/services"
 	"aiagent/internal/infrastructure/config"
 	"aiagent/internal/infrastructure/database"
@@ -39,7 +38,8 @@ func main() {
 	chatRepo := repositories.NewMongoChatRepository(db.Collection("chats"))
 
 	configurations := map[string]string{
-		"workspace": "/Users/drujensen/workspace",
+		"workspace":      cfg.Workspace,
+		"tavily_api_key": cfg.TavilyAPIKey,
 	}
 
 	toolRepo, err := integrations.NewToolRegistry(configurations, logger)
@@ -85,9 +85,6 @@ func main() {
 	agentController := uicontrollers.NewAgentController(logger, tmpl, agentService, toolService)
 	chatController := uicontrollers.NewChatController(logger, tmpl, chatService, agentService)
 
-	apiAgentController := apicontrollers.NewAgentController(agentService, cfg)
-	apiChatController := apicontrollers.NewChatController(chatService, cfg)
-
 	// Initialize Echo
 	e := echo.New()
 
@@ -124,14 +121,6 @@ func main() {
 	// Sidebar Partial Routes
 	e.GET("/sidebar/chats", homeController.ChatsPartialHandler)
 	e.GET("/sidebar/agents", homeController.AgentsPartialHandler)
-
-	// API Routes
-	e.GET("/api/agents", apiAgentController.AgentsHandler)
-	e.POST("/api/agents", apiAgentController.AgentsHandler)
-	e.GET("/api/agents/:id", apiAgentController.AgentDetailHandler)
-	e.PUT("/api/agents/:id", apiAgentController.AgentDetailHandler)
-	e.DELETE("/api/agents/:id", apiAgentController.AgentDetailHandler)
-	e.POST("/api/chats", apiChatController.CreateChat)
 
 	// Start server
 	logger.Info("Starting HTTP server on :8080")
