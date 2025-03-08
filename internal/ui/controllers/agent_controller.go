@@ -52,6 +52,11 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusInternalServerError, "Internal server error")
 	}
 
+	toolNames := []string{}
+	for _, tool := range tools {
+		toolNames = append(toolNames, (*tool).Name())
+	}
+
 	var agent *entities.Agent
 	path := eCtx.Request().URL.Path
 	isEdit := strings.HasSuffix(path, "/edit")
@@ -101,7 +106,7 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 		"Title":           "Agent Form",
 		"ContentTemplate": "agent_form_content",
 		"Agent":           agentData,
-		"Tools":           tools,
+		"Tools":           toolNames,
 		"Agents":          agents,
 	}
 

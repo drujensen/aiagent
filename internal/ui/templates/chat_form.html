@@ -1,9 +1,9 @@
 {{define "chat_form_content"}}
 <div class="agent-form">
     <h2>{{if .Chat.ID}}Edit a Conversation{{else}}Start a New Conversation{{end}}</h2>
-    <form 
-        {{if .Chat.ID}}hx-put="/chats/{{.Chat.ID}}"{{else}}hx-post="/chats"{{end}} 
-        hx-target="#response-message" 
+    <form
+        {{if .Chat.ID}}hx-put="/chats/{{.Chat.ID}}"{{else}}hx-post="/chats"{{end}}
+        hx-target="#response-message"
         hx-swap="innerHTML">
         <div class="form-group">
             <label for="chat-name">Conversation Name:</label>

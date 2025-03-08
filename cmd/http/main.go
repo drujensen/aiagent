@@ -39,7 +39,6 @@ func main() {
 	chatRepo := repositories.NewMongoChatRepository(db.Collection("chats"))
 
 	configurations := map[string]string{
-		"baseURL":   "https://api.duckduckgo.com",
 		"workspace": "/Users/drujensen/workspace",
 	}
 
@@ -72,7 +71,6 @@ func main() {
 		"internal/ui/templates/sidebar.html",
 		"internal/ui/templates/sidebar_chats.html",
 		"internal/ui/templates/sidebar_agents.html",
-		"internal/ui/templates/sidebar_tools.html",
 		"internal/ui/templates/home.html",
 		"internal/ui/templates/agent_form.html",
 		"internal/ui/templates/chat.html",
@@ -88,7 +86,6 @@ func main() {
 	chatController := uicontrollers.NewChatController(logger, tmpl, chatService, agentService)
 
 	apiAgentController := apicontrollers.NewAgentController(agentService, cfg)
-	apiToolController := apicontrollers.NewToolController(toolService, cfg)
 	apiChatController := apicontrollers.NewChatController(chatService, cfg)
 
 	// Initialize Echo
@@ -127,7 +124,6 @@ func main() {
 	// Sidebar Partial Routes
 	e.GET("/sidebar/chats", homeController.ChatsPartialHandler)
 	e.GET("/sidebar/agents", homeController.AgentsPartialHandler)
-	e.GET("/sidebar/tools", homeController.ToolsPartialHandler)
 
 	// API Routes
 	e.GET("/api/agents", apiAgentController.AgentsHandler)
@@ -135,7 +131,6 @@ func main() {
 	e.GET("/api/agents/:id", apiAgentController.AgentDetailHandler)
 	e.PUT("/api/agents/:id", apiAgentController.AgentDetailHandler)
 	e.DELETE("/api/agents/:id", apiAgentController.AgentDetailHandler)
-	e.GET("/api/tools", apiToolController.ListTools)
 	e.POST("/api/chats", apiChatController.CreateChat)
 
 	// Start server

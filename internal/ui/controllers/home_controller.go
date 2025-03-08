@@ -60,15 +60,3 @@ func (c *HomeController) AgentsPartialHandler(eCtx echo.Context) error {
 	}
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_agents", data)
 }
-
-func (c *HomeController) ToolsPartialHandler(eCtx echo.Context) error {
-	tools, err := c.toolService.ListTools()
-	if err != nil {
-		c.logger.Error("Failed to list tools", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to load tools")
-	}
-	data := map[string]interface{}{
-		"Tools": tools,
-	}
-	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_tools", data)
-}
