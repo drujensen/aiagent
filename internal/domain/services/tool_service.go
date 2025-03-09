@@ -2,6 +2,8 @@ package services
 
 import (
 	"aiagent/internal/domain/interfaces"
+
+	"go.uber.org/zap"
 )
 
 type ToolService interface {
@@ -10,9 +12,10 @@ type ToolService interface {
 
 type toolService struct {
 	toolRepo interfaces.ToolRepository
+	logger   *zap.Logger
 }
 
-func NewToolService(toolRepo interfaces.ToolRepository) *toolService {
+func NewToolService(toolRepo interfaces.ToolRepository, logger *zap.Logger) *toolService {
 	return &toolService{
 		toolRepo: toolRepo,
 	}

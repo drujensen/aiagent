@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.uber.org/zap"
 )
 
 type ChatService interface {
@@ -29,14 +30,16 @@ type chatService struct {
 	agentRepo interfaces.AgentRepository
 	toolRepo  interfaces.ToolRepository
 	config    *config.Config
+	logger    *zap.Logger
 }
 
-func NewChatService(chatRepo interfaces.ChatRepository, agentRepo interfaces.AgentRepository, toolRepo interfaces.ToolRepository, cfg *config.Config) *chatService {
+func NewChatService(chatRepo interfaces.ChatRepository, agentRepo interfaces.AgentRepository, toolRepo interfaces.ToolRepository, cfg *config.Config, logger *zap.Logger) *chatService {
 	return &chatService{
 		chatRepo:  chatRepo,
 		agentRepo: agentRepo,
 		toolRepo:  toolRepo,
 		config:    cfg,
+		logger:    logger,
 	}
 }
 
@@ -86,7 +89,7 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		return nil, fmt.Errorf("failed to resolve API key for agent %s: %v", agent.ID.Hex(), err)
 	}
 
-	aiModel, err := integrations.NewAIModelIntegration(agent.Endpoint, resolvedAPIKey, agent.Model, s.toolRepo)
+	aiModel, err := integrations.NewAIModelIntegration(agent.Endpoint, resolvedAPIKey, agent.Model, s.toolRepo, s.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AI model: %v", err)
 	}

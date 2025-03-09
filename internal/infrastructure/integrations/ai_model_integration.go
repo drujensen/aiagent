@@ -10,6 +10,8 @@ import (
 
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/interfaces"
+
+	"go.uber.org/zap"
 )
 
 type AIModelIntegration struct {
@@ -19,9 +21,10 @@ type AIModelIntegration struct {
 	lastUsage  int
 	modelName  string
 	toolRepo   interfaces.ToolRepository
+	logger     *zap.Logger
 }
 
-func NewAIModelIntegration(baseURL, apiKey, modelName string, toolRepo interfaces.ToolRepository) (*AIModelIntegration, error) {
+func NewAIModelIntegration(baseURL, apiKey, modelName string, toolRepo interfaces.ToolRepository, logger *zap.Logger) (*AIModelIntegration, error) {
 	if baseURL == "" {
 		return nil, fmt.Errorf("baseURL cannot be empty")
 	}
@@ -38,16 +41,8 @@ func NewAIModelIntegration(baseURL, apiKey, modelName string, toolRepo interface
 		lastUsage:  0,
 		modelName:  modelName,
 		toolRepo:   toolRepo,
+		logger:     logger,
 	}, nil
-}
-
-type ToolCall struct {
-	ID       string `json:"id"`
-	Type     string `json:"type"`
-	Function struct {
-		Name      string `json:"name"`
-		Arguments string `json:"arguments"`
-	} `json:"function"`
 }
 
 func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, toolList []*interfaces.ToolIntegration, options map[string]interface{}) ([]*entities.Message, error) {
@@ -144,8 +139,8 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, tool
 		var responseBody struct {
 			Choices []struct {
 				Message struct {
-					Content   string     `json:"content"`
-					ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+					Content   string              `json:"content"`
+					ToolCalls []entities.ToolCall `json:"tool_calls,omitempty"`
 				} `json:"message"`
 			} `json:"choices"`
 			Usage struct {
@@ -207,12 +202,37 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, tool
 			toolResponseMessage := entities.NewMessage("tool", toolResponseContent)
 			newMessages = append(newMessages, toolResponseMessage)
 
+			// Append tool call message to messages for next API call
+			toolCallObj := entities.ToolCall{
+				ID:   toolCall.ID,
+				Type: "function",
+				Function: struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				}{
+					Name:      toolCall.Function.Name,
+					Arguments: toolCall.Function.Arguments,
+				},
+			}
+
+			toolCallsJSON, err := json.Marshal([]entities.ToolCall{toolCallObj})
+			if err != nil {
+				return nil, fmt.Errorf("error marshaling tool call: %v", err)
+			}
+
+			messages = append(messages, map[string]string{
+				"role":       "assistant",
+				"content":    "",
+				"tool_calls": string(toolCallsJSON),
+			})
+
 			// Append to messages for next API call
 			messages = append(messages, map[string]string{
 				"role":         "tool",
 				"content":      toolResult,
 				"tool_call_id": toolCall.ID,
 			})
+			m.logger.Info("Messages:", zap.Any("messages", messages))
 		}
 
 		// Prepare for next iteration

@@ -47,9 +47,9 @@ func main() {
 		logger.Fatal("Failed to initialize tools", zap.Error(err))
 	}
 
-	agentService := services.NewAgentService(agentRepo)
-	toolService := services.NewToolService(toolRepo)
-	chatService := services.NewChatService(chatRepo, agentRepo, toolRepo, cfg)
+	agentService := services.NewAgentService(agentRepo, logger)
+	toolService := services.NewToolService(toolRepo, logger)
+	chatService := services.NewChatService(chatRepo, agentRepo, toolRepo, cfg, logger)
 
 	// Define custom template functions
 	funcMap := template.FuncMap{

@@ -9,6 +9,7 @@ import (
 	"aiagent/internal/domain/interfaces"
 
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.uber.org/zap"
 )
 
 type AgentService interface {
@@ -21,11 +22,13 @@ type AgentService interface {
 
 type agentService struct {
 	agentRepo interfaces.AgentRepository
+	logger    *zap.Logger
 }
 
-func NewAgentService(agentRepo interfaces.AgentRepository) *agentService {
+func NewAgentService(agentRepo interfaces.AgentRepository, logger *zap.Logger) *agentService {
 	return &agentService{
 		agentRepo: agentRepo,
+		logger:    logger,
 	}
 }
 
