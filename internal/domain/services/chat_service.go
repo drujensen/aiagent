@@ -21,7 +21,7 @@ type ChatService interface {
 	ListActiveChats(ctx context.Context) ([]*entities.Chat, error)
 	GetChat(ctx context.Context, id string) (*entities.Chat, error)
 	UpdateChat(ctx context.Context, id, name string) (*entities.Chat, error)
-	DeleteChat(ctx context.Context, id string) error // Added method
+	DeleteChat(ctx context.Context, id string) error
 }
 
 type chatService struct {
@@ -38,6 +38,18 @@ func NewChatService(chatRepo interfaces.ChatRepository, agentRepo interfaces.Age
 		toolRepo:  toolRepo,
 		config:    cfg,
 	}
+}
+
+// estimateTokens approximates the token count for a message.
+// Uses len(content) / 4 + 4 as a simple estimation (1 token ≈ 4 characters + overhead).
+func estimateTokens(message map[string]string) int {
+	content, ok := message["content"]
+	if !ok {
+		return 0
+	}
+	// Ceiling division for content length and add 4 tokens for role/overhead
+	contentTokens := (len(content) + 3) / 4
+	return contentTokens + 4
 }
 
 func (s *chatService) SendMessage(ctx context.Context, chatID string, message entities.Message) (*entities.Message, error) {
@@ -81,19 +93,59 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		return nil, fmt.Errorf("failed to initialize AI model: %v", err)
 	}
 
-	messages := make([]map[string]string, len(chat.Messages))
-	for i, msg := range chat.Messages {
-		messages[i] = map[string]string{
+	// Define constants
+	const contextLength = 131072 // Model's maximum context length
+	const toolBuffer = 500       // Estimated tokens for tool schemas
+
+	// Set maxTokens with a reasonable default
+	maxTokens := 4096 // Default completion tokens
+	if agent.MaxTokens != nil {
+		maxTokens = *agent.MaxTokens
+	}
+
+	// Calculate token limit for input messages (system + chat messages)
+	tokenLimit := contextLength - maxTokens - toolBuffer
+
+	// Prepare system message
+	systemMessage := map[string]string{
+		"role":    "system",
+		"content": agent.SystemPrompt,
+	}
+	systemTokens := estimateTokens(systemMessage)
+	if systemTokens > tokenLimit {
+		return nil, fmt.Errorf("system prompt too large for the context window")
+	}
+
+	// Collect messages from newest to oldest to prioritize recent messages
+	var tempMessages []map[string]string
+	currentTokens := systemTokens
+	for i := len(chat.Messages) - 1; i >= 0; i-- {
+		msg := chat.Messages[i]
+		msgMap := map[string]string{
 			"role":    msg.Role,
 			"content": msg.Content,
 		}
 		if msg.Role == "tool" {
-			messages[i]["tool_call_id"] = msg.ID
+			msgMap["tool_call_id"] = msg.ID
 		}
+		msgTokens := estimateTokens(msgMap)
+		if currentTokens+msgTokens > tokenLimit {
+			break
+		}
+		tempMessages = append(tempMessages, msgMap)
+		currentTokens += msgTokens
 	}
 
-	tools := []*interfaces.ToolIntegration{}
+	// Reverse tempMessages to chronological order (oldest to newest)
+	for i, j := 0, len(tempMessages)-1; i < j; i, j = i+1, j-1 {
+		tempMessages[i], tempMessages[j] = tempMessages[j], tempMessages[i]
+	}
 
+	// Prepare messagesToSend: [system, oldest, ..., newest]
+	messagesToSend := append([]map[string]string{systemMessage}, tempMessages...)
+
+	// Prepare tools
+	tools := []*interfaces.ToolIntegration{}
 	for _, toolName := range agent.Tools {
 		tool, err := s.toolRepo.GetToolByName(toolName)
 		if err != nil {
@@ -102,19 +154,17 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		tools = append(tools, tool)
 	}
 
-	options := map[string]interface{}{}
+	// Prepare options
+	options := map[string]interface{}{
+		"temperature": 0.0, // Default temperature
+		"max_tokens":  maxTokens,
+	}
 	if agent.Temperature != nil {
 		options["temperature"] = *agent.Temperature
-	} else {
-		options["temperature"] = 0.0
-	}
-	if agent.MaxTokens != nil {
-		options["max_tokens"] = *agent.MaxTokens
-	} else {
-		options["max_tokens"] = 128000
 	}
 
-	response, err := aiModel.GenerateResponse(messages, tools, options)
+	// Generate response with trimmed messages
+	response, err := aiModel.GenerateResponse(messagesToSend, tools, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate AI response: %v", err)
 	}
