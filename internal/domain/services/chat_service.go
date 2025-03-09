@@ -41,13 +41,11 @@ func NewChatService(chatRepo interfaces.ChatRepository, agentRepo interfaces.Age
 }
 
 // estimateTokens approximates the token count for a message.
-// Uses len(content) / 4 + 4 as a simple estimation (1 token ≈ 4 characters + overhead).
 func estimateTokens(message map[string]string) int {
 	content, ok := message["content"]
 	if !ok {
 		return 0
 	}
-	// Ceiling division for content length and add 4 tokens for role/overhead
 	contentTokens := (len(content) + 3) / 4
 	return contentTokens + 4
 }
@@ -93,25 +91,19 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		return nil, fmt.Errorf("failed to initialize AI model: %v", err)
 	}
 
-	// Set contextLength from agent or default to 128000
-	contextLength := 128000 // Default context length
+	contextLength := 128000
 	if agent.ContextWindow != nil {
 		contextLength = *agent.ContextWindow
 	}
 
-	// Define constants
-	const toolBuffer = 500 // Estimated tokens for tool schemas
-
-	// Set maxTokens with a reasonable default
-	maxTokens := 4096 // Default completion tokens
+	const toolBuffer = 500
+	maxTokens := 4096
 	if agent.MaxTokens != nil {
 		maxTokens = *agent.MaxTokens
 	}
 
-	// Calculate token limit for input messages (system + chat messages)
 	tokenLimit := contextLength - maxTokens - toolBuffer
 
-	// Prepare system message
 	systemMessage := map[string]string{
 		"role":    "system",
 		"content": agent.SystemPrompt,
@@ -121,7 +113,6 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		return nil, fmt.Errorf("system prompt too large for the context window")
 	}
 
-	// Collect messages from newest to oldest to prioritize recent messages
 	var tempMessages []map[string]string
 	currentTokens := systemTokens
 	for i := len(chat.Messages) - 1; i >= 0; i-- {
@@ -141,15 +132,12 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		currentTokens += msgTokens
 	}
 
-	// Reverse tempMessages to chronological order (oldest to newest)
 	for i, j := 0, len(tempMessages)-1; i < j; i, j = i+1, j-1 {
 		tempMessages[i], tempMessages[j] = tempMessages[j], tempMessages[i]
 	}
 
-	// Prepare messagesToSend: [system, oldest, ..., newest]
 	messagesToSend := append([]map[string]string{systemMessage}, tempMessages...)
 
-	// Prepare tools
 	tools := []*interfaces.ToolIntegration{}
 	for _, toolName := range agent.Tools {
 		tool, err := s.toolRepo.GetToolByName(toolName)
@@ -159,30 +147,34 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		tools = append(tools, tool)
 	}
 
-	// Prepare options
 	options := map[string]interface{}{
-		"temperature": 0.0, // Default temperature
+		"temperature": 0.0,
 		"max_tokens":  maxTokens,
 	}
 	if agent.Temperature != nil {
 		options["temperature"] = *agent.Temperature
 	}
 
-	// Generate response with trimmed messages
-	response, err := aiModel.GenerateResponse(messagesToSend, tools, options)
+	newMessages, err := aiModel.GenerateResponse(messagesToSend, tools, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate AI response: %v", err)
 	}
 
-	aiMessage := entities.NewMessage("assistant", response)
-	chat.Messages = append(chat.Messages, *aiMessage)
+	// Append all new messages to the chat's message history
+	for _, msg := range newMessages {
+		chat.Messages = append(chat.Messages, *msg)
+	}
 	chat.UpdatedAt = time.Now()
 
 	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
 		return nil, fmt.Errorf("failed to update chat with AI response: %v", err)
 	}
 
-	return aiMessage, nil
+	// Return the last message (final assistant response)
+	if len(newMessages) > 0 {
+		return newMessages[len(newMessages)-1], nil
+	}
+	return nil, fmt.Errorf("no AI response generated")
 }
 
 func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error) {

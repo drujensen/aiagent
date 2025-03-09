@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/interfaces"
 )
 
@@ -49,7 +50,7 @@ type ToolCall struct {
 	} `json:"function"`
 }
 
-func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, toolList []*interfaces.ToolIntegration, options map[string]interface{}) (string, error) {
+func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, toolList []*interfaces.ToolIntegration, options map[string]interface{}) ([]*entities.Message, error) {
 	// Prepare tool definitions
 	tools := make([]map[string]interface{}, len(toolList))
 	for i, tool := range toolList {
@@ -60,7 +61,6 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, tool
 			}
 		}
 
-		// Define properties as a map with parameter names as keys
 		properties := make(map[string]interface{})
 		for _, param := range (*tool).Parameters() {
 			property := map[string]interface{}{
@@ -73,7 +73,6 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, tool
 			properties[param.Name] = property
 		}
 
-		// Include "required" inside "parameters"
 		tools[i] = map[string]interface{}{
 			"type": "function",
 			"function": map[string]interface{}{
@@ -101,16 +100,17 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, tool
 		}
 	}
 
-	var finalResponse string
+	var newMessages []*entities.Message
+
 	for {
 		jsonBody, err := json.Marshal(reqBody)
 		if err != nil {
-			return "", fmt.Errorf("error marshaling request: %v", err)
+			return nil, fmt.Errorf("error marshaling request: %v", err)
 		}
 
 		req, err := http.NewRequest("POST", m.baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonBody))
 		if err != nil {
-			return "", fmt.Errorf("error creating request: %v", err)
+			return nil, fmt.Errorf("error creating request: %v", err)
 		}
 
 		req.Header.Set("Content-Type", "application/json")
@@ -124,18 +124,18 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, tool
 					time.Sleep(time.Duration(attempt+1) * time.Second)
 					continue
 				}
-				return "", fmt.Errorf("error making request: %v", err)
+				return nil, fmt.Errorf("error making request: %v", err)
 			}
 			if resp.StatusCode == http.StatusTooManyRequests {
 				if attempt < 2 {
 					time.Sleep(time.Duration(attempt+1) * time.Second)
 					continue
 				}
-				return "", fmt.Errorf("rate limit exceeded")
+				return nil, fmt.Errorf("rate limit exceeded")
 			}
 			if resp.StatusCode != http.StatusOK {
 				body, _ := io.ReadAll(resp.Body)
-				return "", fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+				return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
 			}
 			break
 		}
@@ -154,20 +154,29 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, tool
 		}
 
 		if err := json.NewDecoder(resp.Body).Decode(&responseBody); err != nil {
-			return "", fmt.Errorf("error decoding response: %v", err)
+			return nil, fmt.Errorf("error decoding response: %v", err)
 		}
 		if len(responseBody.Choices) == 0 {
-			return "", fmt.Errorf("no choices in response")
+			return nil, fmt.Errorf("no choices in response")
 		}
 
 		m.lastUsage = responseBody.Usage.TotalTokens
 		choice := responseBody.Choices[0].Message
 
 		if len(choice.ToolCalls) == 0 {
-			// No tool calls, return the content
-			finalResponse = choice.Content
+			// No tool calls, add the final assistant message
+			finalMessage := entities.NewMessage("assistant", choice.Content)
+			newMessages = append(newMessages, finalMessage)
 			break
 		}
+
+		// There are tool calls, create a message for the assistant's tool call
+		toolCallContent := "Calling tools:\n"
+		for _, tc := range choice.ToolCalls {
+			toolCallContent += fmt.Sprintf("- %s with arguments: %s\n", tc.Function.Name, tc.Function.Arguments)
+		}
+		toolCallMessage := entities.NewMessage("assistant", toolCallContent)
+		newMessages = append(newMessages, toolCallMessage)
 
 		// Handle tool calls
 		for _, toolCall := range choice.ToolCalls {
@@ -178,7 +187,7 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, tool
 
 			tool, err := m.toolRepo.GetToolByName(toolName)
 			if err != nil {
-				return "", fmt.Errorf("failed to get tool %s: %v", toolName, err)
+				return nil, fmt.Errorf("failed to get tool %s: %v", toolName, err)
 			}
 
 			var toolResult string
@@ -193,7 +202,12 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, tool
 				toolResult = fmt.Sprintf("Tool %s not found", toolName)
 			}
 
-			// Append tool response message
+			// Create a tool response message
+			toolResponseContent := fmt.Sprintf("Tool %s responded: %s", toolName, toolResult)
+			toolResponseMessage := entities.NewMessage("tool", toolResponseContent)
+			newMessages = append(newMessages, toolResponseMessage)
+
+			// Append to messages for next API call
 			messages = append(messages, map[string]string{
 				"role":         "tool",
 				"content":      toolResult,
@@ -205,7 +219,7 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, tool
 		reqBody["messages"] = messages
 	}
 
-	return finalResponse, nil
+	return newMessages, nil
 }
 
 func (m *AIModelIntegration) GetTokenUsage() (int, error) {
