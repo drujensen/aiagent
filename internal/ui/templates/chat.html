@@ -58,7 +58,7 @@ function handleBeforeRequest(form) {
 
     let thinkingContentDiv = document.createElement('div');
     thinkingContentDiv.className = 'message-content';
-    thinkingContentDiv.textContent = 'Thinking...';
+    thinkingContentDiv.innerHTML = 'Thinking... <span class="spinner"></span>';
 
     thinkingDiv.appendChild(thinkingContentDiv);
     document.getElementById('messages-container').appendChild(thinkingDiv);
