@@ -76,15 +76,16 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 	}
 
 	agentData := struct {
-		ID           string
-		Name         string
-		Endpoint     string
-		Model        string
-		APIKey       string
-		SystemPrompt string
-		Temperature  *float64
-		MaxTokens    *int
-		Tools        []string
+		ID            string
+		Name          string
+		Endpoint      string
+		Model         string
+		APIKey        string
+		SystemPrompt  string
+		Temperature   *float64
+		MaxTokens     *int
+		ContextWindow *int
+		Tools         []string
 	}{
 		Tools: []string{},
 	}
@@ -97,6 +98,7 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 		agentData.SystemPrompt = agent.SystemPrompt
 		agentData.Temperature = agent.Temperature
 		agentData.MaxTokens = agent.MaxTokens
+		agentData.ContextWindow = agent.ContextWindow
 		for _, tool := range agent.Tools {
 			agentData.Tools = append(agentData.Tools, tool)
 		}
@@ -132,6 +134,12 @@ func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 	if maxTokensStr := eCtx.FormValue("max_tokens"); maxTokensStr != "" {
 		if maxTokens, err := strconv.Atoi(maxTokensStr); err == nil {
 			agent.MaxTokens = &maxTokens
+		}
+	}
+
+	if contextWindowStr := eCtx.FormValue("context_window"); contextWindowStr != "" {
+		if contextWindow, err := strconv.Atoi(contextWindowStr); err == nil {
+			agent.ContextWindow = &contextWindow
 		}
 	}
 
@@ -183,6 +191,14 @@ func (c *AgentController) UpdateAgentHandler(eCtx echo.Context) error {
 		}
 	} else {
 		agent.MaxTokens = nil
+	}
+
+	if contextWindowStr := eCtx.FormValue("context_window"); contextWindowStr != "" {
+		if contextWindow, err := strconv.Atoi(contextWindowStr); err == nil {
+			agent.ContextWindow = &contextWindow
+		}
+	} else {
+		agent.ContextWindow = nil
 	}
 
 	tools := eCtx.Request().Form["tools"]

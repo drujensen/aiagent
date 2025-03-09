@@ -93,9 +93,14 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		return nil, fmt.Errorf("failed to initialize AI model: %v", err)
 	}
 
+	// Set contextLength from agent or default to 128000
+	contextLength := 128000 // Default context length
+	if agent.ContextWindow != nil {
+		contextLength = *agent.ContextWindow
+	}
+
 	// Define constants
-	const contextLength = 131072 // Model's maximum context length
-	const toolBuffer = 500       // Estimated tokens for tool schemas
+	const toolBuffer = 500 // Estimated tokens for tool schemas
 
 	// Set maxTokens with a reasonable default
 	maxTokens := 4096 // Default completion tokens
