@@ -3,9 +3,19 @@
     <section class="message-history" id="message-history">
         <div id="messages-container" class="messages-container" data-chat-id="{{.ChatID}}">
             {{range .Messages}}
-            <div class="message {{if eq .Role "user"}}user-message{{else if eq .Role "assistant"}}agent-message{{else}}tool-message{{end}}">
-                {{renderMarkdown .Content}}
-            </div>
+            {{if eq .Role "user"}}
+              <div class="message user-message">
+                <div class="message-content">{{renderMarkdown .Content}}</div>
+              </div>
+            {{else if eq .Role "assistant"}}
+              <div class="message agent-message">
+                <div class="message-content">{{renderMarkdown .Content}}</div>
+              </div>
+            {{else}}
+              <div class="message tool-message">
+                <div class="message-content">{{renderMarkdown .Content}}</div>
+              </div>
+            {{end}}
             {{end}}
         </div>
     </section>
@@ -24,8 +34,6 @@
     </section>
 </main>
 <script>
-let messageCounter = 0;
-
 function handleBeforeRequest(form) {
     console.log("Before request triggered"); // Debug log
     let msg = form.querySelector('textarea').value.trim();
@@ -35,14 +43,24 @@ function handleBeforeRequest(form) {
     let userDiv = document.createElement('div');
     userDiv.id = 'temp-user-message';
     userDiv.className = 'message user-message';
-    userDiv.textContent = msg;
+
+    let userContentDiv = document.createElement('div');
+    userContentDiv.className = 'message-content';
+    userContentDiv.textContent = msg;
+
+    userDiv.appendChild(userContentDiv);
     document.getElementById('messages-container').appendChild(userDiv);
 
     // Append "Thinking..." bubble with unique ID
     let thinkingDiv = document.createElement('div');
     thinkingDiv.id = 'temp-thinking-message';
     thinkingDiv.className = 'message agent-message';
-    thinkingDiv.textContent = 'Thinking...';
+
+    let thinkingContentDiv = document.createElement('div');
+    thinkingContentDiv.className = 'message-content';
+    thinkingContentDiv.textContent = 'Thinking...';
+
+    thinkingDiv.appendChild(thinkingContentDiv);
     document.getElementById('messages-container').appendChild(thinkingDiv);
 
     // Scroll to bottom

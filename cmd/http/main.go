@@ -110,13 +110,15 @@ func main() {
 	e.POST("/agents", agentController.CreateAgentHandler)
 	e.GET("/agents/:id/edit", agentController.AgentFormHandler)
 	e.PUT("/agents/:id", agentController.UpdateAgentHandler)
+	e.DELETE("/agents/:id", agentController.DeleteAgentHandler) // Added DELETE route
 
 	e.GET("/chats/new", chatController.ChatFormHandler)
 	e.POST("/chats", chatController.CreateChatHandler)
 	e.GET("/chats/:id", chatController.ChatHandler)
 	e.GET("/chats/:id/edit", chatController.ChatFormHandler)
 	e.PUT("/chats/:id", chatController.UpdateChatHandler)
-	e.POST("/chats/:id/messages", chatController.SendMessageHandler) // New UI route
+	e.DELETE("/chats/:id", chatController.DeleteChatHandler) // Added DELETE route
+	e.POST("/chats/:id/messages", chatController.SendMessageHandler)
 
 	// Sidebar Partial Routes
 	e.GET("/sidebar/chats", homeController.ChatsPartialHandler)

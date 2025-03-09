@@ -144,3 +144,30 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 
 	return eCtx.HTML(http.StatusOK, buf.String())
 }
+
+func (c *ChatController) DeleteChatHandler(eCtx echo.Context) error {
+	id := eCtx.Param("id")
+	if id == "" {
+		return eCtx.String(http.StatusBadRequest, "Chat ID is required")
+	}
+
+	err := c.chatService.DeleteChat(eCtx.Request().Context(), id)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return eCtx.String(http.StatusNotFound, "Chat not found")
+		}
+		c.logger.Error("Failed to delete chat", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to delete chat")
+	}
+
+	// After successful deletion, return the updated chats list
+	chats, err := c.chatService.ListActiveChats(eCtx.Request().Context())
+	if err != nil {
+		c.logger.Error("Failed to list active chats", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to load chats")
+	}
+	data := map[string]interface{}{
+		"Chats": chats,
+	}
+	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_chats", data)
+}

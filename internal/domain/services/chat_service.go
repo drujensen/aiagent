@@ -21,6 +21,7 @@ type ChatService interface {
 	ListActiveChats(ctx context.Context) ([]*entities.Chat, error)
 	GetChat(ctx context.Context, id string) (*entities.Chat, error)
 	UpdateChat(ctx context.Context, id, name string) (*entities.Chat, error)
+	DeleteChat(ctx context.Context, id string) error // Added method
 }
 
 type chatService struct {
@@ -203,4 +204,18 @@ func (s *chatService) GetChat(ctx context.Context, id string) (*entities.Chat, e
 	}
 
 	return chat, nil
+}
+
+func (s *chatService) DeleteChat(ctx context.Context, id string) error {
+	if id == "" {
+		return fmt.Errorf("chat ID is required")
+	}
+	err := s.chatRepo.DeleteChat(ctx, id)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return fmt.Errorf("chat not found: %s", id)
+		}
+		return fmt.Errorf("failed to delete chat: %v", err)
+	}
+	return nil
 }

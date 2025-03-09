@@ -198,3 +198,30 @@ func (c *AgentController) UpdateAgentHandler(eCtx echo.Context) error {
 
 	return eCtx.String(http.StatusOK, "Agent updated successfully")
 }
+
+func (c *AgentController) DeleteAgentHandler(eCtx echo.Context) error {
+	id := eCtx.Param("id")
+	if id == "" {
+		return eCtx.String(http.StatusBadRequest, "Agent ID is required")
+	}
+
+	err := c.agentService.DeleteAgent(eCtx.Request().Context(), id)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return eCtx.String(http.StatusNotFound, "Agent not found")
+		}
+		c.logger.Error("Failed to delete agent", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to delete agent")
+	}
+
+	// After successful deletion, return the updated agents list
+	agents, err := c.agentService.ListAgents(eCtx.Request().Context())
+	if err != nil {
+		c.logger.Error("Failed to list agents", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to load agents")
+	}
+	data := map[string]interface{}{
+		"Agents": agents,
+	}
+	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_agents", data)
+}
