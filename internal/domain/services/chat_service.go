@@ -44,12 +44,9 @@ func NewChatService(chatRepo interfaces.ChatRepository, agentRepo interfaces.Age
 }
 
 // estimateTokens approximates the token count for a message.
-func estimateTokens(message map[string]string) int {
-	content, ok := message["content"]
-	if !ok {
-		return 0
-	}
-	contentTokens := (len(content) + 3) / 4
+func estimateTokens(msg *entities.Message) int {
+	contentTokens := (len(msg.Content) + 3) / 4
+	// Approximate additional tokens for role, etc.
 	return contentTokens + 4
 }
 
@@ -73,6 +70,8 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 	message.Timestamp = time.Now()
 	chat.Messages = append(chat.Messages, message)
 	chat.UpdatedAt = time.Now()
+
+	s.logger.Info("Before update", zap.Any("chat", chat))
 
 	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
 		return nil, fmt.Errorf("failed to update chat: %w", err)
@@ -99,47 +98,37 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		contextLength = *agent.ContextWindow
 	}
 
-	const toolBuffer = 500
 	maxTokens := 4096
 	if agent.MaxTokens != nil {
 		maxTokens = *agent.MaxTokens
 	}
 
-	tokenLimit := contextLength - maxTokens - toolBuffer
+	tokenLimit := contextLength - maxTokens
 
-	systemMessage := map[string]string{
-		"role":    "system",
-		"content": agent.SystemPrompt,
+	// Create system message
+	systemMessage := &entities.Message{
+		Role:    "system",
+		Content: agent.SystemPrompt,
 	}
 	systemTokens := estimateTokens(systemMessage)
 	if systemTokens > tokenLimit {
 		return nil, fmt.Errorf("system prompt too large for the context window")
 	}
 
-	var tempMessages []map[string]string
+	// Select messages within token limit
+	var tempMessages []*entities.Message
 	currentTokens := systemTokens
 	for i := len(chat.Messages) - 1; i >= 0; i-- {
 		msg := chat.Messages[i]
-		msgMap := map[string]string{
-			"role":    msg.Role,
-			"content": msg.Content,
-		}
-		if msg.Role == "tool" {
-			msgMap["tool_call_id"] = msg.ID
-		}
-		msgTokens := estimateTokens(msgMap)
+		msgTokens := estimateTokens(&msg)
 		if currentTokens+msgTokens > tokenLimit {
 			break
 		}
-		tempMessages = append(tempMessages, msgMap)
+		tempMessages = append([]*entities.Message{&msg}, tempMessages...)
 		currentTokens += msgTokens
 	}
 
-	for i, j := 0, len(tempMessages)-1; i < j; i, j = i+1, j-1 {
-		tempMessages[i], tempMessages[j] = tempMessages[j], tempMessages[i]
-	}
-
-	messagesToSend := append([]map[string]string{systemMessage}, tempMessages...)
+	messagesToSend := append([]*entities.Message{systemMessage}, tempMessages...)
 
 	tools := []*interfaces.ToolIntegration{}
 	for _, toolName := range agent.Tools {

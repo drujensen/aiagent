@@ -11,6 +11,7 @@ import (
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/interfaces"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -45,7 +46,27 @@ func NewAIModelIntegration(baseURL, apiKey, modelName string, toolRepo interface
 	}, nil
 }
 
-func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, toolList []*interfaces.ToolIntegration, options map[string]interface{}) ([]*entities.Message, error) {
+func convertToAPIMessages(messages []*entities.Message) []map[string]interface{} {
+	apiMessages := make([]map[string]interface{}, 0, len(messages))
+	for _, msg := range messages {
+		apiMsg := map[string]interface{}{
+			"role": msg.Role,
+		}
+		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
+			apiMsg["tool_calls"] = msg.ToolCalls
+			apiMsg["content"] = nil
+		} else {
+			apiMsg["content"] = msg.Content
+			if msg.Role == "tool" {
+				apiMsg["tool_call_id"] = msg.ToolCallID
+			}
+		}
+		apiMessages = append(apiMessages, apiMsg)
+	}
+	return apiMessages
+}
+
+func (m *AIModelIntegration) GenerateResponse(messages []*entities.Message, toolList []*interfaces.ToolIntegration, options map[string]interface{}) ([]*entities.Message, error) {
 	// Prepare tool definitions
 	tools := make([]map[string]interface{}, len(toolList))
 	for i, tool := range toolList {
@@ -83,8 +104,7 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, tool
 	}
 
 	reqBody := map[string]interface{}{
-		"model":    m.modelName,
-		"messages": messages,
+		"model": m.modelName,
 	}
 	if len(tools) > 0 {
 		reqBody["tools"] = tools
@@ -94,6 +114,12 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, tool
 			reqBody[key] = value
 		}
 	}
+
+	// Convert initial messages to API format
+	apiMessages := convertToAPIMessages(messages)
+	reqBody["messages"] = apiMessages
+
+	m.logger.Info("Messages before tool calls", zap.Any("messages", apiMessages))
 
 	var newMessages []*entities.Message
 
@@ -160,83 +186,86 @@ func (m *AIModelIntegration) GenerateResponse(messages []map[string]string, tool
 
 		if len(choice.ToolCalls) == 0 {
 			// No tool calls, add the final assistant message
-			finalMessage := entities.NewMessage("assistant", choice.Content)
+			finalMessage := &entities.Message{
+				ID:        uuid.New().String(),
+				Role:      "assistant",
+				Content:   choice.Content,
+				Timestamp: time.Now(),
+			}
 			newMessages = append(newMessages, finalMessage)
 			break
-		}
-
-		// There are tool calls, create a message for the assistant's tool call
-		toolCallContent := "Calling tools:\n"
-		for _, tc := range choice.ToolCalls {
-			toolCallContent += fmt.Sprintf("- %s with arguments: %s\n", tc.Function.Name, tc.Function.Arguments)
-		}
-		toolCallMessage := entities.NewMessage("assistant", toolCallContent)
-		newMessages = append(newMessages, toolCallMessage)
-
-		// Handle tool calls
-		for _, toolCall := range choice.ToolCalls {
-			if toolCall.Type != "function" {
-				continue
+		} else {
+			// There are tool calls, create a message for the assistant's tool call
+			toolCallContent := "Calling tools:\n"
+			for _, tc := range choice.ToolCalls {
+				toolCallContent += fmt.Sprintf("- %s with arguments: %s\n", tc.Function.Name, tc.Function.Arguments)
 			}
-			toolName := toolCall.Function.Name
-
-			tool, err := m.toolRepo.GetToolByName(toolName)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get tool %s: %v", toolName, err)
+			toolCallMessage := &entities.Message{
+				ID:        uuid.New().String(),
+				Role:      "assistant",
+				Content:   toolCallContent,
+				ToolCalls: choice.ToolCalls,
+				Timestamp: time.Now(),
 			}
+			newMessages = append(newMessages, toolCallMessage)
 
-			var toolResult string
-			if tool != nil {
-				result, err := (*tool).Execute(toolCall.Function.Arguments)
-				if err != nil {
-					toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
-				} else {
-					toolResult = result
-				}
-			} else {
-				toolResult = fmt.Sprintf("Tool %s not found", toolName)
-			}
-
-			// Create a tool response message
-			toolResponseContent := fmt.Sprintf("Tool %s responded: %s", toolName, toolResult)
-			toolResponseMessage := entities.NewMessage("tool", toolResponseContent)
-			newMessages = append(newMessages, toolResponseMessage)
-
-			// Append tool call message to messages for next API call
-			toolCallObj := entities.ToolCall{
-				ID:   toolCall.ID,
-				Type: "function",
-				Function: struct {
-					Name      string `json:"name"`
-					Arguments string `json:"arguments"`
-				}{
-					Name:      toolCall.Function.Name,
-					Arguments: toolCall.Function.Arguments,
-				},
-			}
-
-			toolCallsJSON, err := json.Marshal([]entities.ToolCall{toolCallObj})
-			if err != nil {
-				return nil, fmt.Errorf("error marshaling tool call: %v", err)
-			}
-
-			messages = append(messages, map[string]string{
+			// Append assistant message with tool calls to apiMessages
+			assistantMsg := map[string]interface{}{
 				"role":       "assistant",
 				"content":    "",
-				"tool_calls": string(toolCallsJSON),
-			})
+				"tool_calls": choice.ToolCalls,
+			}
+			apiMessages = append(apiMessages, assistantMsg)
 
-			// Append to messages for next API call
-			messages = append(messages, map[string]string{
-				"role":         "tool",
-				"content":      toolResult,
-				"tool_call_id": toolCall.ID,
-			})
-			m.logger.Info("Messages:", zap.Any("messages", messages))
+			// Handle tool calls
+			for _, toolCall := range choice.ToolCalls {
+				if toolCall.Type != "function" {
+					continue
+				}
+				toolName := toolCall.Function.Name
+
+				tool, err := m.toolRepo.GetToolByName(toolName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get tool %s: %v", toolName, err)
+				}
+
+				var toolResult string
+				if tool != nil {
+					result, err := (*tool).Execute(toolCall.Function.Arguments)
+					if err != nil {
+						toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
+					} else {
+						toolResult = result
+					}
+				} else {
+					toolResult = fmt.Sprintf("Tool %s not found", toolName)
+				}
+
+				// Create tool response message
+				toolResponseContent := fmt.Sprintf("Tool %s responded: %s", toolName, toolResult)
+				toolResponseMessage := &entities.Message{
+					ID:         uuid.New().String(),
+					Role:       "tool",
+					Content:    toolResponseContent,
+					ToolCallID: toolCall.ID,
+					Timestamp:  time.Now(),
+				}
+				newMessages = append(newMessages, toolResponseMessage)
+
+				// Append tool response to apiMessages
+				toolResponseMsg := map[string]interface{}{
+					"role":         "tool",
+					"content":      toolResult,
+					"tool_call_id": toolCall.ID,
+				}
+				apiMessages = append(apiMessages, toolResponseMsg)
+			}
+
+			m.logger.Info("Messages after tool calls", zap.Any("messages", newMessages))
+
+			// Prepare for next iteration
+			reqBody["messages"] = apiMessages
 		}
-
-		// Prepare for next iteration
-		reqBody["messages"] = messages
 	}
 
 	return newMessages, nil
