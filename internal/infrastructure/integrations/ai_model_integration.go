@@ -38,7 +38,7 @@ func NewAIModelIntegration(baseURL, apiKey, modelName string, toolRepo interface
 	return &AIModelIntegration{
 		baseURL:    baseURL,
 		apiKey:     apiKey,
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		httpClient: &http.Client{Timeout: 60 * time.Second},
 		lastUsage:  0,
 		modelName:  modelName,
 		toolRepo:   toolRepo,
@@ -106,13 +106,14 @@ func (m *AIModelIntegration) GenerateResponse(messages []*entities.Message, tool
 	reqBody := map[string]interface{}{
 		"model": m.modelName,
 	}
+	// Add tools to request body if any
 	if len(tools) > 0 {
 		reqBody["tools"] = tools
 	}
+
+	// Add options to request body
 	for key, value := range options {
-		if key != "tools" {
-			reqBody[key] = value
-		}
+		reqBody[key] = value
 	}
 
 	// Convert initial messages to API format
@@ -142,6 +143,8 @@ func (m *AIModelIntegration) GenerateResponse(messages []*entities.Message, tool
 			resp, err = m.httpClient.Do(req)
 			if err != nil {
 				if attempt < 2 {
+					m.logger.Warn("Error making request, retrying", zap.Error(err))
+					m.logger.Warn("jsonBody", zap.String("jsonBody", string(jsonBody)))
 					time.Sleep(time.Duration(attempt+1) * time.Second)
 					continue
 				}
@@ -196,14 +199,10 @@ func (m *AIModelIntegration) GenerateResponse(messages []*entities.Message, tool
 			break
 		} else {
 			// There are tool calls, create a message for the assistant's tool call
-			toolCallContent := "Calling tools:\n"
-			for _, tc := range choice.ToolCalls {
-				toolCallContent += fmt.Sprintf("- %s with arguments: %s\n", tc.Function.Name, tc.Function.Arguments)
-			}
 			toolCallMessage := &entities.Message{
 				ID:        uuid.New().String(),
 				Role:      "assistant",
-				Content:   toolCallContent,
+				Content:   "",
 				ToolCalls: choice.ToolCalls,
 				Timestamp: time.Now(),
 			}
@@ -212,7 +211,7 @@ func (m *AIModelIntegration) GenerateResponse(messages []*entities.Message, tool
 			// Append assistant message with tool calls to apiMessages
 			assistantMsg := map[string]interface{}{
 				"role":       "assistant",
-				"content":    "",
+				"content":    nil,
 				"tool_calls": choice.ToolCalls,
 			}
 			apiMessages = append(apiMessages, assistantMsg)
