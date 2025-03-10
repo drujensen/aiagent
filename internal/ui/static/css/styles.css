@@ -33,6 +33,12 @@
     height: calc(100vh - 60px);
 }
 
+.home-content {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #aaa;
+}
+
 .sidebar {
     width: 300px;
     background-color: #2c2c2c;
@@ -124,6 +130,12 @@
     flex-direction: column;
     background-color: #1a1a1a;
     align-items: center;
+}
+
+.message-intro {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #aaa;
 }
 
 .message-history {

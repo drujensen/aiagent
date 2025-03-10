@@ -44,10 +44,21 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusInternalServerError, "Failed to load chat")
 	}
 
+	agent, err := c.agentService.GetAgent(eCtx.Request().Context(), chat.AgentID.Hex())
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return eCtx.String(http.StatusNotFound, "Agent not found")
+		}
+		c.logger.Error("Failed to get agent", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to load agent")
+	}
+
 	data := map[string]interface{}{
 		"Title":           "Chat",
 		"ContentTemplate": "chat_content",
 		"ChatID":          chatID,
+		"ChatName":        chat.Name,
+		"AgentName":       agent.Name,
 		"Messages":        chat.Messages,
 	}
 
