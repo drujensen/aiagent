@@ -26,20 +26,29 @@ type ChatService interface {
 }
 
 type chatService struct {
-	chatRepo  interfaces.ChatRepository
-	agentRepo interfaces.AgentRepository
-	toolRepo  interfaces.ToolRepository
-	config    *config.Config
-	logger    *zap.Logger
+	chatRepo     interfaces.ChatRepository
+	agentRepo    interfaces.AgentRepository
+	providerRepo interfaces.ProviderRepository
+	toolRepo     interfaces.ToolRepository
+	config       *config.Config
+	logger       *zap.Logger
 }
 
-func NewChatService(chatRepo interfaces.ChatRepository, agentRepo interfaces.AgentRepository, toolRepo interfaces.ToolRepository, cfg *config.Config, logger *zap.Logger) *chatService {
+func NewChatService(
+	chatRepo interfaces.ChatRepository, 
+	agentRepo interfaces.AgentRepository, 
+	providerRepo interfaces.ProviderRepository,
+	toolRepo interfaces.ToolRepository, 
+	cfg *config.Config, 
+	logger *zap.Logger,
+) *chatService {
 	return &chatService{
-		chatRepo:  chatRepo,
-		agentRepo: agentRepo,
-		toolRepo:  toolRepo,
-		config:    cfg,
-		logger:    logger,
+		chatRepo:     chatRepo,
+		agentRepo:    agentRepo,
+		providerRepo: providerRepo,
+		toolRepo:     toolRepo,
+		config:       cfg,
+		logger:       logger,
 	}
 }
 
@@ -83,12 +92,20 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		return nil, fmt.Errorf("failed to get agent %s: %v", chat.AgentID.Hex(), err)
 	}
 
+	// Get the provider
+	provider, err := s.providerRepo.GetProvider(ctx, agent.ProviderID.Hex())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get provider %s: %v", agent.ProviderID.Hex(), err)
+	}
+
 	resolvedAPIKey, err := s.config.ResolveAPIKey(agent.APIKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve API key for agent %s: %v", agent.ID.Hex(), err)
 	}
 
-	aiModel, err := integrations.NewAIModelIntegration(agent.Endpoint, resolvedAPIKey, agent.Model, s.toolRepo, s.logger)
+	// Create AI model integration based on provider type
+	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
+	aiModel, err := aiModelFactory.CreateModelIntegration(agent, provider, resolvedAPIKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AI model: %v", err)
 	}
@@ -152,10 +169,33 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		return nil, fmt.Errorf("failed to generate AI response: %v", err)
 	}
 
+	// Get usage information for billing
+	usage, err := aiModel.GetUsage()
+	if err != nil {
+		s.logger.Warn("Failed to get usage info", zap.Error(err))
+	}
+
+	// Get pricing for this model
+	var inputPricePerMille, outputPricePerMille float64
+	modelPricing := provider.GetModelPricing(agent.Model)
+	if modelPricing != nil {
+		inputPricePerMille = modelPricing.InputPricePerMille
+		outputPricePerMille = modelPricing.OutputPricePerMille
+	}
+
+	// Add usage information to the last message (typically the final assistant response)
+	if len(newMessages) > 0 && usage != nil {
+		lastMsg := newMessages[len(newMessages)-1]
+		lastMsg.AddUsage(usage.PromptTokens, usage.CompletionTokens, inputPricePerMille, outputPricePerMille)
+	}
+
 	// Append all new messages to the chat's message history
 	for _, msg := range newMessages {
 		chat.Messages = append(chat.Messages, *msg)
 	}
+	
+	// Update chat usage totals
+	chat.UpdateUsage()
 	chat.UpdatedAt = time.Now()
 
 	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {

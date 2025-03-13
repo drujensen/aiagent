@@ -19,7 +19,7 @@ type AIModelIntegration struct {
 	baseURL    string
 	apiKey     string
 	httpClient *http.Client
-	lastUsage  int
+	lastUsage  *entities.Usage
 	modelName  string
 	toolRepo   interfaces.ToolRepository
 	logger     *zap.Logger
@@ -39,7 +39,7 @@ func NewAIModelIntegration(baseURL, apiKey, modelName string, toolRepo interface
 		baseURL:    baseURL,
 		apiKey:     apiKey,
 		httpClient: &http.Client{Timeout: 60 * time.Second},
-		lastUsage:  0,
+		lastUsage:  &entities.Usage{},
 		modelName:  modelName,
 		toolRepo:   toolRepo,
 		logger:     logger,
@@ -124,6 +124,7 @@ func (m *AIModelIntegration) GenerateResponse(messages []*entities.Message, tool
 
 	var newMessages []*entities.Message
 
+	// Loop to handle tool calls
 	for {
 		jsonBody, err := json.Marshal(reqBody)
 		if err != nil {
@@ -173,7 +174,9 @@ func (m *AIModelIntegration) GenerateResponse(messages []*entities.Message, tool
 				} `json:"message"`
 			} `json:"choices"`
 			Usage struct {
-				TotalTokens int `json:"total_tokens"`
+				PromptTokens     int `json:"prompt_tokens"`
+				CompletionTokens int `json:"completion_tokens"`
+				TotalTokens      int `json:"total_tokens"`
 			} `json:"usage"`
 		}
 
@@ -184,7 +187,11 @@ func (m *AIModelIntegration) GenerateResponse(messages []*entities.Message, tool
 			return nil, fmt.Errorf("no choices in response")
 		}
 
-		m.lastUsage = responseBody.Usage.TotalTokens
+		// Store usage data
+		m.lastUsage.PromptTokens = responseBody.Usage.PromptTokens
+		m.lastUsage.CompletionTokens = responseBody.Usage.CompletionTokens
+		m.lastUsage.TotalTokens = responseBody.Usage.TotalTokens
+
 		choice := responseBody.Choices[0].Message
 
 		if len(choice.ToolCalls) == 0 {
@@ -241,11 +248,10 @@ func (m *AIModelIntegration) GenerateResponse(messages []*entities.Message, tool
 				}
 
 				// Create tool response message
-				toolResponseContent := fmt.Sprintf("Tool %s responded: %s", toolName, toolResult)
 				toolResponseMessage := &entities.Message{
 					ID:         uuid.New().String(),
 					Role:       "tool",
-					Content:    toolResponseContent,
+					Content:    toolResult,
 					ToolCallID: toolCall.ID,
 					Timestamp:  time.Now(),
 				}
@@ -270,8 +276,16 @@ func (m *AIModelIntegration) GenerateResponse(messages []*entities.Message, tool
 	return newMessages, nil
 }
 
-func (m *AIModelIntegration) GetTokenUsage() (int, error) {
+func (m *AIModelIntegration) GetUsage() (*entities.Usage, error) {
 	return m.lastUsage, nil
+}
+
+func (m *AIModelIntegration) ModelName() string {
+	return m.modelName
+}
+
+func (m *AIModelIntegration) ProviderType() entities.ProviderType {
+	return entities.ProviderGeneric
 }
 
 var _ interfaces.AIModelIntegration = (*AIModelIntegration)(nil)

@@ -11,15 +11,44 @@
             <input type="text" id="name" name="name" class="form-control" value="{{.Agent.Name}}" required>
         </div>
         <div class="form-group">
-            <label for="endpoint">Endpoint:</label>
-            <input type="text" id="endpoint" name="endpoint" class="form-control" value="{{.Agent.Endpoint}}" required>
+            <label for="provider">Provider:</label>
+            <select id="provider" name="provider_id" class="form-control" hx-trigger="change" hx-indicator="#provider-loading" required>
+                <option value="">Select Provider</option>
+                {{range .Providers}}
+                <option value="{{.ID.Hex}}" {{if eq .ID.Hex $.Agent.ProviderID.Hex}}selected{{end}}>{{.Name}} ({{.Type}})</option>
+                {{end}}
+            </select>
+            <div id="provider-loading" class="htmx-indicator">Loading models...</div>
+            <div id="provider-error" style="color: red; display: none;"></div>
         </div>
         <div class="form-group">
             <label for="model">Model:</label>
-            <input type="text" id="model" name="model" class="form-control" value="{{.Agent.Model}}" required>
+            <select id="model" name="model" class="form-control">
+                {{if .Agent.Model}}
+                <option value="{{.Agent.Model}}" selected>{{.Agent.Model}}</option>
+                {{else}}
+                <option value="">Select Provider First</option>
+                {{end}}
+                <!-- DEBUG: Provider Models Count: {{if .SelectedProviderModels}}{{len .SelectedProviderModels}}{{else}}none{{end}} -->
+                {{range .SelectedProviderModels}}
+                <option value="{{.Name}}" {{if eq .Name $.Agent.Model}}selected{{end}}>{{.Name}} (Input: ${{.InputPricePerMille}}/1K tokens, Output: ${{.OutputPricePerMille}}/1K tokens)</option>
+                {{end}}
+            </select>
+        </div>
+        <div id="custom-model-container" class="form-group" style="display: {{if or (eq (len .SelectedProviderModels) 0) (eq .SelectedProvider.Type "generic")}}block{{else}}none{{end}};">
+            <label for="custom_model_name">Custom Model Name:</label>
+            <input type="text" id="custom_model_name" class="form-control" 
+                   placeholder="Enter custom model name" 
+                   value="{{if and .Agent.Model (or (eq (len .SelectedProviderModels) 0) (eq .SelectedProvider.Type "generic"))}}{{.Agent.Model}}{{end}}">
+            <small class="form-text">Enter the exact model name required by the provider</small>
         </div>
         <div class="form-group">
-            <label for="api_key">API Key:</label>
+            <label for="endpoint">Custom Endpoint (optional):</label>
+            <input type="text" id="endpoint" name="endpoint" class="form-control" value="{{.Agent.Endpoint}}" placeholder="Leave empty to use provider default">
+            <small class="form-text">Only specify if you need to override the provider's default endpoint.</small>
+        </div>
+        <div class="form-group">
+            <label for="api_key" id="api-key-label">{{if .SelectedProvider}}{{.SelectedProvider.APIKeyName}}{{else}}API Key{{end}}:</label>
             <input type="text" id="api_key" name="api_key" class="form-control" value="{{.Agent.APIKey}}" required>
             <small class="form-text">Use #{VAR_NAME}# to reference an environment variable.</small>
         </div>
@@ -38,6 +67,7 @@
         <div class="form-group">
             <label for="context_window">Context Window (optional):</label>
             <input type="number" id="context_window" name="context_window" class="form-control" value="{{if .Agent.ContextWindow}}{{.Agent.ContextWindow}}{{end}}">
+            <small class="form-text">Will use model's default if not specified.</small>
         </div>
         <div class="form-group">
             <label for="tools">Tools (optional):</label>
@@ -52,4 +82,166 @@
     </form>
     <div id="response-message"></div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get elements
+    const providerSelect = document.getElementById('provider');
+    const modelSelect = document.getElementById('model');
+    const providerErrorDiv = document.getElementById('provider-error');
+    const providerLoadingDiv = document.getElementById('provider-loading');
+    const customModelContainer = document.getElementById('custom-model-container');
+    const customModelInput = document.getElementById('custom_model_name');
+    
+    // Manually fetch models when provider changes
+    providerSelect.addEventListener('change', function() {
+        const providerId = this.value;
+        if (!providerId) {
+            // Clear model dropdown if no provider selected
+            modelSelect.innerHTML = '<option value="">Select Provider First</option>';
+            return;
+        }
+        
+        // Clear any previous errors
+        providerErrorDiv.style.display = 'none';
+        // Show loading indicator
+        providerLoadingDiv.style.display = 'block';
+        
+        // Debug
+        console.log('Selected provider ID:', providerId);
+        
+        // Manually fetch models via fetch API
+        fetch(`/agents/provider-models?provider_id=${encodeURIComponent(providerId)}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+                }
+                
+                // Get headers for API key and provider type
+                const apiKeyName = response.headers.get('X-Provider-Key-Name');
+                const providerType = response.headers.get('X-Provider-Type');
+                
+                // Update API key label
+                const apiKeyLabel = document.getElementById('api-key-label');
+                if (apiKeyLabel && apiKeyName) {
+                    apiKeyLabel.textContent = apiKeyName;
+                }
+                
+                return response.text().then(html => {
+                    return {
+                        html: html,
+                        apiKeyName: apiKeyName,
+                        providerType: providerType
+                    };
+                });
+            })
+            .then(data => {
+                // Update model dropdown
+                modelSelect.innerHTML = data.html;
+                
+                // Update model dropdown visibility
+                if (data.providerType === 'generic') {
+                    // For generic providers, show the custom model field automatically
+                    const customModelContainer = document.getElementById('custom-model-container');
+                    customModelContainer.style.display = 'block';
+                }
+                
+                // Debug info
+                console.log('Provider type:', data.providerType);
+                console.log('API key name:', data.apiKeyName);
+                console.log('Model options count:', modelSelect.options.length);
+                
+                // Hide loading indicator
+                providerLoadingDiv.style.display = 'none';
+            })
+            .catch(error => {
+                // Show error
+                providerErrorDiv.style.display = 'block';
+                providerErrorDiv.textContent = 'Error loading models: ' + error.message;
+                console.error('Error loading models:', error);
+                
+                // Hide loading indicator
+                providerLoadingDiv.style.display = 'none';
+            });
+    });
+    
+    // Handle custom model selection
+    
+    // If a custom model is already visible (either "custom" is selected or we have a Generic provider)
+    if (customModelContainer.style.display !== 'none') {
+        // If we already have a model name but no matching option, it's likely a custom model
+        let found = false;
+        for (let i = 0; i < modelSelect.options.length; i++) {
+            if (modelSelect.options[i].value === modelSelect.value && modelSelect.value !== '') {
+                found = true;
+                break;
+            }
+        }
+        
+        if (!found && modelSelect.value !== '' && modelSelect.value !== 'custom') {
+            // This is a custom model value, make sure the custom input shows it
+            customModelInput.value = modelSelect.value;
+        }
+        
+        // Ensure the custom model input updates the model select value
+        customModelInput.addEventListener('input', updateModelValue);
+    }
+    
+    // Always listen for model selection changes to show/hide custom input
+    modelSelect.addEventListener('change', function() {
+        if (this.value === 'custom') {
+            // Show custom input when "Custom Model" is selected
+            customModelContainer.style.display = 'block';
+            customModelInput.focus();
+            customModelInput.addEventListener('input', updateModelValue);
+        } else if (customModelContainer.style.display !== 'none' && 
+                   this.value !== 'custom' && 
+                   this.value !== customModelInput.value) {
+            // If custom container is visible but user selected a standard model, 
+            // hide custom unless provider is generic
+            const providerType = document.querySelector('select[name="provider_id"]').value;
+            const isGeneric = providerType === 'generic';
+            
+            if (!isGeneric) {
+                customModelContainer.style.display = 'none';
+                customModelInput.removeEventListener('input', updateModelValue);
+            }
+        }
+    });
+    
+    // Update the form before submission to ensure custom model value is used
+    const form = document.querySelector('form');
+    form.addEventListener('htmx:beforeRequest', function() {
+        if (customModelContainer.style.display !== 'none' && customModelInput.value.trim() !== '') {
+            // If custom input is visible and has a value, update the model select
+            updateModelValue();
+        }
+    });
+    
+    function updateModelValue() {
+        if (customModelInput.value.trim() !== '') {
+            // Create or update the model value directly
+            // First check if there's already an option with this value
+            let existingOption = null;
+            for (let i = 0; i < modelSelect.options.length; i++) {
+                if (modelSelect.options[i].value === customModelInput.value.trim()) {
+                    existingOption = modelSelect.options[i];
+                    break;
+                }
+            }
+            
+            if (!existingOption) {
+                // Create a new option with the custom value
+                let customOption = document.createElement('option');
+                customOption.value = customModelInput.value.trim();
+                customOption.textContent = 'Custom: ' + customModelInput.value.trim();
+                modelSelect.appendChild(customOption);
+            }
+            
+            // Select the custom option
+            modelSelect.value = customModelInput.value.trim();
+        }
+    }
+});
+</script>
 {{end}}

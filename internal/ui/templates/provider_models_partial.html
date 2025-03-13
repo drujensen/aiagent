@@ -1,0 +1,8 @@
+{{define "provider_models_partial"}}
+<option value="">Select Model</option>
+<!-- Provider: {{.Provider.Name}} ({{.Provider.Type}}) - Model count: {{len .Models}} -->
+{{range .Models}}
+<option value="{{.Name}}">{{.Name}} (Input: ${{.InputPricePerMille}}/1K tokens, Output: ${{.OutputPricePerMille}}/1K tokens)</option>
+{{end}}
+<option value="custom">Custom Model (Enter name below)</option>
+{{end}}

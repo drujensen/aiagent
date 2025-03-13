@@ -19,7 +19,16 @@ func main() {
 	fmt.Println("Welcome to the AIAgent Console Application!")
 
 	// Example usage of an entity
-	agent := entities.NewAgent("ConsoleAgent", "http://example.com", "gpt-3.5-turbo", "dummy-key", "Hello, AI Agent!", []primitive.ObjectID{})
+	agent := entities.NewAgent(
+		"ConsoleAgent", 
+		primitive.NilObjectID, 
+		entities.ProviderOpenAI, 
+		"http://example.com", 
+		"gpt-3.5-turbo", 
+		"dummy-key", 
+		"Hello, AI Agent!", 
+		[]string{},
+	)
 	fmt.Printf("Agent Prompt: %s\n", agent.SystemPrompt)
 
 	// Interactive loop

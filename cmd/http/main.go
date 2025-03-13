@@ -36,6 +36,7 @@ func main() {
 
 	agentRepo := repositories.NewMongoAgentRepository(db.Collection("agents"))
 	chatRepo := repositories.NewMongoChatRepository(db.Collection("chats"))
+	providerRepo := repositories.NewMongoProviderRepository(db.Collection("providers"))
 
 	configurations := map[string]string{
 		"workspace":      cfg.Workspace,
@@ -47,9 +48,15 @@ func main() {
 		logger.Fatal("Failed to initialize tools", zap.Error(err))
 	}
 
+	providerService := services.NewProviderService(providerRepo, logger)
 	agentService := services.NewAgentService(agentRepo, logger)
 	toolService := services.NewToolService(toolRepo, logger)
-	chatService := services.NewChatService(chatRepo, agentRepo, toolRepo, cfg, logger)
+	chatService := services.NewChatService(chatRepo, agentRepo, providerRepo, toolRepo, cfg, logger)
+	
+	// Initialize default providers if needed
+	if err := providerService.InitializeDefaultProviders(context.Background()); err != nil {
+		logger.Warn("Failed to initialize default providers", zap.Error(err))
+	}
 
 	// Define custom template functions
 	funcMap := template.FuncMap{
@@ -83,14 +90,18 @@ func main() {
 		"internal/ui/templates/chat_form.html",
 		"internal/ui/templates/messages_partial.html",
 		"internal/ui/templates/message_session_partial.html",
+		"internal/ui/templates/provider_form.html",
+		"internal/ui/templates/provider_models_partial.html",
+		"internal/ui/templates/providers_list_content.html",
 	)
 	if err != nil {
 		logger.Fatal("Failed to parse templates", zap.Error(err))
 	}
 
 	homeController := uicontrollers.NewHomeController(logger, tmpl, chatService, agentService, toolService)
-	agentController := uicontrollers.NewAgentController(logger, tmpl, agentService, toolService)
+	agentController := uicontrollers.NewAgentController(logger, tmpl, agentService, toolService, providerService)
 	chatController := uicontrollers.NewChatController(logger, tmpl, chatService, agentService)
+	providerController := uicontrollers.NewProviderController(logger, tmpl, providerService)
 
 	// Initialize Echo
 	e := echo.New()
@@ -118,6 +129,7 @@ func main() {
 	e.GET("/agents/:id/edit", agentController.AgentFormHandler)
 	e.PUT("/agents/:id", agentController.UpdateAgentHandler)
 	e.DELETE("/agents/:id", agentController.DeleteAgentHandler) // Added DELETE route
+	e.GET("/agents/provider-models", agentController.GetProviderModelsHandler) 
 
 	e.GET("/chats/new", chatController.ChatFormHandler)
 	e.POST("/chats", chatController.CreateChatHandler)
@@ -126,6 +138,17 @@ func main() {
 	e.PUT("/chats/:id", chatController.UpdateChatHandler)
 	e.DELETE("/chats/:id", chatController.DeleteChatHandler) // Added DELETE route
 	e.POST("/chats/:id/messages", chatController.SendMessageHandler)
+
+	// Provider routes
+	e.GET("/providers", providerController.ListProvidersHandler)
+	e.GET("/providers/new", providerController.ProviderFormHandler)
+	e.POST("/providers", providerController.CreateProviderHandler)
+	e.GET("/providers/:id/edit", providerController.ProviderFormHandler)
+	e.PUT("/providers/:id", providerController.UpdateProviderHandler)
+	e.DELETE("/providers/:id", providerController.DeleteProviderHandler)
+	e.GET("/api/debug/providers", providerController.DebugProvidersHandler)
+	e.POST("/api/debug/providers/reset", providerController.ResetProvidersHandler)
+	e.GET("/api/providers/:id", providerController.GetProviderHandler)
 
 	// Sidebar Partial Routes
 	e.GET("/sidebar/chats", homeController.ChatsPartialHandler)
