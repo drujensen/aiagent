@@ -38,7 +38,7 @@ func NewAIModelIntegration(baseURL, apiKey, modelName string, toolRepo interface
 	return &AIModelIntegration{
 		baseURL:    baseURL,
 		apiKey:     apiKey,
-		httpClient: &http.Client{Timeout: 60 * time.Second},
+		httpClient: &http.Client{Timeout: 600 * time.Second},
 		lastUsage:  &entities.Usage{},
 		modelName:  modelName,
 		toolRepo:   toolRepo,

@@ -39,7 +39,7 @@ func (s *agentService) CreateAgent(ctx context.Context, agent *entities.Agent) e
 	if agent.SystemPrompt == "" {
 		return fmt.Errorf("agent prompt is required")
 	}
-	if agent.Endpoint == "" || agent.Model == "" || agent.APIKey == "" {
+	if agent.Model == "" || agent.APIKey == "" {
 		return fmt.Errorf("agent endpoint, model, and API key are required")
 	}
 
@@ -72,7 +72,7 @@ func (s *agentService) UpdateAgent(ctx context.Context, agent *entities.Agent) e
 	if agent.SystemPrompt == "" {
 		return fmt.Errorf("agent prompt is required")
 	}
-	if agent.Endpoint == "" || agent.Model == "" || agent.APIKey == "" {
+	if agent.Model == "" || agent.APIKey == "" {
 		return fmt.Errorf("agent endpoint, model, and API key are required")
 	}
 
