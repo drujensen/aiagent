@@ -1,0 +1,19 @@
+{{define "message_session_partial"}}
+<!-- User Message -->
+<div class="message user-message">
+  <div class="message-content">{{renderMarkdown .UserMessage.Content}}</div>
+</div>
+
+<!-- AI Response Messages -->
+{{range .AIMessages}}
+  {{if eq .Role "assistant"}}
+    <div class="message agent-message">
+      <div class="message-content">{{renderMarkdown .Content}}</div>
+    </div>
+  {{else if eq .Role "tool"}}
+    <div class="message tool-message">
+      <div class="message-content">{{renderMarkdown .Content}}</div>
+    </div>
+  {{end}}
+{{end}}
+{{end}}

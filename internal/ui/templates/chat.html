@@ -8,87 +8,77 @@
                 <p>How can I help you today?</p>
               {{end}}
             </div>
-            {{range .Messages}}
-            {{if eq .Role "user"}}
-              <div class="message user-message">
-                <div class="message-content">{{renderMarkdown .Content}}</div>
-              </div>
-            {{else if eq .Role "assistant"}}
-              <div class="message agent-message">
-                <div class="message-content">{{renderMarkdown .Content}}</div>
-              </div>
-            {{else}}
-              <div class="message tool-message">
-                <div class="message-content">{{renderMarkdown .Content}}</div>
-              </div>
+
+            <!-- Group messages by conversation session (user + responses) -->
+            {{$userMsgIndex := 0}}
+            {{$inSession := false}}
+
+            {{range $i, $msg := .Messages}}
+              <!-- Start a new session when we see a user message -->
+              {{if and (eq $msg.Role "user") (not $inSession)}}
+                <div id="message-session-{{$userMsgIndex}}" class="message-session">
+                {{$inSession = true}}
+                {{$userMsgIndex = add $userMsgIndex 1}}
+              {{end}}
+
+              <!-- Render the message based on role -->
+              {{if eq $msg.Role "user"}}
+                <div class="message user-message">
+                  <div class="message-content">{{renderMarkdown $msg.Content}}</div>
+                </div>
+              {{else if eq $msg.Role "assistant"}}
+                <div class="message agent-message">
+                  <div class="message-content">{{renderMarkdown $msg.Content}}</div>
+                </div>
+              {{else}}
+                <div class="message tool-message">
+                  <div class="message-content">{{renderMarkdown $msg.Content}}</div>
+                </div>
+              {{end}}
+
+              <!-- End a session when we see the next user message or end of messages -->
+              {{if or (and (lt (add $i 1) (len $.Messages)) (eq (index $.Messages (add $i 1)).Role "user")) (eq $i (sub (len $.Messages) 1))}}
+                {{if $inSession}}
+                  </div>
+                  {{$inSession = false}}
+                {{end}}
+              {{end}}
             {{end}}
-            {{end}}
+
+            <!-- Placeholder for next message session -->
+            <div id="next-message-session"></div>
         </div>
     </section>
     <section class="message-input" id="message-input-section">
         <form id="message-form" class="message-form"
               hx-post="/chats/{{.ChatID}}/messages"
-              hx-target="#messages-container"
-              hx-swap="beforeend"
+              hx-target="#next-message-session"
+              hx-swap="outerHTML"
+              hx-indicator="#thinking-indicator"
               hx-trigger="submit, keydown[ctrlKey || metaKey && key == 'Enter']"
-              hx-on-htmx-before-request="handleBeforeRequest(this)"
-              hx-on-htmx-after-request="handleAfterRequest(this)">
+              hx-on::after-request="this.reset(); document.getElementById('message-history').scrollTop = document.getElementById('message-history').scrollHeight;">
             <input type="hidden" name="chat_id" value="{{.ChatID}}">
             <textarea name="message" id="message-input" placeholder="Type your message..." rows="3"></textarea>
-            <button type="submit" id="send-button"><i class="fas fa-paper-plane"></i> Send</button>
+            <button type="submit" id="send-button">
+              <span class="htmx-indicator" id="thinking-indicator">
+                Thinking <span class="spinner"></span>
+              </span>
+              <span class="htmx-indicator-hide">
+                <i class="fas fa-paper-plane"></i> Send
+              </span>
+            </button>
         </form>
     </section>
 </main>
-<script>
-function handleBeforeRequest(form) {
-    console.log("Before request triggered"); // Debug log
-    let msg = form.querySelector('textarea').value.trim();
-    if (msg === '') return; // Prevent empty submissions
-
-    // Append user message with unique ID
-    let userDiv = document.createElement('div');
-    userDiv.id = 'temp-user-message';
-    userDiv.className = 'message user-message';
-
-    let userContentDiv = document.createElement('div');
-    userContentDiv.className = 'message-content';
-    userContentDiv.textContent = msg;
-
-    userDiv.appendChild(userContentDiv);
-    document.getElementById('messages-container').appendChild(userDiv);
-
-    // Append "Thinking..." bubble with unique ID
-    let thinkingDiv = document.createElement('div');
-    thinkingDiv.id = 'temp-thinking-message';
-    thinkingDiv.className = 'message agent-message';
-
-    let thinkingContentDiv = document.createElement('div');
-    thinkingContentDiv.className = 'message-content';
-    thinkingContentDiv.innerHTML = 'Thinking... <span class="spinner"></span>';
-
-    thinkingDiv.appendChild(thinkingContentDiv);
-    document.getElementById('messages-container').appendChild(thinkingDiv);
-
-    // Scroll to bottom
-    let messageHistory = document.getElementById('message-history');
-    messageHistory.scrollTop = messageHistory.scrollHeight;
-
-    // Disable send button
-    document.getElementById('send-button').disabled = true;
-}
-
-function handleAfterRequest(form) {
-    // Clear the ids for the next submission
-    document.getElementById('temp-user-message').id = '';
-    document.getElementById('temp-thinking-message').id = '';
-
-    // Scroll to bottom
-    let messageHistory = document.getElementById('message-history');
-    messageHistory.scrollTop = messageHistory.scrollHeight;
-
-    // Re-enable send button and clear textarea
-    document.getElementById('send-button').disabled = false;
-    form.querySelector('textarea').value = '';
-}
-</script>
+<style>
+  .htmx-request .htmx-indicator {
+    display: inline;
+  }
+  .htmx-request .htmx-indicator-hide {
+    display: none;
+  }
+  .htmx-indicator {
+    display: none;
+  }
+</style>
 {{end}}

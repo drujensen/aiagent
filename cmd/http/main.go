@@ -62,6 +62,12 @@ func main() {
 			}
 			return false
 		},
+		"add": func(a, b int) int {
+			return a + b
+		},
+		"sub": func(a, b int) int {
+			return a - b
+		},
 	}
 
 	// Parse templates with custom function map
@@ -76,6 +82,7 @@ func main() {
 		"internal/ui/templates/chat.html",
 		"internal/ui/templates/chat_form.html",
 		"internal/ui/templates/messages_partial.html",
+		"internal/ui/templates/message_session_partial.html",
 	)
 	if err != nil {
 		logger.Fatal("Failed to parse templates", zap.Error(err))

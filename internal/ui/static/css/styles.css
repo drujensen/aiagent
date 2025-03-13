@@ -185,6 +185,12 @@
     white-space: normal;
 }
 
+.message-session {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
 .agent-message .message-content {
     background-color: #1a1a1a;
 }

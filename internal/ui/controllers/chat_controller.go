@@ -2,6 +2,7 @@ package uicontrollers
 
 import (
 	"bytes"
+	"fmt"
 	"html/template"
 	"net/http"
 
@@ -131,7 +132,7 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 
 	userMessage := entities.NewMessage("user", messageContent)
 
-	// Send the message and get the AI response
+	// Send the message and get the AI responses
 	aiMessage, err := c.chatService.SendMessage(eCtx.Request().Context(), chatID, *userMessage)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -141,19 +142,52 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusInternalServerError, "Failed to send message")
 	}
 
-	// Render both user and AI messages using the template partial
-	data := map[string]interface{}{
-		"UserMessage": userMessage,
-		"AIMessage":   aiMessage,
+	// Get the chat to find all messages since the user's message
+	chat, err := c.chatService.GetChat(eCtx.Request().Context(), chatID)
+	if err != nil {
+		c.logger.Error("Failed to get chat after sending message", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to retrieve updated messages")
 	}
 
+	// Find the index of the user's message
+	userMessageIndex := -1
+	for i, msg := range chat.Messages {
+		if msg.ID == userMessage.ID {
+			userMessageIndex = i
+			break
+		}
+	}
+
+	// Extract all responses after the user message (AI assistant + tool messages)
+	var aiMessages []entities.Message
+	if userMessageIndex >= 0 && userMessageIndex < len(chat.Messages)-1 {
+		aiMessages = chat.Messages[userMessageIndex+1:]
+	} else if aiMessage != nil {
+		// Fallback to just the direct AI response if we can't find all messages
+		aiMessages = []entities.Message{*aiMessage}
+	}
+
+	// Create data for the template
+	messageSessionID := fmt.Sprintf("message-session-%d", len(chat.Messages)/2) // Rough estimate of session count
+
+	data := map[string]interface{}{
+		"UserMessage": userMessage,
+		"AIMessages":  aiMessages,
+		"SessionID":   messageSessionID,
+	}
+
+	// Render complete message session using the template
 	var buf bytes.Buffer
-	if err := c.tmpl.ExecuteTemplate(&buf, "messages_partial", data); err != nil {
-		c.logger.Error("Failed to render messages", zap.Error(err))
+	if err := c.tmpl.ExecuteTemplate(&buf, "message_session_partial", data); err != nil {
+		c.logger.Error("Failed to render message session", zap.Error(err))
 		return eCtx.String(http.StatusInternalServerError, "Failed to render messages")
 	}
 
-	return eCtx.HTML(http.StatusOK, buf.String())
+	// Create a placeholder for the next message session
+	responseHTML := fmt.Sprintf(`<div id="message-session-%s" class="message-session">%s</div><div id="next-message-session"></div>`,
+		messageSessionID, buf.String())
+
+	return eCtx.HTML(http.StatusOK, responseHTML)
 }
 
 func (c *ChatController) DeleteChatHandler(eCtx echo.Context) error {
