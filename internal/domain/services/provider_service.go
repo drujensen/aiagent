@@ -186,6 +186,12 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 					ContextWindow:     128000,
 				},
 				{
+					Name:              "gpt-4o-mini",
+					InputPricePerMille: 2.0,
+					OutputPricePerMille: 6.0,
+					ContextWindow:     128000,
+				},
+				{
 					Name:              "gpt-4-turbo",
 					InputPricePerMille: 10.0,
 					OutputPricePerMille: 30.0,
@@ -205,6 +211,12 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			baseURL:    "https://api.anthropic.com",
 			apiKeyName: "Anthropic API Key",
 			models: []entities.ModelPricing{
+				{
+					Name:              "claude-3-5-sonnet",
+					InputPricePerMille: 3.0,
+					OutputPricePerMille: 15.0,
+					ContextWindow:     200000,
+				},
 				{
 					Name:              "claude-3-opus",
 					InputPricePerMille: 15.0,
@@ -236,6 +248,18 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 					InputPricePerMille: 2.0,
 					OutputPricePerMille: 6.0,
 					ContextWindow:     128000,
+				},
+				{
+					Name:              "grok-2",
+					InputPricePerMille: 2.5,
+					OutputPricePerMille: 7.5,
+					ContextWindow:     128000,
+				},
+				{
+					Name:              "grok-3",
+					InputPricePerMille: 0.0, // Pricing not available yet
+					OutputPricePerMille: 0.0, // Pricing not available yet
+					ContextWindow:     1000000, // Estimated
 				},
 			},
 		},
@@ -312,7 +336,7 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			},
 		},
 		{
-			name:       "Generic Provider",
+			name:       "Custom Provider",
 			type_:      entities.ProviderGeneric,
 			baseURL:    "",
 			apiKeyName: "API Key",

@@ -15,11 +15,16 @@
             <select id="provider" name="provider_id" class="form-control" hx-trigger="change" hx-indicator="#provider-loading" required>
                 <option value="">Select Provider</option>
                 {{range .Providers}}
-                <option value="{{.ID.Hex}}" {{if eq .ID.Hex $.Agent.ProviderID.Hex}}selected{{end}}>{{.Name}} ({{.Type}})</option>
+                <option value="{{.ID.Hex}}" {{if eq .ID.Hex $.Agent.ProviderID.Hex}}selected{{end}}>{{if eq .Type "generic"}}Custom Provider{{else}}{{.Name}} ({{.Type}}){{end}}</option>
                 {{end}}
             </select>
             <div id="provider-loading" class="htmx-indicator">Loading models...</div>
             <div id="provider-error" style="color: red; display: none;"></div>
+        </div>
+        <div class="form-group">
+            <label for="endpoint">Endpoint:</label>
+            <input type="text" id="endpoint" name="endpoint" class="form-control" value="{{.Agent.Endpoint}}" placeholder="Provider API endpoint URL">
+            <small class="form-text">URL for the provider's API. Will be populated automatically when selecting a provider.</small>
         </div>
         <div class="form-group">
             <label for="model">Model:</label>
@@ -31,21 +36,16 @@
                 {{end}}
                 <!-- DEBUG: Provider Models Count: {{if .SelectedProviderModels}}{{len .SelectedProviderModels}}{{else}}none{{end}} -->
                 {{range .SelectedProviderModels}}
-                <option value="{{.Name}}" {{if eq .Name $.Agent.Model}}selected{{end}}>{{.Name}} (Input: ${{.InputPricePerMille}}/1K tokens, Output: ${{.OutputPricePerMille}}/1K tokens)</option>
+                <option value="{{.Name}}" {{if eq .Name $.Agent.Model}}selected{{end}}>{{.Name}} (Input: ${{.InputPricePerMille}}/1M tokens, Output: ${{.OutputPricePerMille}}/1M tokens)</option>
                 {{end}}
             </select>
         </div>
         <div id="custom-model-container" class="form-group" style="display: {{if or (eq (len .SelectedProviderModels) 0) (eq .SelectedProvider.Type "generic")}}block{{else}}none{{end}};">
-            <label for="custom_model_name">Custom Model Name:</label>
+            <label for="custom_model_name">Model Name:</label>
             <input type="text" id="custom_model_name" class="form-control" 
-                   placeholder="Enter custom model name" 
+                   placeholder="Enter model name" 
                    value="{{if and .Agent.Model (or (eq (len .SelectedProviderModels) 0) (eq .SelectedProvider.Type "generic"))}}{{.Agent.Model}}{{end}}">
-            <small class="form-text">Enter the exact model name required by the provider</small>
-        </div>
-        <div class="form-group">
-            <label for="endpoint">Custom Endpoint (optional):</label>
-            <input type="text" id="endpoint" name="endpoint" class="form-control" value="{{.Agent.Endpoint}}" placeholder="Leave empty to use provider default">
-            <small class="form-text">Only specify if you need to override the provider's default endpoint.</small>
+            <small class="form-text">Will be populated when selecting a model, or enter a custom model name</small>
         </div>
         <div class="form-group">
             <label for="api_key" id="api-key-label">{{if .SelectedProvider}}{{.SelectedProvider.APIKeyName}}{{else}}API Key{{end}}:</label>
@@ -88,18 +88,82 @@ document.addEventListener('DOMContentLoaded', function() {
     // Get elements
     const providerSelect = document.getElementById('provider');
     const modelSelect = document.getElementById('model');
+    const endpointInput = document.getElementById('endpoint');
     const providerErrorDiv = document.getElementById('provider-error');
     const providerLoadingDiv = document.getElementById('provider-loading');
     const customModelContainer = document.getElementById('custom-model-container');
     const customModelInput = document.getElementById('custom_model_name');
     
-    // Manually fetch models when provider changes
-    providerSelect.addEventListener('change', function() {
-        const providerId = this.value;
-        if (!providerId) {
+    // Always show the Model Name field
+    customModelContainer.style.display = 'block';
+    
+    // Add "Custom Model" option if it doesn't exist
+    let hasCustomModel = false;
+    for (let i = 0; i < modelSelect.options.length; i++) {
+        if (modelSelect.options[i].value === 'custom') {
+            hasCustomModel = true;
+            break;
+        }
+    }
+    
+    if (!hasCustomModel && modelSelect.options.length > 0) {
+        const customOption = document.createElement('option');
+        customOption.value = "custom";
+        customOption.textContent = "Custom Model (Enter name below)";
+        modelSelect.appendChild(customOption);
+    }
+    
+    // Check if there's a model selected that's not in the dropdown
+    if (modelSelect.value) {
+        let modelInList = false;
+        for (let i = 0; i < modelSelect.options.length; i++) {
+            if (modelSelect.options[i].value === modelSelect.value && 
+                modelSelect.options[i].value !== '' &&
+                modelSelect.options[i].value !== 'custom') {
+                modelInList = true;
+                break;
+            }
+        }
+        
+        // If model is not in list, add it as a custom option and select it
+        if (!modelInList) {
+            const customOption = document.createElement('option');
+            customOption.value = modelSelect.value;
+            customOption.textContent = 'Custom: ' + modelSelect.value;
+            modelSelect.appendChild(customOption);
+            
+            // Update custom model input field
+            customModelInput.value = modelSelect.value;
+            
+            // Make sure the custom option is selected
+            modelSelect.value = customModelInput.value;
+        }
+    }
+    
+    // If we have a custom endpoint that doesn't match known providers, we'll handle it later
+    // Ollama provider will be automatically detected if endpoint is http://localhost:11434
+    
+    // No need to add Local Provider - Ollama already exists in the system
+    
+    // Function to load provider info and update related fields
+    async function loadProviderInfo(providerId) {
+        if (!providerId || providerId === '') {
             // Clear model dropdown if no provider selected
             modelSelect.innerHTML = '<option value="">Select Provider First</option>';
             return;
+        }
+        
+        // Special handling for Ollama provider
+        if (providerId === "local" || 
+            (providerSelect.options[providerSelect.selectedIndex].text.toLowerCase().includes('ollama'))) {
+            // Set the endpoint to Ollama's default if empty
+            if (!endpointInput.value) {
+                endpointInput.value = "http://localhost:11434";
+                endpointInput.dataset.autoSet = 'true';
+            }
+            
+            // We'll still let the normal provider loading happen for Ollama
+            // since it might have models configured in the database
         }
         
         // Clear any previous errors
@@ -107,113 +171,128 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show loading indicator
         providerLoadingDiv.style.display = 'block';
         
-        // Debug
-        console.log('Selected provider ID:', providerId);
-        
-        // Manually fetch models via fetch API
-        fetch(`/agents/provider-models?provider_id=${encodeURIComponent(providerId)}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
-                }
-                
-                // Get headers for API key and provider type
-                const apiKeyName = response.headers.get('X-Provider-Key-Name');
-                const providerType = response.headers.get('X-Provider-Type');
-                
-                // Update API key label
-                const apiKeyLabel = document.getElementById('api-key-label');
-                if (apiKeyLabel && apiKeyName) {
-                    apiKeyLabel.textContent = apiKeyName;
-                }
-                
-                return response.text().then(html => {
-                    return {
-                        html: html,
-                        apiKeyName: apiKeyName,
-                        providerType: providerType
-                    };
-                });
-            })
-            .then(data => {
-                // Update model dropdown
-                modelSelect.innerHTML = data.html;
-                
-                // Update model dropdown visibility
-                if (data.providerType === 'generic') {
-                    // For generic providers, show the custom model field automatically
-                    const customModelContainer = document.getElementById('custom-model-container');
-                    customModelContainer.style.display = 'block';
-                }
-                
-                // Debug info
-                console.log('Provider type:', data.providerType);
-                console.log('API key name:', data.apiKeyName);
-                console.log('Model options count:', modelSelect.options.length);
-                
-                // Hide loading indicator
-                providerLoadingDiv.style.display = 'none';
-            })
-            .catch(error => {
-                // Show error
-                providerErrorDiv.style.display = 'block';
-                providerErrorDiv.textContent = 'Error loading models: ' + error.message;
-                console.error('Error loading models:', error);
-                
-                // Hide loading indicator
-                providerLoadingDiv.style.display = 'none';
-            });
-    });
-    
-    // Handle custom model selection
-    
-    // If a custom model is already visible (either "custom" is selected or we have a Generic provider)
-    if (customModelContainer.style.display !== 'none') {
-        // If we already have a model name but no matching option, it's likely a custom model
-        let found = false;
-        for (let i = 0; i < modelSelect.options.length; i++) {
-            if (modelSelect.options[i].value === modelSelect.value && modelSelect.value !== '') {
-                found = true;
-                break;
+        try {
+            // Fetch models via fetch API
+            const response = await fetch(`/agents/provider-models?provider_id=${encodeURIComponent(providerId)}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
             }
+            
+            // Get headers for API key and provider type
+            const apiKeyName = response.headers.get('X-Provider-Key-Name');
+            const providerType = response.headers.get('X-Provider-Type');
+            const providerBaseUrl = response.headers.get('X-Provider-URL');
+            
+            // Update API key label
+            const apiKeyLabel = document.getElementById('api-key-label');
+            if (apiKeyLabel && apiKeyName) {
+                apiKeyLabel.textContent = apiKeyName;
+            }
+            
+            // Set endpoint value if we don't have a custom one
+            if (providerBaseUrl && (!endpointInput.value || endpointInput.dataset.autoSet === 'true')) {
+                endpointInput.value = providerBaseUrl;
+                endpointInput.dataset.autoSet = 'true';
+            } else if (providerBaseUrl && endpointInput.value !== providerBaseUrl) {
+                // We have a custom endpoint different than the provider's default
+                console.log('Using custom endpoint:', endpointInput.value, 'instead of provider default:', providerBaseUrl);
+            }
+            
+            const html = await response.text();
+            
+            // Update model dropdown
+            modelSelect.innerHTML = html;
+            
+            // Debug info
+            console.log('Provider loaded:', {
+                type: providerType,
+                apiKeyName: apiKeyName,
+                baseUrl: providerBaseUrl,
+                modelCount: modelSelect.options.length
+            });
+            
+            // Add back our current model if it's not in the list
+            if (customModelInput.value && customModelInput.value.trim() !== '') {
+                let modelInList = false;
+                for (let i = 0; i < modelSelect.options.length; i++) {
+                    if (modelSelect.options[i].value === customModelInput.value.trim()) {
+                        modelInList = true;
+                        modelSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+                
+                if (!modelInList && customModelInput.value.trim() !== 'custom') {
+                    // Create a new option with the custom value if it doesn't exist
+                    const customOption = document.createElement('option');
+                    customOption.value = customModelInput.value.trim();
+                    customOption.textContent = 'Custom: ' + customModelInput.value.trim();
+                    modelSelect.appendChild(customOption);
+                    modelSelect.value = customModelInput.value.trim();
+                }
+            }
+            
+            // Hide loading indicator
+            providerLoadingDiv.style.display = 'none';
+            
+        } catch (error) {
+            // Show error
+            providerErrorDiv.style.display = 'block';
+            providerErrorDiv.textContent = 'Error loading models: ' + error.message;
+            console.error('Error loading models:', error);
+            
+            // Hide loading indicator
+            providerLoadingDiv.style.display = 'none';
         }
-        
-        if (!found && modelSelect.value !== '' && modelSelect.value !== 'custom') {
-            // This is a custom model value, make sure the custom input shows it
-            customModelInput.value = modelSelect.value;
-        }
-        
-        // Ensure the custom model input updates the model select value
-        customModelInput.addEventListener('input', updateModelValue);
     }
     
-    // Always listen for model selection changes to show/hide custom input
+    // Initialize model name field if we have a model
+    if (modelSelect.value && modelSelect.value !== '' && modelSelect.value !== 'custom') {
+        customModelInput.value = modelSelect.value;
+    }
+    
+    // Load initial provider info if selected
+    if (providerSelect.value) {
+        loadProviderInfo(providerSelect.value);
+    }
+    
+    // Manually fetch models when provider changes
+    providerSelect.addEventListener('change', function() {
+        loadProviderInfo(this.value);
+    });
+    
+    // Handle custom endpoint changes
+    endpointInput.addEventListener('input', function() {
+        // When user manually changes endpoint, mark it as custom
+        if (this.dataset.autoSet === 'true') {
+            this.dataset.autoSet = 'false';
+        }
+    });
+    
+    // When user changes the Model Name field
+    customModelInput.addEventListener('input', function() {
+        if (this.value.trim() !== '') {
+            updateModelValue();
+        }
+    });
+    
+    // When model dropdown changes
     modelSelect.addEventListener('change', function() {
         if (this.value === 'custom') {
-            // Show custom input when "Custom Model" is selected
-            customModelContainer.style.display = 'block';
+            // Focus on custom input when "Custom Model" is selected
             customModelInput.focus();
-            customModelInput.addEventListener('input', updateModelValue);
-        } else if (customModelContainer.style.display !== 'none' && 
-                   this.value !== 'custom' && 
-                   this.value !== customModelInput.value) {
-            // If custom container is visible but user selected a standard model, 
-            // hide custom unless provider is generic
-            const providerType = document.querySelector('select[name="provider_id"]').value;
-            const isGeneric = providerType === 'generic';
-            
-            if (!isGeneric) {
-                customModelContainer.style.display = 'none';
-                customModelInput.removeEventListener('input', updateModelValue);
-            }
+        } else if (this.value && this.value !== '') {
+            // When a standard model is selected, update the custom model field with the value
+            customModelInput.value = this.value;
         }
     });
     
     // Update the form before submission to ensure custom model value is used
     const form = document.querySelector('form');
     form.addEventListener('htmx:beforeRequest', function() {
-        if (customModelContainer.style.display !== 'none' && customModelInput.value.trim() !== '') {
-            // If custom input is visible and has a value, update the model select
+        if (customModelInput.value.trim() !== '') {
+            // If custom input has a value, update the model select
             updateModelValue();
         }
     });

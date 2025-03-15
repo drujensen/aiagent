@@ -409,10 +409,13 @@ func (c *AgentController) GetProviderModelsHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusInternalServerError, "Failed to render provider models")
 	}
 
-	// Send API key name along with the models
+	// Send provider details through headers
 	eCtx.Response().Header().Set("X-Provider-Key-Name", provider.APIKeyName)
 	eCtx.Response().Header().Set("X-Provider-Type", string(provider.Type))
+	eCtx.Response().Header().Set("X-Provider-URL", provider.BaseURL)
 
-	c.logger.Info("Returning provider models template", zap.String("html_length", fmt.Sprintf("%d bytes", buf.Len())))
+	c.logger.Info("Returning provider models template", 
+		zap.String("html_length", fmt.Sprintf("%d bytes", buf.Len())),
+		zap.String("provider_url", provider.BaseURL))
 	return eCtx.HTML(http.StatusOK, buf.String())
 }

@@ -139,14 +139,14 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 			return eCtx.String(http.StatusNotFound, "Chat not found")
 		}
 		c.logger.Error("Failed to send message", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to send message")
+		return eCtx.String(http.StatusInternalServerError, "Failed to send message: "+err.Error())
 	}
 
 	// Get the chat to find all messages since the user's message
 	chat, err := c.chatService.GetChat(eCtx.Request().Context(), chatID)
 	if err != nil {
 		c.logger.Error("Failed to get chat after sending message", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to retrieve updated messages")
+		return eCtx.String(http.StatusInternalServerError, "Failed to retrieve updated messages: "+err.Error())
 	}
 
 	// Find the index of the user's message
@@ -180,13 +180,16 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 	var buf bytes.Buffer
 	if err := c.tmpl.ExecuteTemplate(&buf, "message_session_partial", data); err != nil {
 		c.logger.Error("Failed to render message session", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to render messages")
+		return eCtx.String(http.StatusInternalServerError, "Failed to render messages: "+err.Error())
 	}
 
 	// Create a placeholder for the next message session
 	responseHTML := fmt.Sprintf(`<div id="message-session-%s" class="message-session">%s</div><div id="next-message-session"></div>`,
 		messageSessionID, buf.String())
 
+	// Set the header to trigger scrolling to the response
+	eCtx.Response().Header().Set("HX-Trigger", "messageReceived")
+	
 	return eCtx.HTML(http.StatusOK, responseHTML)
 }
 

@@ -1,46 +1,64 @@
 package main
 
 import (
-	"bufio"
+	"context"
 	"fmt"
 	"os"
+	"time"
 
-	"aiagent/internal/domain/entities"
+	"aiagent/internal/domain/interfaces"
+	"aiagent/internal/domain/services"
+	"aiagent/internal/infrastructure/config"
+	"aiagent/internal/infrastructure/database"
+	"aiagent/internal/infrastructure/repositories"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
 
 func main() {
-	// Initialize zap logger
+	// Initialize logger
 	logger, _ := zap.NewProduction()
 	defer logger.Sync() // flushes buffer, if any
 
-	fmt.Println("Welcome to the AIAgent Console Application!")
+	// Initialize config
+	cfg, err := config.InitConfig()
+	if err != nil {
+		logger.Fatal("Failed to initialize config", zap.Error(err))
+		os.Exit(1)
+	}
 
-	// Example usage of an entity
-	agent := entities.NewAgent(
-		"ConsoleAgent", 
-		primitive.NilObjectID, 
-		entities.ProviderOpenAI, 
-		"http://example.com", 
-		"gpt-3.5-turbo", 
-		"dummy-key", 
-		"Hello, AI Agent!", 
-		[]string{},
-	)
-	fmt.Printf("Agent Prompt: %s\n", agent.SystemPrompt)
+	// Initialize MongoDB connection
+	mongodb, err := database.NewMongoDB(cfg.MongoURI, "aiagent", logger)
+	if err != nil {
+		logger.Fatal("Failed to connect to MongoDB", zap.Error(err))
+		os.Exit(1)
+	}
+	
+	// Get collections
+	providersCollection := mongodb.Collection("providers")
 
-	// Interactive loop
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		fmt.Print("You: ")
-		input, _ := reader.ReadString('\n')
-		logger.Info("User input received", zap.String("input", input))
+	// Initialize repositories
+	var providerRepo interfaces.ProviderRepository
+	providerRepo = repositories.NewMongoProviderRepository(providersCollection)
 
-		// Simulate AI agent response
-		response := "AI Agent: " + agent.SystemPrompt
-		fmt.Println(response)
-		logger.Info("AI agent response", zap.String("response", response))
+	// Initialize services
+	providerService := services.NewProviderService(providerRepo, logger)
+
+	// Create a timeout context
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Reset providers
+	fmt.Println("Resetting all providers to defaults...")
+	if err := providerService.ResetDefaultProviders(ctx); err != nil {
+		logger.Fatal("Failed to reset providers", zap.Error(err))
+		os.Exit(1)
+	}
+
+	fmt.Println("Successfully reset all providers to defaults!")
+	
+	// Disconnect from MongoDB
+	if err := mongodb.Disconnect(context.Background()); err != nil {
+		logger.Error("Failed to disconnect from MongoDB", zap.Error(err))
 	}
 }
