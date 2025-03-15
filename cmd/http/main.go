@@ -134,6 +134,7 @@ func main() {
 
 	e.GET("/agents/new", agentController.AgentFormHandler)
 	e.POST("/agents", agentController.CreateAgentHandler)
+	e.GET("/agents/repair-providers", agentController.RepairAgentProvidersHandler) // Admin endpoint to fix provider IDs
 	e.GET("/agents/:id/edit", agentController.AgentFormHandler)
 	e.PUT("/agents/:id", agentController.UpdateAgentHandler)
 	e.DELETE("/agents/:id", agentController.DeleteAgentHandler) // Added DELETE route
