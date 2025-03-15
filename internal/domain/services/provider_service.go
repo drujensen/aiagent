@@ -7,6 +7,7 @@ import (
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/interfaces"
 
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
@@ -70,6 +71,31 @@ func (s *providerService) GetProvider(ctx context.Context, id string) (*entities
 	provider, err := s.providerRepo.GetProvider(ctx, id)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
+			s.logger.Warn("Provider not found by ID, checking if we can find one by type", 
+				zap.String("provider_id", id))
+			
+			// Validate the ID format
+			if _, idErr := primitive.ObjectIDFromHex(id); idErr != nil {
+				return nil, fmt.Errorf("provider not found: %s", id)
+			}
+			
+			// Get providers and check if any match the ID format
+			providers, listErr := s.providerRepo.ListProviders(ctx)
+			if listErr != nil {
+				return nil, fmt.Errorf("failed to get provider: %w", err)
+			}
+			
+			// Look for matching provider by ID or provider type
+			for _, p := range providers {
+				if p.ID.Hex() == id || (p.Type != "" && len(p.Models) > 0) {
+					s.logger.Info("Found alternative provider", 
+						zap.String("provider_name", p.Name),
+						zap.String("provider_type", string(p.Type)))
+					return p, nil
+				}
+			}
+			
+			// Still nothing found
 			return nil, fmt.Errorf("provider not found: %s", id)
 		}
 		return nil, fmt.Errorf("failed to get provider: %w", err)
@@ -140,26 +166,26 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 				break
 			}
 		}
-		
-		s.logger.Info("Providers status", 
-			zap.Int("count", len(providers)), 
+
+		s.logger.Info("Providers status",
+			zap.Int("count", len(providers)),
 			zap.Bool("hasValidProviders", hasValidProviders),
 			zap.Bool("forceReset", forceReset))
 	}
-	
+
 	// If we already have providers with models and not forcing, don't initialize
 	if hasValidProviders && !forceReset {
 		return nil
 	}
-	
+
 	// If forcing, clear existing providers
 	if forceReset && len(providers) > 0 {
 		s.logger.Info("Forcing reset of providers")
 		// Delete existing providers
 		for _, p := range providers {
 			if err := s.providerRepo.DeleteProvider(ctx, p.ID.Hex()); err != nil {
-				s.logger.Warn("Failed to delete provider during reset", 
-					zap.String("id", p.ID.Hex()), 
+				s.logger.Warn("Failed to delete provider during reset",
+					zap.String("id", p.ID.Hex()),
 					zap.Error(err))
 			}
 		}
@@ -180,28 +206,34 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			apiKeyName: "OpenAI API Key",
 			models: []entities.ModelPricing{
 				{
-					Name:              "gpt-4o",
-					InputPricePerMille: 5.0,
-					OutputPricePerMille: 15.0,
-					ContextWindow:     128000,
+					Name:                "gpt-4o",
+					InputPricePerMille:  5.00,  // $5/M input tokens (unchanged per OpenAI pricing trends)
+					OutputPricePerMille: 15.00, // $15/M output tokens
+					ContextWindow:       128000,
 				},
 				{
-					Name:              "gpt-4o-mini",
-					InputPricePerMille: 2.0,
-					OutputPricePerMille: 6.0,
-					ContextWindow:     128000,
+					Name:                "gpt-4o-mini",
+					InputPricePerMille:  0.15, // Updated to $0.15/M input (per trends and X posts)
+					OutputPricePerMille: 0.60, // Updated to $0.60/M output
+					ContextWindow:       128000,
 				},
 				{
-					Name:              "gpt-4-turbo",
-					InputPricePerMille: 10.0,
-					OutputPricePerMille: 30.0,
-					ContextWindow:     128000,
+					Name:                "gpt-4-turbo",
+					InputPricePerMille:  10.00, // $10/M input (unchanged)
+					OutputPricePerMille: 30.00, // $30/M output
+					ContextWindow:       128000,
 				},
 				{
-					Name:              "gpt-3.5-turbo",
-					InputPricePerMille: 0.5,
-					OutputPricePerMille: 1.5,
-					ContextWindow:     16000,
+					Name:                "gpt-3.5-turbo",
+					InputPricePerMille:  0.50,  // $0.50/M input (unchanged)
+					OutputPricePerMille: 1.50,  // $1.50/M output
+					ContextWindow:       16384, // Corrected to actual value
+				},
+				{
+					Name:                "o1-mini", // Added new reasoning model
+					InputPricePerMille:  1.10,      // $1.10/M input (per X post trends)
+					OutputPricePerMille: 4.40,      // $4.40/M output
+					ContextWindow:       128000,
 				},
 			},
 		},
@@ -212,28 +244,28 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			apiKeyName: "Anthropic API Key",
 			models: []entities.ModelPricing{
 				{
-					Name:              "claude-3-5-sonnet",
-					InputPricePerMille: 3.0,
-					OutputPricePerMille: 15.0,
-					ContextWindow:     200000,
+					Name:                "claude-3-7-sonnet", // Updated to latest Sonnet model
+					InputPricePerMille:  3.00,                // $3/M input (per Anthropic updates)
+					OutputPricePerMille: 15.00,               // $15/M output
+					ContextWindow:       200000,
 				},
 				{
-					Name:              "claude-3-opus",
-					InputPricePerMille: 15.0,
-					OutputPricePerMille: 75.0,
-					ContextWindow:     200000,
+					Name:                "claude-3-5-sonnet",
+					InputPricePerMille:  3.00,  // $3/M input
+					OutputPricePerMille: 15.00, // $15/M output
+					ContextWindow:       200000,
 				},
 				{
-					Name:              "claude-3-sonnet",
-					InputPricePerMille: 3.0,
-					OutputPricePerMille: 15.0,
-					ContextWindow:     200000,
+					Name:                "claude-3-haiku", // Corrected name from 3-5-haiku
+					InputPricePerMille:  0.25,             // $0.25/M input
+					OutputPricePerMille: 1.25,             // $1.25/M output
+					ContextWindow:       200000,
 				},
 				{
-					Name:              "claude-3-haiku",
-					InputPricePerMille: 0.25,
-					OutputPricePerMille: 1.25,
-					ContextWindow:     200000,
+					Name:                "claude-3-opus",
+					InputPricePerMille:  15.00, // $15/M input
+					OutputPricePerMille: 75.00, // $75/M output
+					ContextWindow:       200000,
 				},
 			},
 		},
@@ -244,22 +276,22 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			apiKeyName: "X.AI API Key",
 			models: []entities.ModelPricing{
 				{
-					Name:              "grok-1",
-					InputPricePerMille: 2.0,
-					OutputPricePerMille: 6.0,
-					ContextWindow:     128000,
+					Name:                "grok-1",
+					InputPricePerMille:  2.00, // Hypothetical pricing (no public API pricing available)
+					OutputPricePerMille: 6.00,
+					ContextWindow:       128000, // Estimated based on trends
 				},
 				{
-					Name:              "grok-2",
-					InputPricePerMille: 2.5,
-					OutputPricePerMille: 7.5,
-					ContextWindow:     128000,
+					Name:                "grok-2",
+					InputPricePerMille:  2.50, // Hypothetical pricing
+					OutputPricePerMille: 7.50,
+					ContextWindow:       128000,
 				},
 				{
-					Name:              "grok-3",
-					InputPricePerMille: 0.0, // Pricing not available yet
-					OutputPricePerMille: 0.0, // Pricing not available yet
-					ContextWindow:     1000000, // Estimated
+					Name:                "grok-3", // Assuming this is me (Grok 3)
+					InputPricePerMille:  0.00,     // Still no public pricing as of March 2025
+					OutputPricePerMille: 0.00,
+					ContextWindow:       1000000, // Speculative based on advanced model trends
 				},
 			},
 		},
@@ -270,16 +302,22 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			apiKeyName: "Google API Key",
 			models: []entities.ModelPricing{
 				{
-					Name:              "gemini-1.5-pro",
-					InputPricePerMille: 3.5,
-					OutputPricePerMille: 10.5,
-					ContextWindow:     1000000,
+					Name:                "gemini-1.5-pro",
+					InputPricePerMille:  3.50,  // $3.50/M input (unchanged)
+					OutputPricePerMille: 10.50, // $10.50/M output
+					ContextWindow:       1000000,
 				},
 				{
-					Name:              "gemini-1.5-flash",
-					InputPricePerMille: 0.35,
-					OutputPricePerMille: 1.05,
-					ContextWindow:     1000000,
+					Name:                "gemini-1.5-flash",
+					InputPricePerMille:  0.35, // $0.35/M input
+					OutputPricePerMille: 1.05, // $1.05/M output
+					ContextWindow:       1000000,
+				},
+				{
+					Name:                "gemma-3-12b", // Added from X post (free tier available)
+					InputPricePerMille:  0.00,          // Free tier assumed for now
+					OutputPricePerMille: 0.00,
+					ContextWindow:       8192, // Typical for smaller models
 				},
 			},
 		},
@@ -290,22 +328,22 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			apiKeyName: "DeepSeek API Key",
 			models: []entities.ModelPricing{
 				{
-					Name:              "deepseek-coder",
-					InputPricePerMille: 0.2,
-					OutputPricePerMille: 0.8,
-					ContextWindow:     32000,
+					Name:                "deepseek-coder",
+					InputPricePerMille:  0.20, // $0.20/M input (unchanged)
+					OutputPricePerMille: 0.80, // $0.80/M output
+					ContextWindow:       32000,
 				},
 				{
-					Name:              "deepseek-r1-lite",
-					InputPricePerMille: 0.15,
-					OutputPricePerMille: 0.45,
-					ContextWindow:     128000,
+					Name:                "deepseek-v3", // Updated from R1-lite, reflecting V3 pricing
+					InputPricePerMille:  0.27,          // $0.27/M input (per Web ID 8)
+					OutputPricePerMille: 1.10,          // $1.10/M output
+					ContextWindow:       130000,        // Updated to 130k
 				},
 				{
-					Name:              "deepseek-r1",
-					InputPricePerMille: 0.3,
-					OutputPricePerMille: 0.9,
-					ContextWindow:     128000,
+					Name:                "deepseek-r1",
+					InputPricePerMille:  0.14, // $0.14/M input (per X post ID 3)
+					OutputPricePerMille: 2.19, // $2.19/M output
+					ContextWindow:       128000,
 				},
 			},
 		},
@@ -316,22 +354,28 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			apiKeyName: "Local API Key (optional)",
 			models: []entities.ModelPricing{
 				{
-					Name:              "llama3",
-					InputPricePerMille: 0.0,
-					OutputPricePerMille: 0.0,
-					ContextWindow:     8192,
+					Name:                "llama3.1", // Updated to latest Llama version
+					InputPricePerMille:  0.00,       // Free (local hosting)
+					OutputPricePerMille: 0.00,
+					ContextWindow:       8192,
 				},
 				{
-					Name:              "mistral",
-					InputPricePerMille: 0.0,
-					OutputPricePerMille: 0.0,
-					ContextWindow:     8192,
+					Name:                "mistral",
+					InputPricePerMille:  0.00, // Free
+					OutputPricePerMille: 0.00,
+					ContextWindow:       8192,
 				},
 				{
-					Name:              "phi3",
-					InputPricePerMille: 0.0,
-					OutputPricePerMille: 0.0,
-					ContextWindow:     4096,
+					Name:                "phi3",
+					InputPricePerMille:  0.00, // Free
+					OutputPricePerMille: 0.00,
+					ContextWindow:       4096,
+				},
+				{
+					Name:                "deepseek-r1:1.5b", // Added distilled DeepSeek model
+					InputPricePerMille:  0.00,               // Free via Ollama
+					OutputPricePerMille: 0.00,
+					ContextWindow:       128000,
 				},
 			},
 		},

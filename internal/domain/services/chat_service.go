@@ -95,7 +95,33 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 	// Get the provider
 	provider, err := s.providerRepo.GetProvider(ctx, agent.ProviderID.Hex())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get provider %s: %v", agent.ProviderID.Hex(), err)
+		// Fallback to get provider by type if ID lookup fails
+		s.logger.Warn("Failed to get provider by ID, attempting to find by type",
+			zap.String("agent_id", agent.ID.Hex()),
+			zap.String("provider_id", agent.ProviderID.Hex()),
+			zap.String("provider_type", string(agent.ProviderType)),
+			zap.Error(err))
+		
+		providerByType, typeErr := s.providerRepo.GetProviderByType(ctx, agent.ProviderType)
+		if typeErr != nil {
+			return nil, fmt.Errorf("failed to get provider %s and fallback by type %s also failed: %v", 
+				agent.ProviderID.Hex(), agent.ProviderType, err)
+		}
+		
+		s.logger.Info("Successfully found provider by type", 
+			zap.String("provider_name", providerByType.Name),
+			zap.String("provider_type", string(providerByType.Type)))
+		
+		// Update the agent with the new provider ID for future calls
+		agent.ProviderID = providerByType.ID
+		if updateErr := s.agentRepo.UpdateAgent(ctx, agent); updateErr != nil {
+			s.logger.Error("Failed to update agent with new provider ID", 
+				zap.String("agent_id", agent.ID.Hex()),
+				zap.Error(updateErr))
+			// Continue anyway since we have a valid provider now
+		}
+		
+		provider = providerByType
 	}
 
 	resolvedAPIKey, err := s.config.ResolveAPIKey(agent.APIKey)
