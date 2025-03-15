@@ -157,6 +157,13 @@ func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 		APIKey:       eCtx.FormValue("api_key"),
 		SystemPrompt: eCtx.FormValue("system_prompt"),
 	}
+	
+	// Log the agent details for debugging
+	c.logger.Info("Creating agent", 
+		zap.String("name", agent.Name),
+		zap.String("endpoint", agent.Endpoint),
+		zap.String("model", agent.Model),
+		zap.String("api_key_length", fmt.Sprintf("%d chars", len(agent.APIKey))))
 
 	// Set provider ID
 	providerId := eCtx.FormValue("provider_id")

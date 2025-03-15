@@ -50,6 +50,7 @@ func NewAnthropicIntegration(baseURL, apiKey, model string, toolRepo interfaces.
 
 // ModelName returns the name of the model being used
 func (m *AnthropicIntegration) ModelName() string {
+	m.logger.Info("Using Anthropic model", zap.String("model", m.model))
 	return m.model
 }
 
@@ -196,6 +197,11 @@ func (m *AnthropicIntegration) GenerateResponse(messages []*entities.Message, to
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("x-api-key", m.apiKey)
 		req.Header.Set("anthropic-version", "2023-06-01")
+		
+		// Log the request for debugging
+		m.logger.Info("Sending request to Anthropic", 
+			zap.String("model", m.model), 
+			zap.String("url", m.baseURL+"/v1/messages"))
 
 		var resp *http.Response
 		for attempt := 0; attempt < 3; attempt++ {
@@ -217,7 +223,12 @@ func (m *AnthropicIntegration) GenerateResponse(messages []*entities.Message, to
 			}
 			if resp.StatusCode != http.StatusOK {
 				body, _ := io.ReadAll(resp.Body)
-				return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+				bodyStr := string(body)
+				m.logger.Error("Anthropic API error",
+					zap.Int("status_code", resp.StatusCode),
+					zap.String("body", bodyStr),
+					zap.String("model", m.model))
+				return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, bodyStr)
 			}
 			break
 		}

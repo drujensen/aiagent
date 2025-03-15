@@ -244,27 +244,27 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			apiKeyName: "Anthropic API Key",
 			models: []entities.ModelPricing{
 				{
-					Name:                "claude-3-7-sonnet", // Updated to latest Sonnet model
-					InputPricePerMille:  3.00,                // $3/M input (per Anthropic updates)
-					OutputPricePerMille: 15.00,               // $15/M output
+					Name:                "claude-3-7-sonnet-20250219", // Full model name with date suffix
+					InputPricePerMille:  3.00,                         // $3/M input (per Anthropic updates)
+					OutputPricePerMille: 15.00,                        // $15/M output
 					ContextWindow:       200000,
 				},
 				{
-					Name:                "claude-3-5-sonnet",
-					InputPricePerMille:  3.00,  // $3/M input
-					OutputPricePerMille: 15.00, // $15/M output
+					Name:                "claude-3-5-sonnet-20240620", // Added date suffix
+					InputPricePerMille:  3.00,                         // $3/M input
+					OutputPricePerMille: 15.00,                        // $15/M output
 					ContextWindow:       200000,
 				},
 				{
-					Name:                "claude-3-haiku", // Corrected name from 3-5-haiku
-					InputPricePerMille:  0.25,             // $0.25/M input
-					OutputPricePerMille: 1.25,             // $1.25/M output
+					Name:                "claude-3-haiku-20240307", // Added date suffix
+					InputPricePerMille:  0.25,                      // $0.25/M input
+					OutputPricePerMille: 1.25,                      // $1.25/M output
 					ContextWindow:       200000,
 				},
 				{
-					Name:                "claude-3-opus",
-					InputPricePerMille:  15.00, // $15/M input
-					OutputPricePerMille: 75.00, // $75/M output
+					Name:                "claude-3-opus-20240229", // Added date suffix
+					InputPricePerMille:  15.00,                   // $15/M input
+					OutputPricePerMille: 75.00,                   // $75/M output
 					ContextWindow:       200000,
 				},
 			},
