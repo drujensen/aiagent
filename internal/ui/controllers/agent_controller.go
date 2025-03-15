@@ -67,7 +67,7 @@ func (c *AgentController) RepairAgentProvidersHandler(eCtx echo.Context) error {
 		}
 		
 		// Check if provider exists
-		provider, err := c.providerService.GetProvider(eCtx.Request().Context(), agent.ProviderID.Hex())
+		_, err := c.providerService.GetProvider(eCtx.Request().Context(), agent.ProviderID.Hex())
 		if err != nil {
 			c.logger.Warn("Agent has invalid provider ID",
 				zap.String("agent_id", agent.ID.Hex()),
