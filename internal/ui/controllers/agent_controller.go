@@ -223,6 +223,8 @@ func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusBadRequest, "Failed to create agent: "+err.Error())
 	}
 
+	// Add a response header to trigger sidebar refresh
+	eCtx.Response().Header().Set("HX-Trigger", `{"refreshAgents": true}`)
 	return eCtx.String(http.StatusOK, "Agent created successfully")
 }
 
@@ -317,6 +319,8 @@ func (c *AgentController) UpdateAgentHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusBadRequest, "Failed to update agent: "+err.Error())
 	}
 
+	// Add a response header to trigger sidebar refresh
+	eCtx.Response().Header().Set("HX-Trigger", `{"refreshAgents": true}`)
 	return eCtx.String(http.StatusOK, "Agent updated successfully")
 }
 

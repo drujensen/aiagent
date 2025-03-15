@@ -40,7 +40,7 @@ func NewOpenAIIntegration(baseURL, apiKey, model string, toolRepo interfaces.Too
 	return &OpenAIIntegration{
 		baseURL:    baseURL,
 		apiKey:     apiKey,
-		httpClient: &http.Client{Timeout: 60 * time.Second},
+		httpClient: &http.Client{Timeout: 600 * time.Second},
 		model:      model,
 		toolRepo:   toolRepo,
 		logger:     logger,

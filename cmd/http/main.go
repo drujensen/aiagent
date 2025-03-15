@@ -52,7 +52,7 @@ func main() {
 	agentService := services.NewAgentService(agentRepo, logger)
 	toolService := services.NewToolService(toolRepo, logger)
 	chatService := services.NewChatService(chatRepo, agentRepo, providerRepo, toolRepo, cfg, logger)
-	
+
 	// Initialize default providers if needed
 	if err := providerService.InitializeDefaultProviders(context.Background()); err != nil {
 		logger.Warn("Failed to initialize default providers", zap.Error(err))
@@ -118,6 +118,14 @@ func main() {
 		}
 	})
 
+	// Middleware to set Content-Language header
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			c.Response().Header().Set("Content-Language", "en")
+			return next(c)
+		}
+	})
+
 	// Static file serving
 	e.Static("/static", "internal/ui/static")
 
@@ -129,7 +137,7 @@ func main() {
 	e.GET("/agents/:id/edit", agentController.AgentFormHandler)
 	e.PUT("/agents/:id", agentController.UpdateAgentHandler)
 	e.DELETE("/agents/:id", agentController.DeleteAgentHandler) // Added DELETE route
-	e.GET("/agents/provider-models", agentController.GetProviderModelsHandler) 
+	e.GET("/agents/provider-models", agentController.GetProviderModelsHandler)
 
 	e.GET("/chats/new", chatController.ChatFormHandler)
 	e.POST("/chats", chatController.CreateChatHandler)
