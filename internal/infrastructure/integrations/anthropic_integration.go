@@ -228,13 +228,11 @@ func (m *AnthropicIntegration) GenerateResponse(messages []*entities.Message, to
 				OutputTokens int `json:"output_tokens"`
 			} `json:"usage"`
 			Content []struct {
-				Type    string `json:"type"`
-				Text    string `json:"text,omitempty"`
-				ToolUse struct {
-					ID    string          `json:"id"`
-					Name  string          `json:"name"`
-					Input json.RawMessage `json:"input"`
-				} `json:"tool_use,omitempty"`
+				Type  string          `json:"type"`
+				Text  string          `json:"text,omitempty"`
+				Id    string          `json:"id"`
+				Name  string          `json:"name"`
+				Input json.RawMessage `json:"input"`
 			} `json:"content"`
 		}
 		if err := json.Unmarshal(respBody, &responseBody); err != nil {
@@ -246,9 +244,9 @@ func (m *AnthropicIntegration) GenerateResponse(messages []*entities.Message, to
 			if content.Type == "tool_use" {
 				m.logger.Info("Parsed tool_use block",
 					zap.Int("index", i),
-					zap.String("id", content.ToolUse.ID),
-					zap.String("name", content.ToolUse.Name),
-					zap.String("input", string(content.ToolUse.Input)))
+					zap.String("id", content.Id),
+					zap.String("name", content.Name),
+					zap.String("input", string(content.Input)))
 			} else if content.Type == "text" {
 				m.logger.Info("Parsed text block",
 					zap.Int("index", i),
@@ -271,16 +269,16 @@ func (m *AnthropicIntegration) GenerateResponse(messages []*entities.Message, to
 				textContent += content.Text
 			} else if content.Type == "tool_use" {
 				toolCall := entities.ToolCall{
-					ID:   content.ToolUse.ID,
+					ID:   content.Id,
 					Type: "function",
 				}
-				toolCall.Function.Name = content.ToolUse.Name
-				toolCall.Function.Arguments = string(content.ToolUse.Input)
+				toolCall.Function.Name = content.Name
+				toolCall.Function.Arguments = string(content.Input)
 				toolCalls = append(toolCalls, toolCall)
 				m.logger.Info("Tool use processed",
-					zap.String("id", content.ToolUse.ID),
-					zap.String("name", content.ToolUse.Name),
-					zap.String("input", string(content.ToolUse.Input)))
+					zap.String("id", content.Id),
+					zap.String("name", content.Name),
+					zap.String("input", string(content.Input)))
 			}
 		}
 
@@ -346,9 +344,9 @@ func (m *AnthropicIntegration) GenerateResponse(messages []*entities.Message, to
 						"role": "user", // Use "user" role to report tool result as per Anthropic's convention
 						"content": []map[string]interface{}{
 							{
-								"type":         "tool_result",
-								"tool_call_id": toolCall.ID,
-								"content":      toolResult,
+								"type":        "tool_result",
+								"tool_use_id": toolCall.ID,
+								"content":     toolResult,
 							},
 						},
 					})
