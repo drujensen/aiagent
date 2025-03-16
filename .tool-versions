@@ -1,0 +1,12 @@
+dotnet          9.0.101
+g++             13.2.0
+gcc             13.2.0
+golang          1.23.2
+java            openjdk-23
+kotlin          2.1.0
+nodejs          23.3.0
+python          3.11.11
+ruby            3.3.6
+rust            1.83.0
+swift           6.0.2
+zig             0.13.0
