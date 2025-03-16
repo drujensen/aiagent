@@ -71,30 +71,30 @@ func (s *providerService) GetProvider(ctx context.Context, id string) (*entities
 	provider, err := s.providerRepo.GetProvider(ctx, id)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			s.logger.Warn("Provider not found by ID, checking if we can find one by type", 
+			s.logger.Warn("Provider not found by ID, checking if we can find one by type",
 				zap.String("provider_id", id))
-			
+
 			// Validate the ID format
 			if _, idErr := primitive.ObjectIDFromHex(id); idErr != nil {
 				return nil, fmt.Errorf("provider not found: %s", id)
 			}
-			
+
 			// Get providers and check if any match the ID format
 			providers, listErr := s.providerRepo.ListProviders(ctx)
 			if listErr != nil {
 				return nil, fmt.Errorf("failed to get provider: %w", err)
 			}
-			
+
 			// Look for matching provider by ID or provider type
 			for _, p := range providers {
 				if p.ID.Hex() == id || (p.Type != "" && len(p.Models) > 0) {
-					s.logger.Info("Found alternative provider", 
+					s.logger.Info("Found alternative provider",
 						zap.String("provider_name", p.Name),
 						zap.String("provider_type", string(p.Type)))
 					return p, nil
 				}
 			}
-			
+
 			// Still nothing found
 			return nil, fmt.Errorf("provider not found: %s", id)
 		}
@@ -224,16 +224,10 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 					ContextWindow:       128000,
 				},
 				{
-					Name:                "gpt-3.5-turbo",
-					InputPricePerMille:  0.50,  // $0.50/M input (unchanged)
-					OutputPricePerMille: 1.50,  // $1.50/M output
-					ContextWindow:       16384, // Corrected to actual value
-				},
-				{
-					Name:                "o1-mini", // Added new reasoning model
+					Name:                "o3-mini", // Added new reasoning model
 					InputPricePerMille:  1.10,      // $1.10/M input (per X post trends)
 					OutputPricePerMille: 4.40,      // $4.40/M output
-					ContextWindow:       128000,
+					ContextWindow:       200000,
 				},
 			},
 		},
@@ -263,8 +257,8 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 				},
 				{
 					Name:                "claude-3-opus-20240229", // Added date suffix
-					InputPricePerMille:  15.00,                   // $15/M input
-					OutputPricePerMille: 75.00,                   // $75/M output
+					InputPricePerMille:  15.00,                    // $15/M input
+					OutputPricePerMille: 75.00,                    // $75/M output
 					ContextWindow:       200000,
 				},
 			},
