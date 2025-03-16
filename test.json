@@ -1,0 +1,30 @@
+{
+  "body": {
+    "id": "msg_01QCZ94qhmMRPhwPD9bEAA4G",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-3-7-sonnet-20250219",
+    "content": [
+      {
+        "type": "text",
+        "text": "I'll search for information about the top programming languages predicted for 2025."
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_01UfXhTRLeTK8Mmbg48SANq8",
+        "name": "Search",
+        "input": {
+          "query": "top 10 programming languages for 2025 predictions"
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 605,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "output_tokens": 79
+    }
+  }
+}

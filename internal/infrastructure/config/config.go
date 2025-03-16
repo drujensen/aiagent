@@ -10,11 +10,13 @@ import (
 )
 
 type Config struct {
-	MongoURI     string `mapstructure:"MONGO_URI"`
-	Workspace    string `mapstructure:"WORKSPACE"`
-	TavilyAPIKey string `mapstructure:"TAVILY_API_KEY"`
-	logger       *zap.Logger
-	viper        *viper.Viper
+	MongoURI      string `mapstructure:"MONGO_URI"`
+	Workspace     string `mapstructure:"WORKSPACE"`
+	TavilyAPIKey  string `mapstructure:"TAVILY_API_KEY"`
+	BasicAuthUser string `mapstructure:"BASIC_AUTH_USER"`
+	BasicAuthPass string `mapstructure:"BASIC_AUTH_PASS"`
+	logger        *zap.Logger
+	viper         *viper.Viper
 }
 
 var (
