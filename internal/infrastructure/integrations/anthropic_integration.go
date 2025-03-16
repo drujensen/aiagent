@@ -339,7 +339,18 @@ func (m *AnthropicIntegration) GenerateResponse(messages []*entities.Message, to
 				newMessages = append(newMessages, toolResponseMessage)
 
 				// Append tool result to apiMessages for next iteration
-				if toolCall.ID != "" { // Only append if we have a valid tool_call_id
+				if toolCall.ID != "" {
+					apiMessages = append(apiMessages, map[string]interface{}{
+						"role": "assistant",
+						"content": []map[string]interface{}{
+							{
+								"type":  "tool_use",
+								"id":    toolCall.ID,
+								"name":  toolName,
+								"input": json.RawMessage(toolCall.Function.Arguments),
+							},
+						},
+					})
 					apiMessages = append(apiMessages, map[string]interface{}{
 						"role": "user", // Use "user" role to report tool result as per Anthropic's convention
 						"content": []map[string]interface{}{
