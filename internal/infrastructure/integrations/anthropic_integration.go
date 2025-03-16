@@ -63,7 +63,7 @@ func (m *AnthropicIntegration) ProviderType() entities.ProviderType {
 func convertToAnthropicMessages(messages []*entities.Message) []map[string]interface{} {
 	apiMessages := make([]map[string]interface{}, 0, len(messages))
 	for _, msg := range messages {
-		if msg.Role == "system" || msg.Role == "tool" { // Skip system and tool roles for initial request
+		if msg.Role == "system" { // Skip system for initial request
 			continue
 		}
 
@@ -77,10 +77,6 @@ func convertToAnthropicMessages(messages []*entities.Message) []map[string]inter
 			apiMsg["role"] = "assistant"
 			if len(msg.ToolCalls) > 0 {
 				content := make([]map[string]interface{}, 0)
-				content = append(content, map[string]interface{}{
-					"type": "text",
-					"text": "",
-				})
 				for _, tc := range msg.ToolCalls {
 					content = append(content, map[string]interface{}{
 						"type":  "tool_use",
@@ -92,6 +88,15 @@ func convertToAnthropicMessages(messages []*entities.Message) []map[string]inter
 				apiMsg["content"] = content
 			} else {
 				apiMsg["content"] = msg.Content
+			}
+		case "tool":
+			apiMsg["role"] = "user" // Use "user" role to report tool result as per Anthropic's convention
+			apiMsg["content"] = []map[string]interface{}{
+				{
+					"type":        "tool_result",
+					"tool_use_id": msg.ToolCallID,
+					"content":     msg.Content,
+				},
 			}
 		}
 

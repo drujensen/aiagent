@@ -28,7 +28,7 @@ type Message struct {
 	Content    string     `json:"content" bson:"content"`
 	ToolCallID string     `json:"tool_call_id,omitempty" bson:"tool_call_id,omitempty"`
 	ToolCalls  []ToolCall `json:"tool_calls" bson:"tool_calls"`
-	Usage      *Usage     `json:"usage,omitempty" bson:"usage,omitempty"`  // Usage metrics for this message
+	Usage      *Usage     `json:"usage,omitempty" bson:"usage,omitempty"` // Usage metrics for this message
 	Timestamp  time.Time  `json:"timestamp" bson:"timestamp"`
 }
 
@@ -44,17 +44,17 @@ func NewMessage(role, content string) *Message {
 // AddUsage adds usage information to the message
 func (m *Message) AddUsage(promptTokens, completionTokens int, inputCostPerMille, outputCostPerMille float64) {
 	totalTokens := promptTokens + completionTokens
-	
+
 	// Calculate cost
 	inputCost := float64(promptTokens) * inputCostPerMille / 1000.0
 	outputCost := float64(completionTokens) * outputCostPerMille / 1000.0
 	totalCost := inputCost + outputCost
-	
+
 	// Create or update usage
 	if m.Usage == nil {
 		m.Usage = &Usage{}
 	}
-	
+
 	m.Usage.PromptTokens = promptTokens
 	m.Usage.CompletionTokens = completionTokens
 	m.Usage.TotalTokens = totalTokens
