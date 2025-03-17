@@ -89,52 +89,55 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -qq -y \
     apt-get autoclean -qq -y && \
     apt-get autoremove -qq -y
 
+# Install asdf
+RUN echo "Downloading asdf version v0.16.5 for linux-arm64" && \
+    curl -fSL -o /tmp/asdf.tar.gz "https://github.com/asdf-vm/asdf/releases/download/v0.16.5/asdf-v0.16.5-linux-arm64.tar.gz" && \
+    mkdir -p /opt/asdf && \
+    tar -xzf /tmp/asdf.tar.gz -C /opt/asdf && \
+    chmod +x /opt/asdf/asdf && \
+    ln -s /opt/asdf/asdf /usr/bin/asdf
 
-# asdf languages
-RUN git clone https://github.com/asdf-vm/asdf.git /root/.asdf
-RUN chmod 755 /root/.asdf/asdf.sh
-RUN echo "/root/.asdf/asdf.sh" >> /etc/bash.bashrc
+# Verify asdf installation
+RUN echo "Verifying asdf installation:" && /usr/bin/asdf --version
 
-# Add asdf and above languages to PATH
-ENV PATH="${PATH}:/root/.asdf/shims:/root/.asdf/bin"
+# Add asdf to PATH
+ENV PATH="/usr/bin:/root/.asdf/shims:${PATH}"
 
+# Copy .tool-versions file
 COPY .tool-versions /root/app/.
 
-RUN asdf plugin-add golang
-RUN asdf install golang
+# Install asdf plugins and versions
+RUN /usr/bin/asdf plugin add golang
+RUN /usr/bin/asdf install golang
 
-RUN asdf plugin-add rust
-RUN asdf install rust
+RUN /usr/bin/asdf plugin add rust
+RUN /usr/bin/asdf install rust
 
-RUN asdf plugin add zig https://github.com/zigcc/asdf-zig
-RUN asdf install zig
+RUN /usr/bin/asdf plugin add zig https://github.com/zigcc/asdf-zig
+RUN /usr/bin/asdf install zig
 
-RUN asdf plugin-add swift https://github.com/drujensen/asdf-swift
-RUN asdf install swift
+RUN /usr/bin/asdf plugin add swift https://github.com/drujensen/asdf-swift
+RUN /usr/bin/asdf install swift
 
-RUN asdf plugin-add java
-RUN asdf install java
+RUN /usr/bin/asdf plugin add java
+RUN /usr/bin/asdf install java
 
-RUN asdf plugin-add kotlin
-RUN asdf install kotlin
+RUN /usr/bin/asdf plugin add kotlin
+RUN /usr/bin/asdf install kotlin
 
-RUN asdf plugin-add dotnet
-RUN asdf install dotnet
+RUN /usr/bin/asdf plugin add dotnet
+RUN /usr/bin/asdf install dotnet
 
-RUN asdf plugin-add nodejs
-RUN asdf install nodejs
+RUN /usr/bin/asdf plugin add nodejs
+RUN /usr/bin/asdf install nodejs
 
-RUN asdf plugin-add python
-RUN asdf install python
+RUN /usr/bin/asdf plugin add python
+RUN /usr/bin/asdf install python
 
-RUN asdf plugin-add ruby
-RUN asdf install ruby
+RUN /usr/bin/asdf plugin add ruby
+RUN /usr/bin/asdf install ruby
 
-
-#FROM golang:1.23
-
-#WORKDIR /app
-
+# Install Go and build the application
 COPY go.mod go.sum ./
 RUN go mod download
 
