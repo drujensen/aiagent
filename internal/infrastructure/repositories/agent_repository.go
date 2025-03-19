@@ -67,19 +67,12 @@ func (r *MongoAgentRepository) UpdateAgent(ctx context.Context, agent *entities.
 		return mongo.ErrNoDocuments
 	}
 
-	update := bson.M{
-		"$set": bson.M{
-			"name":           agent.Name,
-			"endpoint":       agent.Endpoint,
-			"model":          agent.Model,
-			"api_key":        agent.APIKey,
-			"system_prompt":  agent.SystemPrompt,
-			"temperature":    agent.Temperature,
-			"max_tokens":     agent.MaxTokens,
-			"context_window": agent.ContextWindow,
-			"tools":          agent.Tools,
-			"updated_at":     agent.UpdatedAt,
-		},
+	// Convert the agent struct to BSON
+	update, err := bson.Marshal(bson.M{
+		"$set": agent,
+	})
+	if err != nil {
+		return err
 	}
 
 	result, err := r.collection.UpdateOne(ctx, bson.M{"_id": oid}, update)

@@ -35,11 +35,11 @@ type chatService struct {
 }
 
 func NewChatService(
-	chatRepo interfaces.ChatRepository, 
-	agentRepo interfaces.AgentRepository, 
+	chatRepo interfaces.ChatRepository,
+	agentRepo interfaces.AgentRepository,
 	providerRepo interfaces.ProviderRepository,
-	toolRepo interfaces.ToolRepository, 
-	cfg *config.Config, 
+	toolRepo interfaces.ToolRepository,
+	cfg *config.Config,
 	logger *zap.Logger,
 ) *chatService {
 	return &chatService{
@@ -101,26 +101,26 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 			zap.String("provider_id", agent.ProviderID.Hex()),
 			zap.String("provider_type", string(agent.ProviderType)),
 			zap.Error(err))
-		
+
 		providerByType, typeErr := s.providerRepo.GetProviderByType(ctx, agent.ProviderType)
 		if typeErr != nil {
-			return nil, fmt.Errorf("failed to get provider %s and fallback by type %s also failed: %v", 
+			return nil, fmt.Errorf("failed to get provider %s and fallback by type %s also failed: %v",
 				agent.ProviderID.Hex(), agent.ProviderType, err)
 		}
-		
-		s.logger.Info("Successfully found provider by type", 
+
+		s.logger.Info("Successfully found provider by type",
 			zap.String("provider_name", providerByType.Name),
 			zap.String("provider_type", string(providerByType.Type)))
-		
+
 		// Update the agent with the new provider ID for future calls
 		agent.ProviderID = providerByType.ID
 		if updateErr := s.agentRepo.UpdateAgent(ctx, agent); updateErr != nil {
-			s.logger.Error("Failed to update agent with new provider ID", 
+			s.logger.Error("Failed to update agent with new provider ID",
 				zap.String("agent_id", agent.ID.Hex()),
 				zap.Error(updateErr))
 			// Continue anyway since we have a valid provider now
 		}
-		
+
 		provider = providerByType
 	}
 
@@ -151,7 +151,7 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 	// Create system message
 	systemMessage := &entities.Message{
 		Role:    "system",
-		Content: agent.SystemPrompt,
+		Content: agent.FullSystemPrompt(),
 	}
 	systemTokens := estimateTokens(systemMessage)
 	if systemTokens > tokenLimit {
@@ -219,7 +219,7 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 	for _, msg := range newMessages {
 		chat.Messages = append(chat.Messages, *msg)
 	}
-	
+
 	// Update chat usage totals
 	chat.UpdateUsage()
 	chat.UpdatedAt = time.Now()

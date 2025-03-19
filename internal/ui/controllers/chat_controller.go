@@ -60,6 +60,7 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 		"ChatID":          chatID,
 		"ChatName":        chat.Name,
 		"AgentName":       agent.Name,
+		"AgentRole":       agent.Role,
 		"Messages":        chat.Messages,
 	}
 
@@ -189,7 +190,7 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 
 	// Set the header to trigger scrolling to the response
 	eCtx.Response().Header().Set("HX-Trigger", "messageReceived")
-	
+
 	return eCtx.HTML(http.StatusOK, responseHTML)
 }
 

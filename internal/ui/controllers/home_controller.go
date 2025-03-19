@@ -7,6 +7,7 @@ import (
 	"aiagent/internal/domain/services"
 
 	"github.com/labstack/echo/v4"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
 
@@ -43,9 +44,37 @@ func (c *HomeController) ChatsPartialHandler(eCtx echo.Context) error {
 		c.logger.Error("Failed to list active chats", zap.Error(err))
 		return eCtx.String(http.StatusInternalServerError, "Failed to load chats")
 	}
-	data := map[string]interface{}{
-		"Chats": chats,
+
+	// Create a new slice to hold the processed chat data
+	processedChats := make([]map[string]string, 0, len(chats))
+
+	for _, chat := range chats {
+		agent, err := c.agentService.GetAgent(eCtx.Request().Context(), chat.AgentID.Hex())
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				c.logger.Warn("Agent not found for chat", zap.String("chatID", chat.ID.Hex()))
+				continue // Skip this chat if agent is not found
+			}
+			c.logger.Error("Failed to get agent", zap.Error(err), zap.String("chatID", chat.ID.Hex()))
+			return eCtx.String(http.StatusInternalServerError, "Failed to load agent")
+		}
+
+		// Create a new map for each chat with the required fields
+		chatData := map[string]string{
+			"ID":        chat.ID.Hex(),
+			"ChatName":  chat.Name,
+			"AgentName": agent.Name,
+			"AgentRole": agent.Role,
+		}
+
+		// Append the processed chat data to the slice
+		processedChats = append(processedChats, chatData)
 	}
+
+	data := map[string]interface{}{
+		"Chats": processedChats,
+	}
+
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_chats", data)
 }
 
