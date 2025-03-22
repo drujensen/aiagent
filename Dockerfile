@@ -1,10 +1,6 @@
 FROM ubuntu:24.04
 
-USER root
-RUN mkdir -p /root/app
-WORKDIR /root/app
-
-# prerequisite packages
+# Update and install packages as root
 RUN apt-get update -qq && \
     apt-get upgrade -qq -y && \
     DEBIAN_FRONTEND=noninteractive apt-get install -qq -y \
@@ -32,19 +28,7 @@ RUN apt-get update -qq && \
             unzip \
             vim \
             wget \
-            xorg-dev && \
-    apt-get clean -qq -y && \
-    apt-get autoclean -qq -y && \
-    apt-get autoremove -qq -y
-
-# locales
-RUN locale-gen en_US.UTF-8
-ENV LANG=en_US.UTF-8
-ENV LANGUAGE=en_US:en
-ENV LC_ALL=en_US.UTF-8
-
-# libraries
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -qq -y \
+            xorg-dev \
             llvm \
             clang \
             libbz2-dev \
@@ -89,6 +73,12 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -qq -y \
     apt-get autoclean -qq -y && \
     apt-get autoremove -qq -y
 
+# Set up locales
+RUN locale-gen en_US.UTF-8
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US:en
+ENV LC_ALL=en_US.UTF-8
+
 # Install asdf
 RUN echo "Downloading asdf version v0.16.5 for linux-arm64" && \
     curl -fSL -o /tmp/asdf.tar.gz "https://github.com/asdf-vm/asdf/releases/download/v0.16.5/asdf-v0.16.5-linux-arm64.tar.gz" && \
@@ -97,52 +87,51 @@ RUN echo "Downloading asdf version v0.16.5 for linux-arm64" && \
     chmod +x /opt/asdf/asdf && \
     ln -s /opt/asdf/asdf /usr/bin/asdf
 
-# Verify asdf installation
-RUN echo "Verifying asdf installation:" && /usr/bin/asdf --version
+# Switch to ubuntu
+USER ubuntu
+WORKDIR /home/ubuntu
 
-# Add asdf to PATH
-ENV PATH="/usr/bin:/root/.asdf/shims:${PATH}"
+# Set up asdf for ubuntu
+ENV PATH="/home/ubuntu/.asdf/shims:/home/ubuntu/.asdf/bin:${PATH}"
+RUN echo '. /opt/asdf/asdf.sh' >> /home/ubuntu/.bashrc && \
+    echo '. /opt/asdf/completions/asdf.bash' >> /home/ubuntu/.bashrc
 
 # Copy .tool-versions file
-COPY .tool-versions /root/app/.
+COPY --chown=ubuntu:ubuntu .tool-versions ./
 
 # Install asdf plugins and versions
-RUN /usr/bin/asdf plugin add golang
-RUN /usr/bin/asdf install golang
+RUN /usr/bin/asdf plugin add golang && \
+    /usr/bin/asdf install golang && \
+    /usr/bin/asdf plugin add rust && \
+    /usr/bin/asdf install rust && \
+    /usr/bin/asdf plugin add zig https://github.com/zigcc/asdf-zig && \
+    /usr/bin/asdf install zig && \
+    /usr/bin/asdf plugin add swift https://github.com/drujensen/asdf-swift && \
+    /usr/bin/asdf install swift && \
+    /usr/bin/asdf plugin add java && \
+    /usr/bin/asdf install java && \
+    /usr/bin/asdf plugin add kotlin && \
+    /usr/bin/asdf install kotlin && \
+    /usr/bin/asdf plugin add dotnet && \
+    /usr/bin/asdf install dotnet && \
+    /usr/bin/asdf plugin add nodejs && \
+    /usr/bin/asdf install nodejs && \
+    /usr/bin/asdf plugin add python && \
+    /usr/bin/asdf install python && \
+    /usr/bin/asdf plugin add ruby && \
+    /usr/bin/asdf install ruby
 
-RUN /usr/bin/asdf plugin add rust
-RUN /usr/bin/asdf install rust
-
-RUN /usr/bin/asdf plugin add zig https://github.com/zigcc/asdf-zig
-RUN /usr/bin/asdf install zig
-
-RUN /usr/bin/asdf plugin add swift https://github.com/drujensen/asdf-swift
-RUN /usr/bin/asdf install swift
-
-RUN /usr/bin/asdf plugin add java
-RUN /usr/bin/asdf install java
-
-RUN /usr/bin/asdf plugin add kotlin
-RUN /usr/bin/asdf install kotlin
-
-RUN /usr/bin/asdf plugin add dotnet
-RUN /usr/bin/asdf install dotnet
-
-RUN /usr/bin/asdf plugin add nodejs
-RUN /usr/bin/asdf install nodejs
-
-RUN /usr/bin/asdf plugin add python
-RUN /usr/bin/asdf install python
-
-RUN /usr/bin/asdf plugin add ruby
-RUN /usr/bin/asdf install ruby
-
-# Install Go and build the application
-COPY go.mod go.sum ./
+# Copy Go project files
+COPY --chown=ubuntu:ubuntu go.mod go.sum ./
 RUN go mod download
 
-COPY . .
+# Copy .env file
+COPY --chown=ubuntu:ubuntu .env ./
 
+# Copy the rest of the application code
+COPY --chown=ubuntu:ubuntu . .
+
+# Build the Go application
 RUN go build -o main ./cmd/http
 
 EXPOSE 8080

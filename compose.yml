@@ -5,11 +5,12 @@ services:
     ports:
       - "8080:8080"
     env_file:
-      - .env.docker
+      - .env
     volumes:
-      - ~/workspace:/workspace
-      - ~/.ssh:/root/.ssh
-      - ~/.gitconfig:/root/.gitconfig
+      - ~/workspace:/home/ubuntu/workspace
+      - ~/.ssh:/home/ubuntu/.ssh
+      - ~/.gitconfig:/home/ubuntu/.gitconfig
+    user: "1000:1000"
 
   mongo:
     container_name: mongo
