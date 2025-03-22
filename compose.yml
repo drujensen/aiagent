@@ -23,6 +23,7 @@ services:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: password
       MONGO_INITDB_DATABASE: aiagent
+    user: "1000:1000"
 
 volumes:
   mongo_data:
