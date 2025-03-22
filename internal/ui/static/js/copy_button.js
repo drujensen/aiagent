@@ -1,9 +1,9 @@
 function scrollToBottom() {
-            const messageHistory = document.getElementById('message-history');
-            if (messageHistory) {
-                messageHistory.scrollTop = messageHistory.scrollHeight;
-            }
-        }
+    const messageHistory = document.getElementById('message-history');
+    if (messageHistory) {
+        messageHistory.scrollTop = messageHistory.scrollHeight;
+    }
+}
 
 document.addEventListener('DOMContentLoaded', scrollToBottom);
 
@@ -19,15 +19,44 @@ function addCopyButtonToBlock(block) {
     // Add click event
     button.addEventListener('click', () => {
         const code = block.querySelector('code')?.textContent || block.textContent;
-        navigator.clipboard.writeText(code).then(() => {
-            button.textContent = 'Copied!';
-            button.classList.add('copied');
-            setTimeout(() => {
-                button.textContent = 'Copy';
-                button.classList.remove('copied');
-            }, 2000);
-        }).catch(err => {
-            console.error('Failed to copy:', err);
+
+        // Function to handle copying with fallback
+        const copyToClipboard = (text) => {
+            if (navigator.clipboard && window.isSecureContext) {
+                // Modern Clipboard API (preferred)
+                return navigator.clipboard.writeText(text).then(() => true).catch(() => false);
+            } else {
+                // Fallback using execCommand
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                let success = false;
+                try {
+                    success = document.execCommand('copy');
+                } catch (err) {
+                    console.error('Fallback copy failed:', err);
+                }
+                document.body.removeChild(textarea);
+                return Promise.resolve(success);
+            }
+        };
+
+        copyToClipboard(code).then((success) => {
+            if (success) {
+                button.textContent = 'Copied!';
+                button.classList.add('copied');
+                setTimeout(() => {
+                    button.textContent = 'Copy';
+                    button.classList.remove('copied');
+                }, 2000);
+            } else {
+                console.error('Failed to copy text');
+                button.textContent = 'Failed';
+                setTimeout(() => {
+                    button.textContent = 'Copy';
+                }, 2000);
+            }
         });
     });
 
@@ -48,7 +77,6 @@ const observer = new MutationObserver((mutationsList) => {
     for (let mutation of mutationsList) {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
             mutation.addedNodes.forEach(node => {
-                // Check if the added node is a <pre> or contains <pre> elements
                 if (node.nodeName === 'PRE') {
                     addCopyButtonToBlock(node);
                 } else if (node.querySelectorAll) {
