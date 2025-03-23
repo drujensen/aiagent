@@ -56,8 +56,8 @@
               hx-swap="outerHTML"
               hx-indicator="#user-message-indicator,#thinking-indicator"
               hx-trigger="submit, keydown[ctrlKey || metaKey && key == 'Enter']"
-              hx-on::before-request="showUserMessage(this); document.getElementById('send-button').classList.add('cancel-button');"
-              hx-on::after-request="this.reset(); document.getElementById('message-history').scrollTop = document.getElementById('message-history').scrollHeight; document.getElementById('send-button').classList.remove('cancel-button');"
+              hx-on::before-request="showUserMessage(this); activateCancel();"
+              hx-on::after-request="this.reset(); document.getElementById('message-history').scrollTop = document.getElementById('message-history').scrollHeight; deactivateCancel();"
               hx-on::after-swap="scrollToResponse();">
             <input type="hidden" name="chat_id" value="{{.ChatID}}">
             <textarea name="message" id="message-input" placeholder="Type your message..." rows="3"></textarea>
@@ -72,19 +72,92 @@
         </form>
         
         <script>
+          let isRequestActive = false;
+          const chatID = document.getElementById('messages-container').dataset.chatId;
+          
+          // Activate cancel functionality
+          function activateCancel() {
+            isRequestActive = true;
+            
+            // Show cancel button
+            document.querySelector('.send-text').style.display = 'none';
+            document.querySelector('.cancel-text').style.display = 'inline';
+            
+            // Add cancel button class
+            document.getElementById('send-button').classList.add('cancel-button');
+            
+            // Change button behavior to cancel
+            document.getElementById('send-button').onclick = function(e) {
+              if (isRequestActive) {
+                e.preventDefault();
+                e.stopPropagation();
+                cancelRequest();
+                return false;
+              }
+            };
+          }
+          
+          // Deactivate cancel functionality
+          function deactivateCancel() {
+            isRequestActive = false;
+            
+            // Show send button
+            document.querySelector('.send-text').style.display = 'inline';
+            document.querySelector('.cancel-text').style.display = 'none';
+            
+            // Remove cancel button class
+            document.getElementById('send-button').classList.remove('cancel-button');
+            
+            // Reset button behavior
+            document.getElementById('send-button').onclick = null;
+          }
+          
+          // Send cancel request to server
+          function cancelRequest() {
+            if (!isRequestActive) return;
+            
+            fetch(`/chats/${chatID}/cancel`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'HX-Request': 'true'
+              }
+            })
+            .then(response => {
+              if (response.ok) {
+                console.log('Request canceled successfully');
+                
+                // Update thinking message to show cancellation
+                const thinkingMessage = document.getElementById('thinking-message');
+                if (thinkingMessage) {
+                  thinkingMessage.innerHTML = `
+                    <div class="message-content thinking-content">
+                      Request canceled by user
+                    </div>
+                  `;
+                }
+                
+                deactivateCancel();
+              } else {
+                console.error('Failed to cancel request:', response.statusText);
+              }
+            })
+            .catch(error => {
+              console.error('Error canceling request:', error);
+            });
+          }
+          
           // Change Send button to Cancel button during request
           document.addEventListener('htmx:beforeRequest', function(evt) {
             if (evt.detail.elt.id === 'message-form') {
-              document.querySelector('.send-text').style.display = 'none';
-              document.querySelector('.cancel-text').style.display = 'inline';
+              activateCancel();
             }
           });
           
           // Change Cancel button back to Send button after request
           document.addEventListener('htmx:afterRequest', function(evt) {
             if (evt.detail.elt.id === 'message-form') {
-              document.querySelector('.send-text').style.display = 'inline';
-              document.querySelector('.cancel-text').style.display = 'none';
+              deactivateCancel();
             }
           });
           
@@ -133,9 +206,7 @@
                 `;
               }
               
-              // Reset the button state
-              document.querySelector('.send-text').style.display = 'inline';
-              document.querySelector('.cancel-text').style.display = 'none';
+              deactivateCancel();
             }
           });
         </script>

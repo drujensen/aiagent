@@ -2,9 +2,11 @@ package uicontrollers
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"html/template"
 	"net/http"
+	"sync"
 
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/services"
@@ -15,18 +17,20 @@ import (
 )
 
 type ChatController struct {
-	logger       *zap.Logger
-	tmpl         *template.Template
-	chatService  services.ChatService
-	agentService services.AgentService
+	logger          *zap.Logger
+	tmpl            *template.Template
+	chatService     services.ChatService
+	agentService    services.AgentService
+	activeCancelers sync.Map // Maps chatID to context cancelFunc
 }
 
 func NewChatController(logger *zap.Logger, tmpl *template.Template, chatService services.ChatService, agentService services.AgentService) *ChatController {
 	return &ChatController{
-		logger:       logger,
-		tmpl:         tmpl,
-		chatService:  chatService,
-		agentService: agentService,
+		logger:          logger,
+		tmpl:            tmpl,
+		chatService:     chatService,
+		agentService:    agentService,
+		activeCancelers: sync.Map{},
 	}
 }
 
@@ -133,9 +137,25 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 
 	userMessage := entities.NewMessage("user", messageContent)
 
+	// Create a cancellable context
+	ctx, cancel := context.WithCancel(eCtx.Request().Context())
+	
+	// Store the cancellation function
+	c.activeCancelers.Store(chatID, cancel)
+	
+	// Ensure cancellation when the operation completes (success or failure)
+	defer func() {
+		cancel()
+		c.activeCancelers.Delete(chatID)
+	}()
+
 	// Send the message and get the AI responses
-	aiMessage, err := c.chatService.SendMessage(eCtx.Request().Context(), chatID, *userMessage)
+	aiMessage, err := c.chatService.SendMessage(ctx, chatID, *userMessage)
 	if err != nil {
+		if ctx.Err() == context.Canceled {
+			c.logger.Info("Message processing was canceled", zap.String("chatID", chatID))
+			return eCtx.String(http.StatusRequestTimeout, "Request was canceled")
+		}
 		if err == mongo.ErrNoDocuments {
 			return eCtx.String(http.StatusNotFound, "Chat not found")
 		}
@@ -219,4 +239,29 @@ func (c *ChatController) DeleteChatHandler(eCtx echo.Context) error {
 		"Chats": chats,
 	}
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_chats", data)
+}
+
+// CancelMessageHandler cancels an ongoing message processing operation
+func (c *ChatController) CancelMessageHandler(eCtx echo.Context) error {
+	chatID := eCtx.Param("id")
+	if chatID == "" {
+		return eCtx.String(http.StatusBadRequest, "Chat ID is required")
+	}
+	
+	// Check if there's an active cancellation function for this chat
+	cancelValue, exists := c.activeCancelers.Load(chatID)
+	if !exists {
+		c.logger.Warn("No active request to cancel for this chat", zap.String("chatID", chatID))
+		return eCtx.String(http.StatusOK, "No active request to cancel")
+	}
+	
+	// Execute the cancellation
+	if cancelFunc, ok := cancelValue.(context.CancelFunc); ok {
+		cancelFunc()
+		c.logger.Info("Request canceled successfully", zap.String("chatID", chatID))
+		return eCtx.String(http.StatusOK, "Request canceled")
+	}
+	
+	c.logger.Error("Invalid cancellation function", zap.String("chatID", chatID))
+	return eCtx.String(http.StatusInternalServerError, "Failed to cancel request")
 }

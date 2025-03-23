@@ -86,6 +86,11 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		return nil, fmt.Errorf("failed to update chat: %w", err)
 	}
 
+	// Check for cancellation
+	if ctx.Err() == context.Canceled {
+		return nil, fmt.Errorf("message processing was canceled")
+	}
+
 	// Generate AI response synchronously
 	agent, err := s.agentRepo.GetAgent(ctx, chat.AgentID.Hex())
 	if err != nil {
@@ -158,6 +163,11 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		return nil, fmt.Errorf("system prompt too large for the context window")
 	}
 
+	// Check for cancellation
+	if ctx.Err() == context.Canceled {
+		return nil, fmt.Errorf("message processing was canceled")
+	}
+
 	// Select messages within token limit
 	var tempMessages []*entities.Message
 	currentTokens := systemTokens
@@ -182,6 +192,11 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		tools = append(tools, tool)
 	}
 
+	// Check for cancellation
+	if ctx.Err() == context.Canceled {
+		return nil, fmt.Errorf("message processing was canceled")
+	}
+
 	options := map[string]interface{}{
 		"temperature": 0.0,
 		"max_tokens":  maxTokens,
@@ -190,7 +205,7 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		options["temperature"] = *agent.Temperature
 	}
 
-	newMessages, err := aiModel.GenerateResponse(messagesToSend, tools, options)
+	newMessages, err := aiModel.GenerateResponse(ctx, messagesToSend, tools, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate AI response: %v", err)
 	}

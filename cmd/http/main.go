@@ -152,6 +152,7 @@ func main() {
 	e.PUT("/chats/:id", chatController.UpdateChatHandler)
 	e.DELETE("/chats/:id", chatController.DeleteChatHandler) // Added DELETE route
 	e.POST("/chats/:id/messages", chatController.SendMessageHandler)
+	e.POST("/chats/:id/cancel", chatController.CancelMessageHandler) // Added cancel route
 
 	// Provider routes
 	e.GET("/providers", providerController.ListProvidersHandler)

@@ -2,6 +2,7 @@ package integrations
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -106,10 +107,15 @@ func convertToAnthropicMessages(messages []*entities.Message) []map[string]inter
 }
 
 // GenerateResponse generates a response from the Anthropic API
-func (m *AnthropicIntegration) GenerateResponse(messages []*entities.Message, toolList []*interfaces.ToolIntegration, options map[string]interface{}) ([]*entities.Message, error) {
+func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*interfaces.ToolIntegration, options map[string]interface{}) ([]*entities.Message, error) {
 	// Prepare tool definitions for Anthropic
 	tools := make([]map[string]interface{}, len(toolList))
 	for i, tool := range toolList {
+		// Check for cancellation
+		if ctx.Err() == context.Canceled {
+			return nil, fmt.Errorf("operation canceled by user")
+		}
+		
 		requiredFields := make([]string, 0)
 		for _, param := range (*tool).Parameters() {
 			if param.Required {
@@ -172,13 +178,18 @@ func (m *AnthropicIntegration) GenerateResponse(messages []*entities.Message, to
 
 	// Tool call handling loop
 	for {
+		// Check for cancellation before sending request
+		if ctx.Err() == context.Canceled {
+			return nil, fmt.Errorf("operation canceled by user")
+		}
+		
 		jsonBody, err := json.Marshal(reqBody)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling request: %v", err)
 		}
 		m.logger.Info("Sending request to Anthropic", zap.String("body", string(jsonBody)))
 
-		req, err := http.NewRequest("POST", m.baseURL+"/v1/messages", bytes.NewBuffer(jsonBody))
+		req, err := http.NewRequestWithContext(ctx, "POST", m.baseURL+"/v1/messages", bytes.NewBuffer(jsonBody))
 		if err != nil {
 			return nil, fmt.Errorf("error creating request: %v", err)
 		}
@@ -189,6 +200,11 @@ func (m *AnthropicIntegration) GenerateResponse(messages []*entities.Message, to
 
 		var resp *http.Response
 		for attempt := 0; attempt < 3; attempt++ {
+			// Check for cancellation before making request
+			if ctx.Err() == context.Canceled {
+				return nil, fmt.Errorf("operation canceled by user")
+			}
+			
 			resp, err = m.httpClient.Do(req)
 			if err != nil {
 				if attempt < 2 {
@@ -313,6 +329,11 @@ func (m *AnthropicIntegration) GenerateResponse(messages []*entities.Message, to
 			newMessages = append(newMessages, toolCallMessage)
 
 			for _, toolCall := range toolCalls {
+				// Check for cancellation before executing tool
+				if ctx.Err() == context.Canceled {
+					return nil, fmt.Errorf("operation canceled by user")
+				}
+				
 				toolName := toolCall.Function.Name
 				tool, err := m.toolRepo.GetToolByName(toolName)
 				if err != nil {

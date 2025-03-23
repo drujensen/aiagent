@@ -2,6 +2,7 @@ package integrations
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -85,10 +86,20 @@ func convertToOpenAIMessages(messages []*entities.Message) []map[string]interfac
 }
 
 // GenerateResponse generates a response from the OpenAI API
-func (m *OpenAIIntegration) GenerateResponse(messages []*entities.Message, toolList []*interfaces.ToolIntegration, options map[string]interface{}) ([]*entities.Message, error) {
+func (m *OpenAIIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*interfaces.ToolIntegration, options map[string]interface{}) ([]*entities.Message, error) {
+	// Check for cancellation
+	if ctx.Err() == context.Canceled {
+		return nil, fmt.Errorf("operation canceled by user")
+	}
+	
 	// Prepare tool definitions
 	tools := make([]map[string]interface{}, len(toolList))
 	for i, tool := range toolList {
+		// Check for cancellation
+		if ctx.Err() == context.Canceled {
+			return nil, fmt.Errorf("operation canceled by user")
+		}
+		
 		requiredFields := make([]string, 0)
 		for _, param := range (*tool).Parameters() {
 			if param.Required {
@@ -145,12 +156,17 @@ func (m *OpenAIIntegration) GenerateResponse(messages []*entities.Message, toolL
 
 	// Loop to handle tool calls
 	for {
+		// Check for cancellation before preparing request
+		if ctx.Err() == context.Canceled {
+			return nil, fmt.Errorf("operation canceled by user")
+		}
+		
 		jsonBody, err := json.Marshal(reqBody)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling request: %v", err)
 		}
 
-		req, err := http.NewRequest("POST", m.baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonBody))
+		req, err := http.NewRequestWithContext(ctx, "POST", m.baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonBody))
 		if err != nil {
 			return nil, fmt.Errorf("error creating request: %v", err)
 		}
@@ -160,6 +176,11 @@ func (m *OpenAIIntegration) GenerateResponse(messages []*entities.Message, toolL
 
 		var resp *http.Response
 		for attempt := 0; attempt < 3; attempt++ {
+			// Check for cancellation before making request
+			if ctx.Err() == context.Canceled {
+				return nil, fmt.Errorf("operation canceled by user")
+			}
+			
 			resp, err = m.httpClient.Do(req)
 			if err != nil {
 				if attempt < 2 {
@@ -243,6 +264,11 @@ func (m *OpenAIIntegration) GenerateResponse(messages []*entities.Message, toolL
 
 			// Handle tool calls
 			for _, toolCall := range choice.ToolCalls {
+				// Check for cancellation before executing tool
+				if ctx.Err() == context.Canceled {
+					return nil, fmt.Errorf("operation canceled by user")
+				}
+				
 				if toolCall.Type != "function" {
 					continue
 				}
