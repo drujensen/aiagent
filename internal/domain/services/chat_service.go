@@ -184,7 +184,7 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 
 	if float64(totalMessageTokens) > compressionThreshold && len(chat.Messages) > 0 {
 		// Compress messages
-		compressedMessages, err := s.compressMessages(ctx, chat, agent, provider, resolvedAPIKey, tokenLimit)
+		compressedMessages, originalMessagesReplaced, err := s.compressMessages(ctx, chat, agent, provider, resolvedAPIKey, tokenLimit)
 		if err != nil {
 			s.logger.Warn("Failed to compress messages", zap.Error(err))
 			// Fall back to normal message selection if compression fails
@@ -200,6 +200,14 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 			}
 			messagesToSend = append(messagesToSend, tempMessages...)
 		} else {
+			// If we successfully compressed messages, update the chat's messages array
+			if originalMessagesReplaced {
+				// Save the updated chat with compressed messages to the database
+				if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
+					s.logger.Warn("Failed to update chat with compressed messages", zap.Error(err))
+					// Continue with the compressed messages in memory even if save failed
+				}
+			}
 			messagesToSend = append(messagesToSend, compressedMessages...)
 		}
 	} else {
@@ -375,6 +383,7 @@ func (s *chatService) DeleteChat(ctx context.Context, id string) error {
 }
 
 // compressMessages summarizes older messages to reduce token count while preserving context
+// Returns the compressed messages, a flag indicating if the chat messages were replaced, and any error
 func (s *chatService) compressMessages(
 	ctx context.Context,
 	chat *entities.Chat,
@@ -382,7 +391,7 @@ func (s *chatService) compressMessages(
 	provider *entities.Provider,
 	apiKey string,
 	tokenLimit int,
-) ([]*entities.Message, error) {
+) ([]*entities.Message, bool, error) {
 	// Calculate how many messages to summarize (approx 40% of older messages)
 	numMessagesToKeep := int(float64(len(chat.Messages)) * 0.6)
 	if numMessagesToKeep < 1 {
@@ -402,7 +411,7 @@ func (s *chatService) compressMessages(
 	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
 	aiModel, err := aiModelFactory.CreateModelIntegration(agent, provider, apiKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize AI model for summarization: %v", err)
+		return nil, false, fmt.Errorf("failed to initialize AI model for summarization: %v", err)
 	}
 
 	// Create summary prompt
@@ -429,16 +438,16 @@ func (s *chatService) compressMessages(
 
 	// Check for cancellation
 	if ctx.Err() == context.Canceled {
-		return nil, fmt.Errorf("message summarization was canceled")
+		return nil, false, fmt.Errorf("message summarization was canceled")
 	}
 
 	summaryResponse, err := aiModel.GenerateResponse(ctx, historyMsgs, nil, options)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate summary: %v", err)
+		return nil, false, fmt.Errorf("failed to generate summary: %v", err)
 	}
 
 	if len(summaryResponse) == 0 {
-		return nil, fmt.Errorf("no summary generated")
+		return nil, false, fmt.Errorf("no summary generated")
 	}
 
 	// Create a single message that contains the summary
@@ -449,7 +458,15 @@ func (s *chatService) compressMessages(
 		Timestamp: time.Now(),
 	}
 
-	// Combine the summary with recent messages
+	// Create new array with summary message + recent messages to keep
+	var newMessages []entities.Message
+	newMessages = append(newMessages, *summaryMsg)
+	newMessages = append(newMessages, recentMessagesToKeep...)
+
+	// Replace the chat's messages with the compressed version
+	chat.Messages = newMessages
+
+	// Prepare the messages to return for the current message processing
 	var compressedMessages []*entities.Message
 	compressedMessages = append(compressedMessages, summaryMsg)
 
@@ -474,5 +491,5 @@ func (s *chatService) compressMessages(
 		currentTokens += msgTokens
 	}
 
-	return finalMessages, nil
+	return finalMessages, true, nil
 }
