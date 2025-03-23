@@ -168,20 +168,54 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 		return nil, fmt.Errorf("message processing was canceled")
 	}
 
-	// Select messages within token limit
-	var tempMessages []*entities.Message
+	// Check if we need message compression (at 90% of token limit)
+	compressionThreshold := float64(tokenLimit) * 0.9
+	var messagesToSend []*entities.Message
+
+	// Always start with the system message
+	messagesToSend = append(messagesToSend, systemMessage)
 	currentTokens := systemTokens
-	for i := len(chat.Messages) - 1; i >= 0; i-- {
-		msg := chat.Messages[i]
-		msgTokens := estimateTokens(&msg)
-		if currentTokens+msgTokens > tokenLimit {
-			break
-		}
-		tempMessages = append([]*entities.Message{&msg}, tempMessages...)
-		currentTokens += msgTokens
+
+	// Check if we need to compress messages
+	totalMessageTokens := systemTokens
+	for i := 0; i < len(chat.Messages); i++ {
+		totalMessageTokens += estimateTokens(&chat.Messages[i])
 	}
 
-	messagesToSend := append([]*entities.Message{systemMessage}, tempMessages...)
+	if float64(totalMessageTokens) > compressionThreshold && len(chat.Messages) > 0 {
+		// Compress messages
+		compressedMessages, err := s.compressMessages(ctx, chat, agent, provider, resolvedAPIKey, tokenLimit)
+		if err != nil {
+			s.logger.Warn("Failed to compress messages", zap.Error(err))
+			// Fall back to normal message selection if compression fails
+			var tempMessages []*entities.Message
+			for i := len(chat.Messages) - 1; i >= 0; i-- {
+				msg := chat.Messages[i]
+				msgTokens := estimateTokens(&msg)
+				if currentTokens+msgTokens > tokenLimit {
+					break
+				}
+				tempMessages = append([]*entities.Message{&msg}, tempMessages...)
+				currentTokens += msgTokens
+			}
+			messagesToSend = append(messagesToSend, tempMessages...)
+		} else {
+			messagesToSend = append(messagesToSend, compressedMessages...)
+		}
+	} else {
+		// Normal message selection within token limit
+		var tempMessages []*entities.Message
+		for i := len(chat.Messages) - 1; i >= 0; i-- {
+			msg := chat.Messages[i]
+			msgTokens := estimateTokens(&msg)
+			if currentTokens+msgTokens > tokenLimit {
+				break
+			}
+			tempMessages = append([]*entities.Message{&msg}, tempMessages...)
+			currentTokens += msgTokens
+		}
+		messagesToSend = append(messagesToSend, tempMessages...)
+	}
 
 	tools := []*interfaces.ToolIntegration{}
 	for _, toolName := range agent.Tools {
@@ -338,4 +372,107 @@ func (s *chatService) DeleteChat(ctx context.Context, id string) error {
 		return fmt.Errorf("failed to delete chat: %v", err)
 	}
 	return nil
+}
+
+// compressMessages summarizes older messages to reduce token count while preserving context
+func (s *chatService) compressMessages(
+	ctx context.Context,
+	chat *entities.Chat,
+	agent *entities.Agent,
+	provider *entities.Provider,
+	apiKey string,
+	tokenLimit int,
+) ([]*entities.Message, error) {
+	// Calculate how many messages to summarize (approx 40% of older messages)
+	numMessagesToKeep := int(float64(len(chat.Messages)) * 0.6)
+	if numMessagesToKeep < 1 {
+		numMessagesToKeep = 1 // Always keep at least the most recent message
+	}
+
+	// Split messages: older ones to summarize and recent ones to keep
+	summarizeEndIdx := len(chat.Messages) - numMessagesToKeep
+	if summarizeEndIdx < 1 {
+		summarizeEndIdx = 1 // Ensure we have at least one message to summarize
+	}
+
+	messagesToSummarize := chat.Messages[:summarizeEndIdx]
+	recentMessagesToKeep := chat.Messages[summarizeEndIdx:]
+
+	// Create AI model for summarization
+	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
+	aiModel, err := aiModelFactory.CreateModelIntegration(agent, provider, apiKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize AI model for summarization: %v", err)
+	}
+
+	// Create summary prompt
+	summaryPrompt := &entities.Message{
+		Role:    "system",
+		Content: "You are an expert at summarizing conversation history. Create a concise summary of the following conversation that captures all important context, decisions, and information. The summary will be used as context for future messages in this conversation. Focus on key facts, goals, decisions, and relevant details. Your summary should be complete enough that the conversation can continue without losing context.",
+	}
+
+	// Messages for the summarization request
+	var historyMsgs []*entities.Message
+	historyMsgs = append(historyMsgs, summaryPrompt)
+
+	// Add messages to summarize
+	for i := 0; i < len(messagesToSummarize); i++ {
+		msg := messagesToSummarize[i]
+		historyMsgs = append(historyMsgs, &msg)
+	}
+
+	// Generate summary
+	options := map[string]interface{}{
+		"temperature": 0.0,
+		"max_tokens":  1000, // Allow sufficient tokens for a detailed summary
+	}
+
+	// Check for cancellation
+	if ctx.Err() == context.Canceled {
+		return nil, fmt.Errorf("message summarization was canceled")
+	}
+
+	summaryResponse, err := aiModel.GenerateResponse(ctx, historyMsgs, nil, options)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate summary: %v", err)
+	}
+
+	if len(summaryResponse) == 0 {
+		return nil, fmt.Errorf("no summary generated")
+	}
+
+	// Create a single message that contains the summary
+	summaryMsg := &entities.Message{
+		ID:        uuid.New().String(),
+		Role:      "assistant",
+		Content:   "Summary of previous conversation: " + summaryResponse[0].Content,
+		Timestamp: time.Now(),
+	}
+
+	// Combine the summary with recent messages
+	var compressedMessages []*entities.Message
+	compressedMessages = append(compressedMessages, summaryMsg)
+
+	// Add recent messages to keep
+	for i := 0; i < len(recentMessagesToKeep); i++ {
+		msg := recentMessagesToKeep[i]
+		compressedMessages = append(compressedMessages, &msg)
+	}
+
+	// Verify we're not exceeding token limit
+	currentTokens := estimateTokens(summaryMsg)
+	var finalMessages []*entities.Message
+	finalMessages = append(finalMessages, summaryMsg)
+
+	// Add as many of the recent messages as possible within token limit
+	for i := 0; i < len(recentMessagesToKeep); i++ {
+		msgTokens := estimateTokens(&recentMessagesToKeep[i])
+		if currentTokens+msgTokens > tokenLimit {
+			break
+		}
+		finalMessages = append(finalMessages, &recentMessagesToKeep[i])
+		currentTokens += msgTokens
+	}
+
+	return finalMessages, nil
 }
