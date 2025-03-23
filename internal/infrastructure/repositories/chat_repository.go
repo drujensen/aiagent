@@ -67,14 +67,12 @@ func (r *MongoChatRepository) UpdateChat(ctx context.Context, chat *entities.Cha
 		return mongo.ErrNoDocuments
 	}
 
-	update := bson.M{
-		"$set": bson.M{
-			"agent_id":   chat.AgentID,
-			"name":       chat.Name, // Update the name in MongoDB
-			"messages":   chat.Messages,
-			"updated_at": chat.UpdatedAt,
-			"active":     chat.Active,
-		},
+	// Convert the chat struct to BSON
+	update, err := bson.Marshal(bson.M{
+		"$set": chat,
+	})
+	if err != nil {
+		return err
 	}
 
 	result, err := r.collection.UpdateOne(ctx, bson.M{"_id": oid}, update)
