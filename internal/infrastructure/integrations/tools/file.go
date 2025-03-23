@@ -1,11 +1,10 @@
 package tools
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"aiagent/internal/domain/interfaces"
@@ -30,7 +29,7 @@ func (t *FileTool) Name() string {
 }
 
 func (t *FileTool) Description() string {
-	return "A tool to read, write or patch files"
+	return "A tool to read, write, find, or replace content in files"
 }
 
 func (t *FileTool) Configuration() []string {
@@ -44,8 +43,8 @@ func (t *FileTool) Parameters() []interfaces.Parameter {
 		{
 			Name:        "operation",
 			Type:        "string",
-			Enum:        []string{"read", "write", "patch"},
-			Description: "read, write or patch operation",
+			Enum:        []string{"read", "write", "find", "replace"},
+			Description: "read, write, find, or replace operation",
 			Required:    true,
 		},
 		{
@@ -55,22 +54,28 @@ func (t *FileTool) Parameters() []interfaces.Parameter {
 			Required:    true,
 		},
 		{
-			Name:        "content",
+			Name:        "pattern",
 			Type:        "string",
-			Description: "The content to write or the diff to patch",
+			Description: "The regex pattern to find or replace (for find/replace operations)",
+			Required:    false,
+		},
+		{
+			Name:        "replacement",
+			Type:        "string",
+			Description: "The content to replace the matched pattern (for replace operation)",
 			Required:    false,
 		},
 	}
 }
 
 func (t *FileTool) Execute(arguments string) (string, error) {
-	// Log the file operation arguments
 	t.logger.Debug("Executing file operation", zap.String("arguments", arguments))
 
 	var args struct {
-		Operation string `json:"operation"`
-		Path      string `json:"path"`
-		Content   string `json:"content"`
+		Operation   string `json:"operation"`
+		Path        string `json:"path"`
+		Pattern     string `json:"pattern"`
+		Replacement string `json:"replacement"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
@@ -79,7 +84,8 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 
 	operation := args.Operation
 	path := args.Path
-	content := args.Content
+	pattern := args.Pattern
+	replacement := args.Replacement
 
 	if operation == "" || path == "" {
 		t.logger.Error("Operation and path are required")
@@ -112,11 +118,11 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		return string(data), nil
 
 	case "write":
-		if content == "" {
-			t.logger.Error("Content is required for write operation")
+		if replacement == "" {
+			t.logger.Error("Replacement content is required for write operation")
 			return "", nil
 		}
-		err := os.WriteFile(fullPath, []byte(content), 0644)
+		err := os.WriteFile(fullPath, []byte(replacement), 0644)
 		if err != nil {
 			t.logger.Error("Failed to write file",
 				zap.String("path", fullPath),
@@ -126,42 +132,77 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		t.logger.Info("File written successfully", zap.String("path", fullPath))
 		return "File written successfully", nil
 
-	case "patch":
-		if content == "" {
-			t.logger.Error("Content is required for patch operation")
+	case "find":
+		if pattern == "" {
+			t.logger.Error("Pattern is required for find operation")
 			return "", nil
 		}
-		tempFile, err := os.CreateTemp("", "diff-*.txt")
+		data, err := os.ReadFile(fullPath)
 		if err != nil {
-			t.logger.Error("Failed to create temp file for patch", zap.Error(err))
-			return "", err
-		}
-		//defer os.Remove(tempFile.Name())
-		t.logger.Debug("TEMP: " + tempFile.Name())
-
-		_, err = tempFile.WriteString(content)
-		if err != nil {
-			tempFile.Close()
-			t.logger.Error("Failed to write diff to temp file", zap.Error(err))
-			return "", err
-		}
-		tempFile.Close()
-
-		cmd := exec.Command("patch", fullPath, tempFile.Name())
-		var out bytes.Buffer
-		var stderr bytes.Buffer
-		cmd.Stdout = &out
-		cmd.Stderr = &stderr
-		err = cmd.Run()
-		if err != nil {
-			t.logger.Error("Patch operation failed",
+			t.logger.Error("Failed to read file for find",
 				zap.String("path", fullPath),
-				zap.Error(err),
-				zap.String("stderr", stderr.String()))
+				zap.Error(err))
 			return "", err
 		}
-		t.logger.Info("File patched successfully", zap.String("path", fullPath))
-		return "File patched successfully", nil
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			t.logger.Error("Invalid regex pattern",
+				zap.String("pattern", pattern),
+				zap.Error(err))
+			return "", err
+		}
+		matches := re.FindAllString(string(data), -1)
+		if len(matches) == 0 {
+			t.logger.Info("No matches found",
+				zap.String("path", fullPath),
+				zap.String("pattern", pattern))
+			return "No matches found", nil
+		}
+		result := strings.Join(matches, "\n")
+		t.logger.Info("Matches found",
+			zap.String("path", fullPath),
+			zap.String("pattern", pattern),
+			zap.Int("count", len(matches)))
+		return result, nil
+
+	case "replace":
+		if pattern == "" || replacement == "" {
+			t.logger.Error("Both pattern and replacement are required for replace operation")
+			return "", nil
+		}
+		data, err := os.ReadFile(fullPath)
+		if err != nil {
+			t.logger.Error("Failed to read file for replace",
+				zap.String("path", fullPath),
+				zap.Error(err))
+			return "", err
+		}
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			t.logger.Error("Invalid regex pattern",
+				zap.String("pattern", pattern),
+				zap.Error(err))
+			return "", err
+		}
+		original := string(data)
+		newContent := re.ReplaceAllString(original, replacement)
+		if newContent == original {
+			t.logger.Info("No replacements made",
+				zap.String("path", fullPath),
+				zap.String("pattern", pattern))
+			return "No replacements made", nil
+		}
+		err = os.WriteFile(fullPath, []byte(newContent), 0644)
+		if err != nil {
+			t.logger.Error("Failed to write updated file",
+				zap.String("path", fullPath),
+				zap.Error(err))
+			return "", err
+		}
+		t.logger.Info("File replaced successfully",
+			zap.String("path", fullPath),
+			zap.String("pattern", pattern))
+		return "File replaced successfully", nil
 
 	default:
 		t.logger.Error("Unknown operation", zap.String("operation", operation))
