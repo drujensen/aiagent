@@ -201,6 +201,10 @@
     background-color: #1a1a1a;
 }
 
+.user-message .message-content {
+    background-color: #007bff;
+}
+
 .message-input {
     display: flex;
     width: 100%;
