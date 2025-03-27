@@ -15,6 +15,7 @@ type Config struct {
 	TavilyAPIKey  string `mapstructure:"TAVILY_API_KEY"`
 	BasicAuthUser string `mapstructure:"BASIC_AUTH_USER"`
 	BasicAuthPass string `mapstructure:"BASIC_AUTH_PASS"`
+	MCPServerURL  string `mapstructure:"MCP_SERVER_URL"`
 	logger        *zap.Logger
 	viper         *viper.Viper
 }
@@ -78,6 +79,9 @@ func InitConfig() (*Config, error) {
 			logger.Warn("WORKSPACE not set. Search tool will not work")
 		}
 
+		if configInstance.MCPServerURL == "" {
+			logger.Warn("MCP_SERVER_URL not set. MCP tool will not function")
+		}
 	})
 
 	if initErr != nil {

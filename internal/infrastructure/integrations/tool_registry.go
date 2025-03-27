@@ -37,6 +37,12 @@ func NewToolRegistry(configuration map[string]string, logger *zap.Logger) (*Tool
 				return tools.NewFileTool(configuration, logger)
 			},
 		},
+		{
+			name: "MCP",
+			factory: func(configuration map[string]string, logger *zap.Logger) interfaces.ToolIntegration {
+				return tools.NewMCPTool(configuration, logger)
+			},
+		},
 	}
 
 	for _, pt := range predefinedTools {
