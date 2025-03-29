@@ -43,7 +43,6 @@ func main() {
 		"tavily_api_key":  cfg.TavilyAPIKey,
 		"basic_auth_user": cfg.BasicAuthUser,
 		"basic_auth_pass": cfg.BasicAuthPass,
-		"mcp_server_url":  cfg.MCPServerURL,
 	}
 
 	toolRepo, err := integrations.NewToolRegistry(configurations, logger)
