@@ -91,7 +91,7 @@ func (m *OpenAIIntegration) GenerateResponse(ctx context.Context, messages []*en
 	if ctx.Err() == context.Canceled {
 		return nil, fmt.Errorf("operation canceled by user")
 	}
-	
+
 	// Prepare tool definitions
 	tools := make([]map[string]interface{}, len(toolList))
 	for i, tool := range toolList {
@@ -99,7 +99,7 @@ func (m *OpenAIIntegration) GenerateResponse(ctx context.Context, messages []*en
 		if ctx.Err() == context.Canceled {
 			return nil, fmt.Errorf("operation canceled by user")
 		}
-		
+
 		requiredFields := make([]string, 0)
 		for _, param := range (*tool).Parameters() {
 			if param.Required {
@@ -160,7 +160,7 @@ func (m *OpenAIIntegration) GenerateResponse(ctx context.Context, messages []*en
 		if ctx.Err() == context.Canceled {
 			return nil, fmt.Errorf("operation canceled by user")
 		}
-		
+
 		jsonBody, err := json.Marshal(reqBody)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling request: %v", err)
@@ -180,7 +180,7 @@ func (m *OpenAIIntegration) GenerateResponse(ctx context.Context, messages []*en
 			if ctx.Err() == context.Canceled {
 				return nil, fmt.Errorf("operation canceled by user")
 			}
-			
+
 			resp, err = m.httpClient.Do(req)
 			if err != nil {
 				if attempt < 2 {
@@ -268,7 +268,7 @@ func (m *OpenAIIntegration) GenerateResponse(ctx context.Context, messages []*en
 				if ctx.Err() == context.Canceled {
 					return nil, fmt.Errorf("operation canceled by user")
 				}
-				
+
 				if toolCall.Type != "function" {
 					continue
 				}

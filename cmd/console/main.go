@@ -33,7 +33,7 @@ func main() {
 		logger.Fatal("Failed to connect to MongoDB", zap.Error(err))
 		os.Exit(1)
 	}
-	
+
 	// Get collections
 	providersCollection := mongodb.Collection("providers")
 
@@ -56,7 +56,7 @@ func main() {
 	}
 
 	fmt.Println("Successfully reset all providers to defaults!")
-	
+
 	// Disconnect from MongoDB
 	if err := mongodb.Disconnect(context.Background()); err != nil {
 		logger.Error("Failed to disconnect from MongoDB", zap.Error(err))

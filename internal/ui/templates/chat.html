@@ -70,22 +70,22 @@
               </span>
             </button>
         </form>
-        
+
         <script>
           let isRequestActive = false;
           const chatID = document.getElementById('messages-container').dataset.chatId;
-          
+
           // Activate cancel functionality
           function activateCancel() {
             isRequestActive = true;
-            
+
             // Show cancel button
             document.querySelector('.send-text').style.display = 'none';
             document.querySelector('.cancel-text').style.display = 'inline';
-            
+
             // Add cancel button class
             document.getElementById('send-button').classList.add('cancel-button');
-            
+
             // Change button behavior to cancel
             document.getElementById('send-button').onclick = function(e) {
               if (isRequestActive) {
@@ -96,26 +96,26 @@
               }
             };
           }
-          
+
           // Deactivate cancel functionality
           function deactivateCancel() {
             isRequestActive = false;
-            
+
             // Show send button
             document.querySelector('.send-text').style.display = 'inline';
             document.querySelector('.cancel-text').style.display = 'none';
-            
+
             // Remove cancel button class
             document.getElementById('send-button').classList.remove('cancel-button');
-            
+
             // Reset button behavior
             document.getElementById('send-button').onclick = null;
           }
-          
+
           // Send cancel request to server
           function cancelRequest() {
             if (!isRequestActive) return;
-            
+
             fetch(`/chats/${chatID}/cancel`, {
               method: 'POST',
               headers: {
@@ -126,7 +126,7 @@
             .then(response => {
               if (response.ok) {
                 console.log('Request canceled successfully');
-                
+
                 // Update thinking message to show cancellation
                 const thinkingMessage = document.getElementById('thinking-message');
                 if (thinkingMessage) {
@@ -136,7 +136,7 @@
                     </div>
                   `;
                 }
-                
+
                 deactivateCancel();
               } else {
                 console.error('Failed to cancel request:', response.statusText);
@@ -146,29 +146,29 @@
               console.error('Error canceling request:', error);
             });
           }
-          
+
           // Change Send button to Cancel button during request
           document.addEventListener('htmx:beforeRequest', function(evt) {
             if (evt.detail.elt.id === 'message-form') {
               activateCancel();
             }
           });
-          
+
           // Change Cancel button back to Send button after request
           document.addEventListener('htmx:afterRequest', function(evt) {
             if (evt.detail.elt.id === 'message-form') {
               deactivateCancel();
             }
           });
-          
+
           // Add user message immediately to message history
           function showUserMessage(form) {
             const messageText = form.elements["message"].value.trim();
             if (!messageText) return;
-            
+
             const userMessageId = 'temp-user-message-' + Date.now();
             const sessionId = 'temp-session-' + Date.now();
-            
+
             const messageHtml = `
               <div id="${sessionId}" class="message-session">
                 <div class="message user-message">
@@ -181,11 +181,11 @@
                 </div>
               </div>
             `;
-            
+
             document.getElementById('next-message-session').innerHTML = messageHtml;
             document.getElementById('message-history').scrollTop = document.getElementById('message-history').scrollHeight;
           }
-          
+
           // Scroll to the beginning of the most recent response
           function scrollToResponse() {
             const latestSession = document.querySelector('.message-session:last-of-type');
@@ -193,7 +193,7 @@
               latestSession.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
           }
-          
+
           // Handle request errors
           document.addEventListener('htmx:responseError', function(evt) {
             if (evt.detail.elt.id === 'message-form') {
@@ -205,7 +205,7 @@
                   </div>
                 `;
               }
-              
+
               deactivateCancel();
             }
           });

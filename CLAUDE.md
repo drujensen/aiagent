@@ -11,7 +11,7 @@
 - **Architecture**: Domain-Driven Design (DDD) with clear separation between domain and infrastructure
 - **Error Handling**: Use detailed error messages with `fmt.Errorf`, always check and propagate errors
 - **Context**: Pass context in all repository and service method signatures
-- **Naming**: 
+- **Naming**:
   - Use `NewXxx` for constructor functions
   - Interfaces should end with `er` (e.g., `Repository`, `Service`)
   - Variables should be camelCase

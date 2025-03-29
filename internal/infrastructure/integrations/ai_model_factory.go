@@ -38,7 +38,7 @@ func (f *AIModelFactory) CreateModelIntegration(agent *entities.Agent, provider 
 	case entities.ProviderAnthropic:
 		return NewAnthropicIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
 	case entities.ProviderXAI:
-		return NewXAIIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger) 
+		return NewXAIIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
 	case entities.ProviderGoogle:
 		return NewGoogleIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
 	case entities.ProviderDeepseek:

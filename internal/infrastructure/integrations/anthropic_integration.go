@@ -115,7 +115,7 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 		if ctx.Err() == context.Canceled {
 			return nil, fmt.Errorf("operation canceled by user")
 		}
-		
+
 		requiredFields := make([]string, 0)
 		for _, param := range (*tool).Parameters() {
 			if param.Required {
@@ -182,7 +182,7 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 		if ctx.Err() == context.Canceled {
 			return nil, fmt.Errorf("operation canceled by user")
 		}
-		
+
 		jsonBody, err := json.Marshal(reqBody)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling request: %v", err)
@@ -204,7 +204,7 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 			if ctx.Err() == context.Canceled {
 				return nil, fmt.Errorf("operation canceled by user")
 			}
-			
+
 			resp, err = m.httpClient.Do(req)
 			if err != nil {
 				if attempt < 2 {
@@ -333,7 +333,7 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 				if ctx.Err() == context.Canceled {
 					return nil, fmt.Errorf("operation canceled by user")
 				}
-				
+
 				toolName := toolCall.Function.Name
 				tool, err := m.toolRepo.GetToolByName(toolName)
 				if err != nil {

@@ -3,7 +3,7 @@ package integrations
 import (
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/interfaces"
-	
+
 	"go.uber.org/zap"
 )
 
@@ -20,7 +20,7 @@ func NewOllamaIntegration(baseURL, apiKey, model string, toolRepo interfaces.Too
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &OllamaIntegration{
 		OpenAIIntegration: openAIIntegration,
 	}, nil

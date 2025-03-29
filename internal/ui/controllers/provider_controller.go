@@ -16,15 +16,15 @@ import (
 )
 
 type ProviderController struct {
-	logger         *zap.Logger
-	tmpl           *template.Template
+	logger          *zap.Logger
+	tmpl            *template.Template
 	providerService services.ProviderService
 }
 
 func NewProviderController(logger *zap.Logger, tmpl *template.Template, providerService services.ProviderService) *ProviderController {
 	return &ProviderController{
-		logger:         logger,
-		tmpl:           tmpl,
+		logger:          logger,
+		tmpl:            tmpl,
 		providerService: providerService,
 	}
 }
@@ -162,10 +162,10 @@ func (c *ProviderController) CreateProviderHandler(eCtx echo.Context) error {
 		}
 
 		models = append(models, entities.ModelPricing{
-			Name:               name,
-			InputPricePerMille: inputPrice,
+			Name:                name,
+			InputPricePerMille:  inputPrice,
 			OutputPricePerMille: outputPrice,
-			ContextWindow:      contextWindow,
+			ContextWindow:       contextWindow,
 		})
 	}
 
@@ -223,10 +223,10 @@ func (c *ProviderController) UpdateProviderHandler(eCtx echo.Context) error {
 		}
 
 		models = append(models, entities.ModelPricing{
-			Name:               name,
-			InputPricePerMille: inputPrice,
+			Name:                name,
+			InputPricePerMille:  inputPrice,
 			OutputPricePerMille: outputPrice,
-			ContextWindow:      contextWindow,
+			ContextWindow:       contextWindow,
 		})
 	}
 
@@ -265,7 +265,7 @@ func (c *ProviderController) DeleteProviderHandler(eCtx echo.Context) error {
 // ResetProvidersHandler resets providers to default configuration
 func (c *ProviderController) ResetProvidersHandler(eCtx echo.Context) error {
 	c.logger.Info("Resetting providers to default configuration")
-	
+
 	err := c.providerService.ResetDefaultProviders(eCtx.Request().Context())
 	if err != nil {
 		c.logger.Error("Failed to reset providers", zap.Error(err))
@@ -273,21 +273,21 @@ func (c *ProviderController) ResetProvidersHandler(eCtx echo.Context) error {
 			"error": "Failed to reset providers: " + err.Error(),
 		})
 	}
-	
+
 	providers, err := c.providerService.ListProviders(eCtx.Request().Context())
 	if err != nil {
 		c.logger.Error("Failed to list providers after reset", zap.Error(err))
 	} else {
 		c.logger.Info("Providers reset successfully", zap.Int("provider_count", len(providers)))
 		for i, p := range providers {
-			c.logger.Info("Provider details", 
+			c.logger.Info("Provider details",
 				zap.Int("index", i),
 				zap.String("id", p.ID.Hex()),
 				zap.String("name", p.Name),
 				zap.Int("models_count", len(p.Models)))
 		}
 	}
-	
+
 	return eCtx.JSON(http.StatusOK, map[string]string{
 		"message": "Providers reset successfully",
 		"count":   fmt.Sprintf("%d", len(providers)),
@@ -306,21 +306,21 @@ func (c *ProviderController) DebugProvidersHandler(eCtx echo.Context) error {
 	debugInfo := []map[string]interface{}{}
 	for _, p := range providers {
 		providerInfo := map[string]interface{}{
-			"id":          p.ID.Hex(),
-			"name":        p.Name,
-			"type":        string(p.Type),
-			"baseURL":     p.BaseURL,
-			"apiKeyName":  p.APIKeyName,
+			"id":           p.ID.Hex(),
+			"name":         p.Name,
+			"type":         string(p.Type),
+			"baseURL":      p.BaseURL,
+			"apiKeyName":   p.APIKeyName,
 			"models_count": len(p.Models),
-			"models":      []map[string]interface{}{},
+			"models":       []map[string]interface{}{},
 		}
 
 		for _, m := range p.Models {
 			modelInfo := map[string]interface{}{
-				"name":              m.Name,
-				"inputPrice":        m.InputPricePerMille,
-				"outputPrice":       m.OutputPricePerMille,
-				"contextWindow":     m.ContextWindow,
+				"name":          m.Name,
+				"inputPrice":    m.InputPricePerMille,
+				"outputPrice":   m.OutputPricePerMille,
+				"contextWindow": m.ContextWindow,
 			}
 			providerInfo["models"] = append(providerInfo["models"].([]map[string]interface{}), modelInfo)
 		}

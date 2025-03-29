@@ -32,7 +32,7 @@
             <input type="text" id="api_key_name" name="api_key_name" class="form-control" value="{{.Provider.APIKeyName}}" required>
             <small class="form-text">Name displayed in the API key field (e.g., "OpenAI API Key")</small>
         </div>
-        
+
         <h3>Models</h3>
         <div id="models-container">
             {{range $index, $model := .Provider.Models}}
@@ -58,9 +58,9 @@
             </div>
             {{end}}
         </div>
-        
+
         <button type="button" id="add-model" class="btn-secondary"><i class="fas fa-plus"></i> Add Model</button>
-        
+
         <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Save Provider</button>
     </form>
     <div id="response-message"></div>
@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <button type="button" class="btn-delete-model">Remove Model</button>
     </div>
     `;
-    
+
     // Add model button handler
     document.getElementById('add-model').addEventListener('click', function() {
         const modelsContainer = document.getElementById('models-container');
@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function() {
         modelsContainer.insertAdjacentHTML('beforeend', newModel);
         setupDeleteButtons();
     });
-    
+
     // Set up delete buttons for existing models
     function setupDeleteButtons() {
         document.querySelectorAll('.btn-delete-model').forEach(button => {
@@ -109,14 +109,14 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-    
+
     // Initialize delete buttons
     setupDeleteButtons();
-    
+
     // Provider type change handler
     document.getElementById('type').addEventListener('change', function() {
         const type = this.value;
-        
+
         // Preset URLs based on provider type
         const urlMap = {
             'openai': 'https://api.openai.com',
@@ -127,24 +127,24 @@ document.addEventListener('DOMContentLoaded', function() {
             'ollama': 'http://localhost:11434',
             'generic': ''
         };
-        
+
         // Set the base URL field if it's empty or matches an existing preset
         const baseUrlField = document.getElementById('base_url');
         const currentUrl = baseUrlField.value.trim();
-        
+
         // Check if the current URL is one of our presets
         const isPresetUrl = Object.values(urlMap).includes(currentUrl);
-        
+
         // Update only if empty or was a preset value
         if (currentUrl === '' || isPresetUrl) {
             baseUrlField.value = urlMap[type] || '';
         }
-        
+
         // Update API key name field if empty or default
         const apiKeyNameField = document.getElementById('api_key_name');
         const currentName = apiKeyNameField.value.trim();
         const defaultNames = ['API Key', 'OpenAI API Key', 'Anthropic API Key', 'X.AI API Key', 'Google API Key', 'DeepSeek API Key', 'Local API Key (optional)'];
-        
+
         if (currentName === '' || defaultNames.includes(currentName)) {
             // Set appropriate API key name based on type
             switch(type) {
