@@ -37,13 +37,15 @@ func NewChatController(logger *zap.Logger, tmpl *template.Template, chatService 
 func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 	chatID := eCtx.Param("id")
 	if chatID == "" {
-		return eCtx.String(http.StatusBadRequest, "Chat ID is required")
+		eCtx.Response().Header().Set("HX-Redirect", "/")
+		return eCtx.String(http.StatusOK, "Chat not found. Redirecting to home page...")
 	}
 
 	chat, err := c.chatService.GetChat(eCtx.Request().Context(), chatID)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return eCtx.String(http.StatusNotFound, "Chat not found")
+			eCtx.Response().Header().Set("HX-Redirect", "/")
+			return eCtx.String(http.StatusOK, "Chat not found. Redirecting to home page...")
 		}
 		c.logger.Error("Failed to get chat", zap.Error(err))
 		return eCtx.String(http.StatusInternalServerError, "Failed to load chat")
@@ -52,7 +54,8 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 	agent, err := c.agentService.GetAgent(eCtx.Request().Context(), chat.AgentID.Hex())
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return eCtx.String(http.StatusNotFound, "Agent not found")
+			eCtx.Response().Header().Set("HX-Redirect", "/")
+			return eCtx.String(http.StatusOK, "Agent not found. Redirecting to home page...")
 		}
 		c.logger.Error("Failed to get agent", zap.Error(err))
 		return eCtx.String(http.StatusInternalServerError, "Failed to load agent")
@@ -124,6 +127,26 @@ func (c *ChatController) UpdateChatHandler(eCtx echo.Context) error {
 	return eCtx.String(http.StatusOK, "Chat updated successfully")
 }
 
+func (c *ChatController) DeleteChatHandler(eCtx echo.Context) error {
+	id := eCtx.Param("id")
+	if id == "" {
+		return eCtx.String(http.StatusBadRequest, "Chat ID is required")
+	}
+
+	err := c.chatService.DeleteChat(eCtx.Request().Context(), id)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return eCtx.String(http.StatusNotFound, "Chat not found")
+		}
+		c.logger.Error("Failed to delete chat", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to delete chat")
+	}
+
+	// After successful deletion, return the updated chats list
+	eCtx.Response().Header().Set("HX-Trigger", `{"refreshChats": true}`)
+	return eCtx.String(http.StatusOK, "Chat deleted successfully")
+}
+
 func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 	chatID := eCtx.Param("id")
 	if chatID == "" {
@@ -139,10 +162,10 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 
 	// Create a cancellable context
 	ctx, cancel := context.WithCancel(eCtx.Request().Context())
-	
+
 	// Store the cancellation function
 	c.activeCancelers.Store(chatID, cancel)
-	
+
 	// Ensure cancellation when the operation completes (success or failure)
 	defer func() {
 		cancel()
@@ -214,54 +237,27 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 	return eCtx.HTML(http.StatusOK, responseHTML)
 }
 
-func (c *ChatController) DeleteChatHandler(eCtx echo.Context) error {
-	id := eCtx.Param("id")
-	if id == "" {
-		return eCtx.String(http.StatusBadRequest, "Chat ID is required")
-	}
-
-	err := c.chatService.DeleteChat(eCtx.Request().Context(), id)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return eCtx.String(http.StatusNotFound, "Chat not found")
-		}
-		c.logger.Error("Failed to delete chat", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to delete chat")
-	}
-
-	// After successful deletion, return the updated chats list
-	chats, err := c.chatService.ListActiveChats(eCtx.Request().Context())
-	if err != nil {
-		c.logger.Error("Failed to list active chats", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to load chats")
-	}
-	data := map[string]interface{}{
-		"Chats": chats,
-	}
-	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_chats", data)
-}
-
 // CancelMessageHandler cancels an ongoing message processing operation
 func (c *ChatController) CancelMessageHandler(eCtx echo.Context) error {
 	chatID := eCtx.Param("id")
 	if chatID == "" {
 		return eCtx.String(http.StatusBadRequest, "Chat ID is required")
 	}
-	
+
 	// Check if there's an active cancellation function for this chat
 	cancelValue, exists := c.activeCancelers.Load(chatID)
 	if !exists {
 		c.logger.Warn("No active request to cancel for this chat", zap.String("chatID", chatID))
 		return eCtx.String(http.StatusOK, "No active request to cancel")
 	}
-	
+
 	// Execute the cancellation
 	if cancelFunc, ok := cancelValue.(context.CancelFunc); ok {
 		cancelFunc()
 		c.logger.Info("Request canceled successfully", zap.String("chatID", chatID))
 		return eCtx.String(http.StatusOK, "Request canceled")
 	}
-	
+
 	c.logger.Error("Invalid cancellation function", zap.String("chatID", chatID))
 	return eCtx.String(http.StatusInternalServerError, "Failed to cancel request")
 }

@@ -20,7 +20,7 @@
    </header>
    <div class="container">
        <aside class="sidebar">
-           <div id="sidebar-chats" hx-get="/sidebar/chats" hx-trigger="load" hx-swap="innerHTML">
+           <div id="sidebar-chats" hx-get="/sidebar/chats" hx-trigger="load, refreshChats from:body" hx-swap="innerHTML">
                <h2><i class="fas fa-comment"></i> Chats <span class="spinner"></span></h2>
                <ul class="chat-list"><li>Loading...</li></ul>
            </div>
