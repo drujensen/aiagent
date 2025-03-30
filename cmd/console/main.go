@@ -8,9 +8,9 @@ import (
 
 	"aiagent/internal/domain/interfaces"
 	"aiagent/internal/domain/services"
-	"aiagent/internal/infrastructure/config"
-	"aiagent/internal/infrastructure/database"
-	"aiagent/internal/infrastructure/repositories"
+	"aiagent/internal/impl/config"
+	"aiagent/internal/impl/database"
+	"aiagent/internal/impl/repositories"
 
 	"go.uber.org/zap"
 )

@@ -11,7 +11,6 @@ import (
 
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/services"
-	"aiagent/internal/infrastructure/config"
 
 	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -25,21 +24,15 @@ type AgentController struct {
 	agentService    services.AgentService
 	toolService     services.ToolService
 	providerService services.ProviderService
-	config          *config.Config
 }
 
 func NewAgentController(logger *zap.Logger, tmpl *template.Template, agentService services.AgentService, toolService services.ToolService, providerService services.ProviderService) *AgentController {
-	cfg, err := config.InitConfig()
-	if err != nil {
-		logger.Fatal("Failed to initialize config in AgentController", zap.Error(err))
-	}
 	return &AgentController{
 		logger:          logger,
 		tmpl:            tmpl,
 		agentService:    agentService,
 		toolService:     toolService,
 		providerService: providerService,
-		config:          cfg,
 	}
 }
 

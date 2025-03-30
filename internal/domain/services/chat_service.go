@@ -7,8 +7,8 @@ import (
 
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/interfaces"
-	"aiagent/internal/infrastructure/config"
-	"aiagent/internal/infrastructure/integrations"
+	"aiagent/internal/impl/config"
+	"aiagent/internal/impl/integrations"
 
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -17,12 +17,12 @@ import (
 )
 
 type ChatService interface {
-	SendMessage(ctx context.Context, chatID string, message entities.Message) (*entities.Message, error)
-	CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error)
-	ListActiveChats(ctx context.Context) ([]*entities.Chat, error)
+	ListChats(ctx context.Context) ([]*entities.Chat, error)
 	GetChat(ctx context.Context, id string) (*entities.Chat, error)
+	CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error)
 	UpdateChat(ctx context.Context, id, name string) (*entities.Chat, error)
 	DeleteChat(ctx context.Context, id string) error
+	SendMessage(ctx context.Context, id string, message entities.Message) (*entities.Message, error)
 }
 
 type chatService struct {
@@ -52,25 +52,108 @@ func NewChatService(
 	}
 }
 
-// estimateTokens approximates the token count for a message.
-func estimateTokens(msg *entities.Message) int {
-	contentTokens := (len(msg.Content) + 3) / 4
-	// Approximate additional tokens for role, etc.
-	return contentTokens + 4
+func (s *chatService) ListChats(ctx context.Context) ([]*entities.Chat, error) {
+	chats, err := s.chatRepo.ListChats(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list chats: %v", err)
+	}
+
+	var activeChats []*entities.Chat
+	for _, conv := range chats {
+		if conv.Active {
+			activeChats = append(activeChats, conv)
+		}
+	}
+	return activeChats, nil
 }
 
-func (s *chatService) SendMessage(ctx context.Context, chatID string, message entities.Message) (*entities.Message, error) {
-	if chatID == "" {
+func (s *chatService) GetChat(ctx context.Context, id string) (*entities.Chat, error) {
+	if id == "" {
+		return nil, fmt.Errorf("chat ID is required")
+	}
+
+	chat, err := s.chatRepo.GetChat(ctx, id)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, fmt.Errorf("chat not found: %s", id)
+		}
+		return nil, fmt.Errorf("failed to retrieve chat: %v", err)
+	}
+
+	return chat, nil
+}
+
+func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error) {
+	if agentID == "" {
+		return nil, fmt.Errorf("agent ID is required")
+	}
+
+	agentObjID, err := primitive.ObjectIDFromHex(agentID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid agent ID: %v", err)
+	}
+
+	chat := entities.NewChat(agentObjID, name)
+	if err := s.chatRepo.CreateChat(ctx, chat); err != nil {
+		return nil, fmt.Errorf("failed to create chat: %v", err)
+	}
+
+	return chat, nil
+}
+
+func (s *chatService) UpdateChat(ctx context.Context, id, name string) (*entities.Chat, error) {
+	if id == "" {
+		return nil, fmt.Errorf("chat ID is required")
+	}
+
+	if name == "" {
+		return nil, fmt.Errorf("chat name is required")
+	}
+
+	existingChat, err := s.chatRepo.GetChat(ctx, id)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, fmt.Errorf("chat not found: %s", id)
+		}
+		return nil, fmt.Errorf("failed to get existing chat: %v", err)
+	}
+
+	existingChat.Name = name
+	existingChat.UpdatedAt = time.Now()
+
+	if err := s.chatRepo.UpdateChat(ctx, existingChat); err != nil {
+		return nil, fmt.Errorf("failed to update chat: %v", err)
+	}
+
+	return existingChat, nil
+}
+
+func (s *chatService) DeleteChat(ctx context.Context, id string) error {
+	if id == "" {
+		return fmt.Errorf("chat ID is required")
+	}
+	err := s.chatRepo.DeleteChat(ctx, id)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return fmt.Errorf("chat not found: %s", id)
+		}
+		return fmt.Errorf("failed to delete chat: %v", err)
+	}
+	return nil
+}
+
+func (s *chatService) SendMessage(ctx context.Context, id string, message entities.Message) (*entities.Message, error) {
+	if id == "" {
 		return nil, fmt.Errorf("chat ID is required")
 	}
 	if message.Role == "" || message.Content == "" {
 		return nil, fmt.Errorf("message role and content are required")
 	}
 
-	chat, err := s.chatRepo.GetChat(ctx, chatID)
+	chat, err := s.chatRepo.GetChat(ctx, id)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, fmt.Errorf("chat not found: %s", chatID)
+			return nil, fmt.Errorf("chat not found: %s", id)
 		}
 		return nil, fmt.Errorf("failed to retrieve chat: %w", err)
 	}
@@ -292,94 +375,11 @@ func (s *chatService) SendMessage(ctx context.Context, chatID string, message en
 	return nil, fmt.Errorf("no AI response generated")
 }
 
-func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error) {
-	if agentID == "" {
-		return nil, fmt.Errorf("agent ID is required")
-	}
-
-	agentObjID, err := primitive.ObjectIDFromHex(agentID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid agent ID: %v", err)
-	}
-
-	chat := entities.NewChat(agentObjID, name)
-	if err := s.chatRepo.CreateChat(ctx, chat); err != nil {
-		return nil, fmt.Errorf("failed to create chat: %v", err)
-	}
-
-	return chat, nil
-}
-
-func (s *chatService) UpdateChat(ctx context.Context, id, name string) (*entities.Chat, error) {
-	if id == "" {
-		return nil, fmt.Errorf("chat ID is required")
-	}
-
-	if name == "" {
-		return nil, fmt.Errorf("chat name is required")
-	}
-
-	existingChat, err := s.chatRepo.GetChat(ctx, id)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, fmt.Errorf("chat not found: %s", id)
-		}
-		return nil, fmt.Errorf("failed to get existing chat: %v", err)
-	}
-
-	existingChat.Name = name
-	existingChat.UpdatedAt = time.Now()
-
-	if err := s.chatRepo.UpdateChat(ctx, existingChat); err != nil {
-		return nil, fmt.Errorf("failed to update chat: %v", err)
-	}
-
-	return existingChat, nil
-}
-
-func (s *chatService) ListActiveChats(ctx context.Context) ([]*entities.Chat, error) {
-	chats, err := s.chatRepo.ListChats(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list chats: %v", err)
-	}
-
-	var activeChats []*entities.Chat
-	for _, conv := range chats {
-		if conv.Active {
-			activeChats = append(activeChats, conv)
-		}
-	}
-	return activeChats, nil
-}
-
-func (s *chatService) GetChat(ctx context.Context, id string) (*entities.Chat, error) {
-	if id == "" {
-		return nil, fmt.Errorf("chat ID is required")
-	}
-
-	chat, err := s.chatRepo.GetChat(ctx, id)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, fmt.Errorf("chat not found: %s", id)
-		}
-		return nil, fmt.Errorf("failed to retrieve chat: %v", err)
-	}
-
-	return chat, nil
-}
-
-func (s *chatService) DeleteChat(ctx context.Context, id string) error {
-	if id == "" {
-		return fmt.Errorf("chat ID is required")
-	}
-	err := s.chatRepo.DeleteChat(ctx, id)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return fmt.Errorf("chat not found: %s", id)
-		}
-		return fmt.Errorf("failed to delete chat: %v", err)
-	}
-	return nil
+// estimateTokens approximates the token count for a message.
+func estimateTokens(msg *entities.Message) int {
+	contentTokens := (len(msg.Content) + 3) / 4
+	// Approximate additional tokens for role, etc.
+	return contentTokens + 4
 }
 
 // compressMessages summarizes older messages to reduce token count while preserving context
@@ -493,3 +493,6 @@ func (s *chatService) compressMessages(
 
 	return finalMessages, true, nil
 }
+
+// verify that chatService implements ChatService
+var _ ChatService = &chatService{}

@@ -13,11 +13,11 @@ import (
 )
 
 type AgentService interface {
+	ListAgents(ctx context.Context) ([]*entities.Agent, error)
+	GetAgent(ctx context.Context, id string) (*entities.Agent, error)
 	CreateAgent(ctx context.Context, agent *entities.Agent) error
 	UpdateAgent(ctx context.Context, agent *entities.Agent) error
 	DeleteAgent(ctx context.Context, id string) error
-	GetAgent(ctx context.Context, id string) (*entities.Agent, error)
-	ListAgents(ctx context.Context) ([]*entities.Agent, error)
 }
 
 type agentService struct {
@@ -30,6 +30,28 @@ func NewAgentService(agentRepo interfaces.AgentRepository, logger *zap.Logger) *
 		agentRepo: agentRepo,
 		logger:    logger,
 	}
+}
+
+func (s *agentService) ListAgents(ctx context.Context) ([]*entities.Agent, error) {
+	agents, err := s.agentRepo.ListAgents(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list agents: %w", err)
+	}
+
+	return agents, nil
+}
+
+func (s *agentService) GetAgent(ctx context.Context, id string) (*entities.Agent, error) {
+	if id == "" {
+		return nil, fmt.Errorf("agent ID is required")
+	}
+
+	agent, err := s.agentRepo.GetAgent(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return agent, nil
 }
 
 func (s *agentService) CreateAgent(ctx context.Context, agent *entities.Agent) error {
@@ -106,24 +128,5 @@ func (s *agentService) DeleteAgent(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *agentService) GetAgent(ctx context.Context, id string) (*entities.Agent, error) {
-	if id == "" {
-		return nil, fmt.Errorf("agent ID is required")
-	}
-
-	agent, err := s.agentRepo.GetAgent(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return agent, nil
-}
-
-func (s *agentService) ListAgents(ctx context.Context) ([]*entities.Agent, error) {
-	agents, err := s.agentRepo.ListAgents(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list agents: %w", err)
-	}
-
-	return agents, nil
-}
+// verify interface implementation
+var _ AgentService = &agentService{}

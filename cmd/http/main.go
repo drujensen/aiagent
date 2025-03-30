@@ -6,10 +6,10 @@ import (
 	"html/template"
 
 	"aiagent/internal/domain/services"
-	"aiagent/internal/infrastructure/config"
-	"aiagent/internal/infrastructure/database"
-	"aiagent/internal/infrastructure/integrations"
-	"aiagent/internal/infrastructure/repositories"
+	"aiagent/internal/impl/config"
+	"aiagent/internal/impl/database"
+	"aiagent/internal/impl/integrations"
+	"aiagent/internal/impl/repositories"
 	uicontrollers "aiagent/internal/ui/controllers"
 
 	"github.com/labstack/echo/v4"

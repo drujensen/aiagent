@@ -2,7 +2,7 @@ package integrations
 
 import (
 	"aiagent/internal/domain/interfaces"
-	"aiagent/internal/infrastructure/integrations/tools"
+	"aiagent/internal/impl/integrations/tools"
 
 	"go.uber.org/zap"
 )

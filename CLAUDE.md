@@ -8,7 +8,7 @@
 - Build and run with Docker: `docker-compose up --build`
 
 ## Code Style Guidelines
-- **Architecture**: Domain-Driven Design (DDD) with clear separation between domain and infrastructure
+- **Architecture**: Domain-Driven Design (DDD) with clear separation between domain and impl
 - **Error Handling**: Use detailed error messages with `fmt.Errorf`, always check and propagate errors
 - **Context**: Pass context in all repository and service method signatures
 - **Naming**:
@@ -21,7 +21,7 @@
 
 ## Project Structure
 - `cmd/`: Entry points for applications
-- `internal/`: Core code (domain, infrastructure, UI)
+- `internal/`: Core code (domain, impl, UI)
 - `domain/`: Business entities, interfaces, services
-- `infrastructure/`: External systems integration
+- `impl/`: External systems integration
 - `ui/`: User interface components
