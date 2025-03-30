@@ -39,7 +39,7 @@ func (c *HomeController) HomeHandler(eCtx echo.Context) error {
 }
 
 func (c *HomeController) ChatsPartialHandler(eCtx echo.Context) error {
-	chats, err := c.chatService.ListActiveChats(eCtx.Request().Context())
+	chats, err := c.chatService.ListChats(eCtx.Request().Context())
 	if err != nil {
 		c.logger.Error("Failed to list active chats", zap.Error(err))
 		return eCtx.String(http.StatusInternalServerError, "Failed to load chats")
