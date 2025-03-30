@@ -2,13 +2,12 @@ package services
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"aiagent/internal/domain/entities"
+	"aiagent/internal/domain/errors"
 	"aiagent/internal/domain/interfaces"
 
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
 
@@ -35,7 +34,7 @@ func NewAgentService(agentRepo interfaces.AgentRepository, logger *zap.Logger) *
 func (s *agentService) ListAgents(ctx context.Context) ([]*entities.Agent, error) {
 	agents, err := s.agentRepo.ListAgents(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list agents: %w", err)
+		return nil, err
 	}
 
 	return agents, nil
@@ -43,7 +42,7 @@ func (s *agentService) ListAgents(ctx context.Context) ([]*entities.Agent, error
 
 func (s *agentService) GetAgent(ctx context.Context, id string) (*entities.Agent, error) {
 	if id == "" {
-		return nil, fmt.Errorf("agent ID is required")
+		return nil, errors.ValidationErrorf("agent ID is required")
 	}
 
 	agent, err := s.agentRepo.GetAgent(ctx, id)
@@ -56,20 +55,20 @@ func (s *agentService) GetAgent(ctx context.Context, id string) (*entities.Agent
 
 func (s *agentService) CreateAgent(ctx context.Context, agent *entities.Agent) error {
 	if agent.Name == "" {
-		return fmt.Errorf("agent name is required")
+		return errors.ValidationErrorf("agent name is required")
 	}
 	if agent.SystemPrompt == "" {
-		return fmt.Errorf("agent prompt is required")
+		return errors.ValidationErrorf("agent prompt is required")
 	}
 	if agent.Model == "" || agent.APIKey == "" {
-		return fmt.Errorf("agent endpoint, model, and API key are required")
+		return errors.ValidationErrorf("agent endpoint, model, and API key are required")
 	}
 
 	agent.CreatedAt = time.Now()
 	agent.UpdatedAt = time.Now()
 
 	if err := s.agentRepo.CreateAgent(ctx, agent); err != nil {
-		return fmt.Errorf("failed to create agent: %w", err)
+		return err
 	}
 
 	return nil
@@ -77,32 +76,29 @@ func (s *agentService) CreateAgent(ctx context.Context, agent *entities.Agent) e
 
 func (s *agentService) UpdateAgent(ctx context.Context, agent *entities.Agent) error {
 	if agent.ID.IsZero() {
-		return fmt.Errorf("agent ID is required for update")
+		return errors.ValidationErrorf("agent ID is required")
 	}
 
 	existing, err := s.agentRepo.GetAgent(ctx, agent.ID.Hex())
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return fmt.Errorf("agent not found: %s", agent.ID.Hex())
-		}
-		return fmt.Errorf("failed to retrieve agent: %w", err)
+		return err
 	}
 
 	if agent.Name == "" {
-		return fmt.Errorf("agent name is required")
+		return errors.ValidationErrorf("agent name is required")
 	}
 	if agent.SystemPrompt == "" {
-		return fmt.Errorf("agent prompt is required")
+		return errors.ValidationErrorf("agent prompt is required")
 	}
 	if agent.Model == "" || agent.APIKey == "" {
-		return fmt.Errorf("agent endpoint, model, and API key are required")
+		return errors.ValidationErrorf("agent endpoint, model, and API key are required")
 	}
 
 	agent.CreatedAt = existing.CreatedAt
 	agent.UpdatedAt = time.Now()
 
 	if err := s.agentRepo.UpdateAgent(ctx, agent); err != nil {
-		return fmt.Errorf("failed to update agent: %w", err)
+		return err
 	}
 
 	return nil
@@ -110,19 +106,16 @@ func (s *agentService) UpdateAgent(ctx context.Context, agent *entities.Agent) e
 
 func (s *agentService) DeleteAgent(ctx context.Context, id string) error {
 	if id == "" {
-		return fmt.Errorf("agent ID is required for deletion")
+		return errors.ValidationErrorf("agent ID is required")
 	}
 
 	_, err := s.agentRepo.GetAgent(ctx, id)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return fmt.Errorf("agent not found: %s", id)
-		}
-		return fmt.Errorf("failed to retrieve agent: %w", err)
+		return err
 	}
 
 	if err := s.agentRepo.DeleteAgent(ctx, id); err != nil {
-		return fmt.Errorf("failed to delete agent: %w", err)
+		return err
 	}
 
 	return nil

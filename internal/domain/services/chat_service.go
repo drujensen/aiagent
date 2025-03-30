@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"aiagent/internal/domain/entities"
+	"aiagent/internal/domain/errors"
 	"aiagent/internal/domain/interfaces"
 	"aiagent/internal/impl/config"
 	"aiagent/internal/impl/integrations"
 
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
 
@@ -55,29 +55,20 @@ func NewChatService(
 func (s *chatService) ListChats(ctx context.Context) ([]*entities.Chat, error) {
 	chats, err := s.chatRepo.ListChats(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list chats: %v", err)
+		return nil, err
 	}
 
-	var activeChats []*entities.Chat
-	for _, conv := range chats {
-		if conv.Active {
-			activeChats = append(activeChats, conv)
-		}
-	}
-	return activeChats, nil
+	return chats, nil
 }
 
 func (s *chatService) GetChat(ctx context.Context, id string) (*entities.Chat, error) {
 	if id == "" {
-		return nil, fmt.Errorf("chat ID is required")
+		return nil, errors.ValidationErrorf("chat ID is required")
 	}
 
 	chat, err := s.chatRepo.GetChat(ctx, id)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, fmt.Errorf("chat not found: %s", id)
-		}
-		return nil, fmt.Errorf("failed to retrieve chat: %v", err)
+		return nil, err
 	}
 
 	return chat, nil
@@ -85,7 +76,7 @@ func (s *chatService) GetChat(ctx context.Context, id string) (*entities.Chat, e
 
 func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error) {
 	if agentID == "" {
-		return nil, fmt.Errorf("agent ID is required")
+		return nil, errors.ValidationErrorf("agent ID is required")
 	}
 
 	agentObjID, err := primitive.ObjectIDFromHex(agentID)
@@ -95,7 +86,7 @@ func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*en
 
 	chat := entities.NewChat(agentObjID, name)
 	if err := s.chatRepo.CreateChat(ctx, chat); err != nil {
-		return nil, fmt.Errorf("failed to create chat: %v", err)
+		return nil, err
 	}
 
 	return chat, nil
@@ -103,26 +94,23 @@ func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*en
 
 func (s *chatService) UpdateChat(ctx context.Context, id, name string) (*entities.Chat, error) {
 	if id == "" {
-		return nil, fmt.Errorf("chat ID is required")
+		return nil, errors.ValidationErrorf("chat ID is required")
 	}
 
 	if name == "" {
-		return nil, fmt.Errorf("chat name is required")
+		return nil, errors.ValidationErrorf("chat name is required")
 	}
 
 	existingChat, err := s.chatRepo.GetChat(ctx, id)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, fmt.Errorf("chat not found: %s", id)
-		}
-		return nil, fmt.Errorf("failed to get existing chat: %v", err)
+		return nil, err
 	}
 
 	existingChat.Name = name
 	existingChat.UpdatedAt = time.Now()
 
 	if err := s.chatRepo.UpdateChat(ctx, existingChat); err != nil {
-		return nil, fmt.Errorf("failed to update chat: %v", err)
+		return nil, err
 	}
 
 	return existingChat, nil
@@ -130,32 +118,27 @@ func (s *chatService) UpdateChat(ctx context.Context, id, name string) (*entitie
 
 func (s *chatService) DeleteChat(ctx context.Context, id string) error {
 	if id == "" {
-		return fmt.Errorf("chat ID is required")
+		return errors.ValidationErrorf("chat ID is required")
 	}
 	err := s.chatRepo.DeleteChat(ctx, id)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return fmt.Errorf("chat not found: %s", id)
-		}
-		return fmt.Errorf("failed to delete chat: %v", err)
+		return err
 	}
+
 	return nil
 }
 
 func (s *chatService) SendMessage(ctx context.Context, id string, message entities.Message) (*entities.Message, error) {
 	if id == "" {
-		return nil, fmt.Errorf("chat ID is required")
+		return nil, errors.ValidationErrorf("chat ID is required")
 	}
 	if message.Role == "" || message.Content == "" {
-		return nil, fmt.Errorf("message role and content are required")
+		return nil, errors.ValidationErrorf("message role and content are required")
 	}
 
 	chat, err := s.chatRepo.GetChat(ctx, id)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, fmt.Errorf("chat not found: %s", id)
-		}
-		return nil, fmt.Errorf("failed to retrieve chat: %w", err)
+		return nil, err
 	}
 
 	message.ID = uuid.New().String()
@@ -163,21 +146,19 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 	chat.Messages = append(chat.Messages, message)
 	chat.UpdatedAt = time.Now()
 
-	s.logger.Info("Before update", zap.Any("chat", chat))
-
 	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
-		return nil, fmt.Errorf("failed to update chat: %w", err)
+		return nil, err
 	}
 
 	// Check for cancellation
 	if ctx.Err() == context.Canceled {
-		return nil, fmt.Errorf("message processing was canceled")
+		return nil, errors.CanceledErrorf("message processing was canceled")
 	}
 
 	// Generate AI response synchronously
 	agent, err := s.agentRepo.GetAgent(ctx, chat.AgentID.Hex())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get agent %s: %v", chat.AgentID.Hex(), err)
+		return nil, err
 	}
 
 	// Get the provider
@@ -192,21 +173,13 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 
 		providerByType, typeErr := s.providerRepo.GetProviderByType(ctx, agent.ProviderType)
 		if typeErr != nil {
-			return nil, fmt.Errorf("failed to get provider %s and fallback by type %s also failed: %v",
-				agent.ProviderID.Hex(), agent.ProviderType, err)
+			return nil, errors.InternalErrorf("failed to get provider %s and fallback by type %s also failed: %v", agent.ProviderID.Hex(), agent.ProviderType, err)
 		}
-
-		s.logger.Info("Successfully found provider by type",
-			zap.String("provider_name", providerByType.Name),
-			zap.String("provider_type", string(providerByType.Type)))
 
 		// Update the agent with the new provider ID for future calls
 		agent.ProviderID = providerByType.ID
 		if updateErr := s.agentRepo.UpdateAgent(ctx, agent); updateErr != nil {
-			s.logger.Error("Failed to update agent with new provider ID",
-				zap.String("agent_id", agent.ID.Hex()),
-				zap.Error(updateErr))
-			// Continue anyway since we have a valid provider now
+			s.logger.Error("Failed to update agent with new provider ID", zap.String("agent_id", agent.ID.Hex()), zap.Error(updateErr))
 		}
 
 		provider = providerByType
@@ -214,14 +187,14 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 
 	resolvedAPIKey, err := s.config.ResolveAPIKey(agent.APIKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve API key for agent %s: %v", agent.ID.Hex(), err)
+		return nil, errors.InternalErrorf("failed to resolve API key for agent %s: %v", agent.ID.Hex(), err)
 	}
 
 	// Create AI model integration based on provider type
 	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
 	aiModel, err := aiModelFactory.CreateModelIntegration(agent, provider, resolvedAPIKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize AI model: %v", err)
+		return nil, errors.InternalErrorf("failed to initialize AI model: %v", err)
 	}
 
 	contextLength := 128000
@@ -243,12 +216,12 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 	}
 	systemTokens := estimateTokens(systemMessage)
 	if systemTokens > tokenLimit {
-		return nil, fmt.Errorf("system prompt too large for the context window")
+		return nil, errors.InternalErrorf("system prompt too large for the context window")
 	}
 
 	// Check for cancellation
 	if ctx.Err() == context.Canceled {
-		return nil, fmt.Errorf("message processing was canceled")
+		return nil, errors.CanceledErrorf("message processing was canceled")
 	}
 
 	// Check if we need message compression (at 90% of token limit)
@@ -312,14 +285,14 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 	for _, toolName := range agent.Tools {
 		tool, err := s.toolRepo.GetToolByName(toolName)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get tool %s: %v", toolName, err)
+			return nil, errors.InternalErrorf("failed to get tool %s: %v", toolName, err)
 		}
 		tools = append(tools, tool)
 	}
 
 	// Check for cancellation
 	if ctx.Err() == context.Canceled {
-		return nil, fmt.Errorf("message processing was canceled")
+		return nil, errors.CanceledErrorf("message processing was canceled")
 	}
 
 	options := map[string]interface{}{
@@ -332,7 +305,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 
 	newMessages, err := aiModel.GenerateResponse(ctx, messagesToSend, tools, options)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate AI response: %v", err)
+		return nil, errors.InternalErrorf("failed to generate AI response: %v", err)
 	}
 
 	// Get usage information for billing
@@ -365,14 +338,14 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 	chat.UpdatedAt = time.Now()
 
 	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
-		return nil, fmt.Errorf("failed to update chat with AI response: %v", err)
+		return nil, err
 	}
 
 	// Return the last message (final assistant response)
 	if len(newMessages) > 0 {
 		return newMessages[len(newMessages)-1], nil
 	}
-	return nil, fmt.Errorf("no AI response generated")
+	return nil, errors.InternalErrorf("no AI response generated")
 }
 
 // estimateTokens approximates the token count for a message.
@@ -411,7 +384,7 @@ func (s *chatService) compressMessages(
 	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
 	aiModel, err := aiModelFactory.CreateModelIntegration(agent, provider, apiKey)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to initialize AI model for summarization: %v", err)
+		return nil, false, errors.InternalErrorf("failed to initialize AI model for summarization: %v", err)
 	}
 
 	// Create summary prompt
@@ -438,12 +411,12 @@ func (s *chatService) compressMessages(
 
 	// Check for cancellation
 	if ctx.Err() == context.Canceled {
-		return nil, false, fmt.Errorf("message summarization was canceled")
+		return nil, false, errors.CanceledErrorf("message summarization was canceled")
 	}
 
 	summaryResponse, err := aiModel.GenerateResponse(ctx, historyMsgs, nil, options)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to generate summary: %v", err)
+		return nil, false, errors.InternalErrorf("failed to generate summary: %v", err)
 	}
 
 	if len(summaryResponse) == 0 {

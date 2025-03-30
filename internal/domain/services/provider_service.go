@@ -2,9 +2,9 @@ package services
 
 import (
 	"context"
-	"fmt"
 
 	"aiagent/internal/domain/entities"
+	"aiagent/internal/domain/errors"
 	"aiagent/internal/domain/interfaces"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -39,7 +39,7 @@ func (s *providerService) CreateProvider(ctx context.Context, name string, provi
 	provider := entities.NewProvider(name, providerType, baseURL, apiKeyName, models)
 
 	if err := s.providerRepo.CreateProvider(ctx, provider); err != nil {
-		return nil, fmt.Errorf("failed to create provider: %w", err)
+		return nil, err
 	}
 
 	return provider, nil
@@ -48,10 +48,7 @@ func (s *providerService) CreateProvider(ctx context.Context, name string, provi
 func (s *providerService) UpdateProvider(ctx context.Context, id string, name string, providerType entities.ProviderType, baseURL, apiKeyName string, models []entities.ModelPricing) (*entities.Provider, error) {
 	existingProvider, err := s.providerRepo.GetProvider(ctx, id)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, fmt.Errorf("provider not found: %s", id)
-		}
-		return nil, fmt.Errorf("failed to get existing provider: %w", err)
+		return nil, err
 	}
 
 	existingProvider.Name = name
@@ -61,7 +58,7 @@ func (s *providerService) UpdateProvider(ctx context.Context, id string, name st
 	existingProvider.Models = models
 
 	if err := s.providerRepo.UpdateProvider(ctx, existingProvider); err != nil {
-		return nil, fmt.Errorf("failed to update provider: %w", err)
+		return nil, err
 	}
 
 	return existingProvider, nil
@@ -71,18 +68,17 @@ func (s *providerService) GetProvider(ctx context.Context, id string) (*entities
 	provider, err := s.providerRepo.GetProvider(ctx, id)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			s.logger.Warn("Provider not found by ID, checking if we can find one by type",
-				zap.String("provider_id", id))
+			s.logger.Warn("Provider not found by ID, checking if we can find one by type", zap.String("provider_id", id))
 
 			// Validate the ID format
 			if _, idErr := primitive.ObjectIDFromHex(id); idErr != nil {
-				return nil, fmt.Errorf("provider not found: %s", id)
+				return nil, errors.ValidationErrorf("invalid provider ID: %s", id)
 			}
 
 			// Get providers and check if any match the ID format
 			providers, listErr := s.providerRepo.ListProviders(ctx)
 			if listErr != nil {
-				return nil, fmt.Errorf("failed to get provider: %w", err)
+				return nil, err
 			}
 
 			// Look for matching provider by ID or provider type
@@ -96,9 +92,9 @@ func (s *providerService) GetProvider(ctx context.Context, id string) (*entities
 			}
 
 			// Still nothing found
-			return nil, fmt.Errorf("provider not found: %s", id)
+			return nil, errors.NotFoundErrorf("provider not found: %s", id)
 		}
-		return nil, fmt.Errorf("failed to get provider: %w", err)
+		return nil, errors.InternalErrorf("failed to get provider: %v", err)
 	}
 
 	return provider, nil
@@ -107,10 +103,7 @@ func (s *providerService) GetProvider(ctx context.Context, id string) (*entities
 func (s *providerService) GetProviderByType(ctx context.Context, providerType entities.ProviderType) (*entities.Provider, error) {
 	provider, err := s.providerRepo.GetProviderByType(ctx, providerType)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, fmt.Errorf("provider not found for type: %s", providerType)
-		}
-		return nil, fmt.Errorf("failed to get provider by type: %w", err)
+		return nil, err
 	}
 
 	return provider, nil
@@ -119,7 +112,7 @@ func (s *providerService) GetProviderByType(ctx context.Context, providerType en
 func (s *providerService) ListProviders(ctx context.Context) ([]*entities.Provider, error) {
 	providers, err := s.providerRepo.ListProviders(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list providers: %w", err)
+		return nil, err
 	}
 
 	return providers, nil
@@ -128,10 +121,7 @@ func (s *providerService) ListProviders(ctx context.Context) ([]*entities.Provid
 func (s *providerService) DeleteProvider(ctx context.Context, id string) error {
 	err := s.providerRepo.DeleteProvider(ctx, id)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return fmt.Errorf("provider not found: %s", id)
-		}
-		return fmt.Errorf("failed to delete provider: %w", err)
+		return err
 	}
 
 	return nil
@@ -153,7 +143,7 @@ func (s *providerService) ResetDefaultProviders(ctx context.Context) error {
 func (s *providerService) createDefaultProviders(ctx context.Context, forceReset bool) error {
 	providers, err := s.providerRepo.ListProviders(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to list providers: %w", err)
+		return err
 	}
 
 	// Check if we already have providers with models
@@ -385,7 +375,7 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 	for _, p := range defaultProviders {
 		provider := entities.NewProvider(p.name, p.type_, p.baseURL, p.apiKeyName, p.models)
 		if err := s.providerRepo.CreateProvider(ctx, provider); err != nil {
-			return fmt.Errorf("failed to create provider %s: %w", p.name, err)
+			return errors.InternalErrorf("failed to create provider %s: %v", p.name, err)
 		}
 		s.logger.Info("Created default provider", zap.String("name", p.name))
 	}
