@@ -2,12 +2,12 @@ package apicontrollers
 
 import (
 	"aiagent/internal/domain/entities"
+	"aiagent/internal/domain/errors"
 	"aiagent/internal/domain/services"
-	"aiagent/internal/impl/config"
-	"encoding/json"
 	"net/http"
 	"time"
 
+	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
@@ -15,137 +15,125 @@ import (
 type AgentController struct {
 	logger       *zap.Logger
 	agentService services.AgentService
-	config       *config.Config
 }
 
-// NewAgentController is a constructor that returns a new instance of the AgentController
-func NewAgentController(logger *zap.Logger, agentService services.AgentService, config *config.Config) *AgentController {
+func NewAgentController(logger *zap.Logger, agentService services.AgentService) *AgentController {
 	return &AgentController{
 		logger:       logger,
 		agentService: agentService,
-		config:       config,
 	}
+}
+
+// RegisterRoutes registers all agent-related routes with Echo
+func (c *AgentController) RegisterRoutes(e *echo.Group) {
+	e.GET("/agents", c.ListAgents)
+	e.GET("/agents/:id", c.GetAgent)
+	e.POST("/agents", c.CreateAgent)
+	e.PUT("/agents/:id", c.UpdateAgent)
+	e.DELETE("/agents/:id", c.DeleteAgent)
 }
 
 // ListAgents handles the GET request to list all agents
-func (c *AgentController) ListAgents(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	agents, err := c.agentService.ListAgents(ctx)
+func (c *AgentController) ListAgents(ctx echo.Context) error {
+	agents, err := c.agentService.ListAgents(ctx.Request().Context())
 	if err != nil {
-		c.handleError(w, err, http.StatusInternalServerError)
-		return
+		return c.handleError(ctx, err, http.StatusInternalServerError)
 	}
-
-	c.respondWithJSON(w, http.StatusOK, agents)
+	return ctx.JSON(http.StatusOK, agents)
 }
 
 // GetAgent handles the GET request to retrieve a specific agent
-func (c *AgentController) GetAgent(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	id := r.URL.Query().Get("id")
+func (c *AgentController) GetAgent(ctx echo.Context) error {
+	id := ctx.Param("id")
 	if id == "" {
-		c.handleError(w, "Missing agent ID", http.StatusBadRequest)
-		return
+		return c.handleError(ctx, "Missing agent ID", http.StatusBadRequest)
 	}
 
-	agent, err := c.agentService.GetAgent(ctx, id)
+	agent, err := c.agentService.GetAgent(ctx.Request().Context(), id)
 	if err != nil {
-		if err == entities.ErrAgentNotFound {
-			c.handleError(w, "Agent not found", http.StatusNotFound)
-			return
+		switch err.(type) {
+		case *errors.NotFoundError:
+			return c.handleError(ctx, "Agent not found", http.StatusNotFound)
+		default:
+			return c.handleError(ctx, err, http.StatusInternalServerError)
 		}
-		c.handleError(w, err, http.StatusInternalServerError)
-		return
 	}
 
-	c.respondWithJSON(w, http.StatusOK, agent)
+	return ctx.JSON(http.StatusOK, agent)
 }
 
 // CreateAgent handles the POST request to create a new agent
-func (c *AgentController) CreateAgent(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+func (c *AgentController) CreateAgent(ctx echo.Context) error {
 	var agent entities.Agent
-	if err := json.NewDecoder(r.Body).Decode(&agent); err != nil {
-		c.handleError(w, "Invalid request body", http.StatusBadRequest)
-		return
+	if err := ctx.Bind(&agent); err != nil {
+		return c.handleError(ctx, "Invalid request body", http.StatusBadRequest)
 	}
 
 	agent.ID = primitive.NewObjectID()
 	agent.CreatedAt = time.Now()
 	agent.UpdatedAt = time.Now()
 
-	if err := c.agentService.CreateAgent(ctx, &agent); err != nil {
-		c.handleError(w, err, http.StatusInternalServerError)
-		return
+	if err := c.agentService.CreateAgent(ctx.Request().Context(), &agent); err != nil {
+		return c.handleError(ctx, err, http.StatusInternalServerError)
 	}
 
-	c.respondWithJSON(w, http.StatusCreated, agent)
+	return ctx.JSON(http.StatusCreated, agent)
 }
 
 // UpdateAgent handles the PUT request to update an existing agent
-func (c *AgentController) UpdateAgent(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	id := r.URL.Query().Get("id")
+func (c *AgentController) UpdateAgent(ctx echo.Context) error {
+	id := ctx.Param("id")
 	if id == "" {
-		c.handleError(w, "Missing agent ID", http.StatusBadRequest)
-		return
+		return c.handleError(ctx, "Missing agent ID", http.StatusBadRequest)
 	}
 
 	var agent entities.Agent
-	if err := json.NewDecoder(r.Body).Decode(&agent); err != nil {
-		c.handleError(w, "Invalid request body", http.StatusBadRequest)
-		return
+	if err := ctx.Bind(&agent); err != nil {
+		return c.handleError(ctx, "Invalid request body", http.StatusBadRequest)
 	}
 
-	agent.ID, _ = primitive.ObjectIDFromHex(id)
+	var err error
+	agent.ID, err = primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return c.handleError(ctx, "Invalid agent ID", http.StatusBadRequest)
+	}
 	agent.UpdatedAt = time.Now()
 
-	if err := c.agentService.UpdateAgent(ctx, &agent); err != nil {
-		if err == entities.ErrAgentNotFound {
-			c.handleError(w, "Agent not found", http.StatusNotFound)
-			return
+	if err := c.agentService.UpdateAgent(ctx.Request().Context(), &agent); err != nil {
+		switch err.(type) {
+		case *errors.NotFoundError:
+			return c.handleError(ctx, "Agent not found", http.StatusNotFound)
+		default:
+			return c.handleError(ctx, err, http.StatusInternalServerError)
 		}
-		c.handleError(w, err, http.StatusInternalServerError)
-		return
 	}
 
-	c.respondWithJSON(w, http.StatusOK, agent)
+	return ctx.JSON(http.StatusOK, agent)
 }
 
 // DeleteAgent handles the DELETE request to delete an agent
-func (c *AgentController) DeleteAgent(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	id := r.URL.Query().Get("id")
+func (c *AgentController) DeleteAgent(ctx echo.Context) error {
+	id := ctx.Param("id")
 	if id == "" {
-		c.handleError(w, "Missing agent ID", http.StatusBadRequest)
-		return
+		return c.handleError(ctx, "Missing agent ID", http.StatusBadRequest)
 	}
 
-	if err := c.agentService.DeleteAgent(ctx, id); err != nil {
-		if err == entities.ErrAgentNotFound {
-			c.handleError(w, "Agent not found", http.StatusNotFound)
-			return
+	if err := c.agentService.DeleteAgent(ctx.Request().Context(), id); err != nil {
+		switch err.(type) {
+		case *errors.NotFoundError:
+			return c.handleError(ctx, "Agent not found", http.StatusNotFound)
+		default:
+			return c.handleError(ctx, err, http.StatusInternalServerError)
 		}
-		c.handleError(w, err, http.StatusInternalServerError)
-		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	return ctx.NoContent(http.StatusNoContent)
 }
 
-// Helper function to handle errors
-func (c *AgentController) handleError(w http.ResponseWriter, err interface{}, statusCode int) {
+// handleError handles errors and returns them in a consistent format
+func (c *AgentController) handleError(ctx echo.Context, err interface{}, statusCode int) error {
 	c.logger.Error("Error occurred", zap.Any("error", err))
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	return ctx.JSON(statusCode, map[string]interface{}{
 		"error": err,
 	})
-}
-
-// Helper function to respond with JSON
-func (c *AgentController) respondWithJSON(w http.ResponseWriter, statusCode int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(data)
 }

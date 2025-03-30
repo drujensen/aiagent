@@ -9,10 +9,10 @@ import (
 	"sync"
 
 	"aiagent/internal/domain/entities"
+	"aiagent/internal/domain/errors"
 	"aiagent/internal/domain/services"
 
 	"github.com/labstack/echo/v4"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
 
@@ -34,6 +34,18 @@ func NewChatController(logger *zap.Logger, tmpl *template.Template, chatService 
 	}
 }
 
+func (c *ChatController) RegisterRoutes(e *echo.Echo) {
+	e.GET("/chats/new", c.ChatFormHandler)
+	e.POST("/chats", c.CreateChatHandler)
+	e.GET("/chats/:id", c.ChatHandler)
+	e.GET("/chats/:id/edit", c.ChatFormHandler)
+	e.PUT("/chats/:id", c.UpdateChatHandler)
+	e.DELETE("/chats/:id", c.DeleteChatHandler)
+
+	e.POST("/chats/:id/messages", c.SendMessageHandler)
+	e.POST("/chats/:id/cancel", c.CancelMessageHandler)
+}
+
 func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 	chatID := eCtx.Param("id")
 	if chatID == "" {
@@ -43,22 +55,22 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 
 	chat, err := c.chatService.GetChat(eCtx.Request().Context(), chatID)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			eCtx.Response().Header().Set("HX-Redirect", "/")
-			return eCtx.String(http.StatusOK, "Chat not found. Redirecting to home page...")
+		switch err.(type) {
+		case *errors.NotFoundError:
+			return eCtx.String(http.StatusNotFound, "Chat not found")
+		default:
+			return eCtx.String(http.StatusInternalServerError, "Failed to load chat")
 		}
-		c.logger.Error("Failed to get chat", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to load chat")
 	}
 
 	agent, err := c.agentService.GetAgent(eCtx.Request().Context(), chat.AgentID.Hex())
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			eCtx.Response().Header().Set("HX-Redirect", "/")
-			return eCtx.String(http.StatusOK, "Agent not found. Redirecting to home page...")
+		switch err.(type) {
+		case *errors.NotFoundError:
+			return eCtx.String(http.StatusNotFound, "Agent not found")
+		default:
+			return eCtx.String(http.StatusInternalServerError, "Failed to load agent")
 		}
-		c.logger.Error("Failed to get agent", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to load agent")
 	}
 
 	data := map[string]interface{}{
@@ -116,11 +128,12 @@ func (c *ChatController) UpdateChatHandler(eCtx echo.Context) error {
 
 	_, err := c.chatService.UpdateChat(eCtx.Request().Context(), chatID, name)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
+		switch err.(type) {
+		case *errors.NotFoundError:
 			return eCtx.String(http.StatusNotFound, "Chat not found")
+		default:
+			return eCtx.String(http.StatusInternalServerError, "Failed to load chat")
 		}
-		c.logger.Error("Failed to update chat", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to update chat")
 	}
 
 	eCtx.Response().Header().Set("HX-Redirect", "/chats/"+chatID)
@@ -135,11 +148,12 @@ func (c *ChatController) DeleteChatHandler(eCtx echo.Context) error {
 
 	err := c.chatService.DeleteChat(eCtx.Request().Context(), id)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
+		switch err.(type) {
+		case *errors.NotFoundError:
 			return eCtx.String(http.StatusNotFound, "Chat not found")
+		default:
+			return eCtx.String(http.StatusInternalServerError, "Failed to load chat")
 		}
-		c.logger.Error("Failed to delete chat", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to delete chat")
 	}
 
 	// After successful deletion, return the updated chats list
@@ -175,15 +189,15 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 	// Send the message and get the AI responses
 	aiMessage, err := c.chatService.SendMessage(ctx, chatID, *userMessage)
 	if err != nil {
-		if ctx.Err() == context.Canceled {
+		switch err.(type) {
+		case *errors.CanceledError:
 			c.logger.Info("Message processing was canceled", zap.String("chatID", chatID))
 			return eCtx.String(http.StatusRequestTimeout, "Request was canceled")
-		}
-		if err == mongo.ErrNoDocuments {
+		case *errors.NotFoundError:
 			return eCtx.String(http.StatusNotFound, "Chat not found")
+		default:
+			return eCtx.String(http.StatusInternalServerError, "Failed to load chat")
 		}
-		c.logger.Error("Failed to send message", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to send message: "+err.Error())
 	}
 
 	// Get the chat to find all messages since the user's message

@@ -2,10 +2,11 @@ package apicontrollers
 
 import (
 	"aiagent/internal/domain/entities"
+	"aiagent/internal/domain/errors"
 	"aiagent/internal/domain/services"
-	"encoding/json"
 	"net/http"
 
+	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
@@ -22,136 +23,138 @@ func NewChatController(logger *zap.Logger, chatService services.ChatService) *Ch
 	}
 }
 
-// ListChats handles GET requests to list all chats
-func (cc *ChatController) ListChats(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	chats, err := cc.chatService.ListChats(ctx)
-	if err != nil {
-		cc.logger.Error("Failed to list chats", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
+// RegisterRoutes registers all chat-related routes with Echo
+func (c *ChatController) RegisterRoutes(e *echo.Group) {
+	e.GET("/chats", c.ListChats)
+	e.GET("/chats/:id", c.GetChat)
+	e.POST("/chats", c.CreateChat)
+	e.PUT("/chats/:id", c.UpdateChat)
+	e.DELETE("/chats/:id", c.DeleteChat)
+	e.POST("/chats/:id/messages", c.SendMessage)
+}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(chats)
+// ListChats handles GET requests to list all chats
+func (c *ChatController) ListChats(ctx echo.Context) error {
+	chats, err := c.chatService.ListChats(ctx.Request().Context())
+	if err != nil {
+		return c.handleError(ctx, err, http.StatusInternalServerError)
+	}
+	return ctx.JSON(http.StatusOK, chats)
 }
 
 // GetChat handles GET requests to retrieve a specific chat
-func (cc *ChatController) GetChat(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	id := r.URL.Query().Get("id")
-
-	chat, err := cc.chatService.GetChat(ctx, id)
-	if err != nil {
-		if err == entities.ErrChatNotFound {
-			http.Error(w, "Chat not found", http.StatusNotFound)
-			return
-		}
-		cc.logger.Error("Failed to get chat", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+func (c *ChatController) GetChat(ctx echo.Context) error {
+	id := ctx.Param("id")
+	if id == "" {
+		return c.handleError(ctx, "Missing chat ID", http.StatusBadRequest)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(chat)
+	chat, err := c.chatService.GetChat(ctx.Request().Context(), id)
+	if err != nil {
+		switch err.(type) {
+		case *errors.NotFoundError:
+			return c.handleError(ctx, "Chat not found", http.StatusNotFound)
+		default:
+			return c.handleError(ctx, err, http.StatusInternalServerError)
+		}
+	}
+
+	return ctx.JSON(http.StatusOK, chat)
 }
 
 // CreateChat handles POST requests to create a new chat
-func (cc *ChatController) CreateChat(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+func (c *ChatController) CreateChat(ctx echo.Context) error {
 	var input struct {
 		AgentID primitive.ObjectID `json:"agent_id"`
 		Name    string             `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	if err := ctx.Bind(&input); err != nil {
+		return c.handleError(ctx, "Invalid request body", http.StatusBadRequest)
 	}
 
-	chat, err := cc.chatService.CreateChat(ctx, input.AgentID.Hex(), input.Name)
+	chat, err := c.chatService.CreateChat(ctx.Request().Context(), input.AgentID.Hex(), input.Name)
 	if err != nil {
-		cc.logger.Error("Failed to create chat", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		return c.handleError(ctx, err, http.StatusInternalServerError)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(chat)
+	return ctx.JSON(http.StatusCreated, chat)
 }
 
 // UpdateChat handles PUT requests to update an existing chat
-func (cc *ChatController) UpdateChat(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	id := r.URL.Query().Get("id")
+func (c *ChatController) UpdateChat(ctx echo.Context) error {
+	id := ctx.Param("id")
+	if id == "" {
+		return c.handleError(ctx, "Missing chat ID", http.StatusBadRequest)
+	}
 
 	var input struct {
 		Name string `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	if err := ctx.Bind(&input); err != nil {
+		return c.handleError(ctx, "Invalid request body", http.StatusBadRequest)
 	}
 
-	chat, err := cc.chatService.UpdateChat(ctx, id, input.Name)
+	chat, err := c.chatService.UpdateChat(ctx.Request().Context(), id, input.Name)
 	if err != nil {
-		if err == entities.ErrChatNotFound {
-			http.Error(w, "Chat not found", http.StatusNotFound)
-			return
+		switch err.(type) {
+		case *errors.NotFoundError:
+			return c.handleError(ctx, "Chat not found", http.StatusNotFound)
+		default:
+			return c.handleError(ctx, err, http.StatusInternalServerError)
 		}
-		cc.logger.Error("Failed to update chat", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(chat)
+	return ctx.JSON(http.StatusOK, chat)
 }
 
 // DeleteChat handles DELETE requests to delete a specific chat
-func (cc *ChatController) DeleteChat(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	id := r.URL.Query().Get("id")
-
-	if err := cc.chatService.DeleteChat(ctx, id); err != nil {
-		if err == entities.ErrChatNotFound {
-			http.Error(w, "Chat not found", http.StatusNotFound)
-			return
-		}
-		cc.logger.Error("Failed to delete chat", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+func (c *ChatController) DeleteChat(ctx echo.Context) error {
+	id := ctx.Param("id")
+	if id == "" {
+		return c.handleError(ctx, "Missing chat ID", http.StatusBadRequest)
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	if err := c.chatService.DeleteChat(ctx.Request().Context(), id); err != nil {
+		switch err.(type) {
+		case *errors.NotFoundError:
+			return c.handleError(ctx, "Chat not found", http.StatusNotFound)
+		default:
+			return c.handleError(ctx, err, http.StatusInternalServerError)
+		}
+	}
+
+	return ctx.NoContent(http.StatusNoContent)
 }
 
 // SendMessage handles POST requests to send a new message to a chat
-func (cc *ChatController) SendMessage(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	id := r.URL.Query().Get("id")
+func (c *ChatController) SendMessage(ctx echo.Context) error {
+	id := ctx.Param("id")
+	if id == "" {
+		return c.handleError(ctx, "Missing chat ID", http.StatusBadRequest)
+	}
 
 	var message entities.Message
-	if err := json.NewDecoder(r.Body).Decode(&message); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	if err := ctx.Bind(&message); err != nil {
+		return c.handleError(ctx, "Invalid request body", http.StatusBadRequest)
 	}
 
-	newMessage, err := cc.chatService.SendMessage(ctx, id, message)
+	newMessage, err := c.chatService.SendMessage(ctx.Request().Context(), id, message)
 	if err != nil {
-		if err == entities.ErrChatNotFound {
-			http.Error(w, "Chat not found", http.StatusNotFound)
-			return
+		switch err.(type) {
+		case *errors.NotFoundError:
+			return c.handleError(ctx, "Chat not found", http.StatusNotFound)
+		default:
+			return c.handleError(ctx, err, http.StatusInternalServerError)
 		}
-		cc.logger.Error("Failed to send message", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(newMessage)
+	return ctx.JSON(http.StatusOK, newMessage)
+}
+
+// handleError handles errors and returns them in a consistent format
+func (c *ChatController) handleError(ctx echo.Context, err interface{}, statusCode int) error {
+	c.logger.Error("Error occurred", zap.Any("error", err))
+	return ctx.JSON(statusCode, map[string]interface{}{
+		"error": err,
+	})
 }

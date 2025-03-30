@@ -10,11 +10,11 @@ import (
 	"strings"
 
 	"aiagent/internal/domain/entities"
+	"aiagent/internal/domain/errors"
 	"aiagent/internal/domain/services"
 
 	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
 
@@ -34,6 +34,17 @@ func NewAgentController(logger *zap.Logger, tmpl *template.Template, agentServic
 		toolService:     toolService,
 		providerService: providerService,
 	}
+}
+
+func (c *AgentController) RegisterRoutes(e *echo.Echo) {
+	e.GET("/agents/new", c.AgentFormHandler)
+	e.POST("/agents", c.CreateAgentHandler)
+	e.GET("/agents/:id/edit", c.AgentFormHandler)
+	e.PUT("/agents/:id", c.UpdateAgentHandler)
+	e.DELETE("/agents/:id", c.DeleteAgentHandler)
+
+	e.GET("/agents/provider-models", c.GetProviderModelsHandler)
+	e.POST("/agents/repair-providers", c.RepairAgentProvidersHandler)
 }
 
 // RepairAgentProvidersHandler fixes agent provider IDs that are no longer valid
@@ -157,18 +168,24 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 		}
 		agent, err = c.agentService.GetAgent(eCtx.Request().Context(), id)
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
+			switch err.(type) {
+			case *errors.NotFoundError:
 				return eCtx.String(http.StatusNotFound, "Agent not found")
+			default:
+				return eCtx.String(http.StatusInternalServerError, "Failed to load agent")
 			}
-			c.logger.Error("Failed to get agent", zap.String("id", id), zap.Error(err))
-			return eCtx.String(http.StatusInternalServerError, "Internal server error")
 		}
 
 		// If agent has a provider ID, get the provider details
 		if !agent.ProviderID.IsZero() {
 			selectedProvider, err = c.providerService.GetProvider(eCtx.Request().Context(), agent.ProviderID.Hex())
-			if err != nil && err != mongo.ErrNoDocuments {
-				c.logger.Error("Failed to get provider for agent", zap.Error(err))
+			if err != nil {
+				switch err.(type) {
+				case *errors.NotFoundError:
+					break // Provider not found, continue without it
+				default:
+					return eCtx.String(http.StatusInternalServerError, "Failed to load agent")
+				}
 			}
 		}
 	}
@@ -488,11 +505,12 @@ func (c *AgentController) DeleteAgentHandler(eCtx echo.Context) error {
 
 	err := c.agentService.DeleteAgent(eCtx.Request().Context(), id)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
+		switch err.(type) {
+		case *errors.NotFoundError:
 			return eCtx.String(http.StatusNotFound, "Agent not found")
+		default:
+			return eCtx.String(http.StatusInternalServerError, "Failed to load agent")
 		}
-		c.logger.Error("Failed to delete agent", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to delete agent")
 	}
 
 	// After successful deletion, return the updated agents list
@@ -532,12 +550,12 @@ func (c *AgentController) GetProviderModelsHandler(eCtx echo.Context) error {
 
 	provider, err := c.providerService.GetProvider(eCtx.Request().Context(), cleanProviderID)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			c.logger.Error("Provider not found", zap.String("provider_id", cleanProviderID))
+		switch err.(type) {
+		case *errors.NotFoundError:
 			return eCtx.String(http.StatusNotFound, "Provider not found")
+		default:
+			return eCtx.String(http.StatusInternalServerError, "Failed to load provider")
 		}
-		c.logger.Error("Failed to get provider", zap.String("provider_id", cleanProviderID), zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to load provider")
 	}
 
 	// Log provider details for debugging

@@ -5,6 +5,7 @@ import (
 	"context"
 	"html/template"
 
+	apicontrollers "aiagent/internal/api/controllers"
 	"aiagent/internal/domain/services"
 	"aiagent/internal/impl/config"
 	"aiagent/internal/impl/database"
@@ -100,10 +101,15 @@ func main() {
 		logger.Fatal("Failed to parse templates", zap.Error(err))
 	}
 
+	// UI Controllers
 	homeController := uicontrollers.NewHomeController(logger, tmpl, chatService, agentService, toolService)
 	agentController := uicontrollers.NewAgentController(logger, tmpl, agentService, toolService, providerService)
 	chatController := uicontrollers.NewChatController(logger, tmpl, chatService, agentService)
 	providerController := uicontrollers.NewProviderController(logger, tmpl, providerService)
+
+	// API Controllers
+	apiAgentController := apicontrollers.NewAgentController(logger, agentService)
+	apiChatController := apicontrollers.NewChatController(logger, chatService)
 
 	// Initialize Echo
 	e := echo.New()
@@ -135,39 +141,15 @@ func main() {
 	e.Static("/static", "internal/ui/static")
 
 	// UI Routes
-	e.GET("/", homeController.HomeHandler)
+	homeController.RegisterRoutes(e)
+	agentController.RegisterRoutes(e)
+	chatController.RegisterRoutes(e)
+	providerController.RegisterRoutes(e)
 
-	e.GET("/agents/new", agentController.AgentFormHandler)
-	e.POST("/agents", agentController.CreateAgentHandler)
-	e.GET("/agents/repair-providers", agentController.RepairAgentProvidersHandler) // Admin endpoint to fix provider IDs
-	e.GET("/agents/:id/edit", agentController.AgentFormHandler)
-	e.PUT("/agents/:id", agentController.UpdateAgentHandler)
-	e.DELETE("/agents/:id", agentController.DeleteAgentHandler) // Added DELETE route
-	e.GET("/agents/provider-models", agentController.GetProviderModelsHandler)
-
-	e.GET("/chats/new", chatController.ChatFormHandler)
-	e.POST("/chats", chatController.CreateChatHandler)
-	e.GET("/chats/:id", chatController.ChatHandler)
-	e.GET("/chats/:id/edit", chatController.ChatFormHandler)
-	e.PUT("/chats/:id", chatController.UpdateChatHandler)
-	e.DELETE("/chats/:id", chatController.DeleteChatHandler) // Added DELETE route
-	e.POST("/chats/:id/messages", chatController.SendMessageHandler)
-	e.POST("/chats/:id/cancel", chatController.CancelMessageHandler) // Added cancel route
-
-	// Provider routes
-	e.GET("/providers", providerController.ListProvidersHandler)
-	e.GET("/providers/new", providerController.ProviderFormHandler)
-	e.POST("/providers", providerController.CreateProviderHandler)
-	e.GET("/providers/:id/edit", providerController.ProviderFormHandler)
-	e.PUT("/providers/:id", providerController.UpdateProviderHandler)
-	e.DELETE("/providers/:id", providerController.DeleteProviderHandler)
-	e.GET("/api/debug/providers", providerController.DebugProvidersHandler)
-	e.POST("/api/debug/providers/reset", providerController.ResetProvidersHandler)
-	e.GET("/api/providers/:id", providerController.GetProviderHandler)
-
-	// Sidebar Partial Routes
-	e.GET("/sidebar/chats", homeController.ChatsPartialHandler)
-	e.GET("/sidebar/agents", homeController.AgentsPartialHandler)
+	// API Routes
+	api := e.Group("/api")
+	apiChatController.RegisterRoutes(api)
+	apiAgentController.RegisterRoutes(api)
 
 	// Start server
 	logger.Info("Starting HTTP server on :8080")

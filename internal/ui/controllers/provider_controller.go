@@ -8,10 +8,10 @@ import (
 	"strconv"
 
 	"aiagent/internal/domain/entities"
+	"aiagent/internal/domain/errors"
 	"aiagent/internal/domain/services"
 
 	"github.com/labstack/echo/v4"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
 
@@ -29,6 +29,19 @@ func NewProviderController(logger *zap.Logger, tmpl *template.Template, provider
 	}
 }
 
+func (c *ProviderController) RegisterRoutes(e *echo.Echo) {
+	e.GET("/providers", c.ListProvidersHandler)
+	e.GET("/providers/new", c.ProviderFormHandler)
+	e.POST("/providers", c.CreateProviderHandler)
+	e.GET("/providers/:id/edit", c.ProviderFormHandler)
+	e.PUT("/providers/:id", c.UpdateProviderHandler)
+	e.DELETE("/providers/:id", c.DeleteProviderHandler)
+
+	e.GET("/api/providers/:id", c.GetProviderHandler)
+	e.GET("/api/debug/providers", c.DebugProvidersHandler)
+	e.POST("/api/debug/providers/reset", c.ResetProvidersHandler)
+}
+
 func (c *ProviderController) ProviderFormHandler(eCtx echo.Context) error {
 	var provider *entities.Provider
 	var err error
@@ -37,11 +50,12 @@ func (c *ProviderController) ProviderFormHandler(eCtx echo.Context) error {
 	if id != "" {
 		provider, err = c.providerService.GetProvider(eCtx.Request().Context(), id)
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
+			switch err.(type) {
+			case *errors.NotFoundError:
 				return eCtx.String(http.StatusNotFound, "Provider not found")
+			default:
+				return eCtx.String(http.StatusInternalServerError, "Failed to load provider")
 			}
-			c.logger.Error("Failed to get provider", zap.Error(err))
-			return eCtx.String(http.StatusInternalServerError, "Failed to load provider")
 		}
 	} else {
 		// Create an empty provider for new form
@@ -81,11 +95,12 @@ func (c *ProviderController) GetProviderModelsHandler(eCtx echo.Context) error {
 
 	provider, err := c.providerService.GetProvider(eCtx.Request().Context(), providerID)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
+		switch err.(type) {
+		case *errors.NotFoundError:
 			return eCtx.String(http.StatusNotFound, "Provider not found")
+		default:
+			return eCtx.String(http.StatusInternalServerError, "Failed to load provider")
 		}
-		c.logger.Error("Failed to get provider", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to load provider")
 	}
 
 	data := map[string]interface{}{
@@ -109,11 +124,12 @@ func (c *ProviderController) GetProviderHandler(eCtx echo.Context) error {
 
 	provider, err := c.providerService.GetProvider(eCtx.Request().Context(), id)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return eCtx.JSON(http.StatusNotFound, map[string]string{"error": "Provider not found"})
+		switch err.(type) {
+		case *errors.NotFoundError:
+			return eCtx.String(http.StatusNotFound, "Provider not found")
+		default:
+			return eCtx.String(http.StatusInternalServerError, "Failed to load provider")
 		}
-		c.logger.Error("Failed to get provider", zap.Error(err))
-		return eCtx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to load provider"})
 	}
 
 	return eCtx.JSON(http.StatusOK, provider)
@@ -232,11 +248,12 @@ func (c *ProviderController) UpdateProviderHandler(eCtx echo.Context) error {
 
 	_, err := c.providerService.UpdateProvider(eCtx.Request().Context(), id, name, providerType, baseURL, apiKeyName, models)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
+		switch err.(type) {
+		case *errors.NotFoundError:
 			return eCtx.String(http.StatusNotFound, "Provider not found")
+		default:
+			return eCtx.String(http.StatusInternalServerError, "Failed to load provider")
 		}
-		c.logger.Error("Failed to update provider", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to update provider: "+err.Error())
 	}
 
 	eCtx.Response().Header().Set("HX-Redirect", "/providers")
@@ -251,11 +268,12 @@ func (c *ProviderController) DeleteProviderHandler(eCtx echo.Context) error {
 
 	err := c.providerService.DeleteProvider(eCtx.Request().Context(), id)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
+		switch err.(type) {
+		case *errors.NotFoundError:
 			return eCtx.String(http.StatusNotFound, "Provider not found")
+		default:
+			return eCtx.String(http.StatusInternalServerError, "Failed to load provider")
 		}
-		c.logger.Error("Failed to delete provider", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to delete provider")
 	}
 
 	// Return success

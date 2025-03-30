@@ -4,10 +4,10 @@ import (
 	"html/template"
 	"net/http"
 
+	"aiagent/internal/domain/errors"
 	"aiagent/internal/domain/services"
 
 	"github.com/labstack/echo/v4"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
 
@@ -27,6 +27,12 @@ func NewHomeController(logger *zap.Logger, tmpl *template.Template, chatService 
 		agentService: agentService,
 		toolService:  toolService,
 	}
+}
+
+func (c *HomeController) RegisterRoutes(e *echo.Echo) {
+	e.GET("/", c.HomeHandler)
+	e.GET("/sidebar/chats", c.ChatsPartialHandler)
+	e.GET("/sidebar/agents", c.AgentsPartialHandler)
 }
 
 func (c *HomeController) HomeHandler(eCtx echo.Context) error {
@@ -51,12 +57,12 @@ func (c *HomeController) ChatsPartialHandler(eCtx echo.Context) error {
 	for _, chat := range chats {
 		agent, err := c.agentService.GetAgent(eCtx.Request().Context(), chat.AgentID.Hex())
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				c.logger.Warn("Agent not found for chat", zap.String("chatID", chat.ID.Hex()))
-				continue // Skip this chat if agent is not found
+			switch err.(type) {
+			case *errors.NotFoundError:
+				return eCtx.String(http.StatusNotFound, "Agent not found")
+			default:
+				return eCtx.String(http.StatusInternalServerError, "Failed to load agent")
 			}
-			c.logger.Error("Failed to get agent", zap.Error(err), zap.String("chatID", chat.ID.Hex()))
-			return eCtx.String(http.StatusInternalServerError, "Failed to load agent")
 		}
 
 		// Create a new map for each chat with the required fields
