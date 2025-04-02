@@ -20,9 +20,15 @@ func NewToolRegistry(configuration map[string]string, logger *zap.Logger) (*Tool
 		factory func(configuration map[string]string, logger *zap.Logger) interfaces.ToolIntegration
 	}{
 		{
-			name: "Search",
+			name: "Tavily Search",
 			factory: func(configuration map[string]string, logger *zap.Logger) interfaces.ToolIntegration {
-				return tools.NewSearchTool(configuration, logger)
+				return tools.NewTavilyTool(configuration, logger)
+			},
+		},
+		{
+			name: "Brave Search",
+			factory: func(configuration map[string]string, logger *zap.Logger) interfaces.ToolIntegration {
+				return tools.NewBraveTool(configuration, logger)
 			},
 		},
 		{

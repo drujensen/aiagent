@@ -13,6 +13,7 @@ type Config struct {
 	MongoURI      string `mapstructure:"MONGO_URI"`
 	Workspace     string `mapstructure:"WORKSPACE"`
 	TavilyAPIKey  string `mapstructure:"TAVILY_API_KEY"`
+	BraveAPIKey   string `mapstructure:"BRAVE_API_KEY"`
 	BasicAuthUser string `mapstructure:"BASIC_AUTH_USER"`
 	BasicAuthPass string `mapstructure:"BASIC_AUTH_PASS"`
 	MCPServerURL  string `mapstructure:"MCP_SERVER_URL"`
@@ -72,15 +73,15 @@ func InitConfig() (*Config, error) {
 		}
 
 		if configInstance.TavilyAPIKey == "" {
-			logger.Warn("TAVILY_API_KEY not set. Search tool will not work")
+			logger.Warn("TAVILY_API_KEY not set. Tavily Search tool will not work")
+		}
+
+		if configInstance.BraveAPIKey == "" {
+			logger.Warn("BRAVE_API_KEY not set. Brave Search tool will not work")
 		}
 
 		if configInstance.Workspace == "" {
-			logger.Warn("WORKSPACE not set. Search tool will not work")
-		}
-
-		if configInstance.MCPServerURL == "" {
-			logger.Warn("MCP_SERVER_URL not set. MCP tool will not function")
+			logger.Warn("WORKSPACE not set. File tool will not work")
 		}
 	})
 

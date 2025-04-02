@@ -42,6 +42,7 @@ func main() {
 	configurations := map[string]string{
 		"workspace":       cfg.Workspace,
 		"tavily_api_key":  cfg.TavilyAPIKey,
+		"brave_api_key":   cfg.BraveAPIKey,
 		"basic_auth_user": cfg.BasicAuthUser,
 		"basic_auth_pass": cfg.BasicAuthPass,
 	}

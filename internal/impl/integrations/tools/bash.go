@@ -36,9 +36,7 @@ func (t *BashTool) Description() string {
 }
 
 func (t *BashTool) Configuration() []string {
-	return []string{
-		"workspace",
-	}
+	return []string{"workspace"}
 }
 
 func (t *BashTool) Parameters() []interfaces.Parameter {
