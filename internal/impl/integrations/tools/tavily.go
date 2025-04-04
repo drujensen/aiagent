@@ -28,7 +28,7 @@ func NewTavilyTool(configuration map[string]string, logger *zap.Logger) *TavilyT
 
 // Name returns the name of the tool.
 func (t *TavilyTool) Name() string {
-	return "Tavily Search"
+	return "TavilySearch"
 }
 
 // Description returns a description of the tool.

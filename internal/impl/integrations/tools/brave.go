@@ -50,7 +50,7 @@ func NewBraveTool(configuration map[string]string, logger *zap.Logger) *BraveToo
 
 // Name returns the name of the tool.
 func (t *BraveTool) Name() string {
-	return "Brave Search"
+	return "BraveSearch"
 }
 
 // Description returns a description of the tool.
