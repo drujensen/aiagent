@@ -3,7 +3,6 @@
     <section class="message-history" id="message-history">
         <div id="messages-container" class="messages-container" data-chat-id="{{.ChatID}}">
           <div class="message-intro">
-            <h2>{{.ChatName}} with {{.AgentName}} ({{.AgentRole}})</h2>
               {{if eq (len .Messages) 0}}
                 <p>How can I help you today?</p>
               {{end}}

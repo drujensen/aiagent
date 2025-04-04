@@ -21,6 +21,14 @@
                <i class="fas fa-robot"></i> AI Agents
            </a>
        </div>
+       {{if eq .ContentTemplate "chat_content"}}
+           <div class="chat-title">
+               {{.ChatName}} with {{.AgentName}} ({{.AgentRole}})
+           </div>
+           <div class="chat-cost">
+               Total Cost: ${{printf "%.2f" .ChatCost}}
+           </div>
+       {{end}}
    </header>
    <div class="container">
        <div class="row">

@@ -1,6 +1,7 @@
 /* Base layout adjustments for content */
 .content {
     height: 100vh;
+    width: 80%;
     display: flex;
     flex-direction: column;
     background-color: #1a1a1a;
@@ -14,10 +15,12 @@
 
 .header {
     background-color: #333;
-    padding: 10px 15px; /* Add padding for full-width readability */
+    padding: 10px 15px;
     border-bottom: 1px solid #444;
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    position: relative;
 }
 
 .header a {
@@ -33,13 +36,46 @@
 .logo {
     font-size: 24px;
     font-weight: bold;
+    order: 2;
+    margin-left: 10px;
 }
 
 .logo a {
     color: #fff;
 }
 
-/* Container leverages the full-width 12-column grid */
+.chat-title {
+    color: #fff;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+    position: absolute;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    top: 50%;
+    margin: 0;
+}
+
+.chat-cost {
+    color: #aaa;
+    font-size: 16px;
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.hamburger {
+    display: none;
+    font-size: 24px;
+    color: #fff;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 10px;
+    order: 1;
+}
+
 .container {
     height: calc(100vh - 60px);
 }
@@ -153,6 +189,7 @@
     overflow-y: auto;
     padding: 20px;
     scrollbar-width: none; /* Firefox */
+    width: 80%;
     max-width: 767px;
 }
 
@@ -439,17 +476,6 @@ pre {
     background-color: #2ecc71; /* Green color to indicate success */
 }
 
-/* Hamburger menu for mobile */
-.hamburger {
-    display: none;
-    font-size: 24px;
-    color: #fff;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 10px;
-}
-
 /* Responsive adjustments */
 @media (min-width: 992px) {
     .sidebar {
@@ -463,9 +489,9 @@ pre {
 @media (max-width: 991px) {
     .sidebar {
         position: fixed;
-        top: 60px; /* Below header */
+        top: 60px;
         left: 0;
-        width: 300px; /* Fixed width for collapsed sidebar */
+        width: 300px;
         height: calc(100vh - 60px);
         z-index: 1000;
         transform: translateX(-100%);
@@ -480,14 +506,22 @@ pre {
     .hamburger {
         display: block;
     }
+    .logo {
+        display: none;
+    }
+    .chat-title {
+        font-size: 16px;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+    .chat-cost {
+        font-size: 14px;
+    }
 }
 
 @media (max-width: 767px) {
     .sidebar {
         width: 100%; /* Full width on small screens when active */
-    }
-    .message-input textarea {
-        width: 85%; /* Slightly reduce width on small screens */
     }
     .agent-form, #chat-starter {
         max-width: 100%;
