@@ -1,9 +1,14 @@
 package interfaces
 
+type Item struct {
+	Type string
+}
+
 type Parameter struct {
 	Name        string
 	Type        string
 	Enum        []string
+	Items       []Item
 	Description string
 	Required    bool
 }

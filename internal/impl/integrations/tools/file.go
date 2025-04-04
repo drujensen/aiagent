@@ -57,6 +57,7 @@ func (t *FileTool) Parameters() []interfaces.Parameter {
 		{
 			Name:        "paths",
 			Type:        "array",
+			Items:       []interfaces.Item{{Type: "string"}},
 			Description: "Array of file paths (for read_multiple operation)",
 			Required:    false,
 		},
@@ -69,6 +70,7 @@ func (t *FileTool) Parameters() []interfaces.Parameter {
 		{
 			Name:        "edits",
 			Type:        "array",
+			Items:       []interfaces.Item{{Type: "object"}},
 			Description: "Array of edit operations with oldText and newText (for edit operation)",
 			Required:    false,
 		},
@@ -93,6 +95,7 @@ func (t *FileTool) Parameters() []interfaces.Parameter {
 		{
 			Name:        "exclude_patterns",
 			Type:        "array",
+			Items:       []interfaces.Item{{Type: "string"}},
 			Description: "Patterns to exclude (for search operation)",
 			Required:    false,
 		},

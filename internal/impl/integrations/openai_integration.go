@@ -116,6 +116,11 @@ func (m *OpenAIIntegration) GenerateResponse(ctx context.Context, messages []*en
 			if len(param.Enum) > 0 {
 				property["enum"] = param.Enum
 			}
+			if param.Type == "array" && len(param.Items) > 0 {
+				property["items"] = map[string]interface{}{
+					"type": param.Items[0].Type,
+				}
+			}
 			properties[param.Name] = property
 		}
 
@@ -170,7 +175,7 @@ func (m *OpenAIIntegration) GenerateResponse(ctx context.Context, messages []*en
 		if err != nil {
 			return nil, fmt.Errorf("error creating request: %v", err)
 		}
-
+		m.logger.Debug("Request body", zap.String("body", string(jsonBody)))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+m.apiKey)
 
@@ -199,6 +204,7 @@ func (m *OpenAIIntegration) GenerateResponse(ctx context.Context, messages []*en
 			}
 			if resp.StatusCode != http.StatusOK {
 				body, _ := io.ReadAll(resp.Body)
+				m.logger.Error("Unexpected status code", zap.Int("status", resp.StatusCode), zap.String("body", string(body)))
 				return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
 			}
 			break

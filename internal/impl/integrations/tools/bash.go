@@ -60,8 +60,11 @@ func (t *BashTool) Parameters() []interfaces.Parameter {
 			Required:    false,
 		},
 		{
-			Name:        "env",
-			Type:        "array",
+			Name: "env",
+			Type: "array",
+			Items: []interfaces.Item{
+				{Type: "string"},
+			},
 			Description: "Environment variables as key=value pairs (e.g., ['PORT=8080'])",
 			Required:    false,
 		},
