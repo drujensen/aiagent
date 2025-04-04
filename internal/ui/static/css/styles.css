@@ -1,7 +1,10 @@
+/* Base layout adjustments for content */
 .content {
+    height: 100vh;
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    background-color: #1a1a1a;
+    align-items: center;
 }
 
 .dark-theme {
@@ -11,8 +14,10 @@
 
 .header {
     background-color: #333;
-    padding: 10px;
+    padding: 10px 15px; /* Add padding for full-width readability */
     border-bottom: 1px solid #444;
+    display: flex;
+    align-items: center;
 }
 
 .header a {
@@ -34,8 +39,8 @@
     color: #fff;
 }
 
+/* Container leverages the full-width 12-column grid */
 .container {
-    display: flex;
     height: calc(100vh - 60px);
 }
 
@@ -45,12 +50,14 @@
     color: #aaa;
 }
 
+/* Sidebar with full-width capability */
 .sidebar {
-    width: 300px;
     background-color: #2c2c2c;
-    padding: 20px;
+    padding: 20px 15px; /* Add padding for readability */
     border-right: 1px solid #444;
     overflow-y: auto;
+    transition: transform 0.3s ease-in-out;
+    position: relative;
 }
 
 .sidebar h2 {
@@ -95,7 +102,7 @@
 
 .add-icon-wrapper {
     position: absolute;
-    right: 0;
+    right: 15px; /* Adjusted for padding */
     top: 50%;
     transform: translateY(-50%);
 }
@@ -129,13 +136,10 @@
     color: #cc0000; /* Darker red on hover */
 }
 
+/* Main content area */
 .content {
     flex: 1;
-    display: flex;
-    height: 95vh;
-    flex-direction: column;
-    background-color: #1a1a1a;
-    align-items: center;
+    padding: 0 15px; /* Add padding for readability */
 }
 
 .message-intro {
@@ -149,7 +153,7 @@
     overflow-y: auto;
     padding: 20px;
     scrollbar-width: none; /* Firefox */
-    width: 768px;
+    max-width: 767px;
 }
 
 .message-history::-webkit-scrollbar {
@@ -250,14 +254,13 @@
 }
 
 .agent-form {
-    max-width: 500px;
+    max-width: 767px;
     margin: 40px auto 0;
     padding: 20px;
     background-color: #2c2c2c;
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     color: #fff;
-    width: 100%;
 }
 
 .agent-form h2 {
@@ -410,7 +413,7 @@ pre {
     padding: 1em;
     border-radius: 5px;
     overflow-x: auto;
-    position: relative; /* Added for positioning the button */
+    position: relative;
 }
 
 .copy-button {
@@ -434,4 +437,60 @@ pre {
 
 .copy-button.copied {
     background-color: #2ecc71; /* Green color to indicate success */
+}
+
+/* Hamburger menu for mobile */
+.hamburger {
+    display: none;
+    font-size: 24px;
+    color: #fff;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 10px;
+}
+
+/* Responsive adjustments */
+@media (min-width: 992px) {
+    .sidebar {
+        transform: translateX(0);
+    }
+    .content {
+        height: 95vh;
+    }
+}
+
+@media (max-width: 991px) {
+    .sidebar {
+        position: fixed;
+        top: 60px; /* Below header */
+        left: 0;
+        width: 300px; /* Fixed width for collapsed sidebar */
+        height: calc(100vh - 60px);
+        z-index: 1000;
+        transform: translateX(-100%);
+    }
+    .sidebar.active {
+        transform: translateX(0);
+    }
+    .content {
+        height: 95vh;
+        padding: 0 15px; /* Maintain padding */
+    }
+    .hamburger {
+        display: block;
+    }
+}
+
+@media (max-width: 767px) {
+    .sidebar {
+        width: 100%; /* Full width on small screens when active */
+    }
+    .message-input textarea {
+        width: 85%; /* Slightly reduce width on small screens */
+    }
+    .agent-form, #chat-starter {
+        max-width: 100%;
+        margin: 20px auto;
+    }
 }

@@ -7,11 +7,15 @@
    <title>{{.Title}}</title>
    <link rel="stylesheet" href="/static/css/basic.css">
    <link rel="stylesheet" href="/static/css/styles.css">
+   <link rel="stylesheet" href="/static/css/layout.css">
    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body class="dark-theme">
    <header class="header">
+       <button class="hamburger" aria-label="Toggle Sidebar">
+           <i class="fas fa-bars"></i>
+       </button>
        <div class="logo">
            <a href="/" class="nav-link">
                <i class="fas fa-robot"></i> AI Agents
@@ -19,30 +23,37 @@
        </div>
    </header>
    <div class="container">
-       <aside class="sidebar">
-           <div id="sidebar-chats" hx-get="/sidebar/chats" hx-trigger="load, refreshChats from:body" hx-swap="innerHTML">
-               <h2><i class="fas fa-comment"></i> Chats <span class="spinner"></span></h2>
-               <ul class="chat-list"><li>Loading...</li></ul>
-           </div>
-           <div id="sidebar-agents" hx-get="/sidebar/agents" hx-trigger="load, refreshAgents from:body" hx-swap="innerHTML">
-               <h2><i class="fas fa-robot"></i> AI Agents <span class="spinner"></span></h2>
-               <ul class="agent-list"><li>Loading...</li></ul>
-           </div>
-       </aside>
-       <main id="main-content" class="content">
-           {{if eq .ContentTemplate "home_content"}}
-               {{template "home_content" .}}
-           {{else if eq .ContentTemplate "agent_form_content"}}
-               {{template "agent_form_content" .}}
-           {{else if eq .ContentTemplate "chat_content"}}
-               {{template "chat_content" .}}
-           {{else if eq .ContentTemplate "chat_form_content"}}
-               {{template "chat_form_content" .}}
-           {{end}}
-       </main>
+       <div class="row">
+           <aside class="sidebar col col-3">
+               <div id="sidebar-chats" hx-get="/sidebar/chats" hx-trigger="load, refreshChats from:body" hx-swap="innerHTML">
+                   <h2><i class="fas fa-comment"></i> Chats <span class="spinner"></span></h2>
+                   <ul class="chat-list"><li>Loading...</li></ul>
+               </div>
+               <div id="sidebar-agents" hx-get="/sidebar/agents" hx-trigger="load, refreshAgents from:body" hx-swap="innerHTML">
+                   <h2><i class="fas fa-robot"></i> AI Agents <span class="spinner"></span></h2>
+                   <ul class="agent-list"><li>Loading...</li></ul>
+               </div>
+           </aside>
+           <main id="main-content" class="content col col-7">
+               {{if eq .ContentTemplate "home_content"}}
+                   {{template "home_content" .}}
+               {{else if eq .ContentTemplate "agent_form_content"}}
+                   {{template "agent_form_content" .}}
+               {{else if eq .ContentTemplate "chat_content"}}
+                   {{template "chat_content" .}}
+               {{else if eq .ContentTemplate "chat_form_content"}}
+                   {{template "chat_form_content" .}}
+               {{end}}
+           </main>
+       </div>
    </div>
    <script src="/static/js/htmx.min.js"></script>
    <script src="/static/js/copy_button.js"></script>
+   <script>
+       document.querySelector('.hamburger').addEventListener('click', function() {
+           document.querySelector('.sidebar').classList.toggle('active');
+       });
+   </script>
 </body>
 </html>
 {{end}}
