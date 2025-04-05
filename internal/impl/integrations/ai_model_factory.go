@@ -47,7 +47,7 @@ func (f *AIModelFactory) CreateModelIntegration(agent *entities.Agent, provider 
 		return NewOllamaIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
 	case entities.ProviderGeneric:
 		// For generic providers, use the OpenAI-compatible API
-		return NewGenericOpenAIIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
+		return NewGenericIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %s", provider.Type)
 	}

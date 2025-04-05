@@ -49,15 +49,14 @@ func (c *ChatController) RegisterRoutes(e *echo.Echo) {
 func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 	chatID := eCtx.Param("id")
 	if chatID == "" {
-		eCtx.Response().Header().Set("HX-Redirect", "/")
-		return eCtx.String(http.StatusOK, "Chat not found. Redirecting to home page...")
+		return eCtx.Redirect(http.StatusFound, "/")
 	}
 
 	chat, err := c.chatService.GetChat(eCtx.Request().Context(), chatID)
 	if err != nil {
 		switch err.(type) {
 		case *errors.NotFoundError:
-			return eCtx.String(http.StatusNotFound, "Chat not found")
+			return eCtx.Redirect(http.StatusFound, "/")
 		default:
 			return eCtx.String(http.StatusInternalServerError, "Failed to load chat")
 		}

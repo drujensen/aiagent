@@ -8,21 +8,21 @@ import (
 )
 
 // OllamaIntegration implements the Ollama API
-// For now, we'll use OpenAI implementation as Ollama can use an OpenAI-compatible API,
+// For now, we'll use Base implementation as Ollama can use an Base-compatible API,
 // but in the future this would have Ollama-specific customizations
 type OllamaIntegration struct {
-	*OpenAIIntegration
+	*BaseIntegration
 }
 
 // NewOllamaIntegration creates a new Ollama integration
 func NewOllamaIntegration(baseURL, apiKey, model string, toolRepo interfaces.ToolRepository, logger *zap.Logger) (*OllamaIntegration, error) {
-	openAIIntegration, err := NewOpenAIIntegration(baseURL, apiKey, model, toolRepo, logger)
+	openAIIntegration, err := NewBaseIntegration(baseURL+"/v1/chat/completions", apiKey, model, toolRepo, logger)
 	if err != nil {
 		return nil, err
 	}
 
 	return &OllamaIntegration{
-		OpenAIIntegration: openAIIntegration,
+		BaseIntegration: openAIIntegration,
 	}, nil
 }
 

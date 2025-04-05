@@ -8,21 +8,21 @@ import (
 )
 
 // GoogleIntegration implements the Google Gemini API
-// For now, we'll use OpenAI implementation as a temporary measure,
+// For now, we'll use Base implementation as a temporary measure,
 // but in a real implementation this would use the Gemini API
 type GoogleIntegration struct {
-	*OpenAIIntegration
+	*BaseIntegration
 }
 
 // NewGoogleIntegration creates a new Google integration
 func NewGoogleIntegration(baseURL, apiKey, model string, toolRepo interfaces.ToolRepository, logger *zap.Logger) (*GoogleIntegration, error) {
-	openAIIntegration, err := NewOpenAIIntegration(baseURL, apiKey, model, toolRepo, logger)
+	openAIIntegration, err := NewBaseIntegration(baseURL+"/v1beta/openai/chat/completions", apiKey, model, toolRepo, logger)
 	if err != nil {
 		return nil, err
 	}
 
 	return &GoogleIntegration{
-		OpenAIIntegration: openAIIntegration,
+		BaseIntegration: openAIIntegration,
 	}, nil
 }
 

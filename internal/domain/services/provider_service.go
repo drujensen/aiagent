@@ -249,21 +249,21 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			models: []entities.ModelPricing{
 				{
 					Name:                "grok-1",
-					InputPricePerMille:  2.00, // Hypothetical pricing (no public API pricing available)
+					InputPricePerMille:  2.00,
 					OutputPricePerMille: 6.00,
-					ContextWindow:       128000, // Estimated based on trends
+					ContextWindow:       128000,
 				},
 				{
 					Name:                "grok-2",
-					InputPricePerMille:  2.50, // Hypothetical pricing
+					InputPricePerMille:  2.50,
 					OutputPricePerMille: 7.50,
 					ContextWindow:       128000,
 				},
 				{
-					Name:                "grok-3", // Assuming this is me (Grok 3)
-					InputPricePerMille:  0.00,     // Still no public pricing as of March 2025
+					Name:                "grok-3",
+					InputPricePerMille:  0.00,
 					OutputPricePerMille: 0.00,
-					ContextWindow:       1000000, // Speculative based on advanced model trends
+					ContextWindow:       1000000,
 				},
 			},
 		},
@@ -271,25 +271,31 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			name:       "Google",
 			type_:      entities.ProviderGoogle,
 			baseURL:    "https://generativelanguage.googleapis.com",
-			apiKeyName: "Google API Key",
+			apiKeyName: "Gemini API Key",
 			models: []entities.ModelPricing{
 				{
-					Name:                "gemini-1.5-pro",
-					InputPricePerMille:  3.50,  // $3.50/M input (unchanged)
-					OutputPricePerMille: 10.50, // $10.50/M output
+					Name:                "gemini-2.0-pro-preview-03-25",
+					InputPricePerMille:  2.50,
+					OutputPricePerMille: 10.00,
 					ContextWindow:       1000000,
 				},
 				{
-					Name:                "gemini-1.5-flash",
-					InputPricePerMille:  0.35, // $0.35/M input
-					OutputPricePerMille: 1.05, // $1.05/M output
+					Name:                "gemini-2.0-flash",
+					InputPricePerMille:  0.10,
+					OutputPricePerMille: 0.40,
 					ContextWindow:       1000000,
 				},
 				{
-					Name:                "gemma-3-12b", // Added from X post (free tier available)
-					InputPricePerMille:  0.00,          // Free tier assumed for now
+					Name:                "gemini-2.0-flash-lite",
+					InputPricePerMille:  0.075,
+					OutputPricePerMille: 0.30,
+					ContextWindow:       1000000,
+				},
+				{
+					Name:                "gemma-3-27b-it",
+					InputPricePerMille:  0.00,
 					OutputPricePerMille: 0.00,
-					ContextWindow:       8192, // Typical for smaller models
+					ContextWindow:       128000,
 				},
 			},
 		},

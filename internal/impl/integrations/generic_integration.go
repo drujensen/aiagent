@@ -7,29 +7,29 @@ import (
 	"go.uber.org/zap"
 )
 
-// OpenAIIntegration implements the OpenAI API
+// GenericIntegration implements the Generic API
 // For now, we'll use Base implementation as DeepSeek uses an Base-compatible API,
 // but in the future this could have DeepSeek-specific customizations
-type OpenAIIntegration struct {
+type GenericIntegration struct {
 	*BaseIntegration
 }
 
-// NewOpenAIIntegration creates a new DeepSeek integration
-func NewOpenAIIntegration(baseURL, apiKey, model string, toolRepo interfaces.ToolRepository, logger *zap.Logger) (*OpenAIIntegration, error) {
+// NewGenericIntegration creates a new DeepSeek integration
+func NewGenericIntegration(baseURL, apiKey, model string, toolRepo interfaces.ToolRepository, logger *zap.Logger) (*GenericIntegration, error) {
 	openAIIntegration, err := NewBaseIntegration(baseURL+"/v1/chat/completions", apiKey, model, toolRepo, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	return &OpenAIIntegration{
+	return &GenericIntegration{
 		BaseIntegration: openAIIntegration,
 	}, nil
 }
 
 // ProviderType returns the type of provider
-func (m *OpenAIIntegration) ProviderType() entities.ProviderType {
-	return entities.ProviderOpenAI
+func (m *GenericIntegration) ProviderType() entities.ProviderType {
+	return entities.ProviderGeneric
 }
 
-// Ensure OpenAIIntegration implements AIModelIntegration
-var _ interfaces.AIModelIntegration = (*OpenAIIntegration)(nil)
+// Ensure GenericIntegration implements AIModelIntegration
+var _ interfaces.AIModelIntegration = (*GenericIntegration)(nil)
