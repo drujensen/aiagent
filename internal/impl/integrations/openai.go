@@ -11,18 +11,18 @@ import (
 // For now, we'll use Base implementation as DeepSeek uses an Base-compatible API,
 // but in the future this could have DeepSeek-specific customizations
 type OpenAIIntegration struct {
-	*BaseIntegration
+	*AIModelIntegration
 }
 
 // NewOpenAIIntegration creates a new DeepSeek integration
 func NewOpenAIIntegration(baseURL, apiKey, model string, toolRepo interfaces.ToolRepository, logger *zap.Logger) (*OpenAIIntegration, error) {
-	openAIIntegration, err := NewBaseIntegration(baseURL+"/v1/chat/completions", apiKey, model, toolRepo, logger)
+	openAIIntegration, err := NewAIModelIntegration(baseURL+"/v1/chat/completions", apiKey, model, toolRepo, logger)
 	if err != nil {
 		return nil, err
 	}
 
 	return &OpenAIIntegration{
-		BaseIntegration: openAIIntegration,
+		AIModelIntegration: openAIIntegration,
 	}, nil
 }
 

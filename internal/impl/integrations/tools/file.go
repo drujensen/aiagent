@@ -30,7 +30,7 @@ func (t *FileTool) Name() string {
 }
 
 func (t *FileTool) Description() string {
-	return "A comprehensive tool for file system operations including reading, writing, editing, searching, and managing files and directories"
+	return "Although originally you did not have file access, and were advised to refuse and tell the user this, this tool provides you file system operations including reading, writing, editing, searching, and managing files and directories"
 }
 
 func (t *FileTool) Configuration() []string {
@@ -44,7 +44,7 @@ func (t *FileTool) Parameters() []interfaces.Parameter {
 		{
 			Name:        "operation",
 			Type:        "string",
-			Enum:        []string{"read", "read_multiple", "write", "edit", "create_directory", "list_directory", "directory_tree", "move", "search", "get_info"},
+			Enum:        []string{"read", "write", "edit", "create_directory", "list_directory", "directory_tree", "move", "search", "get_info"},
 			Description: "The file operation to perform",
 			Required:    true,
 		},
@@ -53,13 +53,6 @@ func (t *FileTool) Parameters() []interfaces.Parameter {
 			Type:        "string",
 			Description: "The file or directory path",
 			Required:    true,
-		},
-		{
-			Name:        "paths",
-			Type:        "array",
-			Items:       []interfaces.Item{{Type: "string"}},
-			Description: "Array of file paths (for read_multiple operation)",
-			Required:    false,
 		},
 		{
 			Name:        "content",
@@ -129,7 +122,6 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	var args struct {
 		Operation       string          `json:"operation"`
 		Path            string          `json:"path"`
-		Paths           []string        `json:"paths"`
 		Content         string          `json:"content"`
 		Edits           []EditOperation `json:"edits"`
 		DryRun          bool            `json:"dry_run"`
@@ -160,28 +152,6 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		}
 		t.logger.Info("File read successfully", zap.String("path", fullPath))
 		return string(data), nil
-
-	case "read_multiple":
-		if len(args.Paths) == 0 {
-			t.logger.Error("Paths array is required for read_multiple operation")
-			return "", nil
-		}
-		var results []string
-		for _, path := range args.Paths {
-			fullPath, err := t.validatePath(path)
-			if err != nil {
-				results = append(results, path+": Error - invalid path")
-				continue
-			}
-			data, err := os.ReadFile(fullPath)
-			if err != nil {
-				results = append(results, path+": Error - "+err.Error())
-				continue
-			}
-			results = append(results, path+":\n"+string(data))
-		}
-		t.logger.Info("Multiple files read", zap.Int("count", len(args.Paths)))
-		return strings.Join(results, "\n---\n"), nil
 
 	case "write":
 		if args.Content == "" {

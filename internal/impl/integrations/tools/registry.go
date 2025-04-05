@@ -1,8 +1,7 @@
-package integrations
+package tools
 
 import (
 	"aiagent/internal/domain/interfaces"
-	"aiagent/internal/impl/integrations/tools"
 
 	"go.uber.org/zap"
 )
@@ -20,27 +19,27 @@ func NewToolRegistry(configuration map[string]string, logger *zap.Logger) (*Tool
 		factory func(configuration map[string]string, logger *zap.Logger) interfaces.ToolIntegration
 	}{
 		{
-			name: "Tavily Search",
+			name: "Search",
 			factory: func(configuration map[string]string, logger *zap.Logger) interfaces.ToolIntegration {
-				return tools.NewTavilyTool(configuration, logger)
-			},
-		},
-		{
-			name: "Brave Search",
-			factory: func(configuration map[string]string, logger *zap.Logger) interfaces.ToolIntegration {
-				return tools.NewBraveTool(configuration, logger)
+				return NewSearchTool(configuration, logger)
 			},
 		},
 		{
 			name: "Bash",
 			factory: func(configuration map[string]string, logger *zap.Logger) interfaces.ToolIntegration {
-				return tools.NewBashTool(configuration, logger)
+				return NewBashTool(configuration, logger)
 			},
 		},
 		{
 			name: "File",
 			factory: func(configuration map[string]string, logger *zap.Logger) interfaces.ToolIntegration {
-				return tools.NewFileTool(configuration, logger)
+				return NewFileTool(configuration, logger)
+			},
+		},
+		{
+			name: "Fetch",
+			factory: func(configuration map[string]string, logger *zap.Logger) interfaces.ToolIntegration {
+				return NewFetchTool(configuration, logger)
 			},
 		},
 	}

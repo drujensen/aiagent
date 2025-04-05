@@ -12,37 +12,37 @@ import (
 	"go.uber.org/zap"
 )
 
-// TavilyTool represents a tool for searching using the Tavily API.
-type TavilyTool struct {
+// SearchTool represents a tool for searching using the Tavily API.
+type SearchTool struct {
 	configuration map[string]string
 	logger        *zap.Logger
 }
 
-// NewTavilyTool creates a new instance of TavilyTool.
-func NewTavilyTool(configuration map[string]string, logger *zap.Logger) *TavilyTool {
-	return &TavilyTool{
+// NewSearchTool creates a new instance of SearchTool.
+func NewSearchTool(configuration map[string]string, logger *zap.Logger) *SearchTool {
+	return &SearchTool{
 		configuration: configuration,
 		logger:        logger,
 	}
 }
 
 // Name returns the name of the tool.
-func (t *TavilyTool) Name() string {
-	return "TavilySearch"
+func (t *SearchTool) Name() string {
+	return "WebSearch"
 }
 
 // Description returns a description of the tool.
-func (t *TavilyTool) Description() string {
+func (t *SearchTool) Description() string {
 	return "A tool to search for information using the Tavily API"
 }
 
 // Configuration returns the required configuration keys.
-func (t *TavilyTool) Configuration() []string {
+func (t *SearchTool) Configuration() []string {
 	return []string{"tavily_api_key"}
 }
 
 // Parameters returns the parameters required by the tool.
-func (t *TavilyTool) Parameters() []interfaces.Parameter {
+func (t *SearchTool) Parameters() []interfaces.Parameter {
 	return []interfaces.Parameter{
 		{
 			Name:        "query",
@@ -54,7 +54,7 @@ func (t *TavilyTool) Parameters() []interfaces.Parameter {
 }
 
 // Execute performs the search and returns both the answer and results.
-func (t *TavilyTool) Execute(arguments string) (string, error) {
+func (t *SearchTool) Execute(arguments string) (string, error) {
 	// Log the search query
 	t.logger.Debug("Executing search", zap.String("arguments", arguments))
 

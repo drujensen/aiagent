@@ -16,8 +16,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// BaseIntegration implements the Base API
-type BaseIntegration struct {
+// AIModelIntegration implements the Base API
+type AIModelIntegration struct {
 	baseURL    string
 	apiKey     string
 	httpClient *http.Client
@@ -27,8 +27,8 @@ type BaseIntegration struct {
 	lastUsage  *entities.Usage
 }
 
-// NewBaseIntegration creates a new Base integration
-func NewBaseIntegration(baseURL, apiKey, model string, toolRepo interfaces.ToolRepository, logger *zap.Logger) (*BaseIntegration, error) {
+// NewAIModelIntegration creates a new Base integration
+func NewAIModelIntegration(baseURL, apiKey, model string, toolRepo interfaces.ToolRepository, logger *zap.Logger) (*AIModelIntegration, error) {
 	if baseURL == "" {
 		return nil, fmt.Errorf("baseURL cannot be empty")
 	}
@@ -38,7 +38,7 @@ func NewBaseIntegration(baseURL, apiKey, model string, toolRepo interfaces.ToolR
 	if model == "" {
 		return nil, fmt.Errorf("model cannot be empty")
 	}
-	return &BaseIntegration{
+	return &AIModelIntegration{
 		baseURL:    baseURL,
 		apiKey:     apiKey,
 		httpClient: &http.Client{Timeout: 600 * time.Second},
@@ -50,17 +50,17 @@ func NewBaseIntegration(baseURL, apiKey, model string, toolRepo interfaces.ToolR
 }
 
 // For a generic Base-compatible API
-func NewGenericBaseIntegration(baseURL, apiKey, model string, toolRepo interfaces.ToolRepository, logger *zap.Logger) (*BaseIntegration, error) {
-	return NewBaseIntegration(baseURL, apiKey, model, toolRepo, logger)
+func NewGenericAIModelIntegration(baseURL, apiKey, model string, toolRepo interfaces.ToolRepository, logger *zap.Logger) (*AIModelIntegration, error) {
+	return NewAIModelIntegration(baseURL, apiKey, model, toolRepo, logger)
 }
 
 // ModelName returns the name of the model being used
-func (m *BaseIntegration) ModelName() string {
+func (m *AIModelIntegration) ModelName() string {
 	return m.model
 }
 
 // ProviderType returns the type of provider
-func (m *BaseIntegration) ProviderType() entities.ProviderType {
+func (m *AIModelIntegration) ProviderType() entities.ProviderType {
 	return entities.ProviderGeneric
 }
 
@@ -91,7 +91,7 @@ func convertToBaseMessages(messages []*entities.Message) []map[string]interface{
 }
 
 // GenerateResponse generates a response from the Base API
-func (m *BaseIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*interfaces.ToolIntegration, options map[string]interface{}) ([]*entities.Message, error) {
+func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*interfaces.ToolIntegration, options map[string]interface{}) ([]*entities.Message, error) {
 	// Check for cancellation
 	if ctx.Err() == context.Canceled {
 		return nil, fmt.Errorf("operation canceled by user")
@@ -337,9 +337,9 @@ func (m *BaseIntegration) GenerateResponse(ctx context.Context, messages []*enti
 }
 
 // GetUsage returns the token usage statistics
-func (m *BaseIntegration) GetUsage() (*entities.Usage, error) {
+func (m *AIModelIntegration) GetUsage() (*entities.Usage, error) {
 	return m.lastUsage, nil
 }
 
-// Ensure BaseIntegration implements the AIModelIntegration interface
-var _ interfaces.AIModelIntegration = (*BaseIntegration)(nil)
+// Ensure AIModelIntegration implements the AIModelIntegration interface
+var _ interfaces.AIModelIntegration = (*AIModelIntegration)(nil)

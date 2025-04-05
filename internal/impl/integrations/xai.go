@@ -11,18 +11,18 @@ import (
 // For now, we'll use Base implementation as the API is similar,
 // but in the future, this would have X.AI-specific customizations
 type XAIIntegration struct {
-	*BaseIntegration
+	*AIModelIntegration
 }
 
 // NewXAIIntegration creates a new X.AI integration
 func NewXAIIntegration(baseURL, apiKey, model string, toolRepo interfaces.ToolRepository, logger *zap.Logger) (*XAIIntegration, error) {
-	openAIIntegration, err := NewBaseIntegration(baseURL+"/v1/chat/completions", apiKey, model, toolRepo, logger)
+	openAIIntegration, err := NewAIModelIntegration(baseURL+"/v1/chat/completions", apiKey, model, toolRepo, logger)
 	if err != nil {
 		return nil, err
 	}
 
 	return &XAIIntegration{
-		BaseIntegration: openAIIntegration,
+		AIModelIntegration: openAIIntegration,
 	}, nil
 }
 

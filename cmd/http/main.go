@@ -9,7 +9,7 @@ import (
 	"aiagent/internal/domain/services"
 	"aiagent/internal/impl/config"
 	"aiagent/internal/impl/database"
-	"aiagent/internal/impl/integrations"
+	"aiagent/internal/impl/integrations/tools"
 	"aiagent/internal/impl/repositories"
 	uicontrollers "aiagent/internal/ui/controllers"
 
@@ -47,7 +47,7 @@ func main() {
 		"basic_auth_pass": cfg.BasicAuthPass,
 	}
 
-	toolRepo, err := integrations.NewToolRegistry(configurations, logger)
+	toolRepo, err := tools.NewToolRegistry(configurations, logger)
 	if err != nil {
 		logger.Fatal("Failed to initialize tools", zap.Error(err))
 	}
