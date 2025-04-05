@@ -28,7 +28,7 @@ func NewSearchTool(configuration map[string]string, logger *zap.Logger) *SearchT
 
 // Name returns the name of the tool.
 func (t *SearchTool) Name() string {
-	return "WebSearch"
+	return "Search"
 }
 
 // Description returns a description of the tool.
