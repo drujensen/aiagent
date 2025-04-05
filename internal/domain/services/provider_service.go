@@ -197,8 +197,8 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			models: []entities.ModelPricing{
 				{
 					Name:                "gpt-4o",
-					InputPricePerMille:  5.00,  // $5/M input tokens (unchanged per OpenAI pricing trends)
-					OutputPricePerMille: 15.00, // $15/M output tokens
+					InputPricePerMille:  2.50,  // $2/M input tokens (unchanged per OpenAI pricing trends)
+					OutputPricePerMille: 10.00, // $10/M output tokens
 					ContextWindow:       128000,
 				},
 				{
@@ -206,18 +206,6 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 					InputPricePerMille:  0.15, // Updated to $0.15/M input (per trends and X posts)
 					OutputPricePerMille: 0.60, // Updated to $0.60/M output
 					ContextWindow:       128000,
-				},
-				{
-					Name:                "gpt-4-turbo",
-					InputPricePerMille:  10.00, // $10/M input (unchanged)
-					OutputPricePerMille: 30.00, // $30/M output
-					ContextWindow:       128000,
-				},
-				{
-					Name:                "o3-mini", // Added new reasoning model
-					InputPricePerMille:  1.10,      // $1.10/M input (per X post trends)
-					OutputPricePerMille: 4.40,      // $4.40/M output
-					ContextWindow:       200000,
 				},
 			},
 		},
@@ -312,22 +300,16 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			apiKeyName: "DeepSeek API Key",
 			models: []entities.ModelPricing{
 				{
-					Name:                "deepseek-coder",
-					InputPricePerMille:  0.20, // $0.20/M input (unchanged)
-					OutputPricePerMille: 0.80, // $0.80/M output
-					ContextWindow:       32000,
+					Name:                "deepseek-chat",
+					InputPricePerMille:  0.07, // $0.07/M input (unchanged)
+					OutputPricePerMille: 1.10, // $1.10/M output
+					ContextWindow:       64000,
 				},
 				{
-					Name:                "deepseek-v3", // Updated from R1-lite, reflecting V3 pricing
-					InputPricePerMille:  0.27,          // $0.27/M input (per Web ID 8)
-					OutputPricePerMille: 1.10,          // $1.10/M output
-					ContextWindow:       130000,        // Updated to 130k
-				},
-				{
-					Name:                "deepseek-r1",
-					InputPricePerMille:  0.14, // $0.14/M input (per X post ID 3)
-					OutputPricePerMille: 2.19, // $2.19/M output
-					ContextWindow:       128000,
+					Name:                "deepseek-reasoner",
+					InputPricePerMille:  0.55, // $0.27/M input (per Web ID 8)
+					OutputPricePerMille: 2.19, // $1.10/M output
+					ContextWindow:       64000,
 				},
 			},
 		},
@@ -338,28 +320,28 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			apiKeyName: "Local API Key (optional)",
 			models: []entities.ModelPricing{
 				{
-					Name:                "llama3.1", // Updated to latest Llama version
-					InputPricePerMille:  0.00,       // Free (local hosting)
+					Name:                "llama3.1:8b", // Updated to latest Llama version
+					InputPricePerMille:  0.00,          // Free (local hosting)
 					OutputPricePerMille: 0.00,
 					ContextWindow:       8192,
 				},
 				{
-					Name:                "mistral",
+					Name:                "mistral-nemo:12b",
 					InputPricePerMille:  0.00, // Free
 					OutputPricePerMille: 0.00,
 					ContextWindow:       8192,
 				},
 				{
-					Name:                "phi3",
+					Name:                "qwen-coder:14b",
 					InputPricePerMille:  0.00, // Free
 					OutputPricePerMille: 0.00,
-					ContextWindow:       4096,
+					ContextWindow:       8192,
 				},
 				{
-					Name:                "deepseek-r1:1.5b", // Added distilled DeepSeek model
-					InputPricePerMille:  0.00,               // Free via Ollama
+					Name:                "qwen2.5:3b", // Added distilled DeepSeek model
+					InputPricePerMille:  0.00,         // Free via Ollama
 					OutputPricePerMille: 0.00,
-					ContextWindow:       128000,
+					ContextWindow:       8192,
 				},
 			},
 		},
