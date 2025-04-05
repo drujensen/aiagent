@@ -33,7 +33,14 @@ func (c *AgentController) RegisterRoutes(e *echo.Group) {
 	e.DELETE("/agents/:id", c.DeleteAgent)
 }
 
-// ListAgents handles the GET request to list all agents
+// ListAgents godoc
+// @Summary List all agents
+// @Description Retrieves a list of all agents.
+// @Tags agents
+// @Produce json
+// @Success 200 {array} entities.Agent "Successfully retrieved list of agents"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /api/agents [get]
 func (c *AgentController) ListAgents(ctx echo.Context) error {
 	agents, err := c.agentService.ListAgents(ctx.Request().Context())
 	if err != nil {
@@ -42,7 +49,17 @@ func (c *AgentController) ListAgents(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, agents)
 }
 
-// GetAgent handles the GET request to retrieve a specific agent
+// GetAgent godoc
+// @Summary Get an agent by ID
+// @Description Retrieves an agent's information by their ID.
+// @Tags agents
+// @Produce json
+// @Param id path string true "Agent ID"
+// @Success 200 {object} entities.Agent "Successfully retrieved agent"
+// @Failure 400 {object} map[string]interface{} "Invalid agent ID"
+// @Failure 404 {object} map[string]interface{} "Agent not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /api/agents/{id} [get]
 func (c *AgentController) GetAgent(ctx echo.Context) error {
 	id := ctx.Param("id")
 	if id == "" {
@@ -62,7 +79,17 @@ func (c *AgentController) GetAgent(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, agent)
 }
 
-// CreateAgent handles the POST request to create a new agent
+// CreateAgent godoc
+// @Summary Create a new agent
+// @Description Creates a new agent with the provided information.
+// @Tags agents
+// @Accept json
+// @Produce json
+// @Param agent body entities.Agent true "Agent information to create"
+// @Success 201 {object} entities.Agent "Successfully created agent"
+// @Failure 400 {object} map[string]interface{} "Invalid request body"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /api/agents [post]
 func (c *AgentController) CreateAgent(ctx echo.Context) error {
 	var agent entities.Agent
 	if err := ctx.Bind(&agent); err != nil {
@@ -80,7 +107,19 @@ func (c *AgentController) CreateAgent(ctx echo.Context) error {
 	return ctx.JSON(http.StatusCreated, agent)
 }
 
-// UpdateAgent handles the PUT request to update an existing agent
+// UpdateAgent godoc
+// @Summary Update an existing agent
+// @Description Updates an existing agent with the provided information.
+// @Tags agents
+// @Accept json
+// @Produce json
+// @Param id path string true "Agent ID"
+// @Param agent body entities.Agent true "Agent information to update"
+// @Success 200 {object} entities.Agent "Successfully updated agent"
+// @Failure 400 {object} map[string]interface{} "Invalid request body or agent ID"
+// @Failure 404 {object} map[string]interface{} "Agent not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /api/agents/{id} [put]
 func (c *AgentController) UpdateAgent(ctx echo.Context) error {
 	id := ctx.Param("id")
 	if id == "" {
@@ -111,7 +150,17 @@ func (c *AgentController) UpdateAgent(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, agent)
 }
 
-// DeleteAgent handles the DELETE request to delete an agent
+// DeleteAgent godoc
+// @Summary Delete an agent
+// @Description Deletes an agent by their ID.
+// @Tags agents
+// @Produce json
+// @Param id path string true "Agent ID"
+// @Success 204 "Successfully deleted agent"
+// @Failure 400 {object} map[string]interface{} "Invalid agent ID"
+// @Failure 404 {object} map[string]interface{} "Agent not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /api/agents/{id} [delete]
 func (c *AgentController) DeleteAgent(ctx echo.Context) error {
 	id := ctx.Param("id")
 	if id == "" {

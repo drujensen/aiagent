@@ -33,7 +33,14 @@ func (c *ChatController) RegisterRoutes(e *echo.Group) {
 	e.POST("/chats/:id/messages", c.SendMessage)
 }
 
-// ListChats handles GET requests to list all chats
+// ListChats godoc
+// @Summary List all chats
+// @Description Retrieves a list of all chats.
+// @Tags chats
+// @Produce json
+// @Success 200 {array} entities.Chat "Successfully retrieved list of chats"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /api/chats [get]
 func (c *ChatController) ListChats(ctx echo.Context) error {
 	chats, err := c.chatService.ListChats(ctx.Request().Context())
 	if err != nil {
@@ -42,7 +49,17 @@ func (c *ChatController) ListChats(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, chats)
 }
 
-// GetChat handles GET requests to retrieve a specific chat
+// GetChat godoc
+// @Summary Get a chat by ID
+// @Description Retrieves a chat's information by its ID.
+// @Tags chats
+// @Produce json
+// @Param id path string true "Chat ID"
+// @Success 200 {object} entities.Chat "Successfully retrieved chat"
+// @Failure 400 {object} map[string]interface{} "Invalid chat ID"
+// @Failure 404 {object} map[string]interface{} "Chat not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /api/chats/{id} [get]
 func (c *ChatController) GetChat(ctx echo.Context) error {
 	id := ctx.Param("id")
 	if id == "" {
@@ -62,7 +79,17 @@ func (c *ChatController) GetChat(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, chat)
 }
 
-// CreateChat handles POST requests to create a new chat
+// CreateChat godoc
+// @Summary Create a new chat
+// @Description Creates a new chat with the provided information.
+// @Tags chats
+// @Accept json
+// @Produce json
+// @Param request body CreateChatRequest true "Chat information to create"
+// @Success 201 {object} entities.Chat "Successfully created chat"
+// @Failure 400 {object} map[string]interface{} "Invalid request body"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /api/chats [post]
 func (c *ChatController) CreateChat(ctx echo.Context) error {
 	var input struct {
 		AgentID primitive.ObjectID `json:"agent_id"`
@@ -80,7 +107,19 @@ func (c *ChatController) CreateChat(ctx echo.Context) error {
 	return ctx.JSON(http.StatusCreated, chat)
 }
 
-// UpdateChat handles PUT requests to update an existing chat
+// UpdateChat godoc
+// @Summary Update an existing chat
+// @Description Updates an existing chat with the provided information.
+// @Tags chats
+// @Accept json
+// @Produce json
+// @Param id path string true "Chat ID"
+// @Param request body UpdateChatRequest true "Chat information to update"
+// @Success 200 {object} entities.Chat "Successfully updated chat"
+// @Failure 400 {object} map[string]interface{} "Invalid request body or chat ID"
+// @Failure 404 {object} map[string]interface{} "Chat not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /api/chats/{id} [put]
 func (c *ChatController) UpdateChat(ctx echo.Context) error {
 	id := ctx.Param("id")
 	if id == "" {
@@ -107,7 +146,17 @@ func (c *ChatController) UpdateChat(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, chat)
 }
 
-// DeleteChat handles DELETE requests to delete a specific chat
+// DeleteChat godoc
+// @Summary Delete a chat
+// @Description Deletes a chat by its ID.
+// @Tags chats
+// @Produce json
+// @Param id path string true "Chat ID"
+// @Success 204 "Successfully deleted chat"
+// @Failure 400 {object} map[string]interface{} "Invalid chat ID"
+// @Failure 404 {object} map[string]interface{} "Chat not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /api/chats/{id} [delete]
 func (c *ChatController) DeleteChat(ctx echo.Context) error {
 	id := ctx.Param("id")
 	if id == "" {
@@ -126,7 +175,19 @@ func (c *ChatController) DeleteChat(ctx echo.Context) error {
 	return ctx.NoContent(http.StatusNoContent)
 }
 
-// SendMessage handles POST requests to send a new message to a chat
+// SendMessage godoc
+// @Summary Send a message to a chat
+// @Description Sends a new message to a chat.
+// @Tags chats
+// @Accept json
+// @Produce json
+// @Param id path string true "Chat ID"
+// @Param message body entities.Message true "Message to send"
+// @Success 200 {object} entities.Message "Successfully sent message"
+// @Failure 400 {object} map[string]interface{} "Invalid request body or chat ID"
+// @Failure 404 {object} map[string]interface{} "Chat not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /api/chats/{id}/messages [post]
 func (c *ChatController) SendMessage(ctx echo.Context) error {
 	id := ctx.Param("id")
 	if id == "" {
@@ -157,4 +218,16 @@ func (c *ChatController) handleError(ctx echo.Context, err interface{}, statusCo
 	return ctx.JSON(statusCode, map[string]interface{}{
 		"error": err,
 	})
+}
+
+// CreateChatRequest represents the request body for creating a new chat.
+type CreateChatRequest struct {
+	AgentID string `json:"agent_id" example:"60d0ddb0f0a4a729c0a8e9b1"`
+	Name    string `json:"name" example:"My Chat"`
+}
+
+// UpdateChatRequest represents the request body for updating a chat.
+type UpdateChatRequest struct {
+	AgentID string `json:"agent_id" example:"60d0ddb0f0a4a729c0a8e9b1"`
+	Name    string `json:"name" example:"Updated Chat Name"`
 }

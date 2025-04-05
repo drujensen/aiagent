@@ -15,11 +15,28 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	echoSwagger "github.com/swaggo/echo-swagger"
 	"github.com/yuin/goldmark"
 	gfmext "github.com/yuin/goldmark/extension"
 	"go.uber.org/zap"
+
+	_ "aiagent/docs" // Import the generated docs package
 )
 
+// @title AI Agent API
+// @version 1.0
+// @description This is the API for the AI Agent application.
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.url http://www.swagger.io/support
+// @contact.email support@swagger.io
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host home.drujensen.com
+// @BasePath /
 func main() {
 	logger, _ := zap.NewDevelopment()
 	defer logger.Sync()
@@ -149,8 +166,11 @@ func main() {
 
 	// API Routes
 	api := e.Group("/api")
-	apiChatController.RegisterRoutes(api)
 	apiAgentController.RegisterRoutes(api)
+	apiChatController.RegisterRoutes(api)
+
+	// Swagger route
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	// Start server
 	logger.Info("Starting HTTP server on :8080")
