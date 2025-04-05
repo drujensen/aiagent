@@ -56,7 +56,8 @@ func (c *HomeController) ChatsPartialHandler(eCtx echo.Context) error {
 	for _, chat := range chats {
 		agent, err := c.agentService.GetAgent(eCtx.Request().Context(), chat.AgentID.Hex())
 		if err != nil {
-			break // Skip this chat if the agent is not found
+			c.logger.Error("Failed to get agent for chat", zap.String("chatID", chat.ID.Hex()), zap.Error(err))
+			continue // Skip this chat if we can't find the agent
 		}
 
 		// Create a new map for each chat with the required fields
