@@ -57,11 +57,9 @@ func main() {
 	providerRepo := repositories.NewMongoProviderRepository(db.Collection("providers"))
 
 	configurations := map[string]string{
-		"workspace":       cfg.Workspace,
-		"tavily_api_key":  cfg.TavilyAPIKey,
-		"brave_api_key":   cfg.BraveAPIKey,
-		"basic_auth_user": cfg.BasicAuthUser,
-		"basic_auth_pass": cfg.BasicAuthPass,
+		"workspace":      cfg.Workspace,
+		"tavily_api_key": cfg.TavilyAPIKey,
+		"brave_api_key":  cfg.BraveAPIKey,
 	}
 
 	toolRepo, err := tools.NewToolRegistry(configurations, logger)
@@ -152,9 +150,6 @@ func main() {
 		}
 	})
 
-	// Use the BasicAuth middleware
-	e.Use(basicAuthMiddleware(configurations["basic_auth_user"], configurations["basic_auth_pass"]))
-
 	// Static file serving
 	e.Static("/static", "internal/ui/static")
 
@@ -177,15 +172,6 @@ func main() {
 	if err := e.Start(":8080"); err != nil {
 		logger.Fatal("Failed to start server", zap.Error(err))
 	}
-}
-
-func basicAuthMiddleware(username, password string) echo.MiddlewareFunc {
-	return middleware.BasicAuth(func(user, pass string, c echo.Context) (bool, error) {
-		if user == username && pass == password {
-			return true, nil
-		}
-		return false, nil
-	})
 }
 
 func renderMarkdown(markdown string) (template.HTML, error) {

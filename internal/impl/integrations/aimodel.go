@@ -160,8 +160,6 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 	apiMessages := convertToBaseMessages(messages)
 	reqBody["messages"] = apiMessages
 
-	m.logger.Info("Messages before tool calls", zap.Any("messages", apiMessages))
-
 	var newMessages []*entities.Message
 
 	// Loop to handle tool calls
@@ -180,7 +178,6 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		if err != nil {
 			return nil, fmt.Errorf("error creating request: %v", err)
 		}
-		m.logger.Debug("Request body", zap.String("body", string(jsonBody)))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+m.apiKey)
 
@@ -325,8 +322,6 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				}
 				apiMessages = append(apiMessages, toolResponseMsg)
 			}
-
-			m.logger.Info("Messages after tool calls", zap.Any("messages", newMessages))
 
 			// Prepare for next iteration
 			reqBody["messages"] = apiMessages

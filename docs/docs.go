@@ -203,7 +203,7 @@ const docTemplate = `{
                     },
                     {
                         "description": "Message to send",
-                        "name": "message",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -215,7 +215,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully sent message",
                         "schema": {
-                            "$ref": "#/definitions/entities.Message"
+                            "$ref": "#/definitions/apicontrollers.SendMessageResponse"
                         }
                     },
                     "400": {
@@ -258,7 +258,30 @@ const docTemplate = `{
             }
         },
         "apicontrollers.SendMessageRequest": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Hello, how are you?"
+                },
+                "role": {
+                    "type": "string",
+                    "example": "user"
+                }
+            }
+        },
+        "apicontrollers.SendMessageResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "I'm fine, thank you!"
+                },
+                "role": {
+                    "type": "string",
+                    "example": "assistant"
+                }
+            }
         },
         "entities.Agent": {
             "type": "object",

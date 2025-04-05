@@ -4,6 +4,7 @@ import (
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/errors"
 	"aiagent/internal/domain/services"
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -93,14 +94,20 @@ func (c *ChatController) GetChat(ctx echo.Context) error {
 //	@Router			/api/chats [post]
 func (c *ChatController) CreateChat(ctx echo.Context) error {
 	var input struct {
-		AgentID primitive.ObjectID `json:"agent_id"`
-		Name    string             `json:"name"`
+		AgentID string `json:"agent_id"`
+		Name    string `json:"name"`
 	}
 	if err := ctx.Bind(&input); err != nil {
-		return c.handleError(ctx, "Invalid request body", http.StatusBadRequest)
+		return c.handleError(ctx, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
 	}
 
-	chat, err := c.chatService.CreateChat(ctx.Request().Context(), input.AgentID.Hex(), input.Name)
+	// Convert AgentID string to ObjectID
+	agentID, err := primitive.ObjectIDFromHex(input.AgentID)
+	if err != nil {
+		return c.handleError(ctx, "Invalid agent_id format", http.StatusBadRequest)
+	}
+
+	chat, err := c.chatService.CreateChat(ctx.Request().Context(), agentID.Hex(), input.Name)
 	if err != nil {
 		return c.handleError(ctx, err, http.StatusInternalServerError)
 	}
@@ -116,8 +123,8 @@ func (c *ChatController) CreateChat(ctx echo.Context) error {
 //	@Accept			json
 //	@Produce		json
 //	@Param			id		path		string					true	"Chat ID"
-//	@Param			message	body		SendMessageRequest		true	"Message to send"
-//	@Success		200		{object}	entities.Message		"Successfully sent message"
+//	@Param			request	body		SendMessageRequest		true	"Message to send"
+//	@Success		200		{object}	SendMessageResponse		"Successfully sent message"
 //	@Failure		400		{object}	map[string]interface{}	"Invalid request body or chat ID"
 //	@Failure		404		{object}	map[string]interface{}	"Chat not found"
 //	@Failure		500		{object}	map[string]interface{}	"Internal server error"
@@ -130,10 +137,10 @@ func (c *ChatController) SendMessage(ctx echo.Context) error {
 
 	var messageRequest SendMessageRequest
 	if err := ctx.Bind(&messageRequest); err != nil {
-		return c.handleError(ctx, "Invalid request body", http.StatusBadRequest)
+		return c.handleError(ctx, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
 	}
 
-	var message = entities.NewMessage("User", messageRequest.message)
+	var message = entities.NewMessage(messageRequest.Role, messageRequest.Message)
 
 	newMessage, err := c.chatService.SendMessage(ctx.Request().Context(), id, *message)
 	if err != nil {
@@ -145,14 +152,28 @@ func (c *ChatController) SendMessage(ctx echo.Context) error {
 		}
 	}
 
-	return ctx.JSON(http.StatusOK, newMessage)
+	var response = SendMessageResponse{
+		Role:    newMessage.Role,
+		Message: newMessage.Content,
+	}
+
+	return ctx.JSON(http.StatusOK, response)
 }
 
 // handleError handles errors and returns them in a consistent format
 func (c *ChatController) handleError(ctx echo.Context, err interface{}, statusCode int) error {
-	c.logger.Error("Error occurred", zap.Any("error", err))
+	var errorMessage string
+	switch e := err.(type) {
+	case error:
+		errorMessage = e.Error()
+	case string:
+		errorMessage = e
+	default:
+		errorMessage = fmt.Sprintf("%v", e)
+	}
+	c.logger.Error("Error occurred", zap.String("error", errorMessage))
 	return ctx.JSON(statusCode, map[string]interface{}{
-		"error": err,
+		"error": errorMessage,
 	})
 }
 
@@ -162,7 +183,14 @@ type CreateChatRequest struct {
 	Name    string `json:"name" example:"My Chat"`
 }
 
-// SendMessage represents the request body for sending a message.
+// SendMessageRequest represents the request body for sending a message.
 type SendMessageRequest struct {
-	message string `json:"message" example:"Hello, how are you?"`
+	Role    string `json:"role" example:"user"`
+	Message string `json:"message" example:"Hello, how are you?"`
+}
+
+// SendMessageResponse represents the request body for sending a message.
+type SendMessageResponse struct {
+	Role    string `json:"role" example:"assistant"`
+	Message string `json:"message" example:"I'm fine, thank you!"`
 }

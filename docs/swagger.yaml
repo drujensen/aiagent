@@ -10,6 +10,22 @@ definitions:
         type: string
     type: object
   apicontrollers.SendMessageRequest:
+    properties:
+      message:
+        example: Hello, how are you?
+        type: string
+      role:
+        example: user
+        type: string
+    type: object
+  apicontrollers.SendMessageResponse:
+    properties:
+      message:
+        example: I'm fine, thank you!
+        type: string
+      role:
+        example: assistant
+        type: string
     type: object
   entities.Agent:
     properties:
@@ -282,7 +298,7 @@ paths:
         type: string
       - description: Message to send
         in: body
-        name: message
+        name: request
         required: true
         schema:
           $ref: '#/definitions/apicontrollers.SendMessageRequest'
@@ -292,7 +308,7 @@ paths:
         "200":
           description: Successfully sent message
           schema:
-            $ref: '#/definitions/entities.Message'
+            $ref: '#/definitions/apicontrollers.SendMessageResponse'
         "400":
           description: Invalid request body or chat ID
           schema:

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"go.uber.org/zap"
 )
@@ -63,8 +64,8 @@ func (t *FetchTool) Parameters() []interfaces.Parameter {
 		{
 			Name:        "headers",
 			Type:        "array",
-			Items:       []interfaces.Item{{Type: "object"}},
-			Description: "Array of HEADERS to include in the request",
+			Items:       []interfaces.Item{{Type: "string"}},
+			Description: "Array of headers in the format 'key:value' to include in the request",
 			Required:    false,
 		},
 		{
@@ -186,12 +187,11 @@ func (t *FetchTool) doRequest(req *http.Request, headers []string) (string, erro
 
 	// Add custom headers
 	for _, header := range headers {
-		var h struct {
-			Key   string `json:"key"`
-			Value string `json:"value"`
-		}
-		if err := json.Unmarshal([]byte(header), &h); err == nil {
-			req.Header.Set(h.Key, h.Value)
+		parts := strings.SplitN(header, ":", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			req.Header.Set(key, value)
 		}
 	}
 
