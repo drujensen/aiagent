@@ -332,7 +332,7 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 					ContextWindow:       8192,
 				},
 				{
-					Name:                "qwen-coder:14b",
+					Name:                "qwen2.5-coder:14b",
 					InputPricePerMille:  0.00, // Free
 					OutputPricePerMille: 0.00,
 					ContextWindow:       8192,
