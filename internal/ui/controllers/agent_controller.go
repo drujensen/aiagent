@@ -170,7 +170,7 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 		if err != nil {
 			switch err.(type) {
 			case *errors.NotFoundError:
-				return eCtx.String(http.StatusNotFound, "Agent not found")
+				return eCtx.Redirect(http.StatusFound, "/")
 			default:
 				return eCtx.String(http.StatusInternalServerError, "Failed to load agent")
 			}
