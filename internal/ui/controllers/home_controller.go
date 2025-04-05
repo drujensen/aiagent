@@ -4,7 +4,6 @@ import (
 	"html/template"
 	"net/http"
 
-	"aiagent/internal/domain/errors"
 	"aiagent/internal/domain/services"
 
 	"github.com/labstack/echo/v4"
@@ -57,12 +56,7 @@ func (c *HomeController) ChatsPartialHandler(eCtx echo.Context) error {
 	for _, chat := range chats {
 		agent, err := c.agentService.GetAgent(eCtx.Request().Context(), chat.AgentID.Hex())
 		if err != nil {
-			switch err.(type) {
-			case *errors.NotFoundError:
-				return eCtx.String(http.StatusNotFound, "Agent not found")
-			default:
-				return eCtx.String(http.StatusInternalServerError, "Failed to load agent")
-			}
+			break // Skip this chat if the agent is not found
 		}
 
 		// Create a new map for each chat with the required fields
