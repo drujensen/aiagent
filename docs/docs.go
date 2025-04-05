@@ -52,207 +52,6 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "post": {
-                "description": "Creates a new agent with the provided information.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "agents"
-                ],
-                "summary": "Create a new agent",
-                "parameters": [
-                    {
-                        "description": "Agent information to create",
-                        "name": "agent",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/entities.Agent"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Successfully created agent",
-                        "schema": {
-                            "$ref": "#/definitions/entities.Agent"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid request body",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
-        "/api/agents/{id}": {
-            "get": {
-                "description": "Retrieves an agent's information by their ID.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "agents"
-                ],
-                "summary": "Get an agent by ID",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Agent ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successfully retrieved agent",
-                        "schema": {
-                            "$ref": "#/definitions/entities.Agent"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid agent ID",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Agent not found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
-            "put": {
-                "description": "Updates an existing agent with the provided information.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "agents"
-                ],
-                "summary": "Update an existing agent",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Agent ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Agent information to update",
-                        "name": "agent",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/entities.Agent"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successfully updated agent",
-                        "schema": {
-                            "$ref": "#/definitions/entities.Agent"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid request body or agent ID",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Agent not found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "description": "Deletes an agent by their ID.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "agents"
-                ],
-                "summary": "Delete an agent",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Agent ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "Successfully deleted agent"
-                    },
-                    "400": {
-                        "description": "Invalid agent ID",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Agent not found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
             }
         },
         "/api/chats": {
@@ -379,111 +178,6 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "put": {
-                "description": "Updates an existing chat with the provided information.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "chats"
-                ],
-                "summary": "Update an existing chat",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Chat ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Chat information to update",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/apicontrollers.UpdateChatRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successfully updated chat",
-                        "schema": {
-                            "$ref": "#/definitions/entities.Chat"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid request body or chat ID",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Chat not found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "description": "Deletes a chat by its ID.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "chats"
-                ],
-                "summary": "Delete a chat",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Chat ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "Successfully deleted chat"
-                    },
-                    "400": {
-                        "description": "Invalid chat ID",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Chat not found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
             }
         },
         "/api/chats/{id}/messages": {
@@ -513,7 +207,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/entities.Message"
+                            "$ref": "#/definitions/apicontrollers.SendMessageRequest"
                         }
                     }
                 ],
@@ -563,18 +257,8 @@ const docTemplate = `{
                 }
             }
         },
-        "apicontrollers.UpdateChatRequest": {
-            "type": "object",
-            "properties": {
-                "agent_id": {
-                    "type": "string",
-                    "example": "60d0ddb0f0a4a729c0a8e9b1"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "Updated Chat Name"
-                }
-            }
+        "apicontrollers.SendMessageRequest": {
+            "type": "object"
         },
         "entities.Agent": {
             "type": "object",
@@ -789,7 +473,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "home.drujensen.com",
+	Host:             "localhost:8080",
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "AI Agent API",

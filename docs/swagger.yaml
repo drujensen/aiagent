@@ -9,14 +9,7 @@ definitions:
         example: My Chat
         type: string
     type: object
-  apicontrollers.UpdateChatRequest:
-    properties:
-      agent_id:
-        example: 60d0ddb0f0a4a729c0a8e9b1
-        type: string
-      name:
-        example: Updated Chat Name
-        type: string
+  apicontrollers.SendMessageRequest:
     type: object
   entities.Agent:
     properties:
@@ -157,7 +150,7 @@ definitions:
         description: Total tokens processed
         type: integer
     type: object
-host: home.drujensen.com
+host: localhost:8080
 info:
   contact:
     email: support@swagger.io
@@ -189,143 +182,6 @@ paths:
             additionalProperties: true
             type: object
       summary: List all agents
-      tags:
-      - agents
-    post:
-      consumes:
-      - application/json
-      description: Creates a new agent with the provided information.
-      parameters:
-      - description: Agent information to create
-        in: body
-        name: agent
-        required: true
-        schema:
-          $ref: '#/definitions/entities.Agent'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Successfully created agent
-          schema:
-            $ref: '#/definitions/entities.Agent'
-        "400":
-          description: Invalid request body
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal server error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Create a new agent
-      tags:
-      - agents
-  /api/agents/{id}:
-    delete:
-      description: Deletes an agent by their ID.
-      parameters:
-      - description: Agent ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: Successfully deleted agent
-        "400":
-          description: Invalid agent ID
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Agent not found
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal server error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Delete an agent
-      tags:
-      - agents
-    get:
-      description: Retrieves an agent's information by their ID.
-      parameters:
-      - description: Agent ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Successfully retrieved agent
-          schema:
-            $ref: '#/definitions/entities.Agent'
-        "400":
-          description: Invalid agent ID
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Agent not found
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal server error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Get an agent by ID
-      tags:
-      - agents
-    put:
-      consumes:
-      - application/json
-      description: Updates an existing agent with the provided information.
-      parameters:
-      - description: Agent ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Agent information to update
-        in: body
-        name: agent
-        required: true
-        schema:
-          $ref: '#/definitions/entities.Agent'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Successfully updated agent
-          schema:
-            $ref: '#/definitions/entities.Agent'
-        "400":
-          description: Invalid request body or agent ID
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Agent not found
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal server error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Update an existing agent
       tags:
       - agents
   /api/chats:
@@ -380,37 +236,6 @@ paths:
       tags:
       - chats
   /api/chats/{id}:
-    delete:
-      description: Deletes a chat by its ID.
-      parameters:
-      - description: Chat ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: Successfully deleted chat
-        "400":
-          description: Invalid chat ID
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Chat not found
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal server error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Delete a chat
-      tags:
-      - chats
     get:
       description: Retrieves a chat's information by its ID.
       parameters:
@@ -444,47 +269,6 @@ paths:
       summary: Get a chat by ID
       tags:
       - chats
-    put:
-      consumes:
-      - application/json
-      description: Updates an existing chat with the provided information.
-      parameters:
-      - description: Chat ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Chat information to update
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/apicontrollers.UpdateChatRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Successfully updated chat
-          schema:
-            $ref: '#/definitions/entities.Chat'
-        "400":
-          description: Invalid request body or chat ID
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Chat not found
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal server error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Update an existing chat
-      tags:
-      - chats
   /api/chats/{id}/messages:
     post:
       consumes:
@@ -501,7 +285,7 @@ paths:
         name: message
         required: true
         schema:
-          $ref: '#/definitions/entities.Message'
+          $ref: '#/definitions/apicontrollers.SendMessageRequest'
       produces:
       - application/json
       responses:

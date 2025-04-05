@@ -23,20 +23,20 @@ import (
 	_ "aiagent/docs" // Import the generated docs package
 )
 
-// @title AI Agent API
-// @version 1.0
-// @description This is the API for the AI Agent application.
-// @termsOfService http://swagger.io/terms/
+//	@title			AI Agent API
+//	@version		1.0
+//	@description	This is the API for the AI Agent application.
+//	@termsOfService	http://swagger.io/terms/
 
-// @contact.name API Support
-// @contact.url http://www.swagger.io/support
-// @contact.email support@swagger.io
+//	@contact.name	API Support
+//	@contact.url	http://www.swagger.io/support
+//	@contact.email	support@swagger.io
 
-// @license.name Apache 2.0
-// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+//	@license.name	Apache 2.0
+//	@license.url	http://www.apache.org/licenses/LICENSE-2.0.html
 
-// @host home.drujensen.com
-// @BasePath /
+// @host	localhost:8080
+// @BasePath	/
 func main() {
 	logger, _ := zap.NewDevelopment()
 	defer logger.Sync()
