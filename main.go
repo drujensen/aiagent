@@ -9,8 +9,8 @@ import (
 	"aiagent/internal/domain/services"
 	"aiagent/internal/impl/config"
 	"aiagent/internal/impl/database"
-	"aiagent/internal/impl/integrations/tools"
 	"aiagent/internal/impl/repositories"
+	"aiagent/internal/impl/tools"
 	uicontrollers "aiagent/internal/ui/controllers"
 
 	"github.com/labstack/echo/v4"

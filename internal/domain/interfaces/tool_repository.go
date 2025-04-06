@@ -21,7 +21,7 @@ type ToolIntegration interface {
 }
 
 type ToolRepository interface {
-	ListTools() ([]*ToolIntegration, error)
-	GetToolByName(name string) (*ToolIntegration, error)
 	RegisterTool(name string, tool *ToolIntegration) error
+	GetToolByName(name string) (*ToolIntegration, error)
+	ListTools() ([]*ToolIntegration, error)
 }
