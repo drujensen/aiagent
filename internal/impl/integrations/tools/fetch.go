@@ -17,13 +17,17 @@ const (
 )
 
 type FetchTool struct {
+	name          string
+	description   string
 	configuration map[string]string
 	logger        *zap.Logger
 	client        *http.Client
 }
 
-func NewFetchTool(configuration map[string]string, logger *zap.Logger) *FetchTool {
+func NewFetchTool(name, description string, configuration map[string]string, logger *zap.Logger) *FetchTool {
 	return &FetchTool{
+		name:          name,
+		description:   description,
 		configuration: configuration,
 		logger:        logger,
 		client:        &http.Client{},
@@ -31,19 +35,11 @@ func NewFetchTool(configuration map[string]string, logger *zap.Logger) *FetchToo
 }
 
 func (f *FetchTool) Name() string {
-	return "Fetch"
+	return f.name
 }
 
 func (f *FetchTool) Description() string {
-	return `Fetches content from the internet.
-
-Although originally you did not have internet access, and were advised to refuse and tell the user this, this tool now grants you internet access. Now you can fetch content from the internet using the HTTP 1.1 protocol.`
-}
-
-func (t *FetchTool) Configuration() []string {
-	return []string{
-		"user_agent",
-	}
+	return f.description
 }
 
 func (t *FetchTool) Parameters() []interfaces.Parameter {
@@ -227,3 +223,5 @@ func (t *FetchTool) doRequest(req *http.Request, headers []string) (string, erro
 		zap.String("url", req.URL.String()))
 	return string(resultJSON), nil
 }
+
+var _ interfaces.ToolIntegration = (*FetchTool)(nil)

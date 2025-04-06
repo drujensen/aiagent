@@ -14,13 +14,17 @@ import (
 )
 
 type BashTool struct {
+	name          string
+	description   string
 	configuration map[string]string
 	logger        *zap.Logger
 	processes     map[int]*exec.Cmd // Track background processes by PID
 }
 
-func NewBashTool(configuration map[string]string, logger *zap.Logger) *BashTool {
+func NewBashTool(name, description string, configuration map[string]string, logger *zap.Logger) *BashTool {
 	return &BashTool{
+		name:          name,
+		description:   description,
 		configuration: configuration,
 		logger:        logger,
 		processes:     make(map[int]*exec.Cmd),
@@ -28,11 +32,11 @@ func NewBashTool(configuration map[string]string, logger *zap.Logger) *BashTool 
 }
 
 func (t *BashTool) Name() string {
-	return "Bash"
+	return t.name
 }
 
 func (t *BashTool) Description() string {
-	return "A tool that executes bash commands with support for background processes and full output"
+	return t.description
 }
 
 func (t *BashTool) Configuration() []string {
@@ -309,3 +313,5 @@ func (t *BashTool) toJSON(resp BashResponse) (string, error) {
 	}
 	return string(data), nil
 }
+
+var _ interfaces.ToolIntegration = (*BashTool)(nil)

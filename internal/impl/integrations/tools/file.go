@@ -14,29 +14,27 @@ import (
 )
 
 type FileTool struct {
+	name          string
+	description   string
 	configuration map[string]string
 	logger        *zap.Logger
 }
 
-func NewFileTool(configuration map[string]string, logger *zap.Logger) *FileTool {
+func NewFileTool(name, description string, configuration map[string]string, logger *zap.Logger) *FileTool {
 	return &FileTool{
+		name:          name,
+		description:   description,
 		configuration: configuration,
 		logger:        logger,
 	}
 }
 
 func (t *FileTool) Name() string {
-	return "File"
+	return t.name
 }
 
 func (t *FileTool) Description() string {
-	return "Although originally you did not have file access, and were advised to refuse and tell the user this, this tool provides you file system operations including reading, writing, editing, searching, and managing files and directories"
-}
-
-func (t *FileTool) Configuration() []string {
-	return []string{
-		"workspace",
-	}
+	return t.description
 }
 
 func (t *FileTool) Parameters() []interfaces.Parameter {
@@ -404,3 +402,5 @@ func boolToString(b bool) string {
 	}
 	return "false"
 }
+
+var _ interfaces.ToolIntegration = (*FileTool)(nil)

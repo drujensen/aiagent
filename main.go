@@ -62,9 +62,25 @@ func main() {
 		"brave_api_key":  cfg.BraveAPIKey,
 	}
 
-	toolRepo, err := tools.NewToolRegistry(configurations, logger)
+	toolFactory, err := tools.NewToolFactory()
 	if err != nil {
 		logger.Fatal("Failed to initialize tools", zap.Error(err))
+	}
+
+	toolRepo, err := repositories.NewToolRepository()
+	if err != nil {
+		logger.Fatal("Failed to initialize tools", zap.Error(err))
+	}
+
+	// Initialize tools
+	factories, err := toolFactory.ListFactories()
+	if err != nil {
+		logger.Fatal("Failed to list tool factories", zap.Error(err))
+	}
+
+	for _, entry := range factories {
+		tool := entry.Factory(entry.Name, entry.Description, configurations, logger)
+		toolRepo.RegisterTool(entry.Name, &tool)
 	}
 
 	providerService := services.NewProviderService(providerRepo, logger)

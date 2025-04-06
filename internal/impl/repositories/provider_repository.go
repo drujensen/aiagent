@@ -97,3 +97,5 @@ func (r *mongoProviderRepository) DeleteProvider(ctx context.Context, id string)
 
 	return nil
 }
+
+var _ interfaces.ProviderRepository = (*mongoProviderRepository)(nil)

@@ -14,13 +14,17 @@ import (
 
 // SearchTool represents a tool for searching using the Tavily API.
 type SearchTool struct {
+	name          string
+	description   string
 	configuration map[string]string
 	logger        *zap.Logger
 }
 
 // NewSearchTool creates a new instance of SearchTool.
-func NewSearchTool(configuration map[string]string, logger *zap.Logger) *SearchTool {
+func NewSearchTool(name, description string, configuration map[string]string, logger *zap.Logger) *SearchTool {
 	return &SearchTool{
+		name:          name,
+		description:   description,
 		configuration: configuration,
 		logger:        logger,
 	}
@@ -28,17 +32,12 @@ func NewSearchTool(configuration map[string]string, logger *zap.Logger) *SearchT
 
 // Name returns the name of the tool.
 func (t *SearchTool) Name() string {
-	return "Search"
+	return t.name
 }
 
 // Description returns a description of the tool.
 func (t *SearchTool) Description() string {
-	return "A tool to search for information using the Tavily API"
-}
-
-// Configuration returns the required configuration keys.
-func (t *SearchTool) Configuration() []string {
-	return []string{"tavily_api_key"}
+	return t.description
 }
 
 // Parameters returns the parameters required by the tool.
@@ -173,3 +172,5 @@ func (t *SearchTool) Execute(arguments string) (string, error) {
 	t.logger.Info("Search completed", zap.String("result", output))
 	return output, nil
 }
+
+var _ interfaces.ToolIntegration = (*SearchTool)(nil)
