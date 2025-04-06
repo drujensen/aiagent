@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 
-	"aiagent/internal/domain/interfaces"
+	"aiagent/internal/domain/entities"
 
 	"go.uber.org/zap"
 )
@@ -41,8 +41,8 @@ func (t *SearchTool) Description() string {
 }
 
 // Parameters returns the parameters required by the tool.
-func (t *SearchTool) Parameters() []interfaces.Parameter {
-	return []interfaces.Parameter{
+func (t *SearchTool) Parameters() []entities.Parameter {
+	return []entities.Parameter{
 		{
 			Name:        "query",
 			Type:        "string",
@@ -173,4 +173,4 @@ func (t *SearchTool) Execute(arguments string) (string, error) {
 	return output, nil
 }
 
-var _ interfaces.ToolIntegration = (*SearchTool)(nil)
+var _ entities.Tool = (*SearchTool)(nil)

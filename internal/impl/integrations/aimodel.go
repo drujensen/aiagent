@@ -91,7 +91,7 @@ func convertToBaseMessages(messages []*entities.Message) []map[string]interface{
 }
 
 // GenerateResponse generates a response from the Base API
-func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*interfaces.ToolIntegration, options map[string]interface{}) ([]*entities.Message, error) {
+func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]interface{}) ([]*entities.Message, error) {
 	// Check for cancellation
 	if ctx.Err() == context.Canceled {
 		return nil, fmt.Errorf("operation canceled by user")

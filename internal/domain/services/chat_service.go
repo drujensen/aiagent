@@ -281,7 +281,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 		messagesToSend = append(messagesToSend, tempMessages...)
 	}
 
-	tools := []*interfaces.ToolIntegration{}
+	tools := []*entities.Tool{}
 	for _, toolName := range agent.Tools {
 		tool, err := s.toolRepo.GetToolByName(toolName)
 		if err != nil {

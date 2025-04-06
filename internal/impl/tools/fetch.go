@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"aiagent/internal/domain/interfaces"
+	"aiagent/internal/domain/entities"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -42,8 +42,8 @@ func (f *FetchTool) Description() string {
 	return f.description
 }
 
-func (t *FetchTool) Parameters() []interfaces.Parameter {
-	return []interfaces.Parameter{
+func (t *FetchTool) Parameters() []entities.Parameter {
+	return []entities.Parameter{
 		{
 			Name:        "operation",
 			Type:        "string",
@@ -60,7 +60,7 @@ func (t *FetchTool) Parameters() []interfaces.Parameter {
 		{
 			Name:        "headers",
 			Type:        "array",
-			Items:       []interfaces.Item{{Type: "string"}},
+			Items:       []entities.Item{{Type: "string"}},
 			Description: "Array of headers in the format 'key:value' to include in the request",
 			Required:    false,
 		},
@@ -224,4 +224,4 @@ func (t *FetchTool) doRequest(req *http.Request, headers []string) (string, erro
 	return string(resultJSON), nil
 }
 
-var _ interfaces.ToolIntegration = (*FetchTool)(nil)
+var _ entities.Tool = (*FetchTool)(nil)

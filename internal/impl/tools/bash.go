@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"aiagent/internal/domain/interfaces"
+	"aiagent/internal/domain/entities"
 
 	"go.uber.org/zap"
 )
@@ -43,8 +43,8 @@ func (t *BashTool) Configuration() []string {
 	return []string{"workspace"}
 }
 
-func (t *BashTool) Parameters() []interfaces.Parameter {
-	return []interfaces.Parameter{
+func (t *BashTool) Parameters() []entities.Parameter {
+	return []entities.Parameter{
 		{
 			Name:        "command",
 			Type:        "string",
@@ -66,7 +66,7 @@ func (t *BashTool) Parameters() []interfaces.Parameter {
 		{
 			Name: "env",
 			Type: "array",
-			Items: []interfaces.Item{
+			Items: []entities.Item{
 				{Type: "string"},
 			},
 			Description: "Environment variables as key=value pairs (e.g., ['PORT=8080'])",
@@ -314,4 +314,4 @@ func (t *BashTool) toJSON(resp BashResponse) (string, error) {
 	return string(data), nil
 }
 
-var _ interfaces.ToolIntegration = (*BashTool)(nil)
+var _ entities.Tool = (*BashTool)(nil)

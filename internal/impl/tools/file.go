@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"aiagent/internal/domain/interfaces"
+	"aiagent/internal/domain/entities"
 
 	"github.com/pmezard/go-difflib/difflib"
 	"go.uber.org/zap"
@@ -37,8 +37,8 @@ func (t *FileTool) Description() string {
 	return t.description
 }
 
-func (t *FileTool) Parameters() []interfaces.Parameter {
-	return []interfaces.Parameter{
+func (t *FileTool) Parameters() []entities.Parameter {
+	return []entities.Parameter{
 		{
 			Name:        "operation",
 			Type:        "string",
@@ -61,7 +61,7 @@ func (t *FileTool) Parameters() []interfaces.Parameter {
 		{
 			Name:        "edits",
 			Type:        "array",
-			Items:       []interfaces.Item{{Type: "object"}},
+			Items:       []entities.Item{{Type: "object"}},
 			Description: "Array of edit operations with oldText and newText (for edit operation)",
 			Required:    false,
 		},
@@ -86,7 +86,7 @@ func (t *FileTool) Parameters() []interfaces.Parameter {
 		{
 			Name:        "exclude_patterns",
 			Type:        "array",
-			Items:       []interfaces.Item{{Type: "string"}},
+			Items:       []entities.Item{{Type: "string"}},
 			Description: "Patterns to exclude (for search operation)",
 			Required:    false,
 		},
@@ -403,4 +403,4 @@ func boolToString(b bool) string {
 	return "false"
 }
 
-var _ interfaces.ToolIntegration = (*FileTool)(nil)
+var _ entities.Tool = (*FileTool)(nil)

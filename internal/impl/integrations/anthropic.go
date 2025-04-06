@@ -107,7 +107,7 @@ func convertToAnthropicMessages(messages []*entities.Message) []map[string]inter
 }
 
 // GenerateResponse generates a response from the Anthropic API
-func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*interfaces.ToolIntegration, options map[string]interface{}) ([]*entities.Message, error) {
+func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]interface{}) ([]*entities.Message, error) {
 	// Prepare tool definitions for Anthropic
 	tools := make([]map[string]interface{}, len(toolList))
 	for i, tool := range toolList {
