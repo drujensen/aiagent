@@ -1,47 +1,55 @@
 {{define "tool_form_content"}}
 <div class="agent-form">
-    <h2>{{if .Tool.ID}}Edit Tool{{else}}Create Tool{{end}}</h2>
+    <h2>{{if .IsEdit}}Edit Tool{{else}}Create Tool{{end}}</h2>
     <form
-        {{if .Tool.ID}}hx-put="/tools/{{.Tool.ID}}"{{else}}hx-post="/tools"{{end}}
+        {{if .IsEdit}}hx-put="/tools/{{.Tool.ID.Hex}}"{{else}}hx-post="/tools"{{end}}
         hx-target="#response-message"
         hx-swap="innerHTML">
-        <input type="hidden" name="id" value="{{.Tool.ID}}">
+        <input type="hidden" name="id" value="{{.Tool.ID.Hex}}">
         <div class="form-group">
             <label for="tooltype">Tool Type:</label>
-            <select id="tooltype" name="tooltype" class="form-control" hx-trigger="change" hx-indicator="#tooltype-loading" required>
+            <select
+                id="tooltype"
+                name="tool_type"
+                class="form-control"
+                required
+                hx-get="/tools/defaults"
+                hx-target="#tool-details"
+                hx-swap="innerHTML"
+                hx-indicator="#tooltype-loading">
                 <option value="">Select Tool Type</option>
                 {{range .ToolTypes}}
-                <option value="{{.Name}}" {{if eq .Name $.ToolType}}selected{{end}}></option>
+                <option value="{{.Name}}" {{if eq .Name $.Tool.ToolType}}selected{{end}}>{{.Name}}</option>
                 {{end}}
             </select>
             <div id="tooltype-loading" class="htmx-indicator">Loading...</div>
-            <div id="tooltype-error" style="color: red; display: none;"></div>
         </div>
-        <div class="form-group">
-            <label for="name">Name:</label>
-            <input type="text" id="name" name="name" class="form-control" value="{{.Tool.Name}}" required>
+        <div id="tool-details">
+            <div class="form-group">
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" class="form-control" value="{{.Tool.Name}}" required>
+            </div>
+            <div class="form-group">
+                <label for="description">Description:</label>
+                <textarea id="description" name="description" class="form-control" required>{{.Tool.Description}}</textarea>
+            </div>
+            <div class="form-group" id="configuration-fields">
+                <label>Configuration:</label>
+                {{if .Tool.Configuration}}
+                {{range $key, $value := .Tool.Configuration}}
+                <div class="config-pair">
+                    <input type="text" name="config_key[]" class="form-control" value="{{$key}}" placeholder="Key" readonly>
+                    <input type="text" name="config_value[]" class="form-control" value="{{$value}}" placeholder="Value">
+                </div>
+                {{end}}
+                {{else}}
+                <p>Select a tool type to configure.</p>
+                {{end}}
+                <small class="form-text">Use #{value}# for environment variables</small>
+            </div>
         </div>
-        <div class="form-group">
-            <label for="name">Description:</label>
-            <input type="text" id="role" name="role" class="form-control" value="{{.Tool.Description}}" required>
-        </div>
-        {{range .Configuration}}
-        <div class="form-group">
-            <label for="configuration">Configuration:</label>
-            <input type="text" id="configuration" name="configuration" class="form-control" value="{{.Tool.Configuration}}" placeholder="Tool Configuration">
-            <small class="form-text">Use #{value}# for environment variables</small>
-        </div>
-        {{end}}
         <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Save Tool</button>
     </form>
     <div id="response-message"></div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const toolTypeSelect = document.getElementById('tooltype');
-    const providerErrorDiv = document.getElementById('tooltype-error');
-    const providerLoadingDiv = document.getElementById('tooltype-loading');
-});
-</script>
 {{end}}

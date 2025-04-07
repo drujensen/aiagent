@@ -122,7 +122,7 @@ func main() {
 	homeController := uicontrollers.NewHomeController(logger, tmpl, chatService, agentService, toolService)
 	agentController := uicontrollers.NewAgentController(logger, tmpl, agentService, toolService, providerService)
 	chatController := uicontrollers.NewChatController(logger, tmpl, chatService, agentService)
-	toolController := uicontrollers.NewToolController(logger, tmpl, toolService)
+	toolController := uicontrollers.NewToolController(logger, tmpl, toolService, toolFactory)
 	providerController := uicontrollers.NewProviderController(logger, tmpl, providerService)
 
 	// API Controllers

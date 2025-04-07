@@ -23,19 +23,19 @@ type ToolRepository struct {
 
 func NewToolRepository(collection *mongo.Collection, toolFactory *tools.ToolFactory, logger *zap.Logger) (*ToolRepository, error) {
 	toolRepository := &ToolRepository{
-		collection:  collection,
-		toolFactory: toolFactory,
-		logger:      logger,
+		collection:    collection,
+		toolInstances: make(map[string]*entities.Tool), // Initialize here
+		toolFactory:   toolFactory,
+		logger:        logger,
 	}
-
+	// Load initial tool instances
+	if err := toolRepository.reloadToolInstances(); err != nil {
+		return nil, err
+	}
 	return toolRepository, nil
 }
 
 func (t *ToolRepository) ListTools() ([]*entities.Tool, error) {
-	if t.toolInstances == nil {
-		t.reloadToolInstances()
-	}
-
 	var tools []*entities.Tool
 	for _, tool := range t.toolInstances {
 		tools = append(tools, tool)
@@ -116,9 +116,7 @@ func (t *ToolRepository) CreateToolData(ctx context.Context, toolData *entities.
 		return errors.ValidationErrorf("failed to convert InsertedID to ObjectID")
 	}
 
-	t.reloadToolInstances()
-
-	return nil
+	return t.reloadToolInstances()
 }
 
 func (t *ToolRepository) UpdateToolData(ctx context.Context, toolData *entities.ToolData) error {
@@ -129,15 +127,7 @@ func (t *ToolRepository) UpdateToolData(ctx context.Context, toolData *entities.
 		return errors.NotFoundErrorf("toolData not found: %s", toolData.ID.Hex())
 	}
 
-	// Convert the toolData struct to BSON
-	update, err := bson.Marshal(bson.M{
-		"$set": toolData,
-	})
-	if err != nil {
-		return errors.InternalErrorf("failed to marshal toolData: %v", err)
-	}
-
-	result, err := t.collection.UpdateOne(ctx, bson.M{"_id": oid}, update)
+	result, err := t.collection.UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": toolData})
 	if err != nil {
 		return errors.InternalErrorf("failed to update toolData: %v", err)
 	}
@@ -145,9 +135,7 @@ func (t *ToolRepository) UpdateToolData(ctx context.Context, toolData *entities.
 		return errors.NotFoundErrorf("toolData not found: %s", toolData.ID.Hex())
 	}
 
-	t.reloadToolInstances()
-
-	return nil
+	return t.reloadToolInstances()
 }
 
 func (t *ToolRepository) DeleteToolData(ctx context.Context, id string) error {
@@ -164,23 +152,22 @@ func (t *ToolRepository) DeleteToolData(ctx context.Context, id string) error {
 		return errors.NotFoundErrorf("toolData not found: %s", id)
 	}
 
-	t.reloadToolInstances()
-
-	return nil
+	return t.reloadToolInstances()
 }
 
 func (t *ToolRepository) reloadToolInstances() error {
 	t.toolInstances = make(map[string]*entities.Tool)
-
 	toolDataList, err := t.ListToolData(context.Background())
 	if err != nil {
+		t.logger.Error("Failed to load tool instances", zap.Error(err))
 		return errors.InternalErrorf("failed to load tool instances: %v", err)
 	}
 
 	for _, toolData := range toolDataList {
 		toolFactoryEntry, err := t.toolFactory.GetFactoryByName(toolData.ToolType)
 		if err != nil {
-			return errors.InternalErrorf("failed to get tool factory: %v", err)
+			t.logger.Warn("Skipping tool due to unknown type", zap.String("tool_type", toolData.ToolType), zap.Error(err))
+			continue
 		}
 		tool := toolFactoryEntry.Factory(toolData.Name, toolData.Description, toolData.Configuration, t.logger)
 		t.toolInstances[toolData.Name] = &tool
