@@ -56,31 +56,14 @@ func main() {
 	chatRepo := repositories.NewMongoChatRepository(db.Collection("chats"))
 	providerRepo := repositories.NewMongoProviderRepository(db.Collection("providers"))
 
-	configurations := map[string]string{
-		"workspace":      cfg.Workspace,
-		"tavily_api_key": cfg.TavilyAPIKey,
-		"brave_api_key":  cfg.BraveAPIKey,
-	}
-
 	toolFactory, err := tools.NewToolFactory()
 	if err != nil {
 		logger.Fatal("Failed to initialize tools", zap.Error(err))
 	}
 
-	toolRepo, err := repositories.NewToolRepository()
+	toolRepo, err := repositories.NewToolRepository(db.Collection("tools"), toolFactory, logger)
 	if err != nil {
 		logger.Fatal("Failed to initialize tools", zap.Error(err))
-	}
-
-	// Initialize tools
-	factories, err := toolFactory.ListFactories()
-	if err != nil {
-		logger.Fatal("Failed to list tool factories", zap.Error(err))
-	}
-
-	for _, entry := range factories {
-		tool := entry.Factory(entry.Name, entry.Description, configurations, logger)
-		toolRepo.RegisterTool(entry.Name, &tool)
 	}
 
 	providerService := services.NewProviderService(providerRepo, logger)
@@ -117,12 +100,14 @@ func main() {
 		"internal/ui/templates/layout.html",
 		"internal/ui/templates/header.html",
 		"internal/ui/templates/sidebar.html",
+		"internal/ui/templates/home.html",
 		"internal/ui/templates/sidebar_chats.html",
 		"internal/ui/templates/sidebar_agents.html",
-		"internal/ui/templates/home.html",
-		"internal/ui/templates/agent_form.html",
-		"internal/ui/templates/chat.html",
+		"internal/ui/templates/sidebar_tools.html",
 		"internal/ui/templates/chat_form.html",
+		"internal/ui/templates/agent_form.html",
+		"internal/ui/templates/tool_form.html",
+		"internal/ui/templates/chat.html",
 		"internal/ui/templates/messages_partial.html",
 		"internal/ui/templates/message_session_partial.html",
 		"internal/ui/templates/provider_form.html",
@@ -137,6 +122,7 @@ func main() {
 	homeController := uicontrollers.NewHomeController(logger, tmpl, chatService, agentService, toolService)
 	agentController := uicontrollers.NewAgentController(logger, tmpl, agentService, toolService, providerService)
 	chatController := uicontrollers.NewChatController(logger, tmpl, chatService, agentService)
+	toolController := uicontrollers.NewToolController(logger, tmpl, toolService)
 	providerController := uicontrollers.NewProviderController(logger, tmpl, providerService)
 
 	// API Controllers
@@ -173,6 +159,7 @@ func main() {
 	homeController.RegisterRoutes(e)
 	agentController.RegisterRoutes(e)
 	chatController.RegisterRoutes(e)
+	toolController.RegisterRoutes(e)
 	providerController.RegisterRoutes(e)
 
 	// API Routes

@@ -42,6 +42,10 @@ func (f *FetchTool) Description() string {
 	return f.description
 }
 
+func (t *FetchTool) Configuration() map[string]string {
+	return t.configuration
+}
+
 func (t *FetchTool) Parameters() []entities.Parameter {
 	return []entities.Parameter{
 		{

@@ -30,17 +30,18 @@ func NewSearchTool(name, description string, configuration map[string]string, lo
 	}
 }
 
-// Name returns the name of the tool.
 func (t *SearchTool) Name() string {
 	return t.name
 }
 
-// Description returns a description of the tool.
 func (t *SearchTool) Description() string {
 	return t.description
 }
 
-// Parameters returns the parameters required by the tool.
+func (t *SearchTool) Configuration() map[string]string {
+	return t.configuration
+}
+
 func (t *SearchTool) Parameters() []entities.Parameter {
 	return []entities.Parameter{
 		{

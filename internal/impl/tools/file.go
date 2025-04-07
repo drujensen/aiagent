@@ -37,6 +37,10 @@ func (t *FileTool) Description() string {
 	return t.description
 }
 
+func (t *FileTool) Configuration() map[string]string {
+	return t.configuration
+}
+
 func (t *FileTool) Parameters() []entities.Parameter {
 	return []entities.Parameter{
 		{

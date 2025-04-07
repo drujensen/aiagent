@@ -39,8 +39,8 @@ func (t *BashTool) Description() string {
 	return t.description
 }
 
-func (t *BashTool) Configuration() []string {
-	return []string{"workspace"}
+func (t *BashTool) Configuration() map[string]string {
+	return t.configuration
 }
 
 func (t *BashTool) Parameters() []entities.Parameter {
