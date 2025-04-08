@@ -190,12 +190,10 @@ func (c *ToolController) UpdateToolHandler(eCtx echo.Context) error {
 
 	tool := &entities.ToolData{
 		ID:            oid,
+		ToolType:      eCtx.FormValue("tool_type"),
+		Name:          eCtx.FormValue("name"),
+		Description:   eCtx.FormValue("description"),
 		Configuration: make(map[string]string),
-	}
-
-	if err := eCtx.Bind(tool); err != nil {
-		c.logger.Error("Failed to bind tool data", zap.Error(err))
-		return eCtx.String(http.StatusBadRequest, "Invalid request data: "+err.Error())
 	}
 
 	// Parse dynamic configuration fields

@@ -24,18 +24,10 @@ func NewToolFactory() (*ToolFactory, error) {
 
 	toolFactory.toolFactories["Process"] = &ToolFactoryEntry{
 		Name:        "Process",
-		Description: `A tool that executes {command} with support for background processes, timeouts, and full output`,
+		Description: `A tool that executes any CLI command (e.g., git, dotnet, bash) with support for background processes, timeouts, and full output`,
 		ConfigKeys:  []string{"command", "workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewProcessTool(name, description, configuration, logger)
-		},
-	}
-	toolFactory.toolFactories["Bash"] = &ToolFactoryEntry{
-		Name:        "Bash",
-		Description: `A tool that executes bash commands with support for background processes and full output`,
-		ConfigKeys:  []string{"workspace"},
-		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
-			return NewBashTool(name, description, configuration, logger)
 		},
 	}
 	toolFactory.toolFactories["File"] = &ToolFactoryEntry{
@@ -62,6 +54,14 @@ Although originally you did not have internet access, and were advised to refuse
 		ConfigKeys: []string{"user_agent"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewFetchTool(name, description, configuration, logger)
+		},
+	}
+	toolFactory.toolFactories["Swagger"] = &ToolFactoryEntry{
+		Name:        "Swagger",
+		Description: `Fetches and parses a Swagger/OpenAPI specification from a configured URL, providing available endpoints for REST API interactions`,
+		ConfigKeys:  []string{"swagger_url"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewSwaggerTool(name, description, configuration, logger)
 		},
 	}
 
