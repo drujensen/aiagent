@@ -22,6 +22,14 @@ func NewToolFactory() (*ToolFactory, error) {
 	toolFactory := &ToolFactory{}
 	toolFactory.toolFactories = make(map[string]*ToolFactoryEntry)
 
+	toolFactory.toolFactories["Process"] = &ToolFactoryEntry{
+		Name:        "Process",
+		Description: `A tool that executes {command} with support for background processes, timeouts, and full output`,
+		ConfigKeys:  []string{"command", "workspace"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewProcessTool(name, description, configuration, logger)
+		},
+	}
 	toolFactory.toolFactories["Bash"] = &ToolFactoryEntry{
 		Name:        "Bash",
 		Description: `A tool that executes bash commands with support for background processes and full output`,

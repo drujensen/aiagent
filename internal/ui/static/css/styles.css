@@ -153,11 +153,13 @@
 }
 
 .chat-item .delete-icon,
+.tool-item .delete-icon,
 .agent-item .delete-icon {
     display: none;
 }
 
 .chat-item:hover .delete-icon,
+.tool-item:hover .delete-icon,
 .agent-item:hover .delete-icon {
     display: inline-block;
 }

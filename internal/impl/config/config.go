@@ -10,13 +10,9 @@ import (
 )
 
 type Config struct {
-	MongoURI     string `mapstructure:"MONGO_URI"`
-	Workspace    string `mapstructure:"WORKSPACE"`
-	TavilyAPIKey string `mapstructure:"TAVILY_API_KEY"`
-	BraveAPIKey  string `mapstructure:"BRAVE_API_KEY"`
-	MCPServerURL string `mapstructure:"MCP_SERVER_URL"`
-	logger       *zap.Logger
-	viper        *viper.Viper
+	MongoURI string `mapstructure:"MONGO_URI"`
+	logger   *zap.Logger
+	viper    *viper.Viper
 }
 
 var (
@@ -68,18 +64,6 @@ func InitConfig() (*Config, error) {
 			initErr = fmt.Errorf("MONGO_URI is required but not set")
 			logger.Error("Missing required configuration", zap.String("field", "MONGO_URI"))
 			return
-		}
-
-		if configInstance.TavilyAPIKey == "" {
-			logger.Warn("TAVILY_API_KEY not set. Tavily Search tool will not work")
-		}
-
-		if configInstance.BraveAPIKey == "" {
-			logger.Warn("BRAVE_API_KEY not set. Brave Search tool will not work")
-		}
-
-		if configInstance.Workspace == "" {
-			logger.Warn("WORKSPACE not set. File tool will not work")
 		}
 	})
 
