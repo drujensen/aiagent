@@ -58,7 +58,7 @@ func (t *FetchTool) Parameters() []entities.Parameter {
 		{
 			Name:        "url",
 			Type:        "string",
-			Description: "The URL to fetch",
+			Description: "The URL to fetch. Must include the protocol (e.g., http:// or https://)",
 			Required:    true,
 		},
 		{
