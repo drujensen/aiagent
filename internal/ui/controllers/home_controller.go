@@ -66,7 +66,6 @@ func (c *HomeController) ChatsPartialHandler(eCtx echo.Context) error {
 			"ID":        chat.ID.Hex(),
 			"ChatName":  chat.Name,
 			"AgentName": agent.Name,
-			"AgentRole": agent.Role,
 		}
 
 		// Append the processed chat data to the slice

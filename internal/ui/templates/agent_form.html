@@ -11,10 +11,6 @@
             <input type="text" id="name" name="name" class="form-control" value="{{.Agent.Name}}" required>
         </div>
         <div class="form-group">
-            <label for="name">Agent Role:</label>
-            <input type="text" id="role" name="role" class="form-control" value="{{.Agent.Role}}" required>
-        </div>
-        <div class="form-group">
             <label for="provider">Provider:</label>
             <select id="provider" name="provider_id" class="form-control" hx-trigger="change" hx-indicator="#provider-loading" required>
                 <option value="">Select Provider</option>
@@ -155,19 +151,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // Clear model dropdown if no provider selected
             modelSelect.innerHTML = '<option value="">Select Provider First</option>';
             return;
-        }
-
-        // Special handling for Ollama provider
-        if (providerId === "local" ||
-            (providerSelect.options[providerSelect.selectedIndex].text.toLowerCase().includes('ollama'))) {
-            // Set the endpoint to Ollama's default if empty
-            if (!endpointInput.value) {
-                endpointInput.value = "http://localhost:11434";
-                endpointInput.dataset.autoSet = 'true';
-            }
-
-            // We'll still let the normal provider loading happen for Ollama
-            // since it might have models configured in the database
         }
 
         // Clear any previous errors

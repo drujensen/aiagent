@@ -193,7 +193,6 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 	agentData := struct {
 		ID            string
 		Name          string
-		Role          string
 		ProviderID    primitive.ObjectID
 		ProviderType  entities.ProviderType
 		Endpoint      string
@@ -210,7 +209,6 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 	if agent != nil {
 		agentData.ID = agent.ID.Hex()
 		agentData.Name = agent.Name
-		agentData.Role = agent.Role
 		agentData.ProviderID = agent.ProviderID
 		agentData.ProviderType = agent.ProviderType
 		agentData.Endpoint = agent.Endpoint
@@ -249,7 +247,6 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 	agent := &entities.Agent{
 		Name:         eCtx.FormValue("name"),
-		Role:         eCtx.FormValue("role"),
 		Endpoint:     eCtx.FormValue("endpoint"),
 		Model:        eCtx.FormValue("model"),
 		APIKey:       eCtx.FormValue("api_key"),
@@ -259,7 +256,6 @@ func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 	// Log the agent details for debugging
 	c.logger.Info("Creating agent",
 		zap.String("name", agent.Name),
-		zap.String("role", agent.Role),
 		zap.String("endpoint", agent.Endpoint),
 		zap.String("model", agent.Model),
 		zap.String("api_key_length", fmt.Sprintf("%d chars", len(agent.APIKey))))
@@ -381,7 +377,6 @@ func (c *AgentController) UpdateAgentHandler(eCtx echo.Context) error {
 	agent := &entities.Agent{
 		ID:           oid,
 		Name:         eCtx.FormValue("name"),
-		Role:         eCtx.FormValue("role"),
 		Endpoint:     eCtx.FormValue("endpoint"),
 		Model:        eCtx.FormValue("model"),
 		APIKey:       eCtx.FormValue("api_key"),

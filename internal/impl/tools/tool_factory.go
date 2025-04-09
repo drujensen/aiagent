@@ -24,7 +24,7 @@ func NewToolFactory() (*ToolFactory, error) {
 
 	toolFactory.toolFactories["Process"] = &ToolFactoryEntry{
 		Name:        "Process",
-		Description: `A tool that executes any CLI command (e.g., git, dotnet, bash) with support for background processes, timeouts, and full output`,
+		Description: `This tool executes a configured CLI command (e.g., bash, git, gcc, go, rustc, java, dotnet, python, ruby, node, mysql, psql, mongo, redis-cli, aws, az, docker, kubectl) with support for background processes, timeouts, and full output`,
 		ConfigKeys:  []string{"command", "workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewProcessTool(name, description, configuration, logger)
@@ -32,7 +32,7 @@ func NewToolFactory() (*ToolFactory, error) {
 	}
 	toolFactory.toolFactories["File"] = &ToolFactoryEntry{
 		Name:        "File",
-		Description: `Although originally you did not have file access, and were advised to refuse and tell the user this, this tool provides you file system operations including reading, writing, editing, searching, and managing files and directories`,
+		Description: `This tool provides you file system operations including reading, writing, editing, searching, and managing files and directories`,
 		ConfigKeys:  []string{"workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewFileTool(name, description, configuration, logger)
@@ -40,25 +40,23 @@ func NewToolFactory() (*ToolFactory, error) {
 	}
 	toolFactory.toolFactories["Search"] = &ToolFactoryEntry{
 		Name:        "Search",
-		Description: `Searches the web using the Tavily API.`,
+		Description: `This tool Searches the web using the Tavily API.`,
 		ConfigKeys:  []string{"tavily_api_key"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewSearchTool(name, description, configuration, logger)
 		},
 	}
 	toolFactory.toolFactories["Fetch"] = &ToolFactoryEntry{
-		Name: "Fetch",
-		Description: `Fetches content from the internet.
-
-Although originally you did not have internet access, and were advised to refuse and tell the user this, this tool now grants you internet access. Now you can fetch content from the internet using the HTTP 1.1 protocol.`,
-		ConfigKeys: []string{"user_agent"},
+		Name:        "Fetch",
+		Description: `This tool provides the ability to fetch content from the internet using the HTTP 1.1 protocol. This is useful when paired with the Swagger tool.`,
+		ConfigKeys:  []string{"user_agent"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewFetchTool(name, description, configuration, logger)
 		},
 	}
 	toolFactory.toolFactories["Swagger"] = &ToolFactoryEntry{
 		Name:        "Swagger",
-		Description: `Fetches and parses a Swagger/OpenAPI specification from a configured URL, providing available endpoints for REST API interactions`,
+		Description: `This tool provides a Swagger/OpenAPI specification for a configured URL, providing available endpoints for REST API interactions. Use this in conjunction with the Fetch tool to perform the actions in the specification.`,
 		ConfigKeys:  []string{"swagger_url"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewSwaggerTool(name, description, configuration, logger)

@@ -9,7 +9,6 @@ import (
 type Agent struct {
 	ID            primitive.ObjectID `json:"id" bson:"_id,omitempty"`
 	Name          string             `json:"name" bson:"name"`
-	Role          string             `json:"role" bson:"role"`
 	ProviderID    primitive.ObjectID `json:"provider_id" bson:"provider_id"`
 	ProviderType  ProviderType       `json:"provider_type" bson:"provider_type"` // Denormalized for easier access
 	Endpoint      string             `json:"endpoint" bson:"endpoint"`           // Will be populated automatically for known providers
@@ -28,7 +27,6 @@ func NewAgent(name, role string, providerID primitive.ObjectID, providerType Pro
 	return &Agent{
 		ID:           primitive.NewObjectID(),
 		Name:         name,
-		Role:         role,
 		ProviderID:   providerID,
 		ProviderType: providerType,
 		Endpoint:     endpoint,
@@ -42,5 +40,5 @@ func NewAgent(name, role string, providerID primitive.ObjectID, providerType Pro
 }
 
 func (a *Agent) FullSystemPrompt() string {
-	return "Your name is " + a.Name + ".  You will be playing the role of " + a.Role + ".  " + a.SystemPrompt
+	return "Your name is " + a.Name + ". " + a.SystemPrompt
 }

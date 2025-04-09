@@ -79,7 +79,6 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 		"ChatName":        chat.Name,
 		"AgentName":       agent.Name,
 		"ChatCost":        chat.Usage.TotalCost,
-		"AgentRole":       agent.Role,
 		"Messages":        chat.Messages,
 	}
 
