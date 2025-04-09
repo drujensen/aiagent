@@ -30,6 +30,14 @@ func NewToolFactory() (*ToolFactory, error) {
 			return NewProcessTool(name, description, configuration, logger)
 		},
 	}
+	toolFactory.toolFactories["Bash"] = &ToolFactoryEntry{
+		Name:        "Bash",
+		Description: `This tool executes a Bash shell with support for background processes, timeouts, and full output`,
+		ConfigKeys:  []string{"workspace"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewBashTool(name, description, configuration, logger)
+		},
+	}
 	toolFactory.toolFactories["File"] = &ToolFactoryEntry{
 		Name:        "File",
 		Description: `This tool provides you file system operations including reading, writing, editing, searching, and managing files and directories`,
