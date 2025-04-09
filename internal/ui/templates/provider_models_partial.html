@@ -2,7 +2,7 @@
 <option value="">Select Model</option>
 <!-- Provider: {{.Provider.Name}} ({{.Provider.Type}}) - Model count: {{len .Models}} -->
 {{range .Models}}
-<option value="{{.Name}}">{{.Name}} (Input: ${{.InputPricePerMille}}/1M tokens, Output: ${{.OutputPricePerMille}}/1M tokens)</option>
+<option value="{{.Name}}">{{.Name}} (In: ${{.InputPricePerMille}}/1M, Out: ${{.OutputPricePerMille}}/1M, Ctx: {{.ContextWindow}})</option>
 {{end}}
 <option value="custom">Custom Model (Enter name below)</option>
 <script>

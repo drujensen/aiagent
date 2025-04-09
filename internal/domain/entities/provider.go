@@ -14,6 +14,7 @@ const (
 	ProviderXAI       ProviderType = "xai"
 	ProviderGoogle    ProviderType = "google"
 	ProviderDeepseek  ProviderType = "deepseek"
+	ProviderTogether  ProviderType = "together"
 	ProviderOllama    ProviderType = "ollama"
 	ProviderGeneric   ProviderType = "generic"
 )

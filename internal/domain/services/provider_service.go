@@ -307,15 +307,47 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			models: []entities.ModelPricing{
 				{
 					Name:                "deepseek-chat",
-					InputPricePerMille:  0.07, // $0.07/M input (unchanged)
-					OutputPricePerMille: 1.10, // $1.10/M output
+					InputPricePerMille:  0.07,
+					OutputPricePerMille: 1.10,
 					ContextWindow:       64000,
 				},
 				{
 					Name:                "deepseek-reasoner",
-					InputPricePerMille:  0.55, // $0.27/M input (per Web ID 8)
-					OutputPricePerMille: 2.19, // $1.10/M output
+					InputPricePerMille:  0.55,
+					OutputPricePerMille: 2.19,
 					ContextWindow:       64000,
+				},
+			},
+		},
+		{
+			name:       "Together",
+			type_:      entities.ProviderTogether,
+			baseURL:    "https://api.together.xyz",
+			apiKeyName: "Together API Key",
+			models: []entities.ModelPricing{
+				{
+					Name:                "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+					InputPricePerMille:  0.27,
+					OutputPricePerMille: 0.85,
+					ContextWindow:       10000000,
+				},
+				{
+					Name:                "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+					InputPricePerMille:  0.18,
+					OutputPricePerMille: 0.59,
+					ContextWindow:       10000000,
+				},
+				{
+					Name:                "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo-classifier",
+					InputPricePerMille:  0.18,
+					OutputPricePerMille: 0.18,
+					ContextWindow:       128000,
+				},
+				{
+					Name:                "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
+					InputPricePerMille:  0.00,
+					OutputPricePerMille: 0.00,
+					ContextWindow:       128000,
 				},
 			},
 		},
@@ -326,26 +358,32 @@ func (s *providerService) createDefaultProviders(ctx context.Context, forceReset
 			apiKeyName: "Local API Key (optional)",
 			models: []entities.ModelPricing{
 				{
-					Name:                "llama3.1:8b", // Updated to latest Llama version
-					InputPricePerMille:  0.00,          // Free (local hosting)
-					OutputPricePerMille: 0.00,
-					ContextWindow:       8192,
-				},
-				{
-					Name:                "mistral-nemo:12b",
-					InputPricePerMille:  0.00, // Free
+					Name:                "llama3.1:8b",
+					InputPricePerMille:  0.00,
 					OutputPricePerMille: 0.00,
 					ContextWindow:       8192,
 				},
 				{
 					Name:                "qwen2.5-coder:14b",
-					InputPricePerMille:  0.00, // Free
+					InputPricePerMille:  0.00,
 					OutputPricePerMille: 0.00,
 					ContextWindow:       8192,
 				},
 				{
-					Name:                "qwen2.5:3b", // Added distilled DeepSeek model
-					InputPricePerMille:  0.00,         // Free via Ollama
+					Name:                "mistral-nemo:12b",
+					InputPricePerMille:  0.00,
+					OutputPricePerMille: 0.00,
+					ContextWindow:       8192,
+				},
+				{
+					Name:                "cogito:14b",
+					InputPricePerMille:  0.00,
+					OutputPricePerMille: 0.00,
+					ContextWindow:       8192,
+				},
+				{
+					Name:                "deepcoder:14b",
+					InputPricePerMille:  0.00,
 					OutputPricePerMille: 0.00,
 					ContextWindow:       8192,
 				},

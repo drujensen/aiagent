@@ -9,16 +9,18 @@
 </h2>
 <ul class="tool-list">
     {{range .Tools}}
-    <li class="tool-item">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <a href="/tools/{{.ID.Hex}}/edit">
-                <i class="fas fa-tools"></i> {{.Name}}
-            </a>
-            <a href="#" class="delete-icon" hx-delete="/tools/{{.ID.Hex}}" hx-confirm="Are you sure you want to delete this tool?" hx-target="#sidebar-tools" hx-swap="innerHTML">
-                <i class="fas fa-trash"></i>
-            </a>
-        </div>
-    </li>
+      <li class="tool-item">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+              <a href="/tools/{{.ID.Hex}}/edit">
+                  <i class="fas fa-tools"></i> {{.Name}}
+              </a>
+              <a href="#" class="delete-icon" hx-delete="/tools/{{.ID.Hex}}" hx-confirm="Are you sure you want to delete this tool?" hx-target="#sidebar-tools" hx-swap="innerHTML">
+                  <i class="fas fa-trash"></i>
+              </a>
+          </div>
+      </li>
+    {{else}}
+      <li>No active tools</li>
     {{end}}
 </ul>
 {{end}}

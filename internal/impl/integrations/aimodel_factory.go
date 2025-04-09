@@ -43,6 +43,8 @@ func (f *AIModelFactory) CreateModelIntegration(agent *entities.Agent, provider 
 		return NewGoogleIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
 	case entities.ProviderDeepseek:
 		return NewDeepseekIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
+	case entities.ProviderTogether:
+		return NewTogetherIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
 	case entities.ProviderOllama:
 		return NewOllamaIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
 	case entities.ProviderGeneric:
