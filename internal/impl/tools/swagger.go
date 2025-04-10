@@ -80,7 +80,7 @@ func (t *SwaggerTool) Execute(arguments string) (string, error) {
 	}
 
 	if !args.Fetch {
-		return `{"message": "No action requested"}`, nil
+		return "", fmt.Errorf("no action requested")
 	}
 
 	swaggerURL := t.configuration["swagger_url"]

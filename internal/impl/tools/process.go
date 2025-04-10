@@ -3,6 +3,7 @@ package tools
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -117,13 +118,13 @@ func (t *ProcessTool) Execute(arguments string) (string, error) {
 	baseCommand := t.configuration["command"]
 	if baseCommand == "" {
 		t.logger.Error("Base command not specified in configuration")
-		return "", nil
+		return "", fmt.Errorf("base command not specified in configuration")
 	}
 
 	workspace := t.configuration["workspace"]
 	if workspace == "" {
 		t.logger.Error("Workspace configuration is missing")
-		return "", nil
+		return "", fmt.Errorf("workspace configuration is missing")
 	}
 
 	if args.Action == "" {
@@ -139,7 +140,7 @@ func (t *ProcessTool) Execute(arguments string) (string, error) {
 		return t.killProcess(args.PID)
 	default:
 		t.logger.Error("Unknown action", zap.String("action", args.Action))
-		return "", nil
+		return "", fmt.Errorf("unknown action: %s", args.Action)
 	}
 }
 
@@ -321,7 +322,7 @@ func (t *ProcessTool) runCommand(baseCommand string, args ProcessArgs, workspace
 func (t *ProcessTool) checkStatus(pid int) (string, error) {
 	if pid == 0 {
 		t.logger.Error("PID is required for status check")
-		return "", nil
+		return "", fmt.Errorf("PID is required for status check")
 	}
 	cmd, exists := t.processes[pid]
 	if !exists {
@@ -350,7 +351,7 @@ func (t *ProcessTool) checkStatus(pid int) (string, error) {
 func (t *ProcessTool) killProcess(pid int) (string, error) {
 	if pid == 0 {
 		t.logger.Error("PID is required for kill")
-		return "", nil
+		return "", fmt.Errorf("PID is required for kill")
 	}
 	cmd, exists := t.processes[pid]
 	if !exists {

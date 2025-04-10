@@ -78,7 +78,7 @@ func (t *SearchTool) Execute(arguments string) (string, error) {
 	t.logger.Info("Search query", zap.String("query", query))
 	if query == "" {
 		t.logger.Error("Search query cannot be empty")
-		return "", nil
+		return "", fmt.Errorf("search query cannot be empty")
 	}
 
 	// Get the Tavily API key from configuration
