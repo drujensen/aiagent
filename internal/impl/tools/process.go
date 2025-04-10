@@ -143,14 +143,75 @@ func (t *ProcessTool) Execute(arguments string) (string, error) {
 	}
 }
 
-func (t *ProcessTool) runCommand(baseCommand string, args ProcessArgs, workspace string) (string, error) {
-	// Split the base command and arguments
-	cmdArgs := []string{baseCommand}
-	if args.Arguments != "" {
-		cmdArgs = append(cmdArgs, strings.Fields(args.Arguments)...)
+// splitShellArgs splits a command string into arguments, respecting quoted strings and escapes
+func splitShellArgs(input string) []string {
+	var args []string
+	var current strings.Builder
+	var inQuote bool
+	var quoteChar rune
+	escaped := false
+
+	input = strings.TrimSpace(input)
+	runes := []rune(input)
+
+	for i := 0; i < len(runes); i++ {
+		ch := runes[i]
+
+		if escaped {
+			current.WriteRune(ch)
+			escaped = false
+			continue
+		}
+
+		if ch == '\\' {
+			escaped = true
+			continue
+		}
+
+		if inQuote {
+			if ch == quoteChar {
+				inQuote = false
+				quoteChar = 0
+				continue
+			}
+			current.WriteRune(ch)
+			continue
+		}
+
+		if ch == '"' || ch == '\'' {
+			inQuote = true
+			quoteChar = ch
+			continue
+		}
+
+		if ch == ' ' || ch == '\t' {
+			if current.Len() > 0 {
+				args = append(args, current.String())
+				current.Reset()
+			}
+			continue
+		}
+
+		current.WriteRune(ch)
 	}
 
-	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+
+	return args
+}
+
+func (t *ProcessTool) runCommand(baseCommand string, args ProcessArgs, workspace string) (string, error) {
+	// Initialize command arguments with the parsed arguments
+	cmdArgs := []string{}
+	if args.Arguments != "" {
+		// Use shell-like splitting to handle quoted arguments correctly
+		cmdArgs = splitShellArgs(args.Arguments)
+	}
+
+	// Create the command with the base command and parsed arguments
+	cmd := exec.Command(baseCommand, cmdArgs...)
 	cmd.Dir = workspace
 	cmd.Env = append(os.Environ(), args.Env...)
 
