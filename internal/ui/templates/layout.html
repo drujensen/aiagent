@@ -26,7 +26,7 @@
                {{.ChatName}} with {{.AgentName}}
            </div>
            <div class="chat-cost">
-               Total Cost: ${{printf "%.2f" .ChatCost}}
+              Tokens: {{formatNumber .TotalTokens}} Cost: ${{printf "%.2f" .ChatCost}}
            </div>
        {{end}}
    </header>

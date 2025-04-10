@@ -13,6 +13,7 @@ import (
 	"aiagent/internal/impl/tools"
 	uicontrollers "aiagent/internal/ui/controllers"
 
+	humanize "github.com/dustin/go-humanize"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	echoSwagger "github.com/swaggo/echo-swagger"
@@ -92,6 +93,9 @@ func main() {
 		},
 		"sub": func(a, b int) int {
 			return a - b
+		},
+		"formatNumber": func(num int) string {
+			return humanize.Comma(int64(num))
 		},
 	}
 
