@@ -2,6 +2,7 @@ package tools
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"aiagent/internal/domain/entities"
 
+	"github.com/dustin/go-humanize"
 	"github.com/pmezard/go-difflib/difflib"
 	"go.uber.org/zap"
 )
@@ -312,7 +314,7 @@ func (t *FileTool) applyEdits(filePath string, edits []EditOperation, dryRun boo
 	for _, edit := range edits {
 		if !strings.Contains(modified, edit.OldText) {
 			t.logger.Error("Edit text not found", zap.String("oldText", edit.OldText))
-			return "", nil
+			return "", fmt.Errorf("edit failed: text '%s' not found in file", edit.OldText)
 		}
 		modified = strings.ReplaceAll(modified, edit.OldText, edit.NewText)
 	}
@@ -393,11 +395,20 @@ func (t *FileTool) searchFiles(rootPath, pattern string, excludePatterns []strin
 		}
 		return nil
 	})
-	return results, err
+	if err != nil {
+		t.logger.Error("Failed to search files", zap.String("path", rootPath), zap.Error(err))
+		return nil, err
+	}
+	if len(results) == 0 {
+		t.logger.Warn("No matches found during file search", zap.String("pattern", pattern), zap.String("path", rootPath))
+		return nil, fmt.Errorf("no matches found for pattern '%s' in path '%s'", pattern, rootPath)
+	}
+	t.logger.Info("Files searched successfully", zap.String("path", rootPath), zap.Int("matches", len(results)))
+	return results, nil
 }
 
 func formatSize(size int64) string {
-	return string(size) // Could be enhanced with human-readable formatting
+	return humanize.Bytes(uint64(size))
 }
 
 func boolToString(b bool) string {
