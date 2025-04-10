@@ -140,7 +140,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 
 	if args.Operation == "" || args.Path == "" {
 		t.logger.Error("Operation and path are required")
-		return "", nil
+		return "", fmt.Errorf("operation and path are required")
 	}
 
 	switch args.Operation {
@@ -160,7 +160,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	case "write":
 		if args.Content == "" {
 			t.logger.Error("Content is required for write operation")
-			return "", nil
+			return "", fmt.Errorf("content is required")
 		}
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
@@ -177,7 +177,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	case "edit":
 		if len(args.Edits) == 0 {
 			t.logger.Error("Edits array is required for edit operation")
-			return "", nil
+			return "", fmt.Errorf("edits array is required")
 		}
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
@@ -236,7 +236,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	case "move":
 		if args.Destination == "" {
 			t.logger.Error("Destination is required for move operation")
-			return "", nil
+			return "", fmt.Errorf("destination is required")
 		}
 		srcPath, err := t.validatePath(args.Path)
 		if err != nil {
@@ -257,7 +257,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	case "search":
 		if args.Pattern == "" {
 			t.logger.Error("Pattern is required for search operation")
-			return "", nil
+			return "", fmt.Errorf("pattern is required")
 		}
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
@@ -298,7 +298,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 
 	default:
 		t.logger.Error("Unknown operation", zap.String("operation", args.Operation))
-		return "", nil
+		return "", fmt.Errorf("unknown operation: %s", args.Operation)
 	}
 }
 
@@ -379,7 +379,7 @@ func (t *FileTool) searchFiles(rootPath, pattern string, excludePatterns []strin
 	var results []string
 	err := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil // Skip errors
+			return err
 		}
 		relPath, _ := filepath.Rel(rootPath, path)
 		for _, exclude := range excludePatterns {

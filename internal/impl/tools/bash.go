@@ -3,6 +3,7 @@ package tools
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
@@ -116,13 +117,13 @@ func (t *BashTool) Execute(arguments string) (string, error) {
 
 	if args.Command == "" && args.Action == "" {
 		t.logger.Error("Command or action is required")
-		return "", nil
+		return "", fmt.Errorf("command or action is required")
 	}
 
 	workspace := t.configuration["workspace"]
 	if workspace == "" {
 		t.logger.Error("Workspace configuration is missing")
-		return "", nil
+		return "", fmt.Errorf("workspace configuration is missing")
 	}
 
 	// Default action to "run" if not specified
@@ -251,7 +252,7 @@ func (t *BashTool) runCommand(args BashArgs, workspace string) (string, error) {
 func (t *BashTool) checkStatus(pid int) (string, error) {
 	if pid == 0 {
 		t.logger.Error("PID is required for status check")
-		return "", nil
+		return "", fmt.Errorf("PID is required for status check")
 	}
 	cmd, exists := t.processes[pid]
 	if !exists {
@@ -280,7 +281,7 @@ func (t *BashTool) checkStatus(pid int) (string, error) {
 func (t *BashTool) killProcess(pid int) (string, error) {
 	if pid == 0 {
 		t.logger.Error("PID is required for kill")
-		return "", nil
+		return "", fmt.Errorf("PID is required for kill")
 	}
 	cmd, exists := t.processes[pid]
 	if !exists {
