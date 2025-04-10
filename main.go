@@ -13,7 +13,7 @@ import (
 	"aiagent/internal/impl/tools"
 	uicontrollers "aiagent/internal/ui/controllers"
 
-	humanize "github.com/dustin/go-humanize"
+	"github.com/dustin/go-humanize"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	echoSwagger "github.com/swaggo/echo-swagger"
