@@ -73,7 +73,7 @@ func convertToBaseMessages(messages []*entities.Message) []map[string]interface{
 		}
 		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
 			apiMsg["tool_calls"] = msg.ToolCalls
-			// Provide default content if none exists, to avoid empty string issues
+
 			if msg.Content == "" {
 				apiMsg["content"] = "Executing tool call."
 			} else {
@@ -90,7 +90,6 @@ func convertToBaseMessages(messages []*entities.Message) []map[string]interface{
 	return apiMessages
 }
 
-// GenerateResponse generates a response from the Base API
 func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]interface{}) ([]*entities.Message, error) {
 	// Check for cancellation
 	if ctx.Err() == context.Canceled {

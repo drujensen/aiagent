@@ -187,6 +187,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 
 	resolvedAPIKey, err := s.config.ResolveAPIKey(agent.APIKey)
 	if err != nil {
+		s.logger.Error("Failed to resolve API key", zap.String("agent_id", agent.ID.Hex()), zap.Error(err))
 		return nil, errors.InternalErrorf("failed to resolve API key for agent %s: %v", agent.ID.Hex(), err)
 	}
 
@@ -194,6 +195,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
 	aiModel, err := aiModelFactory.CreateModelIntegration(agent, provider, resolvedAPIKey)
 	if err != nil {
+		s.logger.Error("Failed to create AI model integration", zap.String("agent_id", agent.ID.Hex()), zap.Error(err))
 		return nil, errors.InternalErrorf("failed to initialize AI model: %v", err)
 	}
 
@@ -202,12 +204,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 		contextLength = *agent.ContextWindow
 	}
 
-	maxTokens := 4096
-	if agent.MaxTokens != nil {
-		maxTokens = *agent.MaxTokens
-	}
-
-	tokenLimit := contextLength - maxTokens
+	tokenLimit := contextLength
 
 	// Create system message
 	systemMessage := &entities.Message{
@@ -230,7 +227,6 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 
 	// Always start with the system message
 	messagesToSend = append(messagesToSend, systemMessage)
-	currentTokens := systemTokens
 
 	// Check if we need to compress messages
 	totalMessageTokens := systemTokens
@@ -238,46 +234,33 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 		totalMessageTokens += estimateTokens(&chat.Messages[i])
 	}
 
+	s.logger.Debug("Total message tokens: ", zap.Float64("total_message_tokens", float64(totalMessageTokens)), zap.Float64("compression_threshold", compressionThreshold))
 	if float64(totalMessageTokens) > compressionThreshold && len(chat.Messages) > 0 {
 		// Compress messages
 		compressedMessages, originalMessagesReplaced, err := s.compressMessages(ctx, chat, agent, provider, resolvedAPIKey, tokenLimit)
 		if err != nil {
 			s.logger.Warn("Failed to compress messages", zap.Error(err))
-			// Fall back to normal message selection if compression fails
 			var tempMessages []*entities.Message
 			for i := len(chat.Messages) - 1; i >= 0; i-- {
 				msg := chat.Messages[i]
-				msgTokens := estimateTokens(&msg)
-				if currentTokens+msgTokens > tokenLimit {
-					break
-				}
 				tempMessages = append([]*entities.Message{&msg}, tempMessages...)
-				currentTokens += msgTokens
 			}
 			messagesToSend = append(messagesToSend, tempMessages...)
 		} else {
-			// If we successfully compressed messages, update the chat's messages array
 			if originalMessagesReplaced {
-				// Save the updated chat with compressed messages to the database
 				if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
 					s.logger.Warn("Failed to update chat with compressed messages", zap.Error(err))
-					// Continue with the compressed messages in memory even if save failed
 				}
 			}
 			messagesToSend = append(messagesToSend, compressedMessages...)
 		}
 	} else {
-		// Normal message selection within token limit
 		var tempMessages []*entities.Message
 		for i := len(chat.Messages) - 1; i >= 0; i-- {
 			msg := chat.Messages[i]
-			msgTokens := estimateTokens(&msg)
-			if currentTokens+msgTokens > tokenLimit {
-				break
-			}
 			tempMessages = append([]*entities.Message{&msg}, tempMessages...)
-			currentTokens += msgTokens
 		}
+
 		messagesToSend = append(messagesToSend, tempMessages...)
 	}
 
@@ -297,10 +280,13 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 
 	options := map[string]interface{}{
 		"temperature": 0.0,
-		"max_tokens":  maxTokens,
+		"max_tokens":  4096,
 	}
 	if agent.Temperature != nil {
 		options["temperature"] = *agent.Temperature
+	}
+	if agent.MaxTokens != nil {
+		options["max_tokens"] = *agent.MaxTokens
 	}
 
 	newMessages, err := aiModel.GenerateResponse(ctx, messagesToSend, tools, options)
@@ -384,6 +370,7 @@ func (s *chatService) compressMessages(
 	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
 	aiModel, err := aiModelFactory.CreateModelIntegration(agent, provider, apiKey)
 	if err != nil {
+		s.logger.Error("Failed to create AI model integration for summarization", zap.String("agent_id", agent.ID.Hex()), zap.Error(err))
 		return nil, false, errors.InternalErrorf("failed to initialize AI model for summarization: %v", err)
 	}
 
@@ -416,10 +403,12 @@ func (s *chatService) compressMessages(
 
 	summaryResponse, err := aiModel.GenerateResponse(ctx, historyMsgs, nil, options)
 	if err != nil {
+		s.logger.Error("Failed to generate summary", zap.Error(err))
 		return nil, false, errors.InternalErrorf("failed to generate summary: %v", err)
 	}
 
 	if len(summaryResponse) == 0 {
+		s.logger.Warn("No summary generated")
 		return nil, false, fmt.Errorf("no summary generated")
 	}
 

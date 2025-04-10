@@ -28,7 +28,7 @@ type Message struct {
 	Content    string     `json:"content" bson:"content"`
 	ToolCallID string     `json:"tool_call_id,omitempty" bson:"tool_call_id,omitempty"`
 	ToolCalls  []ToolCall `json:"tool_calls" bson:"tool_calls"`
-	Usage      *Usage     `json:"usage,omitempty" bson:"usage,omitempty"` // Usage metrics for this message
+	Usage      *Usage     `json:"usage,omitempty" bson:"usage,omitempty"`
 	Timestamp  time.Time  `json:"timestamp" bson:"timestamp"`
 }
 
