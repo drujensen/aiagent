@@ -80,8 +80,19 @@ ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
 # Install asdf
-RUN echo "Downloading asdf version v0.16.5 for linux-arm64" && \
-    curl -fSL -o /tmp/asdf.tar.gz "https://github.com/asdf-vm/asdf/releases/download/v0.16.5/asdf-v0.16.5-linux-arm64.tar.gz" && \
+RUN ARCH=$(uname -m) && \
+    echo "Detected architecture: ${ARCH}" && \
+    ASDF_ARCHIVE_URL="https://github.com/asdf-vm/asdf/releases/download/v0.16.5" && \
+    if [ "${ARCH}" = "aarch64" ]; then \
+        ASDF_ARCHIVE_URL="${ASDF_ARCHIVE_URL}/asdf-v0.16.5-linux-arm64.tar.gz"; \
+    elif [ "${ARCH}" = "x86_64" ]; then \
+        ASDF_ARCHIVE_URL="${ASDF_ARCHIVE_URL}/asdf-v0.16.5-linux-amd64.tar.gz"; \
+    else \
+        echo "Unsupported architecture: ${ARCH}"; \
+        exit 1; \
+    fi && \
+    echo "Downloading asdf from $ASDF_ARCHIVE_URL" && \
+    curl -fSLk -o /tmp/asdf.tar.gz "${ASDF_ARCHIVE_URL}" && \
     mkdir -p /opt/asdf && \
     tar -xzf /tmp/asdf.tar.gz -C /opt/asdf && \
     chmod +x /opt/asdf/asdf && \
