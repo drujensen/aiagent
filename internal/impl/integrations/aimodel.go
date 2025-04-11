@@ -132,7 +132,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			"type": "function",
 			"function": map[string]interface{}{
 				"name":        (*tool).Name(),
-				"description": (*tool).Description(),
+				"description": (*tool).FullDescription(),
 				"parameters": map[string]interface{}{
 					"type":       "object",
 					"properties": properties,

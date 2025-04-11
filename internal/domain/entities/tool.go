@@ -32,6 +32,7 @@ type Parameter struct {
 type Tool interface {
 	Name() string
 	Description() string
+	FullDescription() string
 	Configuration() map[string]string
 	Parameters() []Parameter
 	Execute(arguments string) (string, error)

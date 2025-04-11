@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 
@@ -42,6 +43,26 @@ func (t *BashTool) Description() string {
 
 func (t *BashTool) Configuration() map[string]string {
 	return t.configuration
+}
+
+func (t *BashTool) FullDescription() string {
+	var b strings.Builder
+
+	// Add description
+	b.WriteString(t.Description())
+	b.WriteString("\n\n")
+
+	// Add configuration header
+	b.WriteString("Configuration for this tool:\n")
+	b.WriteString("| Key           | Value         |\n")
+	b.WriteString("|---------------|---------------|\n")
+
+	// Loop through configuration and add key-value pairs to the table
+	for key, value := range t.Configuration() {
+		b.WriteString(fmt.Sprintf("| %-13s | %-13s |\n", key, value))
+	}
+
+	return b.String()
 }
 
 func (t *BashTool) Parameters() []entities.Parameter {

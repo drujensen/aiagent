@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"aiagent/internal/domain/entities"
 
@@ -40,6 +41,26 @@ func (t *SearchTool) Description() string {
 
 func (t *SearchTool) Configuration() map[string]string {
 	return t.configuration
+}
+
+func (t *SearchTool) FullDescription() string {
+	var b strings.Builder
+
+	// Add description
+	b.WriteString(t.Description())
+	b.WriteString("\n\n")
+
+	// Add configuration header
+	b.WriteString("Configuration for this tool:\n")
+	b.WriteString("| Key           | Value         |\n")
+	b.WriteString("|---------------|---------------|\n")
+
+	// Loop through configuration and add key-value pairs to the table
+	for key, value := range t.Configuration() {
+		b.WriteString(fmt.Sprintf("| %-13s | %-13s |\n", key, value))
+	}
+
+	return b.String()
 }
 
 func (t *SearchTool) Parameters() []entities.Parameter {

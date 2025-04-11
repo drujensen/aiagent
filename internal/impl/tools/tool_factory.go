@@ -70,6 +70,14 @@ func NewToolFactory() (*ToolFactory, error) {
 			return NewSwaggerTool(name, description, configuration, logger)
 		},
 	}
+	toolFactory.toolFactories["Memory"] = &ToolFactoryEntry{
+		Name:        "Memory",
+		Description: `This tool manages a knowledge graph with entities, relations, and observations, allowing creation, modification, deletion, and querying of structured data.`,
+		ConfigKeys:  []string{"mongo_uri", "mongo_collection"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewMemoryTool(name, description, configuration, logger)
+		},
+	}
 
 	return toolFactory, nil
 }
