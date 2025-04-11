@@ -1,6 +1,6 @@
 services:
-  http:
-    container_name: http
+  aiagent:
+    container_name: aiagent
     image: "drujensen/aiagent:latest"
     build: .
     ports:
