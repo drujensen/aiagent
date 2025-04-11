@@ -102,7 +102,7 @@ RUN ARCH=$(uname -m) && \
 # Install MongoDB shell
 RUN curl -fsSL https://pgp.mongodb.com/server-7.0.asc | \
     gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
-RUN echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/7.0 multiverse" | \
+RUN echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/7.0 multiverse" | \
     tee /etc/apt/sources.list.d/mongodb-org-7.0.list
 RUN apt-get update -qq && \
     apt-get install -qq -y mongodb-mongosh && \
