@@ -1,11 +1,5 @@
 package entities
 
-import (
-	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
-)
-
 type ProviderType string
 
 const (
@@ -29,27 +23,23 @@ type ModelPricing struct {
 
 // Provider represents an AI model provider
 type Provider struct {
-	ID         primitive.ObjectID `json:"id" bson:"_id,omitempty"`
-	Name       string             `json:"name" bson:"name"`
-	Type       ProviderType       `json:"type" bson:"type"`
-	BaseURL    string             `json:"base_url" bson:"base_url"`
-	APIKeyName string             `json:"api_key_name" bson:"api_key_name"` // Name to display for the API key field
-	Models     []ModelPricing     `json:"models" bson:"models"`
-	CreatedAt  time.Time          `json:"created_at" bson:"created_at"`
-	UpdatedAt  time.Time          `json:"updated_at" bson:"updated_at"`
+	ID         string         `json:"id" bson:"id"` // UUID as string
+	Name       string         `json:"name" bson:"name"`
+	Type       ProviderType   `json:"type" bson:"type"`
+	BaseURL    string         `json:"base_url" bson:"base_url"`
+	APIKeyName string         `json:"api_key_name" bson:"api_key_name"` // Name to display for the API key field
+	Models     []ModelPricing `json:"models" bson:"models"`
 }
 
 // NewProvider creates a new provider with the specified attributes
-func NewProvider(name string, providerType ProviderType, baseURL, apiKeyName string, models []ModelPricing) *Provider {
+func NewProvider(id, name string, providerType ProviderType, baseURL, apiKeyName string, models []ModelPricing) *Provider {
 	return &Provider{
-		ID:         primitive.NewObjectID(),
+		ID:         id,
 		Name:       name,
 		Type:       providerType,
 		BaseURL:    baseURL,
 		APIKeyName: apiKeyName,
 		Models:     models,
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
 	}
 }
 
