@@ -143,7 +143,7 @@ COPY --chown=ubuntu:ubuntu .env ./
 COPY --chown=ubuntu:ubuntu . .
 
 # Build the Go application
-RUN go build -o main main.go
+RUN go build -o main cmd/server/main.go
 
 EXPOSE 8080
 
