@@ -23,19 +23,13 @@ func NewToolFactory() (*ToolFactory, error) {
 	toolFactory.toolFactories = make(map[string]*ToolFactoryEntry)
 
 	toolFactory.toolFactories["Process"] = &ToolFactoryEntry{
-		Name:        "Process",
-		Description: `This tool executes a configured CLI command (e.g., bash, git, gcc, go, rustc, java, dotnet, python, ruby, node, mysql, psql, mongo, redis-cli, aws, az, docker, kubectl) with support for background processes, timeouts, and full output`,
-		ConfigKeys:  []string{"command", "workspace"},
+		Name: "Process",
+		Description: `This tool executes a configured CLI command (e.g., bash, git, gcc, go, rustc, java, dotnet, python, ruby, node, mysql, psql, mongo, redis-cli, aws, az, docker, kubectl) with support for background processes, timeouts, and full output.
+
+The command is executed in the workspace directory.  The extraArgs are prepended with the arguments passed to the tool.`,
+		ConfigKeys: []string{"workspace", "command", "extraArgs"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewProcessTool(name, description, configuration, logger)
-		},
-	}
-	toolFactory.toolFactories["Bash"] = &ToolFactoryEntry{
-		Name:        "Bash",
-		Description: `This tool executes a Bash shell with support for background processes, timeouts, and full output`,
-		ConfigKeys:  []string{"workspace"},
-		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
-			return NewBashTool(name, description, configuration, logger)
 		},
 	}
 	toolFactory.toolFactories["File"] = &ToolFactoryEntry{

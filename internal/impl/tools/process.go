@@ -18,7 +18,7 @@ import (
 type ProcessTool struct {
 	name          string
 	description   string
-	configuration map[string]string // Includes "command" (e.g., "git") and "workspace"
+	configuration map[string]string // Includes "command" (e.g., "git"), "workspace", and "extraArgs"
 	logger        *zap.Logger
 	processes     map[int]*exec.Cmd // Track background processes by PID
 }
@@ -224,14 +224,22 @@ func splitShellArgs(input string) []string {
 }
 
 func (t *ProcessTool) runCommand(baseCommand string, args ProcessArgs, workspace string) (string, error) {
-	// Initialize command arguments with the parsed arguments
-	cmdArgs := []string{}
-	if args.Arguments != "" {
-		// Use shell-like splitting to handle quoted arguments correctly
-		cmdArgs = splitShellArgs(args.Arguments)
+	// Initialize command arguments
+	var cmdArgs []string
+
+	// Add extraArgs from configuration if present
+	if extraArgs, exists := t.configuration["extraArgs"]; exists && extraArgs != "" {
+		extraArgsParsed := splitShellArgs(extraArgs)
+		cmdArgs = append(cmdArgs, extraArgsParsed...)
 	}
 
-	// Create the command with the base command and parsed arguments
+	// Append arguments from ProcessArgs if provided
+	if args.Arguments != "" {
+		parsedArgs := splitShellArgs(args.Arguments)
+		cmdArgs = append(cmdArgs, parsedArgs...)
+	}
+
+	// Create the command with the base command and combined arguments
 	cmd := exec.Command(baseCommand, cmdArgs...)
 	cmd.Dir = workspace
 	cmd.Env = append(os.Environ(), args.Env...)
@@ -246,7 +254,7 @@ func (t *ProcessTool) runCommand(baseCommand string, args ProcessArgs, workspace
 		if err != nil {
 			t.logger.Error("Failed to start background command",
 				zap.String("command", baseCommand),
-				zap.String("arguments", args.Arguments),
+				zap.Strings("arguments", cmdArgs),
 				zap.Error(err))
 			return "", err
 		}
@@ -254,7 +262,7 @@ func (t *ProcessTool) runCommand(baseCommand string, args ProcessArgs, workspace
 		t.processes[pid] = cmd
 		t.logger.Info("Background command started",
 			zap.String("command", baseCommand),
-			zap.String("arguments", args.Arguments),
+			zap.Strings("arguments", cmdArgs),
 			zap.Int("pid", pid))
 		resp := ProcessResponse{
 			Stdout: "Command started in background",
@@ -282,7 +290,7 @@ func (t *ProcessTool) runCommand(baseCommand string, args ProcessArgs, workspace
 			if err != nil {
 				t.logger.Error("Command execution failed",
 					zap.String("command", baseCommand),
-					zap.String("arguments", args.Arguments),
+					zap.Strings("arguments", cmdArgs),
 					zap.Error(err),
 					zap.String("stderr", stderr.String()))
 				resp := ProcessResponse{
@@ -299,7 +307,7 @@ func (t *ProcessTool) runCommand(baseCommand string, args ProcessArgs, workspace
 			}
 			t.logger.Info("Command executed successfully",
 				zap.String("command", baseCommand),
-				zap.String("arguments", args.Arguments))
+				zap.Strings("arguments", cmdArgs))
 			return t.toJSON(resp)
 		case <-timer.C:
 			if cmd.Process != nil {
@@ -307,7 +315,7 @@ func (t *ProcessTool) runCommand(baseCommand string, args ProcessArgs, workspace
 			}
 			t.logger.Warn("Command timed out",
 				zap.String("command", baseCommand),
-				zap.String("arguments", args.Arguments),
+				zap.Strings("arguments", cmdArgs),
 				zap.Int("timeout", args.Timeout))
 			resp := ProcessResponse{
 				Stdout: out.String(),
@@ -327,14 +335,14 @@ func (t *ProcessTool) runCommand(baseCommand string, args ProcessArgs, workspace
 		resp.Status = "failed"
 		t.logger.Error("Command execution failed",
 			zap.String("command", baseCommand),
-			zap.String("arguments", args.Arguments),
+			zap.Strings("arguments", cmdArgs),
 			zap.Error(err),
 			zap.String("stderr", stderr.String()))
 	} else {
 		resp.Status = "completed"
 		t.logger.Info("Command executed successfully",
 			zap.String("command", baseCommand),
-			zap.String("arguments", args.Arguments))
+			zap.Strings("arguments", cmdArgs))
 	}
 	return t.toJSON(resp)
 }
