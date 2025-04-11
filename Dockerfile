@@ -99,6 +99,15 @@ RUN ARCH=$(uname -m) && \
     chmod +x /opt/asdf/asdf && \
     ln -s /opt/asdf/asdf /usr/bin/asdf
 
+# Install MongoDB shell
+RUN curl -fsSL https://pgp.mongodb.com/server-7.0.asc | \
+    gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
+RUN echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/7.0 multiverse" | \
+    tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+RUN apt-get update -qq && \
+    apt-get install -qq -y mongodb-mongosh && \
+    rm -rf /var/lib/apt/lists/*
+
 # Switch to ubuntu
 USER ubuntu
 WORKDIR /home/ubuntu
@@ -140,15 +149,6 @@ RUN /usr/bin/asdf install python
 
 RUN /usr/bin/asdf plugin add ruby
 RUN /usr/bin/asdf install ruby
-
-# Install MongoDB shell
-RUN curl -fsSL https://pgp.mongodb.com/server-7.0.asc | \
-    gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
-RUN echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/7.0 multiverse" | \
-    tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-RUN apt-get update -qq && \
-    apt-get install -qq -y mongodb-mongosh && \
-    && rm -rf /var/lib/apt/lists/*
 
 # Copy Go project files
 COPY --chown=ubuntu:ubuntu go.mod go.sum ./
