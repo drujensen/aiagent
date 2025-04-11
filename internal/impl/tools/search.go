@@ -43,6 +43,10 @@ func (t *SearchTool) Configuration() map[string]string {
 	return t.configuration
 }
 
+func (t *SearchTool) UpdateConfiguration(config map[string]string) {
+	t.configuration = config
+}
+
 func (t *SearchTool) FullDescription() string {
 	var b strings.Builder
 

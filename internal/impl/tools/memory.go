@@ -81,6 +81,10 @@ func (t *MemoryTool) Configuration() map[string]string {
 	return t.configuration
 }
 
+func (t *MemoryTool) UpdateConfiguration(config map[string]string) {
+	t.configuration = config
+}
+
 func (t *MemoryTool) FullDescription() string {
 	var b strings.Builder
 	b.WriteString(t.Description())

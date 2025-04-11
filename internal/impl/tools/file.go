@@ -43,6 +43,10 @@ func (t *FileTool) Configuration() map[string]string {
 	return t.configuration
 }
 
+func (t *FileTool) UpdateConfiguration(config map[string]string) {
+	t.configuration = config
+}
+
 func (t *FileTool) FullDescription() string {
 	var b strings.Builder
 

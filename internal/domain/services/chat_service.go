@@ -185,10 +185,27 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 		provider = providerByType
 	}
 
-	resolvedAPIKey, err := s.config.ResolveAPIKey(agent.APIKey)
+	resolvedAPIKey, err := s.config.ResolveEnvironmentVariable(agent.APIKey)
 	if err != nil {
 		s.logger.Error("Failed to resolve API key", zap.String("agent_id", agent.ID.Hex()), zap.Error(err))
 		return nil, errors.InternalErrorf("failed to resolve API key for agent %s: %v", agent.ID.Hex(), err)
+	}
+
+	// Resolve tool configurations
+	tools := []*entities.Tool{}
+	for _, toolName := range agent.Tools {
+		tool, err := s.toolRepo.GetToolByName(toolName)
+		if err != nil {
+			return nil, errors.InternalErrorf("failed to get tool %s: %v", toolName, err)
+		}
+		// Resolve environment variables in tool configuration
+		resolvedConfig, err := s.config.ResolveConfiguration((*tool).Configuration())
+		if err != nil {
+			return nil, errors.InternalErrorf("failed to resolve configuration for tool %s: %v", toolName, err)
+		}
+		// Update tool with resolved configuration
+		(*tool).UpdateConfiguration(resolvedConfig)
+		tools = append(tools, tool)
 	}
 
 	// Create AI model integration based on provider type
@@ -262,15 +279,6 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 		}
 
 		messagesToSend = append(messagesToSend, tempMessages...)
-	}
-
-	tools := []*entities.Tool{}
-	for _, toolName := range agent.Tools {
-		tool, err := s.toolRepo.GetToolByName(toolName)
-		if err != nil {
-			return nil, errors.InternalErrorf("failed to get tool %s: %v", toolName, err)
-		}
-		tools = append(tools, tool)
 	}
 
 	// Check for cancellation

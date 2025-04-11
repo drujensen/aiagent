@@ -42,6 +42,10 @@ func (t *SwaggerTool) Configuration() map[string]string {
 	return t.configuration
 }
 
+func (t *SwaggerTool) UpdateConfiguration(config map[string]string) {
+	t.configuration = config
+}
+
 func (t *SwaggerTool) FullDescription() string {
 	var b strings.Builder
 

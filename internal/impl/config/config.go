@@ -77,30 +77,42 @@ func InitConfig() (*Config, error) {
 	return configInstance, nil
 }
 
-func (c *Config) ResolveAPIKey(apiKey string) (string, error) {
+func (c *Config) ResolveEnvironmentVariable(value string) (string, error) {
 	const prefix, suffix = "#{", "}#"
-	if strings.HasPrefix(apiKey, prefix) && strings.HasSuffix(apiKey, suffix) {
-		varName := strings.TrimSuffix(strings.TrimPrefix(apiKey, prefix), suffix)
+	if strings.HasPrefix(value, prefix) && strings.HasSuffix(value, suffix) {
+		varName := strings.TrimSuffix(strings.TrimPrefix(value, prefix), suffix)
 		if varName == "" {
-			return "", fmt.Errorf("empty variable name in API key reference: %s", apiKey)
+			return "", fmt.Errorf("empty variable name in reference: %s", value)
 		}
 
-		resolved := c.viper.GetString(varName) // Use c.viper instead of viper
+		resolved := c.viper.GetString(varName)
 		if resolved == "" {
-			c.logger.Warn("Environment variable not found for API key reference",
-				zap.String("reference", apiKey),
+			c.logger.Warn("Environment variable not found for reference",
+				zap.String("reference", value),
 				zap.String("var_name", varName))
-			return "", fmt.Errorf("environment variable '%s' not found for API key reference", varName)
+			return "", fmt.Errorf("environment variable '%s' not found", varName)
 		}
 
-		c.logger.Debug("Resolved API key from environment variable",
+		c.logger.Debug("Resolved environment variable",
 			zap.String("var_name", varName),
 			zap.String("resolved", maskKey(resolved)))
 		return resolved, nil
 	}
 
-	c.logger.Debug("Using raw API key value", zap.String("value", maskKey(apiKey)))
-	return apiKey, nil
+	c.logger.Debug("Using raw value", zap.String("value", maskKey(value)))
+	return value, nil
+}
+
+func (c *Config) ResolveConfiguration(config map[string]string) (map[string]string, error) {
+	resolvedConfig := make(map[string]string)
+	for key, value := range config {
+		resolvedValue, err := c.ResolveEnvironmentVariable(value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve configuration for key '%s': %w", key, err)
+		}
+		resolvedConfig[key] = resolvedValue
+	}
+	return resolvedConfig, nil
 }
 
 func maskKey(key string) string {

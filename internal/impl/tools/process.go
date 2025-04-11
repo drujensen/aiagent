@@ -45,6 +45,10 @@ func (t *ProcessTool) Configuration() map[string]string {
 	return t.configuration
 }
 
+func (t *ProcessTool) UpdateConfiguration(config map[string]string) {
+	t.configuration = config
+}
+
 func (t *ProcessTool) FullDescription() string {
 	var b strings.Builder
 

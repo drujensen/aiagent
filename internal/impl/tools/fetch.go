@@ -46,6 +46,10 @@ func (t *FetchTool) Configuration() map[string]string {
 	return t.configuration
 }
 
+func (t *FetchTool) UpdateConfiguration(config map[string]string) {
+	t.configuration = config
+}
+
 func (t *FetchTool) FullDescription() string {
 	var b strings.Builder
 

@@ -36,4 +36,5 @@ type Tool interface {
 	Configuration() map[string]string
 	Parameters() []Parameter
 	Execute(arguments string) (string, error)
+	UpdateConfiguration(config map[string]string)
 }
