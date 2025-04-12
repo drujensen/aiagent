@@ -46,7 +46,7 @@
 
 .chat-title {
     color: #fff;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: bold;
     text-align: center;
     position: absolute;
@@ -58,22 +58,21 @@
 
 .chat-cost {
     color: #aaa;
-    font-size: 16px;
+    font-size: 14px;
     position: absolute;
-    right: 15px;
+    right: 60px;
     top: 50%;
     transform: translateY(-50%);
 }
 
 .hamburger {
-    display: none;
     font-size: 24px;
     color: #fff;
     background: none;
     border: none;
     cursor: pointer;
     padding: 10px;
-    order: 1;
+    order: 2;
 }
 
 .container {
@@ -86,14 +85,24 @@
     color: #aaa;
 }
 
-/* Sidebar with full-width capability */
+/* Sidebar with column integration */
 .sidebar {
     background-color: #2c2c2c;
-    padding: 20px 15px; /* Add padding for readability */
-    border-right: 1px solid #444;
+    padding: 20px 15px;
+    border-left: 1px solid #444; /* Changed to border-left for right-side alignment */
     overflow-y: auto;
     transition: transform 0.3s ease-in-out;
-    position: relative;
+    position: fixed;
+    top: 60px; /* Below header */
+    right: 0; /* Align to right */
+    width: 300px; /* Fixed width for mobile */
+    height: calc(100vh - 60px);
+    z-index: 1000;
+    transform: translateX(100%); /* Hidden by default (off-screen to the right) */
+}
+
+.sidebar.active {
+    transform: translateX(0); /* Visible when active */
 }
 
 .sidebar h2 {
@@ -103,9 +112,6 @@
     color: #fff;
     display: flex;
     align-items: center;
-}
-
-.sidebar h2 {
     position: relative;
 }
 
@@ -138,7 +144,7 @@
 
 .add-icon-wrapper {
     position: absolute;
-    right: 15px; /* Adjusted for padding */
+    right: 15px;
     top: 50%;
     transform: translateY(-50%);
 }
@@ -165,19 +171,24 @@
 }
 
 .delete-icon {
-    color: #ff4d4d; /* Red color for delete */
+    color: #ff4d4d;
     margin-left: 10px;
     text-decoration: none;
 }
 
 .delete-icon:hover {
-    color: #cc0000; /* Darker red on hover */
+    color: #cc0000;
 }
 
-/* Main content area */
+/* Ensure content respects column layout */
 .content {
-    flex: 1;
-    padding: 0 15px; /* Add padding for readability */
+    width: 100%; /* Full width within its column */
+    padding: 0 15px;
+    height: 95vh;
+    display: flex;
+    flex-direction: column;
+    background-color: #1a1a1a;
+    align-items: center;
 }
 
 .message-intro {
@@ -186,13 +197,12 @@
     color: #aaa;
 }
 
+
 .message-history {
     flex: 1 1 auto;
     overflow-y: auto;
     padding: 20px;
     scrollbar-width: none; /* Firefox */
-    width: 80%;
-    max-width: 767px;
 }
 
 .message-history::-webkit-scrollbar {
@@ -488,51 +498,23 @@ pre {
 }
 
 /* Responsive adjustments */
+/* Desktop layout with columns */
 @media (min-width: 992px) {
     .sidebar {
-        transform: translateX(0);
-    }
-    .content {
-        height: 95vh;
-    }
-}
-
-@media (max-width: 991px) {
-    .sidebar {
-        position: fixed;
-        top: 60px;
-        left: 0;
-        width: 300px;
-        height: calc(100vh - 60px);
-        z-index: 1000;
-        transform: translateX(-100%);
+        width: 100%; /* Full width on mobile when active */
+        transform: translateX(100%); /* Hidden by default */
     }
     .sidebar.active {
-        transform: translateX(0);
-    }
-    .content {
-        height: 95vh;
-        padding: 0 15px; /* Maintain padding */
+        transform: translateX(0); /* Slide in from right */
     }
     .hamburger {
         display: block;
-    }
-    .logo {
-        display: none;
-    }
-    .chat-title {
-        font-size: 16px;
-        left: 50%;
-        transform: translate(-50%, -50%);
-    }
-    .chat-cost {
-        font-size: 14px;
     }
 }
 
 @media (max-width: 767px) {
     .sidebar {
-        width: 100%; /* Full width on small screens when active */
+        width: 100%; /* Full width on small screens */
     }
     .agent-form, #chat-starter {
         max-width: 100%;

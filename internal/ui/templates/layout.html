@@ -13,9 +13,6 @@
 </head>
 <body class="dark-theme">
    <header class="header">
-       <button class="hamburger" aria-label="Toggle Sidebar">
-           <i class="fas fa-bars"></i>
-       </button>
        <div class="logo">
            <a href="/" class="nav-link">
                <i class="fas fa-robot"></i> AI Agents
@@ -29,9 +26,26 @@
               Tokens: {{formatNumber .TotalTokens}} Cost: ${{printf "%.2f" .ChatCost}}
            </div>
        {{end}}
+       <button class="hamburger" aria-label="Toggle Sidebar">
+           <i class="fas fa-bars"></i>
+       </button>
    </header>
    <div class="container">
        <div class="row">
+           <div class="col col-3"></div>
+           <main id="main-content" class="content col col-6">
+               {{if eq .ContentTemplate "home_content"}}
+                   {{template "home_content" .}}
+               {{else if eq .ContentTemplate "agent_form_content"}}
+                   {{template "agent_form_content" .}}
+               {{else if eq .ContentTemplate "tool_form_content"}}
+                   {{template "tool_form_content" .}}
+               {{else if eq .ContentTemplate "chat_content"}}
+                   {{template "chat_content" .}}
+               {{else if eq .ContentTemplate "chat_form_content"}}
+                   {{template "chat_form_content" .}}
+               {{end}}
+           </main>
            <aside class="sidebar col col-3">
                <div id="sidebar-chats" hx-get="/sidebar/chats" hx-trigger="load, refreshChats from:body" hx-swap="innerHTML">
                    <h2><i class="fas fa-comment"></i> Chats <span class="spinner"></span></h2>
@@ -46,19 +60,6 @@
                    <ul class="tool-list"><li>Loading...</li></ul>
                </div>
            </aside>
-           <main id="main-content" class="content col col-7">
-               {{if eq .ContentTemplate "home_content"}}
-                   {{template "home_content" .}}
-               {{else if eq .ContentTemplate "agent_form_content"}}
-                   {{template "agent_form_content" .}}
-               {{else if eq .ContentTemplate "tool_form_content"}}
-                   {{template "tool_form_content" .}}
-               {{else if eq .ContentTemplate "chat_content"}}
-                   {{template "chat_content" .}}
-               {{else if eq .ContentTemplate "chat_form_content"}}
-                   {{template "chat_form_content" .}}
-               {{end}}
-           </main>
        </div>
    </div>
    <script src="/static/js/htmx.min.js"></script>
