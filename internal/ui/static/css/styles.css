@@ -1,7 +1,6 @@
 /* Base layout adjustments for content */
 .content {
     height: 100vh;
-    width: 80%;
     display: flex;
     flex-direction: column;
     background-color: #1a1a1a;
@@ -182,7 +181,6 @@
 
 /* Ensure content respects column layout */
 .content {
-    width: 100%; /* Full width within its column */
     padding: 0 15px;
     height: 95vh;
     display: flex;
