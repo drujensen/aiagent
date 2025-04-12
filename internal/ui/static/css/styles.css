@@ -199,6 +199,7 @@
 .message-history {
     flex: 1 1 auto;
     overflow-y: auto;
+    max-width: 768px;
     padding: 20px;
     scrollbar-width: none; /* Firefox */
 }
