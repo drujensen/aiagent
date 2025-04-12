@@ -151,16 +151,49 @@
                 "name": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
                 "input_price_per_mille": 0.27,
                 "output_price_per_mille": 0.85,
-                "context_window": 10000000
+                "context_window": 131072
             },
             {
                 "name": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
                 "input_price_per_mille": 0.18,
                 "output_price_per_mille": 0.59,
-                "context_window": 10000000
+                "context_window": 131072
             },
             {
                 "name": "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
+                "input_price_per_mille": 0.00,
+                "output_price_per_mille": 0.00,
+                "context_window": 131072
+            }
+        ]
+    },
+    {
+        "id": "CFA9E279-2CD3-4929-A92E-EC4584DC5089",
+        "name": "Groq",
+        "type": "groq",
+        "base_url": "https://api.groq.com",
+        "api_key_name": "Groq API Key",
+        "models": [
+            {
+                "name": "llama-3.3-70b-versatile",
+                "input_price_per_mille": 0.59,
+                "output_price_per_mille": 0.79,
+                "context_window": 128000
+            },
+            {
+                "name": "meta-llama/llama-4-maverick-17b-128e-instruct",
+                "input_price_per_mille": 0.27,
+                "output_price_per_mille": 0.85,
+                "context_window": 131072
+            },
+            {
+                "name": "meta-llama/llama-4-scout-17b-16e-instruct",
+                "input_price_per_mille": 0.11,
+                "output_price_per_mille": 0.34,
+                "context_window": 131072
+            },
+            {
+                "name": "deepseek-r1-distill-llama-70b",
                 "input_price_per_mille": 0.00,
                 "output_price_per_mille": 0.00,
                 "context_window": 128000

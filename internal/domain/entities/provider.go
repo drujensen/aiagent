@@ -9,6 +9,7 @@ const (
 	ProviderGoogle    ProviderType = "google"
 	ProviderDeepseek  ProviderType = "deepseek"
 	ProviderTogether  ProviderType = "together"
+	ProviderGroq      ProviderType = "groq"
 	ProviderOllama    ProviderType = "ollama"
 	ProviderGeneric   ProviderType = "generic"
 )
