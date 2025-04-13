@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"aiagent/internal/domain/entities"
@@ -90,16 +91,73 @@ func convertToBaseMessages(messages []*entities.Message) []map[string]interface{
 	return apiMessages
 }
 
+// defaultParseResponse handles standard tool_calls and deprecated function_call formats
+func (m *AIModelIntegration) defaultParseResponse(content string) ([]entities.ToolCall, string, error) {
+	if strings.Contains(content, "<function_call>") {
+		startTag := "<function_call>"
+		endTag := "</function_call>"
+		var toolCalls []entities.ToolCall
+
+		workingContent := content
+		for strings.Contains(workingContent, startTag) {
+			startIdx := strings.Index(workingContent, startTag)
+			endIdx := strings.Index(workingContent[startIdx:], endTag)
+			if endIdx == -1 {
+				return nil, "", fmt.Errorf("malformed function_call: missing closing tag")
+			}
+			endIdx += startIdx + len(endTag)
+
+			functionCallStr := workingContent[startIdx+len(startTag) : endIdx-len(endTag)]
+			var functionCall struct {
+				Action      string `json:"action"`
+				ActionInput struct {
+					Arguments string `json:"arguments"`
+				} `json:"action_input"`
+			}
+			if err := json.Unmarshal([]byte(functionCallStr), &functionCall); err != nil {
+				return nil, "", fmt.Errorf("failed to parse function_call JSON: %v", err)
+			}
+
+			toolCall := entities.ToolCall{
+				ID:   uuid.New().String(),
+				Type: "function",
+				Function: struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				}{
+					Name:      functionCall.Action,
+					Arguments: functionCall.ActionInput.Arguments,
+				},
+			}
+			toolCalls = append(toolCalls, toolCall)
+
+			workingContent = workingContent[:startIdx] + workingContent[endIdx:]
+		}
+
+		if len(toolCalls) == 0 {
+			return nil, "", fmt.Errorf("no valid function calls found")
+		}
+
+		// Clean content by removing function call tags
+		cleanContent := strings.ReplaceAll(content, "<function_call>", "")
+		cleanContent = strings.ReplaceAll(cleanContent, "</function_call>", "")
+		cleanContent = strings.TrimSpace(cleanContent)
+
+		m.logger.Info("Converted deprecated function_call to tool_calls", zap.Any("tool_calls", toolCalls))
+		return toolCalls, cleanContent, nil
+	}
+
+	// If no deprecated format, return empty tool calls and original content
+	return nil, content, nil
+}
+
 func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]interface{}) ([]*entities.Message, error) {
-	// Check for cancellation
 	if ctx.Err() == context.Canceled {
 		return nil, fmt.Errorf("operation canceled by user")
 	}
 
-	// Prepare tool definitions
 	tools := make([]map[string]interface{}, len(toolList))
 	for i, tool := range toolList {
-		// Check for cancellation
 		if ctx.Err() == context.Canceled {
 			return nil, fmt.Errorf("operation canceled by user")
 		}
@@ -145,25 +203,20 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 	reqBody := map[string]interface{}{
 		"model": m.model,
 	}
-	// Add tools to request body if any
 	if len(tools) > 0 {
 		reqBody["tools"] = tools
 	}
 
-	// Add options to request body
 	for key, value := range options {
 		reqBody[key] = value
 	}
 
-	// Convert initial messages to API format
 	apiMessages := convertToBaseMessages(messages)
 	reqBody["messages"] = apiMessages
 
 	var newMessages []*entities.Message
 
-	// Loop to handle tool calls
 	for {
-		// Check for cancellation before preparing request
 		if ctx.Err() == context.Canceled {
 			return nil, fmt.Errorf("operation canceled by user")
 		}
@@ -182,7 +235,6 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 
 		var resp *http.Response
 		for attempt := 0; attempt < 3; attempt++ {
-			// Check for cancellation before making request
 			if ctx.Err() == context.Canceled {
 				return nil, fmt.Errorf("operation canceled by user")
 			}
@@ -226,11 +278,30 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			} `json:"usage"`
 		}
 
-		if err := json.NewDecoder(resp.Body).Decode(&responseBody); err != nil {
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("error reading response: %v", err)
+		}
+
+		var content string
+		var toolCalls []entities.ToolCall
+
+		// Try standard decoding first
+		if err := json.NewDecoder(bytes.NewReader(bodyBytes)).Decode(&responseBody); err != nil {
 			return nil, fmt.Errorf("error decoding response: %v", err)
 		}
 		if len(responseBody.Choices) == 0 {
 			return nil, fmt.Errorf("no choices in response")
+		}
+
+		content = responseBody.Choices[0].Message.Content
+		toolCalls = responseBody.Choices[0].Message.ToolCalls
+
+		// Supported deprecated function_call format
+		parsedToolCalls, parsedContent, err := m.defaultParseResponse(content)
+		if err == nil && len(parsedToolCalls) > 0 {
+			toolCalls = parsedToolCalls
+			content = parsedContent
 		}
 
 		// Store usage data
@@ -238,93 +309,82 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		m.lastUsage.CompletionTokens = responseBody.Usage.CompletionTokens
 		m.lastUsage.TotalTokens = responseBody.Usage.TotalTokens
 
-		choice := responseBody.Choices[0].Message
-
-		if len(choice.ToolCalls) == 0 {
-			// No tool calls, add the final assistant message
+		if len(toolCalls) == 0 {
 			finalMessage := &entities.Message{
 				ID:        uuid.New().String(),
 				Role:      "assistant",
-				Content:   choice.Content,
+				Content:   content,
 				Timestamp: time.Now(),
 			}
 			newMessages = append(newMessages, finalMessage)
 			break
-		} else {
-			// There are tool calls, create a message for the assistant's tool call
-			content := "Executing tool call."
-			if len(choice.ToolCalls) > 0 {
-				content = fmt.Sprintf("Executing %s tool with arguments: %s", choice.ToolCalls[0].Function.Name, choice.ToolCalls[0].Function.Arguments)
-			}
-			toolCallMessage := &entities.Message{
-				ID:        uuid.New().String(),
-				Role:      "assistant",
-				Content:   content,
-				ToolCalls: choice.ToolCalls,
-				Timestamp: time.Now(),
-			}
-			newMessages = append(newMessages, toolCallMessage)
-
-			// Append assistant message with tool calls to apiMessages
-			assistantMsg := map[string]interface{}{
-				"role":       "assistant",
-				"content":    content,
-				"tool_calls": choice.ToolCalls,
-			}
-			apiMessages = append(apiMessages, assistantMsg)
-
-			// Handle tool calls
-			for _, toolCall := range choice.ToolCalls {
-				// Check for cancellation before executing tool
-				if ctx.Err() == context.Canceled {
-					return nil, fmt.Errorf("operation canceled by user")
-				}
-
-				if toolCall.Type != "function" {
-					continue
-				}
-				toolName := toolCall.Function.Name
-
-				tool, err := m.toolRepo.GetToolByName(toolName)
-				if err != nil {
-					return nil, fmt.Errorf("failed to get tool %s: %v", toolName, err)
-				}
-
-				var toolResult string
-				if tool != nil {
-					result, err := (*tool).Execute(toolCall.Function.Arguments)
-					if err != nil {
-						toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
-					} else {
-						toolResult = result
-					}
-				} else {
-					toolResult = fmt.Sprintf("Tool %s not found", toolName)
-				}
-
-				// Create tool response message
-				toolResponseContent := fmt.Sprintf("Tool %s responded: %s", toolName, toolResult)
-				toolResponseMessage := &entities.Message{
-					ID:         uuid.New().String(),
-					Role:       "tool",
-					Content:    toolResponseContent,
-					ToolCallID: toolCall.ID,
-					Timestamp:  time.Now(),
-				}
-				newMessages = append(newMessages, toolResponseMessage)
-
-				// Append tool response to apiMessages
-				toolResponseMsg := map[string]interface{}{
-					"role":         "tool",
-					"content":      toolResult,
-					"tool_call_id": toolCall.ID,
-				}
-				apiMessages = append(apiMessages, toolResponseMsg)
-			}
-
-			// Prepare for next iteration
-			reqBody["messages"] = apiMessages
 		}
+
+		contentMsg := "Executing tool call."
+		if len(toolCalls) > 0 {
+			contentMsg = fmt.Sprintf("Executing %s tool with parameters: %s", toolCalls[0].Function.Name, toolCalls[0].Function.Arguments)
+		}
+		toolCallMessage := &entities.Message{
+			ID:        uuid.New().String(),
+			Role:      "assistant",
+			Content:   contentMsg,
+			ToolCalls: toolCalls,
+			Timestamp: time.Now(),
+		}
+		newMessages = append(newMessages, toolCallMessage)
+
+		assistantMsg := map[string]interface{}{
+			"role":       "assistant",
+			"content":    contentMsg,
+			"tool_calls": toolCalls,
+		}
+		apiMessages = append(apiMessages, assistantMsg)
+
+		for _, toolCall := range toolCalls {
+			if ctx.Err() == context.Canceled {
+				return nil, fmt.Errorf("operation canceled by user")
+			}
+
+			if toolCall.Type != "function" {
+				continue
+			}
+			toolName := toolCall.Function.Name
+
+			tool, err := m.toolRepo.GetToolByName(toolName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get tool %s: %v", toolName, err)
+			}
+
+			var toolResult string
+			if tool != nil {
+				result, err := (*tool).Execute(toolCall.Function.Arguments)
+				if err != nil {
+					toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
+				} else {
+					toolResult = result
+				}
+			} else {
+				toolResult = fmt.Sprintf("Tool %s not found", toolName)
+			}
+
+			toolResponseMessage := &entities.Message{
+				ID:         uuid.New().String(),
+				Role:       "tool",
+				Content:    fmt.Sprintf("Tool %s responded: %s", toolName, toolResult),
+				ToolCallID: toolCall.ID,
+				Timestamp:  time.Now(),
+			}
+			newMessages = append(newMessages, toolResponseMessage)
+
+			toolResponseMsg := map[string]interface{}{
+				"role":         "tool",
+				"content":      toolResult,
+				"tool_call_id": toolCall.ID,
+			}
+			apiMessages = append(apiMessages, toolResponseMsg)
+		}
+
+		reqBody["messages"] = apiMessages
 	}
 
 	return newMessages, nil

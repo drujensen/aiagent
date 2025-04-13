@@ -1,27 +1,25 @@
 {{define "sidebar_chats"}}
-<div id="sidebar-chats">
-    <h2><i class="fas fa-comment" style="padding-right: 5px;"></i> Conversations
-        <span class="add-icon-wrapper">
-            <a href="/chats/new" class="add-icon">
-                <i class="fas fa-plus"></i>
+<h2><i class="fas fa-comment" style="padding-right: 5px;"></i> Conversations
+    <span class="add-icon-wrapper">
+        <a href="/chats/new" class="add-icon">
+            <i class="fas fa-plus"></i>
+        </a>
+    </span>
+</h2>
+<ul class="chat-list" id="chat-list">
+    {{range .Chats}}
+    <li class="chat-item">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <a href="/chats/{{.ID}}">
+              <i class="fas fa-comment-dots"></i> {{.ChatName}} with {{.AgentName}}
             </a>
-        </span>
-    </h2>
-    <ul class="chat-list" id="chat-list">
-        {{range .Chats}}
-        <li class="chat-item">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <a href="/chats/{{.ID}}">
-                  <i class="fas fa-comment-dots"></i> {{.ChatName}} with {{.AgentName}}
-                </a>
-                <a href="#" class="delete-icon" hx-delete="/chats/{{.ID}}" hx-confirm="Are you sure you want to delete this chat?" hx-target="#sidebar-chats" hx-swap="innerHTML">
-                    <i class="fas fa-trash"></i>
-                </a>
-            </div>
-        </li>
-        {{else}}
-        <li>No active chats</li>
-        {{end}}
-    </ul>
-</div>
+            <a href="#" class="delete-icon" hx-delete="/chats/{{.ID}}" hx-confirm="Are you sure you want to delete this chat?" hx-target="#sidebar-chats" hx-swap="innerHTML">
+                <i class="fas fa-trash"></i>
+            </a>
+        </div>
+    </li>
+    {{else}}
+    <li>No active chats</li>
+    {{end}}
+</ul>
 {{end}}

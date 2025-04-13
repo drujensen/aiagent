@@ -93,7 +93,6 @@ func (c *HomeController) AgentsPartialHandler(eCtx echo.Context) error {
 
 func (c *HomeController) ToolsPartialHandler(eCtx echo.Context) error {
 	tools, err := c.toolService.ListToolData(eCtx.Request().Context())
-	c.logger.Info("Tools", zap.Any("tools", tools))
 	if err != nil {
 		c.logger.Error("Failed to list tools", zap.Error(err))
 		return eCtx.String(http.StatusInternalServerError, "Failed to load tools")

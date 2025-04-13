@@ -87,12 +87,10 @@
 /* Sidebar with column integration */
 .sidebar {
     background-color: #2c2c2c;
-    padding: 20px 15px;
     border-left: 1px solid #444; /* Changed to border-left for right-side alignment */
     overflow-y: auto;
     transition: transform 0.3s ease-in-out;
     position: fixed;
-    top: 60px; /* Below header */
     right: 0; /* Align to right */
     width: 300px; /* Fixed width for mobile */
     height: calc(100vh - 60px);
@@ -107,6 +105,7 @@
 .sidebar h2 {
     margin-top: 20px;
     margin-bottom: 10px;
+    margin-left: 5px;
     font-size: 18px;
     color: #fff;
     display: flex;
