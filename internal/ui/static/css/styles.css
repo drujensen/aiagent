@@ -155,22 +155,42 @@
     color: #E6E6E6;
 }
 
+
+.chat-item .edit-icon,
 .chat-item .delete-icon,
 .tool-item .delete-icon,
 .agent-item .delete-icon {
     display: none;
 }
 
+.chat-item:hover .edit-icon,
 .chat-item:hover .delete-icon,
 .tool-item:hover .delete-icon,
 .agent-item:hover .delete-icon {
     display: inline-block;
 }
 
+.show-link {
+    text-decoration: none;
+    flex-grow: 1;
+}
+
+.edit-icon {
+    color: #ff4d4d;
+    margin-left: 10px;
+    text-decoration: none;
+    flex-grow: 0;
+}
+
+.edit-icon:hover {
+    color: #cc0000;
+}
+
 .delete-icon {
     color: #ff4d4d;
     margin-left: 10px;
     text-decoration: none;
+    flex-grow: 0;
 }
 
 .delete-icon:hover {

@@ -10,8 +10,8 @@
 <ul class="agent-list">
     {{range .Agents}}
       <li class="agent-item">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-              <a href="/agents/{{.ID.Hex}}/edit">
+          <div style="display: flex; align-items: center;">
+            <a href="/agents/{{.ID.Hex}}/edit" class="show-link">
                   <i class="fas fa-robot"></i> {{.Name}}
               </a>
               <a href="#" class="delete-icon" hx-delete="/agents/{{.ID.Hex}}" hx-confirm="Are you sure you want to delete this agent?" hx-target="#sidebar-agents" hx-swap="innerHTML">

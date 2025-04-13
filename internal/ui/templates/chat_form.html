@@ -7,18 +7,18 @@
         hx-swap="innerHTML">
         <div class="form-group">
             <label for="chat-name">Conversation Name:</label>
-            <input type="text" id="chat-name" name="chat-name" class="form-control" placeholder="Enter conversation name" required>
+            <input type="text" id="chat-name" name="chat-name" class="form-control" placeholder="Enter conversation name" value="{{.Chat.Name}}" required>
         </div>
         <div class="form-group">
             <label for="agent-select">Select an AI Agent:</label>
             <select id="agent-select" name="agent-select" class="form-control" required>
                 <option value="">Select an AI Agent</option>
                 {{range .Agents}}
-                <option value="{{.ID.Hex}}">{{.Name}}</option>
+                <option value="{{.ID.Hex}}"{{if (eq .ID.Hex $.Chat.AgentID)}}selected{{end}}>{{.Name}}</option>
                 {{end}}
             </select>
         </div>
-        <button type="submit" class="btn-primary">Start Chat</button>
+        <button type="submit" class="btn-primary">{{if .Chat.ID}}Save Chat{{else}}Start Chat{{end}}</button>
     </form>
     <div id="response-message"></div>
 </div>

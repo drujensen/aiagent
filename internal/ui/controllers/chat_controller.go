@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strings"
 	"sync"
 
 	"aiagent/internal/domain/entities"
@@ -93,9 +94,41 @@ func (c *ChatController) ChatFormHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusInternalServerError, "Failed to load agents")
 	}
 
+	var chat *entities.Chat
+	path := eCtx.Request().URL.Path
+	isEdit := strings.HasSuffix(path, "/edit")
+	if isEdit {
+		id := eCtx.Param("id")
+		if id == "" {
+			return eCtx.String(http.StatusBadRequest, "Chat ID is required for editing")
+		}
+		chat, err = c.chatService.GetChat(eCtx.Request().Context(), id)
+		if err != nil {
+			switch err.(type) {
+			case *errors.NotFoundError:
+				return eCtx.Redirect(http.StatusFound, "/")
+			default:
+				return eCtx.String(http.StatusInternalServerError, "Failed to load chat")
+			}
+		}
+	}
+
+	chatData := struct {
+		ID      string
+		Name    string
+		AgentID string
+	}{}
+
+	if chat != nil {
+		chatData.ID = chat.ID.Hex()
+		chatData.Name = chat.Name
+		chatData.AgentID = chat.AgentID.Hex()
+	}
+
 	data := map[string]interface{}{
 		"Title":           "AI Agents - New Chat",
 		"ContentTemplate": "chat_form_content",
+		"Chat":            chatData,
 		"Agents":          agents,
 	}
 
