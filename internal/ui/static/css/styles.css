@@ -14,7 +14,6 @@
 
 .header {
     background-color: #333;
-    padding: 10px 15px;
     border-bottom: 1px solid #444;
     display: flex;
     align-items: center;
@@ -199,7 +198,6 @@
     flex: 1 1 auto;
     overflow-y: auto;
     max-width: 768px;
-    padding: 20px;
     scrollbar-width: none; /* Firefox */
 }
 
