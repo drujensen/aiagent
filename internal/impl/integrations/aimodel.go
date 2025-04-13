@@ -94,6 +94,7 @@ func convertToBaseMessages(messages []*entities.Message) []map[string]interface{
 // defaultParseResponse handles standard tool_calls and deprecated function_call formats
 func (m *AIModelIntegration) defaultParseResponse(content string) ([]entities.ToolCall, string, error) {
 	if strings.Contains(content, "<function_call>") {
+		m.logger.Warn("Detected deprecated function_call format, converting to tool_calls")
 		startTag := "<function_call>"
 		endTag := "</function_call>"
 		var toolCalls []entities.ToolCall
@@ -103,6 +104,7 @@ func (m *AIModelIntegration) defaultParseResponse(content string) ([]entities.To
 			startIdx := strings.Index(workingContent, startTag)
 			endIdx := strings.Index(workingContent[startIdx:], endTag)
 			if endIdx == -1 {
+				m.logger.Error("Malformed function_call: missing closing tag", zap.String("content", workingContent))
 				return nil, "", fmt.Errorf("malformed function_call: missing closing tag")
 			}
 			endIdx += startIdx + len(endTag)
@@ -115,6 +117,7 @@ func (m *AIModelIntegration) defaultParseResponse(content string) ([]entities.To
 				} `json:"action_input"`
 			}
 			if err := json.Unmarshal([]byte(functionCallStr), &functionCall); err != nil {
+				m.logger.Error("Failed to parse function_call JSON", zap.String("function_call", functionCallStr), zap.Error(err))
 				return nil, "", fmt.Errorf("failed to parse function_call JSON: %v", err)
 			}
 
@@ -135,6 +138,7 @@ func (m *AIModelIntegration) defaultParseResponse(content string) ([]entities.To
 		}
 
 		if len(toolCalls) == 0 {
+			m.logger.Error("No valid function calls found in deprecated format")
 			return nil, "", fmt.Errorf("no valid function calls found")
 		}
 
