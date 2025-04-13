@@ -232,7 +232,7 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 	}
 
 	data := map[string]interface{}{
-		"Title":                  "Agent Form",
+		"Title":                  "AI Agents - Agent Form",
 		"ContentTemplate":        "agent_form_content",
 		"Agent":                  agentData,
 		"Tools":                  toolNames,

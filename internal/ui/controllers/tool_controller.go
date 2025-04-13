@@ -74,7 +74,7 @@ func (c *ToolController) ToolFormHandler(eCtx echo.Context) error {
 	}
 
 	data := map[string]interface{}{
-		"Title":           "Tool Form",
+		"Title":           "AI Agents - Tool Form",
 		"ContentTemplate": "tool_form_content",
 		"Tool":            tool,
 		"ToolTypes":       factories,

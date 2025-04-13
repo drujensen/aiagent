@@ -27,7 +27,7 @@ import (
 	_ "aiagent/docs" // Import the generated docs package
 )
 
-//	@title			AI Agent API
+//	@title			AI Agents - API
 //	@version		1.0
 //	@description	This is the API for the AI Agent application.
 //	@termsOfService	http://swagger.io/terms/

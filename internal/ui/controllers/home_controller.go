@@ -38,7 +38,7 @@ func (c *HomeController) RegisterRoutes(e *echo.Echo) {
 func (c *HomeController) HomeHandler(eCtx echo.Context) error {
 	// No longer fetch data here; let HTMX handle it
 	data := map[string]interface{}{
-		"Title":           "AI Chat Application",
+		"Title":           "AI Agents",
 		"ContentTemplate": "home_content",
 	}
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)

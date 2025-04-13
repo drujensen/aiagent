@@ -38,7 +38,7 @@ func (c *ProviderController) ListProvidersHandler(eCtx echo.Context) error {
 	}
 
 	data := map[string]interface{}{
-		"Title":           "Providers",
+		"Title":           "AI Agents - Providers",
 		"ContentTemplate": "providers_list_content",
 		"Providers":       providers,
 	}

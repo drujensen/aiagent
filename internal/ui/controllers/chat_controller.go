@@ -73,13 +73,13 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 	}
 
 	data := map[string]interface{}{
-		"Title":           "Chat",
+		"Title":           "AI Agents - Chat",
 		"ContentTemplate": "chat_content",
 		"ChatID":          chatID,
 		"ChatName":        chat.Name,
 		"AgentName":       agent.Name,
 		"ChatCost":        chat.Usage.TotalCost,
-		"TotalTokens":    chat.Usage.TotalTokens,
+		"TotalTokens":     chat.Usage.TotalTokens,
 		"Messages":        chat.Messages,
 	}
 
@@ -94,7 +94,7 @@ func (c *ChatController) ChatFormHandler(eCtx echo.Context) error {
 	}
 
 	data := map[string]interface{}{
-		"Title":           "New Chat",
+		"Title":           "AI Agents - New Chat",
 		"ContentTemplate": "chat_form_content",
 		"Agents":          agents,
 	}
