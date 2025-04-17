@@ -290,7 +290,6 @@ a:active, button:active, .message-content:active {
     left: 50%;
     transform: translateX(-50%);
     width: 100%;
-    max-width: 768px;
     background-color: #2c2c2c;
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
