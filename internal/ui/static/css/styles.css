@@ -1,18 +1,10 @@
-/* Base layout adjustments for content */
-.content {
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background-color: #1a1a1a;
-    align-items: center;
-}
-
 .dark-theme {
     background-color: #1a1a1a;
     color: #fff;
 }
 
 .header {
+    height: 60px;
     background-color: #333;
     border-bottom: 1px solid #444;
     display: flex;
@@ -71,10 +63,6 @@
     cursor: pointer;
     padding: 10px;
     order: 2;
-}
-
-.container {
-    height: calc(100vh - 60px);
 }
 
 .home-content {
@@ -197,54 +185,15 @@
     color: #cc0000;
 }
 
-/* Ensure content respects column layout */
 .content {
-    padding: 0 15px;
-    height: 95vh;
+    height: 100vh;
     display: flex;
     flex-direction: column;
     background-color: #1a1a1a;
     align-items: center;
-}
-
-.message-intro {
-    text-align: center;
-    margin-bottom: 20px;
-    color: #aaa;
-}
-
-
-.message-history {
-    flex: 1 1 auto;
-    overflow-y: auto;
-    max-width: 768px;
-    scrollbar-width: none; /* Firefox */
-}
-
-.message-history::-webkit-scrollbar {
-    display: none; /* Safari and Chrome */
-}
-
-.message {
-    display: flex;
-    margin-bottom: 20px;
-}
-
-.user-message {
-    justify-content: flex-end;
-}
-
-.agent-message {
-    justify-content: flex-start;
-}
-
-.tool-message {
-    justify-content: flex-start;
-    color: #aaa;
-}
-
-.tool-message .message-content {
-    background-color: #333;
+    box-sizing: border-box;
+    position: relative;
+    background-color: #1a1a1a;
 }
 
 .message-content {
@@ -257,8 +206,76 @@
     background-color: #444;
     color: #fff;
     text-align: left;
-    white-space: normal;
+    white-space: normal; /* Ensure normal wrapping for non-pre content */
+    box-sizing: border-box; /* Prevent padding issues */
 }
+
+a, button, .message-content {
+    transition: background-color 0.2s;
+}
+
+a:active, button:active, .message-content:active {
+    background-color: rgba(70, 78, 184, 0.2);
+}
+
+.message-history {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    max-width: 100%;
+    scrollbar-width: none; /* Firefox */
+    padding-bottom: 100px;
+}
+
+.message-history::-webkit-scrollbar {
+    display: none; /* Safari and Chrome */
+}
+
+@media (max-width: 767px) {
+    .message-content {
+        max-width: 90%; /* Slightly wider on mobile to use available space */
+        padding: 8px; /* Reduce padding for mobile */
+    }
+    .message-history {
+        padding: 0 5px; /* Minimal padding to avoid clipping */
+    }
+}
+
+.message-intro {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #aaa;
+}
+
+.message {
+    display: flex;
+    margin-bottom: 20px;
+}
+
+.user-message {
+    justify-content: flex-end;
+}
+
+.user-message .message-content {
+    background-color: #464EB8;
+}
+
+.agent-message {
+    justify-content: flex-start;
+}
+
+.agent-message .message-content {
+    background-color: #1a1a1a;
+}
+
+.tool-message {
+    justify-content: flex-start;
+    color: #aaa;
+}
+
+.tool-message .message-content {
+    background-color: #333;
+}
+
 
 .message-session {
     display: flex;
@@ -266,21 +283,30 @@
     width: 100%;
 }
 
-.agent-message .message-content {
-    background-color: #1a1a1a;
-}
-
-.user-message .message-content {
-    background-color: #464EB8;
-}
 
 .message-input {
-    display: flex;
+    position: absolute;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
     width: 100%;
+    max-width: 768px;
     background-color: #2c2c2c;
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     color: #fff;
+    padding: 10px;
+    box-sizing: border-box;
+    z-index: 10;
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .message-input {
+        padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    }
+    .message-history {
+        padding-bottom: calc(100px + env(safe-area-inset-bottom));
+    }
 }
 
 .message-form {
@@ -298,6 +324,7 @@
     background-color: #2c2c2c;
     color: #fff;
     resize: vertical;
+    -webkit-touch-callout: default;
 }
 
 .message-input button {
@@ -319,7 +346,6 @@
 }
 
 .agent-form {
-    max-width: 767px;
     margin: 40px auto 0;
     padding: 20px;
     background-color: #2c2c2c;
@@ -482,14 +508,6 @@
     to { transform: rotate(360deg); }
 }
 
-pre {
-    background-color: #2a2a2a;
-    padding: 1em;
-    border-radius: 5px;
-    overflow-x: auto;
-    position: relative;
-}
-
 .copy-button {
     position: absolute;
     top: 5px;
@@ -527,13 +545,30 @@ pre {
         display: block;
     }
 }
-
 @media (max-width: 767px) {
+    .container {
+        padding: 0;
+    }
     .sidebar {
         width: 100%; /* Full width on small screens */
     }
     .agent-form, #chat-starter {
         max-width: 100%;
         margin: 20px auto;
+    }
+    .chat-cost {
+      display: none; /* Hide chat cost on mobile */
+    }
+    .message-input {
+        max-width: 100%;
+        padding: 5px;
+    }
+    .message-history {
+        padding-bottom: 80px;
+    }
+    @supports (padding-bottom: env(safe-area-inset-bottom)) {
+        .message-history {
+            padding-bottom: calc(80px + env(safe-area-inset-bottom));
+        }
     }
 }

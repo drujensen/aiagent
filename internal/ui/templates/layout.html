@@ -3,17 +3,24 @@
 <html lang="en">
 <head>
    <meta charset="UTF-8">
-   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+   <meta name="apple-mobile-web-app-capable" content="yes">
+   <meta name="apple-mobile-web-app-title" content="AI Agents">
+   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
    <title>{{.Title}}</title>
    <link rel="icon" type="image/png" href="/static/img/favicon.png">
+   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon-180x180.png" sizes="180x180">
+   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon-152x152.png" sizes="152x152">
+   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon-120x120.png" sizes="120x120">
    <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">
+   <link rel="apple-touch-startup-image" href="/static/img/launch.png">
    <link rel="stylesheet" href="/static/css/basic.css">
    <link rel="stylesheet" href="/static/css/styles.css">
    <link rel="stylesheet" href="/static/css/layout.css">
    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
-<body class="dark-theme">
+<body class="dark-theme" ontouchstart="" hx-boost="true">
    <header class="header">
        <div class="logo">
            <a href="/" class="nav-link">

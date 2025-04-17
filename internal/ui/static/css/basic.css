@@ -6,6 +6,8 @@ body, html {
     background-color: #1a1a1a;
     color: #fff;
     line-height: 1.6em;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -29,6 +31,21 @@ pre {
     padding: 1em;
     border-radius: 5px;
     overflow-x: auto;
+    position: relative;
+    white-space: pre-wrap; /* Allow text to wrap on smaller screens */
+    word-break: break-word; /* Break long words to fit container */
+    box-sizing: border-box; /* Ensure padding doesn't cause overflow */
+    font-family: monospace, monospace; /* Explicitly set monospace font */
+    margin: 0; /* Remove default margin to avoid spacing issues */
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 767px) {
+    pre {
+        font-size: 0.9em; /* Slightly smaller font on mobile */
+        padding: 0.5em; /* Reduce padding for tighter fit */
+        max-width: 100%; /* Ensure it stays within container */
+    }
 }
 
 code {
