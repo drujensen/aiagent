@@ -186,7 +186,7 @@
 }
 
 .content {
-    height: 100vh;
+    height: calc(100vh - 61px);
     display: flex;
     flex-direction: column;
     background-color: #1a1a1a;
@@ -286,7 +286,7 @@ a:active, button:active, .message-content:active {
 
 .message-input {
     position: absolute;
-    bottom: 60px;
+    bottom: 0px;
     left: 50%;
     transform: translateX(-50%);
     width: 100%;

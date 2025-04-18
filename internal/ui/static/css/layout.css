@@ -1,6 +1,5 @@
 /* Full-width container */
 .container {
-    height: calc(100vh - 61px);
     width: 100%;
     overflow: hidden;
 }
