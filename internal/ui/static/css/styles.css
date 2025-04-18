@@ -34,6 +34,11 @@
     color: #fff;
 }
 
+.logo-title {
+  display: inline-block;
+  margin-left: 10px;
+}
+
 .chat-title {
     color: #fff;
     font-size: 16px;
@@ -230,16 +235,6 @@ a:active, button:active, .message-content:active {
     display: none; /* Safari and Chrome */
 }
 
-@media (max-width: 767px) {
-    .message-content {
-        max-width: 90%; /* Slightly wider on mobile to use available space */
-        padding: 8px; /* Reduce padding for mobile */
-    }
-    .message-history {
-        padding: 0 5px; /* Minimal padding to avoid clipping */
-    }
-}
-
 .message-intro {
     text-align: center;
     margin-bottom: 20px;
@@ -297,15 +292,6 @@ a:active, button:active, .message-content:active {
     padding: 10px;
     box-sizing: border-box;
     z-index: 10;
-}
-
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-    .message-input {
-        padding-bottom: calc(10px + env(safe-area-inset-bottom));
-    }
-    .message-history {
-        padding-bottom: calc(100px + env(safe-area-inset-bottom));
-    }
 }
 
 .message-form {
@@ -555,19 +541,27 @@ a:active, button:active, .message-content:active {
         max-width: 100%;
         margin: 20px auto;
     }
+    .logo-title {
+        display: none; /* Hide logo title on mobile */
+    }
     .chat-cost {
       display: none; /* Hide chat cost on mobile */
     }
     .message-input {
         max-width: 100%;
-        padding: 5px;
+    }
+    .message-content {
+        max-width: 90%; /* Slightly wider on mobile to use available space */
+        padding: 8px; /* Reduce padding for mobile */
     }
     .message-history {
-        padding-bottom: 80px;
-    }
-    @supports (padding-bottom: env(safe-area-inset-bottom)) {
-        .message-history {
-            padding-bottom: calc(80px + env(safe-area-inset-bottom));
-        }
+        padding: 0 5px; /* Minimal padding to avoid clipping */
     }
 }
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .message-history {
+        padding-bottom: calc(60px + env(safe-area-inset-bottom));
+    }
+}
+
