@@ -31,8 +31,8 @@
            <div class="chat-title">
                {{.ChatName}} with {{.AgentName}}
            </div>
-           <div class="chat-cost">
-              Tokens: {{formatNumber .TotalTokens}} Cost: ${{printf "%.2f" .ChatCost}}
+           <div class="chat-cost" hx-get="/chat-cost?chat_id={{.ChatID}}" hx-trigger="refreshChatCost from:body" hx-swap="innerHTML">
+           {{template "chat_cost_partial" .}}
            </div>
        {{end}}
        <button class="hamburger" aria-label="Toggle Sidebar">

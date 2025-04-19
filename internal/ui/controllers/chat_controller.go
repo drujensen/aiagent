@@ -45,6 +45,7 @@ func (c *ChatController) RegisterRoutes(e *echo.Echo) {
 
 	e.POST("/chats/:id/messages", c.SendMessageHandler)
 	e.POST("/chats/:id/cancel", c.CancelMessageHandler)
+	e.GET("/chat-cost", c.ChatCostHandler)
 }
 
 func (c *ChatController) ChatHandler(eCtx echo.Context) error {
@@ -278,13 +279,34 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 	responseHTML := fmt.Sprintf(`<div id="message-session-%s" class="message-session">%s</div><div id="next-message-session"></div>`,
 		messageSessionID, buf.String())
 
-	// Set the header to trigger scrolling to the response
-	eCtx.Response().Header().Set("HX-Trigger", "messageReceived")
+	// Set the header to trigger scrolling to the response and refresh chat cost
+	eCtx.Response().Header().Set("HX-Trigger", "messageReceived, refreshChatCost")
 
 	return eCtx.HTML(http.StatusOK, responseHTML)
 }
 
 // CancelMessageHandler cancels an ongoing message processing operation
+// ChatCostHandler handles the request to update the token and cost display
+func (c *ChatController) ChatCostHandler(eCtx echo.Context) error {
+	chatID := eCtx.QueryParam("chat_id")
+	if chatID == "" {
+		return eCtx.HTML(http.StatusBadRequest, "<div class=\"chat-cost\">Tokens: 0 Cost: $0.00</div>")
+	}
+
+	chat, err := c.chatService.GetChat(eCtx.Request().Context(), chatID)
+	if err != nil {
+		c.logger.Error("Failed to get chat for cost update", zap.Error(err))
+		return eCtx.HTML(http.StatusInternalServerError, "<div class=\"chat-cost\">Tokens: 0 Cost: $0.00</div>")
+	}
+
+	data := map[string]interface{}{
+		"TotalTokens": chat.Usage.TotalTokens,
+		"ChatCost":    chat.Usage.TotalCost,
+	}
+
+	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "chat_cost_partial", data)
+}
+
 func (c *ChatController) CancelMessageHandler(eCtx echo.Context) error {
 	chatID := eCtx.Param("id")
 	if chatID == "" {

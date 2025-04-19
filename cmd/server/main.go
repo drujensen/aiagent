@@ -140,6 +140,7 @@ func main() {
 		"internal/ui/templates/message_session_partial.html",
 		"internal/ui/templates/provider_models_partial.html",
 		"internal/ui/templates/providers_list_content.html",
+		"internal/ui/templates/chat_cost_partial.html",
 	)
 	if err != nil {
 		logger.Fatal("Failed to parse templates", zap.Error(err))
