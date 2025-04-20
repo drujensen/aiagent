@@ -268,7 +268,8 @@ a:active, button:active, .message-content:active {
 }
 
 .tool-message .message-content {
-    background-color: #333;
+    background-color: #444;
+    max-width: 100%;
 }
 
 
