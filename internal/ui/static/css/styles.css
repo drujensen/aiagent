@@ -35,8 +35,8 @@
 }
 
 .logo-title {
-  display: inline-block;
-  margin-left: 10px;
+    display: inline-block;
+    margin-left: 10px;
 }
 
 .chat-title {
@@ -79,19 +79,19 @@
 /* Sidebar with column integration */
 .sidebar {
     background-color: #2c2c2c;
-    border-left: 1px solid #444; /* Changed to border-left for right-side alignment */
+    border-left: 1px solid #444;
     overflow-y: auto;
     transition: transform 0.3s ease-in-out;
     position: fixed;
-    right: 0; /* Align to right */
-    width: 300px; /* Fixed width for mobile */
+    right: 0;
+    width: 300px;
     height: calc(100vh - 60px);
     z-index: 1000;
-    transform: translateX(100%); /* Hidden by default (off-screen to the right) */
+    transform: translateX(100%);
 }
 
 .sidebar.active {
-    transform: translateX(0); /* Visible when active */
+    transform: translateX(0);
 }
 
 .sidebar h2 {
@@ -148,7 +148,6 @@
     color: #E6E6E6;
 }
 
-
 .chat-item .edit-icon,
 .chat-item .delete-icon,
 .tool-item .delete-icon,
@@ -198,7 +197,6 @@
     align-items: center;
     box-sizing: border-box;
     position: relative;
-    background-color: #1a1a1a;
 }
 
 .message-content {
@@ -211,8 +209,8 @@
     background-color: #444;
     color: #fff;
     text-align: left;
-    white-space: normal; /* Ensure normal wrapping for non-pre content */
-    box-sizing: border-box; /* Prevent padding issues */
+    white-space: normal;
+    box-sizing: border-box;
 }
 
 a, button, .message-content {
@@ -227,12 +225,12 @@ a:active, button:active, .message-content:active {
     flex: 1 1 auto;
     overflow-y: auto;
     max-width: 100%;
-    scrollbar-width: none; /* Firefox */
+    scrollbar-width: none;
     padding-bottom: 100px;
 }
 
 .message-history::-webkit-scrollbar {
-    display: none; /* Safari and Chrome */
+    display: none;
 }
 
 .message-intro {
@@ -272,13 +270,11 @@ a:active, button:active, .message-content:active {
     max-width: 100%;
 }
 
-
 .message-session {
     display: flex;
     flex-direction: column;
     width: 100%;
 }
-
 
 .message-input {
     position: absolute;
@@ -329,6 +325,14 @@ a:active, button:active, .message-content:active {
 
 .message-input button i {
     margin-right: 5px;
+}
+
+.send-button.cancel-button {
+    background-color: #dc3545;
+}
+
+.send-button.cancel-button:hover {
+    background-color: #bd2130;
 }
 
 .agent-form {
@@ -514,54 +518,54 @@ a:active, button:active, .message-content:active {
 }
 
 .copy-button.copied {
-    background-color: #2ecc71; /* Green color to indicate success */
+    background-color: #2ecc71;
 }
 
 /* Responsive adjustments */
-/* Desktop layout with columns */
 @media (min-width: 992px) {
     .sidebar {
-        width: 100%; /* Full width on mobile when active */
-        transform: translateX(100%); /* Hidden by default */
+        width: 100%;
+        transform: translateX(100%);
     }
     .sidebar.active {
-        transform: translateX(0); /* Slide in from right */
+        transform: translateX(0);
     }
     .hamburger {
         display: block;
     }
 }
+
 @media (max-width: 767px) {
     .container {
         padding: 0;
     }
     .sidebar {
-        width: 100%; /* Full width on small screens */
+        width: 100%;
     }
     .agent-form, #chat-starter {
         max-width: 100%;
         margin: 20px auto;
     }
     .logo-title {
-        display: none; /* Hide logo title on mobile */
+        display: none;
     }
     .chat-cost {
-      display: none; /* Hide chat cost on mobile */
+        display: none;
     }
     .message-input {
         max-width: 100%;
     }
     .message-content {
-        max-width: 90%; /* Slightly wider on mobile to use available space */
-        padding: 8px; /* Reduce padding for mobile */
+        max-width: 90%;
+        padding: 8px;
     }
     .message-history {
-        overflow-x: hidden; /* Prevent horizontal overflow */
-        padding: 0 5px; /* Minimal padding to avoid clipping */
+        overflow-x: hidden;
+        padding: 0 5px;
     }
     @supports (padding-bottom: env(safe-area-inset-bottom)) {
-       .message-input {
-          bottom: calc(120px + env(safe-area-inset-bottom));
+        .message-input {
+            bottom: calc(120px + env(safe-area-inset-bottom));
         }
         .message-history {
             height: calc(100vh - 120px - env(safe-area-inset-bottom));
@@ -569,5 +573,3 @@ a:active, button:active, .message-content:active {
         }
     }
 }
-
-

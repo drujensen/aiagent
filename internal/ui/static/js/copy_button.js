@@ -1,33 +1,3 @@
-(function() {
-    const observer = new MutationObserver((mutationsList) => {
-        for (let mutation of mutationsList) {
-            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                mutation.addedNodes.forEach(node => {
-                    if (node.nodeName === 'PRE') {
-                        addCopyButtonToBlock(node);
-                    } else if (node.querySelectorAll) {
-                        const newCodeBlocks = node.querySelectorAll('pre');
-                        newCodeBlocks.forEach(block => addCopyButtonToBlock(block));
-                    }
-                });
-            }
-        }
-    });
-
-    const targetNode = document.getElementById('message-history');
-    if (targetNode) {
-        observer.observe(targetNode, { childList: true, subtree: true });
-    }
-})();
-
-function scrollToBottom() {
-    const messageHistory = document.getElementById('message-history');
-    if (messageHistory) {
-        messageHistory.scrollTop = messageHistory.scrollHeight;
-    }
-}
-
-
 function addCopyButtonToBlock(block) {
     if (block.querySelector('.copy-button')) return;
     const button = document.createElement('button');
@@ -73,10 +43,9 @@ function addCopyButtonToBlock(block) {
     block.appendChild(button);
 }
 
-function addCopyButtons() {
+function initCopyButtons() {
     const codeBlocks = document.querySelectorAll('pre');
     codeBlocks.forEach(block => addCopyButtonToBlock(block));
 }
 
-document.addEventListener('DOMContentLoaded', scrollToBottom);
-document.addEventListener('DOMContentLoaded', addCopyButtons);
+document.addEventListener('DOMContentLoaded', initCopyButtons);

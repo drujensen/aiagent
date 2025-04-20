@@ -1,0 +1,27 @@
+{{define "message_controls"}}
+<form id="message-form" class="message-form"
+      hx-post="/chats/{{.ChatID}}/messages"
+      hx-target="#next-message-session"
+      hx-swap="outerHTML"
+      hx-trigger="submit, keydown[ctrlKey || metaKey && key == 'Enter'] from:#message-input"
+      hx-on::before-request="showTempMessage(this); resetForm(this); toggleCancelButton(true); scrollToResponse();"
+      hx-on::after-swap="scrollToResponse(); initCopyButtons()"
+      hx-on::after-request="toggleCancelButton(false);"
+      hx-on::response-error="handleResponseError(this, event)">
+    <input type="hidden" name="chat_id" value="{{.ChatID}}">
+    <textarea name="message" id="message-input" placeholder="Type your message..." rows="3"></textarea>
+    <button type="submit" id="send-button" class="send-button">
+        <span class="send-text">
+            <i class="fas fa-paper-plane"></i> Send
+        </span>
+        <span class="cancel-text"
+              style="display: none;"
+              hx-post="/chats/{{.ChatID}}/cancel"
+              hx-target="#thinking-message"
+              hx-swap="innerHTML"
+              hx-on::after-request="resetForm(this)">
+            <i class="fas fa-times"></i> Cancel
+        </span>
+    </button>
+</form>
+{{end}}

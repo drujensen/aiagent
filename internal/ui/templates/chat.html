@@ -2,10 +2,10 @@
 <main class="content">
     <section class="message-history" id="message-history">
         <div id="messages-container" class="messages-container" data-chat-id="{{.ChatID}}">
-          <div class="message-intro">
-              {{if eq (len .Messages) 0}}
-                <p>How can I help you today?</p>
-              {{end}}
+            <div class="message-intro">
+                {{if eq (len .Messages) 0}}
+                    <p>How can I help you today?</p>
+                {{end}}
             </div>
 
             <!-- Group messages by conversation session (user + responses) -->
@@ -13,35 +13,35 @@
             {{$inSession := false}}
 
             {{range $i, $msg := .Messages}}
-              <!-- Start a new session when we see a user message -->
-              {{if and (eq $msg.Role "user") (not $inSession)}}
-                <div id="message-session-{{$userMsgIndex}}" class="message-session">
-                {{$inSession = true}}
-                {{$userMsgIndex = add $userMsgIndex 1}}
-              {{end}}
-
-              <!-- Render the message based on role -->
-              {{if eq $msg.Role "user"}}
-                <div class="message user-message">
-                  <div class="message-content">{{renderMarkdown $msg.Content}}</div>
-                </div>
-              {{else if eq $msg.Role "assistant"}}
-                <div class="message agent-message">
-                  <div class="message-content">{{renderMarkdown $msg.Content}}</div>
-                </div>
-              {{else}}
-                <div class="message tool-message">
-                  <div class="message-content">{{renderMarkdown $msg.Content}}</div>
-                </div>
-              {{end}}
-
-              <!-- End a session when we see the next user message or end of messages -->
-              {{if or (and (lt (add $i 1) (len $.Messages)) (eq (index $.Messages (add $i 1)).Role "user")) (eq $i (sub (len $.Messages) 1))}}
-                {{if $inSession}}
-                  </div>
-                  {{$inSession = false}}
+                <!-- Start a new session when we see a user message -->
+                {{if and (eq $msg.Role "user") (not $inSession)}}
+                    <div id="message-session-{{$userMsgIndex}}" class="message-session">
+                    {{$inSession = true}}
+                    {{$userMsgIndex = add $userMsgIndex 1}}
                 {{end}}
-              {{end}}
+
+                <!-- Render the message based on role -->
+                {{if eq $msg.Role "user"}}
+                    <div class="message user-message">
+                        <div class="message-content">{{renderMarkdown $msg.Content}}</div>
+                    </div>
+                {{else if eq $msg.Role "assistant"}}
+                    <div class="message agent-message">
+                        <div class="message-content">{{renderMarkdown $msg.Content}}</div>
+                    </div>
+                {{else}}
+                    <div class="message tool-message">
+                        <div class="message-content">{{renderMarkdown $msg.Content}}</div>
+                    </div>
+                {{end}}
+
+                <!-- End a session when we see the next user message or end of messages -->
+                {{if or (and (lt (add $i 1) (len $.Messages)) (eq (index $.Messages (add $i 1)).Role "user")) (eq $i (sub (len $.Messages) 1))}}
+                    {{if $inSession}}
+                        </div>
+                        {{$inSession = false}}
+                    {{end}}
+                {{end}}
             {{end}}
 
             <!-- Placeholder for next message session -->
@@ -49,192 +49,7 @@
         </div>
     </section>
     <section class="message-input" id="message-input-section">
-        <form id="message-form" class="message-form"
-              hx-post="/chats/{{.ChatID}}/messages"
-              hx-target="#next-message-session"
-              hx-swap="outerHTML"
-              hx-trigger="submit, keydown[ctrlKey || metaKey && key == 'Enter']"
-              hx-on::before-request="showUserMessage(this); activateCancel();"
-              hx-on::after-request="this.reset(); document.getElementById('message-history').scrollTop = document.getElementById('message-history').scrollHeight; deactivateCancel();"
-              hx-on::after-swap="scrollToResponse();">
-            <input type="hidden" name="chat_id" value="{{.ChatID}}">
-            <textarea name="message" id="message-input" placeholder="Type your message..." rows="3"></textarea>
-            <button type="submit" id="send-button">
-              <span class="htmx-indicator-hide cancel-text" style="display:none;">
-                <i class="fas fa-times"></i> Cancel
-              </span>
-              <span class="htmx-indicator-hide send-text">
-                <i class="fas fa-paper-plane"></i> Send
-              </span>
-            </button>
-        </form>
-
-        <script>
-
-          // Activate cancel functionality
-          function activateCancel() {
-
-            // Show cancel button
-            document.querySelector('.send-text').style.display = 'none';
-            document.querySelector('.cancel-text').style.display = 'inline';
-
-            let isRequestActive = (document.querySelector('.send-text').style.display == 'none');
-
-            // Add cancel button class
-            document.getElementById('send-button').classList.add('cancel-button');
-
-            // Change button behavior to cancel
-            document.getElementById('send-button').onclick = function(e) {
-              if (isRequestActive) {
-                e.preventDefault();
-                e.stopPropagation();
-                cancelRequest();
-                return false;
-              }
-            };
-          }
-
-          // Deactivate cancel functionality
-          function deactivateCancel() {
-            let isRequestActive = (document.querySelector('.send-text').style.display == 'none');
-
-            // Show send button
-            document.querySelector('.send-text').style.display = 'inline';
-            document.querySelector('.cancel-text').style.display = 'none';
-
-            // Remove cancel button class
-            document.getElementById('send-button').classList.remove('cancel-button');
-
-            // Reset button behavior
-            document.getElementById('send-button').onclick = null;
-          }
-
-          // Send cancel request to server
-          function cancelRequest() {
-            let isRequestActive = (document.querySelector('.send-text').style.display == 'none');
-            if (!isRequestActive) return;
-
-            const chatID = document.getElementById('messages-container').dataset.chatId;
-            fetch(`/chats/${chatID}/cancel`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'HX-Request': 'true'
-              }
-            })
-            .then(response => {
-              if (response.ok) {
-                console.log('Request canceled successfully');
-
-                // Update thinking message to show cancellation
-                const thinkingMessage = document.getElementById('thinking-message');
-                if (thinkingMessage) {
-                  thinkingMessage.innerHTML = `
-                    <div class="message-content thinking-content">
-                      Request canceled by user
-                    </div>
-                  `;
-                }
-
-                deactivateCancel();
-              } else {
-                console.error('Failed to cancel request:', response.statusText);
-              }
-            })
-            .catch(error => {
-              console.error('Error canceling request:', error);
-            });
-          }
-
-          // Change Send button to Cancel button during request
-          document.addEventListener('htmx:beforeRequest', function(evt) {
-            if (evt.detail.elt.id === 'message-form') {
-              activateCancel();
-            }
-          });
-
-          // Change Cancel button back to Send button after request
-          document.addEventListener('htmx:afterRequest', function(evt) {
-            if (evt.detail.elt.id === 'message-form') {
-              deactivateCancel();
-            }
-          });
-
-          // Add user message immediately to message history
-          function showUserMessage(form) {
-            const messageText = form.elements["message"].value.trim();
-            if (!messageText) return;
-
-            const userMessageId = 'temp-user-message-' + Date.now();
-            const sessionId = 'temp-session-' + Date.now();
-
-            const messageHtml = `
-              <div id="${sessionId}" class="message-session">
-                <div class="message user-message">
-                  <div class="message-content">${marked.parse(messageText)}</div>
-                </div>
-                <div id="thinking-message" class="message agent-message">
-                  <div class="message-content thinking-content">
-                    Thinking<span class="spinner"></span>
-                  </div>
-                </div>
-              </div>
-            `;
-
-            document.getElementById('next-message-session').innerHTML = messageHtml;
-            document.getElementById('message-history').scrollTop = document.getElementById('message-history').scrollHeight;
-          }
-
-          // Scroll to the beginning of the most recent response
-          function scrollToResponse() {
-            const latestSession = document.querySelector('.message-session:last-of-type');
-            if (latestSession) {
-              latestSession.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-          }
-
-          // Handle request errors
-          document.addEventListener('htmx:responseError', function(evt) {
-            if (evt.detail.elt.id === 'message-form') {
-              const thinkingMessage = document.getElementById('thinking-message');
-              if (thinkingMessage) {
-                thinkingMessage.innerHTML = `
-                  <div class="message-content error-content">
-                    Error: ${evt.detail.xhr.responseText || 'Failed to get response'}
-                  </div>
-                `;
-              }
-
-              deactivateCancel();
-            }
-          });
-        </script>
+        {{template "message_controls" .}}
     </section>
 </main>
-<style>
-  .htmx-request .htmx-indicator {
-    display: inline;
-  }
-  .htmx-request .htmx-indicator-hide {
-    display: none;
-  }
-  .htmx-indicator {
-    display: none;
-  }
-  .thinking-content {
-    background-color: #333;
-    color: #aaa;
-    font-style: italic;
-  }
-  .error-content {
-    background-color: #3a0000;
-    color: #ff6b6b;
-  }
-  #send-button.cancel-button {
-    background-color: #dc3545;
-  }
-  #send-button.cancel-button:hover {
-    background-color: #bd2130;
-  }
-</style>
 {{end}}
