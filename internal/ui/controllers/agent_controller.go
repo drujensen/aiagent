@@ -45,96 +45,6 @@ func (c *AgentController) RegisterRoutes(e *echo.Echo) {
 	e.DELETE("/agents/:id", c.DeleteAgentHandler)
 
 	e.GET("/agents/provider-models", c.GetProviderModelsHandler)
-	e.POST("/agents/repair-providers", c.RepairAgentProvidersHandler)
-}
-
-// RepairAgentProvidersHandler fixes agent provider IDs that are no longer valid
-func (c *AgentController) RepairAgentProvidersHandler(eCtx echo.Context) error {
-	agents, err := c.agentService.ListAgents(eCtx.Request().Context())
-	if err != nil {
-		c.logger.Error("Failed to list agents", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to list agents")
-	}
-
-	repairedCount := 0
-	agentIssues := []map[string]string{}
-
-	for _, agent := range agents {
-		if agent.ProviderID.IsZero() {
-			c.logger.Warn("Agent has no provider ID", zap.String("agent_id", agent.ID.Hex()), zap.String("agent_name", agent.Name))
-			agentIssues = append(agentIssues, map[string]string{
-				"agent_id": agent.ID.Hex(),
-				"name":     agent.Name,
-				"issue":    "No provider ID",
-			})
-			continue
-		}
-
-		_, err := c.providerService.GetProvider(eCtx.Request().Context(), agent.ProviderID.Hex())
-		if err != nil {
-			c.logger.Warn("Agent has invalid provider ID",
-				zap.String("agent_id", agent.ID.Hex()),
-				zap.String("agent_name", agent.Name),
-				zap.String("provider_id", agent.ProviderID.Hex()),
-				zap.Error(err))
-
-			agentIssue := map[string]string{
-				"agent_id": agent.ID.Hex(),
-				"name":     agent.Name,
-				"issue":    "Invalid provider ID: " + agent.ProviderID.Hex(),
-			}
-
-			if agent.ProviderType != "" {
-				providerByType, typeErr := c.providerService.GetProviderByType(eCtx.Request().Context(), agent.ProviderType)
-				if typeErr == nil && providerByType != nil {
-					c.logger.Info("Repairing agent provider ID",
-						zap.String("agent_id", agent.ID.Hex()),
-						zap.String("agent_name", agent.Name),
-						zap.String("old_provider_id", agent.ProviderID.Hex()),
-						zap.String("new_provider_id", providerByType.ID)) // ID is string, no .Hex()
-
-					// Convert providerByType.ID (string UUID) to ObjectID
-					newProviderID, err := uuidToObjectID(providerByType.ID)
-					if err != nil {
-						c.logger.Error("Failed to convert provider UUID to ObjectID",
-							zap.String("provider_id", providerByType.ID),
-							zap.Error(err))
-						agentIssue["repair_status"] = "Failed: Invalid UUID format"
-					} else {
-						agent.ProviderID = newProviderID
-						if updateErr := c.agentService.UpdateAgent(eCtx.Request().Context(), agent); updateErr != nil {
-							c.logger.Error("Failed to update agent",
-								zap.String("agent_id", agent.ID.Hex()),
-								zap.Error(updateErr))
-							agentIssue["repair_status"] = "Failed: " + updateErr.Error()
-						} else {
-							repairedCount++
-							agentIssue["repair_status"] = "Fixed - Updated provider ID to " + newProviderID.Hex()
-						}
-					}
-				} else {
-					c.logger.Error("Failed to find provider by type",
-						zap.String("agent_id", agent.ID.Hex()),
-						zap.String("agent_name", agent.Name),
-						zap.String("provider_type", string(agent.ProviderType)),
-						zap.Error(typeErr))
-					agentIssue["repair_status"] = "Failed - No provider found for type: " + string(agent.ProviderType)
-				}
-			} else {
-				agentIssue["repair_status"] = "Failed - No provider type specified"
-			}
-
-			agentIssues = append(agentIssues, agentIssue)
-		}
-	}
-
-	result := map[string]interface{}{
-		"total_agents":   len(agents),
-		"repaired_count": repairedCount,
-		"agent_issues":   agentIssues,
-	}
-
-	return eCtx.JSON(http.StatusOK, result)
 }
 
 func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
@@ -304,6 +214,8 @@ func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 		if maxTokens, err := strconv.Atoi(maxTokensStr); err == nil {
 			agent.MaxTokens = &maxTokens
 		}
+	} else {
+		agent.MaxTokens = nil
 	}
 
 	if contextWindowStr := eCtx.FormValue("context_window"); contextWindowStr != "" {
@@ -321,30 +233,14 @@ func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 	if !agent.ProviderID.IsZero() {
 		provider, err := c.providerService.GetProvider(eCtx.Request().Context(), agent.ProviderID.Hex())
 		if err != nil {
-			c.logger.Warn("Specified provider not found, attempting to find by type",
+			c.logger.Error("Failed to get provider",
 				zap.String("provider_id", agent.ProviderID.Hex()),
-				zap.String("provider_type", string(agent.ProviderType)),
 				zap.Error(err))
-
-			if agent.ProviderType != "" {
-				providerByType, typeErr := c.providerService.GetProviderByType(eCtx.Request().Context(), agent.ProviderType)
-				if typeErr == nil && providerByType != nil {
-					c.logger.Info("Found provider by type, updating agent's provider ID",
-						zap.String("old_provider_id", agent.ProviderID.Hex()),
-						zap.String("new_provider_id", providerByType.ID), // ID is string
-						zap.String("provider_name", providerByType.Name))
-					agent.ProviderID, _ = uuidToObjectID(providerByType.ID)
-				} else {
-					c.logger.Error("Failed to find provider by type",
-						zap.String("provider_type", string(agent.ProviderType)),
-						zap.Error(typeErr))
-				}
-			}
+			return eCtx.String(http.StatusBadRequest, "Failed to get provider: "+err.Error())
 		} else {
 			c.logger.Info("Provider verified",
 				zap.String("provider_id", provider.ID), // ID is string
-				zap.String("provider_name", provider.Name),
-				zap.String("provider_type", string(provider.Type)))
+				zap.String("provider_name", provider.Name))
 		}
 	}
 
@@ -443,30 +339,14 @@ func (c *AgentController) UpdateAgentHandler(eCtx echo.Context) error {
 	if !agent.ProviderID.IsZero() {
 		provider, err := c.providerService.GetProvider(eCtx.Request().Context(), agent.ProviderID.Hex())
 		if err != nil {
-			c.logger.Warn("Specified provider not found, attempting to find by type",
+			c.logger.Error("Failed to get provider",
 				zap.String("provider_id", agent.ProviderID.Hex()),
-				zap.String("provider_type", string(agent.ProviderType)),
 				zap.Error(err))
-
-			if agent.ProviderType != "" {
-				providerByType, typeErr := c.providerService.GetProviderByType(eCtx.Request().Context(), agent.ProviderType)
-				if typeErr == nil && providerByType != nil {
-					c.logger.Info("Found provider by type, updating agent's provider ID",
-						zap.String("old_provider_id", agent.ProviderID.Hex()),
-						zap.String("new_provider_id", providerByType.ID), // ID is string
-						zap.String("provider_name", providerByType.Name))
-					agent.ProviderID, _ = uuidToObjectID(providerByType.ID)
-				} else {
-					c.logger.Error("Failed to find provider by type",
-						zap.String("provider_type", string(agent.ProviderType)),
-						zap.Error(typeErr))
-				}
-			}
+			return eCtx.String(http.StatusBadRequest, "Failed to get provider: "+err.Error())
 		} else {
 			c.logger.Info("Provider verified",
 				zap.String("provider_id", provider.ID), // ID is string
-				zap.String("provider_name", provider.Name),
-				zap.String("provider_type", string(provider.Type)))
+				zap.String("provider_name", provider.Name))
 		}
 	}
 

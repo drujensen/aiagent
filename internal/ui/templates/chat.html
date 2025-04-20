@@ -53,7 +53,6 @@
               hx-post="/chats/{{.ChatID}}/messages"
               hx-target="#next-message-session"
               hx-swap="outerHTML"
-              hx-indicator="#user-message-indicator,#thinking-indicator"
               hx-trigger="submit, keydown[ctrlKey || metaKey && key == 'Enter']"
               hx-on::before-request="showUserMessage(this); activateCancel();"
               hx-on::after-request="this.reset(); document.getElementById('message-history').scrollTop = document.getElementById('message-history').scrollHeight; deactivateCancel();"
@@ -71,16 +70,15 @@
         </form>
 
         <script>
-          let isRequestActive = false;
-          const chatID = document.getElementById('messages-container').dataset.chatId;
 
           // Activate cancel functionality
           function activateCancel() {
-            isRequestActive = true;
 
             // Show cancel button
             document.querySelector('.send-text').style.display = 'none';
             document.querySelector('.cancel-text').style.display = 'inline';
+
+            let isRequestActive = (document.querySelector('.send-text').style.display == 'none');
 
             // Add cancel button class
             document.getElementById('send-button').classList.add('cancel-button');
@@ -98,7 +96,7 @@
 
           // Deactivate cancel functionality
           function deactivateCancel() {
-            isRequestActive = false;
+            let isRequestActive = (document.querySelector('.send-text').style.display == 'none');
 
             // Show send button
             document.querySelector('.send-text').style.display = 'inline';
@@ -113,8 +111,10 @@
 
           // Send cancel request to server
           function cancelRequest() {
+            let isRequestActive = (document.querySelector('.send-text').style.display == 'none');
             if (!isRequestActive) return;
 
+            const chatID = document.getElementById('messages-container').dataset.chatId;
             fetch(`/chats/${chatID}/cancel`, {
               method: 'POST',
               headers: {
