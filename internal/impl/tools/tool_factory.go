@@ -72,6 +72,14 @@ The command is executed in the workspace directory.  The extraArgs are prepended
 			return NewMemoryTool(name, description, configuration, logger)
 		},
 	}
+	toolFactory.toolFactories["Browser"] = &ToolFactoryEntry{ // New entry
+		Name:        "Browser",
+		Description: `This tool provides headless browser control using the Rod library for navigation and interaction.`,
+		ConfigKeys:  []string{"headless"}, // Example config key
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewBrowserTool(name, description, configuration, logger) // Implement this in browser.go
+		},
+	}
 
 	return toolFactory, nil
 }
