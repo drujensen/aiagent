@@ -179,6 +179,10 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 			return "", err
 		}
 		t.logger.Info("File read successfully", zap.String("path", fullPath))
+		results := string(data)
+		if len(results) > 16384 {
+			results = results[:16384] + "...truncated"
+		}
 		return string(data), nil
 
 	case "write":

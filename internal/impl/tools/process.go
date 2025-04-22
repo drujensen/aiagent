@@ -54,7 +54,7 @@ func (t *ProcessTool) FullDescription() string {
 
 	// Add description
 	b.WriteString(t.Description())
-	b.WriteString("\n\n")
+	b.WriteString("\nNote: Output is limited to 4096 tokens (~16,384 characters).\n\n")
 
 	// Add configuration header
 	b.WriteString("Configuration for this tool:\n")
@@ -157,7 +157,11 @@ func (t *ProcessTool) Execute(arguments string) (string, error) {
 
 	switch args.Action {
 	case "run":
-		return t.runCommand(baseCommand, args, workspace)
+		results, err := t.runCommand(baseCommand, args, workspace)
+		if len(results) > 16384 {
+			results = results[:16384]
+		}
+		return results, err
 	case "status":
 		return t.checkStatus(args.PID)
 	case "kill":
