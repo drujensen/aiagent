@@ -1,25 +1,30 @@
 {{define "chat_form_content"}}
-<div class="agent-form">
-    <h2>{{if .Chat.ID}}Edit a Conversation{{else}}Start a New Conversation{{end}}</h2>
-    <form
-        {{if .Chat.ID}}hx-put="/chats/{{.Chat.ID}}"{{else}}hx-post="/chats"{{end}}
-        hx-target="#response-message"
-        hx-swap="innerHTML">
-        <div class="form-group">
-            <label for="chat-name">Conversation Name:</label>
-            <input type="text" id="chat-name" name="chat-name" class="form-control" placeholder="Enter conversation name" value="{{.Chat.Name}}" required>
-        </div>
-        <div class="form-group">
-            <label for="agent-select">Select an AI Agent:</label>
-            <select id="agent-select" name="agent-select" class="form-control" required>
-                <option value="">Select an AI Agent</option>
-                {{range .Agents}}
-                <option value="{{.ID.Hex}}"{{if (eq .ID.Hex $.Chat.AgentID)}}selected{{end}}>{{.Name}}</option>
-                {{end}}
-            </select>
-        </div>
-        <button type="submit" class="btn-primary">{{if .Chat.ID}}Save Chat{{else}}Start Chat{{end}}</button>
-    </form>
-    <div id="response-message"></div>
-</div>
+<main class="content">
+  <div class="home-content">
+      <h1>Welcome to the AI Chat Application</h1>
+      <div class="agent-form">
+          <h2>{{if .Chat.ID}}Edit a Conversation{{else}}Start a New Conversation{{end}}</h2>
+          <form
+              {{if .Chat.ID}}hx-put="/chats/{{.Chat.ID}}"{{else}}hx-post="/chats"{{end}}
+              hx-target="#response-message"
+              hx-swap="innerHTML">
+              <div class="form-group">
+                  <label for="chat-name">Conversation Name:</label>
+                  <input type="text" id="chat-name" name="chat-name" class="form-control" placeholder="Enter conversation name" value="{{.Chat.Name}}" required>
+              </div>
+              <div class="form-group">
+                  <label for="agent-select">Select an AI Agent:</label>
+                  <select id="agent-select" name="agent-select" class="form-control" required>
+                      <option value="">Select an AI Agent</option>
+                      {{range .Agents}}
+                      <option value="{{.ID.Hex}}"{{if (eq .ID.Hex $.Chat.AgentID)}}selected{{end}}>{{.Name}}</option>
+                      {{end}}
+                  </select>
+              </div>
+              <button type="submit" class="btn-primary">{{if .Chat.ID}}Save Chat{{else}}Start Chat{{end}}</button>
+          </form>
+          <div id="response-message"></div>
+      </div>
+  </div>
+</main>
 {{end}}

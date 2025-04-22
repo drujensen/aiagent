@@ -36,12 +36,13 @@ func (c *HomeController) RegisterRoutes(e *echo.Echo) {
 }
 
 func (c *HomeController) HomeHandler(eCtx echo.Context) error {
+	return eCtx.Redirect(http.StatusFound, "/chats/new")
 	// No longer fetch data here; let HTMX handle it
-	data := map[string]interface{}{
-		"Title":           "AI Agents",
-		"ContentTemplate": "home_content",
-	}
-	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)
+	//data := map[string]interface{}{
+	//	"Title":           "AI Agents",
+	//	"ContentTemplate": "home_content",
+	//}
+	//return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)
 }
 
 func (c *HomeController) ChatsPartialHandler(eCtx echo.Context) error {
