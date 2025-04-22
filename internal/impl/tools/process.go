@@ -159,7 +159,7 @@ func (t *ProcessTool) Execute(arguments string) (string, error) {
 	case "run":
 		results, err := t.runCommand(baseCommand, args, workspace)
 		if len(results) > 16384 {
-			results = results[:16384]
+			results = results[:16384] + "...truncated"
 		}
 		return results, err
 	case "status":
