@@ -3,7 +3,7 @@
       hx-post="/chats/{{.ChatID}}/messages"
       hx-target="#next-message-session"
       hx-swap="outerHTML"
-      hx-trigger="submit, keydown[ctrlKey || metaKey && key == 'Enter'] from:#message-input"
+      hx-trigger="submit, keydown[key == 'Enter' && !shiftKey] from:#message-input"
       hx-on::before-request="showTempMessage(this); resetForm(this); toggleCancelButton(true); scrollToResponse();"
       hx-on::after-swap="scrollToResponse(); initCopyButtons()"
       hx-on::after-request="toggleCancelButton(false);"

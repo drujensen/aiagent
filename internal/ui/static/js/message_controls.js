@@ -65,4 +65,14 @@ function toggleCancelButton(isRequesting) {
 document.addEventListener('DOMContentLoaded', () => {
     initCopyButtons();
     scrollToResponse();
+
+    const textarea = document.getElementById('message-input');
+    if (textarea) {
+        textarea.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();  // Prevent newline insertion
+                // HTMX will handle the form submission
+            }
+        });
+    }
 });
