@@ -27,7 +27,12 @@
                     </div>
                 {{else if eq $msg.Role "assistant"}}
                     <div class="message agent-message">
-                        <div class="message-content">{{renderMarkdown $msg.Content}}</div>
+                        <div class="message-content">
+                            {{renderMarkdown $msg.Content}}  <!-- Existing text -->
+                            {{if $msg.ImageURL}}
+                                <img src="{{$msg.ImageURL}}" alt="Generated Image" style="max-width: 100%; height: auto; margin-top: 10px;">
+                            {{end}}
+                        </div>
                     </div>
                 {{else}}
                     <div class="message tool-message">
