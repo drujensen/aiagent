@@ -80,12 +80,12 @@ The command is executed in the workspace directory.  The extraArgs are prepended
 			return NewBrowserTool(name, description, configuration, logger)
 		},
 	}
-	toolFactory.toolFactories["ImageGeneration"] = &ToolFactoryEntry{ // New entry
-		Name:        "ImageGeneration",
+	toolFactory.toolFactories["Image"] = &ToolFactoryEntry{
+		Name:        "Image",
 		Description: `This tool generates images using AI providers like XAI or OpenAI.`,
-		ConfigKeys:  []string{"provider", "api_key", "base_url"},
+		ConfigKeys:  []string{"provider", "api_key", "base_url", "model"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
-			return NewImageGenerationTool(name, description, configuration, logger) // Ensure this is defined
+			return NewImageTool(name, description, configuration, logger)
 		},
 	}
 

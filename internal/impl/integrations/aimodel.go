@@ -365,43 +365,20 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				if err != nil {
 					toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
 				} else {
-					toolResult = result // e.g., "Images generated: [url1, url2]"
+					toolResult = result
 				}
 			} else {
 				toolResult = fmt.Sprintf("Tool %s not found", toolName)
 			}
 
 			var newMessage *entities.Message
-			if strings.EqualFold(toolName, "ImageGeneration") {
-				// Special handling for ImageGeneration: Extract and set ImageURL
-				imageURLs := extractImageURLs(toolResult) // Helper function to parse URLs from result string
-				if len(imageURLs) > 0 {
-					newMessage = &entities.Message{
-						ID:         uuid.New().String(),
-						Role:       "tool",
-						Content:    fmt.Sprintf("Tool %s responded with images", toolName),
-						ImageURL:   imageURLs[0], // Use the first URL or handle multiple
-						ToolCallID: toolCall.ID,
-						Timestamp:  time.Now(),
-					}
-				} else {
-					newMessage = &entities.Message{
-						ID:         uuid.New().String(),
-						Role:       "tool",
-						Content:    fmt.Sprintf("Tool %s responded: %s", toolName, toolResult),
-						ToolCallID: toolCall.ID,
-						Timestamp:  time.Now(),
-					}
-				}
-			} else {
-				// Standard handling
-				newMessage = &entities.Message{
-					ID:         uuid.New().String(),
-					Role:       "tool",
-					Content:    fmt.Sprintf("Tool %s responded: %s", toolName, toolResult),
-					ToolCallID: toolCall.ID,
-					Timestamp:  time.Now(),
-				}
+
+			newMessage = &entities.Message{
+				ID:         uuid.New().String(),
+				Role:       "tool",
+				Content:    fmt.Sprintf("Tool %s responded: %s", toolName, toolResult),
+				ToolCallID: toolCall.ID,
+				Timestamp:  time.Now(),
 			}
 			newMessages = append(newMessages, newMessage)
 
@@ -409,7 +386,6 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				"role":         "tool",
 				"content":      newMessage.Content,
 				"tool_call_id": toolCall.ID,
-				"image_url":    newMessage.ImageURL, // Include if available
 			}
 			apiMessages = append(apiMessages, toolResponseMsg)
 		}
@@ -418,23 +394,6 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 	}
 
 	return newMessages, nil
-}
-
-func extractImageURLs(result string) []string {
-	var urls []string
-	// Simple parsing; assume result is like "Images generated: [url1, url2]"
-	if strings.Contains(result, "Images generated:") {
-		startIdx := strings.Index(result, "[") + 1
-		endIdx := strings.Index(result, "]")
-		if startIdx > 0 && endIdx > startIdx {
-			urlString := result[startIdx:endIdx]
-			urlList := strings.Split(urlString, ",")
-			for _, url := range urlList {
-				urls = append(urls, strings.TrimSpace(url))
-			}
-		}
-	}
-	return urls
 }
 
 // GetUsage returns the token usage statistics
