@@ -40,5 +40,7 @@ func NewAgent(name, role string, providerID primitive.ObjectID, providerType Pro
 }
 
 func (a *Agent) FullSystemPrompt() string {
-	return "Your name is " + a.Name + ". " + a.SystemPrompt
+	currentTime := time.Now()
+	formattedTime := currentTime.Format("2006-01-02 15:04:05")
+	return "Your name is " + a.Name + ". Current date and time is " + formattedTime + ". " + a.SystemPrompt
 }
