@@ -68,7 +68,7 @@ func (t *ImageTool) Parameters() []entities.Parameter {
 		{
 			Name:        "n",
 			Type:        "integer",
-			Description: "Number of images to generate (1-4)",
+			Description: "Number of images to generate (1-10)",
 			Required:    false,
 		},
 	}
@@ -90,7 +90,7 @@ func (t *ImageTool) Execute(arguments string) (string, error) {
 		return "", fmt.Errorf("prompt is required")
 	}
 
-	if args.N < 1 || args.N > 4 {
+	if args.N < 1 || args.N > 10 {
 		args.N = 1
 	}
 
