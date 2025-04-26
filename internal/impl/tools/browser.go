@@ -17,7 +17,8 @@ type BrowserTool struct {
 	description   string
 	configuration map[string]string
 	logger        *zap.Logger
-	browser       *rod.Browser // Persistent browser instance
+	browser       *rod.Browser
+	page          *rod.Page
 }
 
 func NewBrowserTool(name, description string, configuration map[string]string, logger *zap.Logger) *BrowserTool {
@@ -26,10 +27,6 @@ func NewBrowserTool(name, description string, configuration map[string]string, l
 		description:   description,
 		configuration: configuration,
 		logger:        logger,
-	}
-	if err := bt.initializeBrowser(); err != nil {
-		logger.Error("Failed to initialize browser in NewBrowserTool", zap.Error(err))
-		// Browser initialization failed; proceed with nil browser, handle in Execute
 	}
 	return bt
 }
@@ -60,10 +57,6 @@ func (b *BrowserTool) Configuration() map[string]string {
 
 func (b *BrowserTool) UpdateConfiguration(config map[string]string) {
 	b.configuration = config
-	// Optionally reinitialize if config changes affect browser (e.g., headless mode)
-	if err := b.initializeBrowser(); err != nil {
-		b.logger.Error("Failed to reinitialize browser after configuration update", zap.Error(err))
-	}
 }
 
 func (b *BrowserTool) Parameters() []entities.Parameter {
@@ -71,7 +64,7 @@ func (b *BrowserTool) Parameters() []entities.Parameter {
 		{
 			Name:        "operation",
 			Type:        "string",
-			Enum:        []string{"navigate", "getTitle", "click"},
+			Enum:        []string{"open", "click", "screenshot", "close", "getTitle", "getPageSource", "getElementText", "getElementAttribute", "setInputValue"},
 			Description: "The browser operation to perform",
 			Required:    true,
 		},
@@ -87,12 +80,20 @@ func (b *BrowserTool) Parameters() []entities.Parameter {
 			Description: "CSS selector for operations like 'click'",
 			Required:    false,
 		},
+		{
+			Name:        "value",
+			Type:        "string",
+			Description: "The value to set for input fields (required for 'setInputValue')",
+			Required:    false,
+		},
 	}
 }
 
 func (b *BrowserTool) Execute(arguments string) (string, error) {
 	b.logger.Debug("Executing browser operation", zap.String("arguments", arguments))
-	if b.browser == nil {
+
+	if err := b.initializeBrowser(); err != nil {
+		b.logger.Error("Failed to initialize browser", zap.Error(err))
 		return "", fmt.Errorf("browser not initialized; check logs for errors")
 	}
 
@@ -100,6 +101,7 @@ func (b *BrowserTool) Execute(arguments string) (string, error) {
 		Operation string `json:"operation"`
 		Url       string `json:"url"`
 		Selector  string `json:"selector"`
+		Value     string `json:"value"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return "", fmt.Errorf("failed to parse arguments: %w", err)
@@ -110,30 +112,88 @@ func (b *BrowserTool) Execute(arguments string) (string, error) {
 	}
 
 	switch args.Operation {
-	case "navigate":
+	case "open":
 		if args.Url == "" {
 			return "", fmt.Errorf("url is required for navigate")
 		}
-		page := b.browser.MustPage(args.Url)
-		defer page.Close() // Close page, not browser
+		b.page = b.browser.MustPage(args.Url)
+		if b.page == nil {
+			return "", fmt.Errorf("page is not initialized")
+		}
 		return fmt.Sprintf("Navigated to %s successfully", args.Url), nil
 	case "getTitle":
-		if args.Url == "" {
-			return "", fmt.Errorf("url is required for getTitle")
+		if b.page == nil {
+			return "", fmt.Errorf("page is not initialized")
 		}
-		page := b.browser.MustPage(args.Url)
-		defer page.Close()
-		title := page.MustInfo().Title
+		title := b.page.MustInfo().Title
 		return title, nil
 	case "click":
-		if args.Url == "" || args.Selector == "" {
-			return "", fmt.Errorf("url and selector are required for click")
+		if b.page == nil {
+			return "", fmt.Errorf("page is not initialized")
 		}
-		page := b.browser.MustPage(args.Url)
-		defer page.Close()
-		element := page.MustElement(args.Selector)
+		if args.Selector == "" {
+			return "", fmt.Errorf("selector is required for click")
+		}
+		element := b.page.MustElement(args.Selector)
 		element.MustClick()
 		return fmt.Sprintf("Clicked element with selector %s", args.Selector), nil
+	case "screenshot":
+		screenshot, err := b.page.Screenshot(true, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to take screenshot: %w", err)
+		}
+		return string(screenshot), nil
+	case "close":
+		if b.page != nil {
+			b.page.MustClose()
+		}
+		if b.browser != nil {
+			b.browser.MustClose()
+		}
+		return "Browser closed successfully", nil
+	case "getPageSource":
+		source, err := b.page.HTML()
+		if err != nil {
+			return "", fmt.Errorf("failed to get page source: %w", err)
+		}
+		return source, nil
+	case "getElementText":
+		if args.Selector == "" {
+			return "", fmt.Errorf("selector is required for getElementText")
+		}
+		element := b.page.MustElement(args.Selector)
+		text, err := element.Text()
+		if err != nil {
+			return "", fmt.Errorf("failed to get element text: %w", err)
+		}
+		return text, nil
+	case "getElementAttribute":
+		if args.Selector == "" {
+			return "", fmt.Errorf("selector is required for getElementAttribute")
+		}
+		element := b.page.MustElement(args.Selector)
+		attribute, err := element.Attribute("value")
+		if err != nil {
+			return "", fmt.Errorf("failed to get element attribute: %w", err)
+		}
+		if attribute == nil {
+			return "", fmt.Errorf("attribute not found")
+		}
+		return *attribute, nil
+	case "setInputValue":
+		if args.Selector == "" {
+			return "", fmt.Errorf("selector is required for setInputValue")
+		}
+		if args.Value == "" {
+			return "", fmt.Errorf("value is required for setInputValue")
+		}
+		element := b.page.MustElement(args.Selector)
+		err := element.Input(args.Value)
+		if err != nil {
+			return "", fmt.Errorf("failed to set input value: %w", err)
+		}
+		return fmt.Sprintf("Set input value for element with selector %s", args.Selector), nil
+
 	default:
 		return "", fmt.Errorf("unsupported operation: %s", args.Operation)
 	}
