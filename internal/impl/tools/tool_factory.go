@@ -88,6 +88,19 @@ The command is executed in the workspace directory.  The extraArgs are prepended
 			return NewImageTool(name, description, configuration, logger)
 		},
 	}
+	toolFactory.toolFactories["Vision"] = &ToolFactoryEntry{
+		Name:        "Vision",
+		Description: "This tool provides image understanding capabilities using providers like x.ai or OpenAI, allowing processing of images via base64 or URLs combined with text prompts.",
+		ConfigKeys:  []string{"provider", "api_key", "base_url", "model"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return &VisionTool{
+				NameField:            name,
+				DescriptionField:     description,
+				FullDescriptionField: description,
+				ConfigurationField:   configuration, // Now includes provider, api_key, etc.
+			}
+		},
+	}
 
 	return toolFactory, nil
 }
