@@ -75,7 +75,7 @@ The command is executed in the workspace directory.  The extraArgs are prepended
 	toolFactory.toolFactories["Browser"] = &ToolFactoryEntry{
 		Name:        "Browser",
 		Description: `This tool provides headless browser control using the Rod library for navigation and interaction.`,
-		ConfigKeys:  []string{"headless"},
+		ConfigKeys:  []string{"headless", "workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewBrowserTool(name, description, configuration, logger)
 		},

@@ -3,6 +3,7 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"aiagent/internal/domain/entities"
@@ -86,6 +87,12 @@ func (b *BrowserTool) Parameters() []entities.Parameter {
 			Description: "The value to set for input fields (required for 'setInputValue')",
 			Required:    false,
 		},
+		{
+			Name:        "filename",
+			Type:        "string",
+			Description: "The name of the file to save the screenshot (required for 'screenshot')",
+			Required:    false,
+		},
 	}
 }
 
@@ -102,6 +109,7 @@ func (b *BrowserTool) Execute(arguments string) (string, error) {
 		Url       string `json:"url"`
 		Selector  string `json:"selector"`
 		Value     string `json:"value"`
+		Filename  string `json:"filename"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return "", fmt.Errorf("failed to parse arguments: %w", err)
@@ -138,17 +146,26 @@ func (b *BrowserTool) Execute(arguments string) (string, error) {
 		element.MustClick()
 		return fmt.Sprintf("Clicked element with selector %s", args.Selector), nil
 	case "screenshot":
+		if b.page == nil {
+			return "", fmt.Errorf("page is not initialized")
+		}
+		workspace := b.configuration["workspace"]
+		if workspace == "" {
+			return "", fmt.Errorf("workspace is not configured")
+		}
+		filename := workspace + "/" + args.Filename
 		screenshot, err := b.page.Screenshot(true, nil)
 		if err != nil {
 			return "", fmt.Errorf("failed to take screenshot: %w", err)
 		}
-		return string(screenshot), nil
+		err = os.WriteFile(filename, screenshot, 0644)
+		if err != nil {
+			return "", fmt.Errorf("failed to save screenshot: %w", err)
+		}
+		return "Screenshot saved successfully at " + filename, nil
 	case "close":
 		if b.page != nil {
 			b.page.MustClose()
-		}
-		if b.browser != nil {
-			b.browser.MustClose()
 		}
 		return "Browser closed successfully", nil
 	case "getPageSource":
