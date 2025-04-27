@@ -104,18 +104,19 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 	}
 
 	agentData := struct {
-		ID            string
-		Name          string
-		ProviderID    primitive.ObjectID
-		ProviderType  entities.ProviderType
-		Endpoint      string
-		Model         string
-		APIKey        string
-		SystemPrompt  string
-		Temperature   *float64
-		MaxTokens     *int
-		ContextWindow *int
-		Tools         []string
+		ID              string
+		Name            string
+		ProviderID      primitive.ObjectID
+		ProviderType    entities.ProviderType
+		Endpoint        string
+		Model           string
+		APIKey          string
+		SystemPrompt    string
+		Temperature     *float64
+		MaxTokens       *int
+		ContextWindow   *int
+		ReasoningEffort string
+		Tools           []string
 	}{
 		Tools: []string{},
 	}
@@ -131,6 +132,7 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 		agentData.Temperature = agent.Temperature
 		agentData.MaxTokens = agent.MaxTokens
 		agentData.ContextWindow = agent.ContextWindow
+		agentData.ReasoningEffort = agent.ReasoningEffort
 		for _, tool := range agent.Tools {
 			agentData.Tools = append(agentData.Tools, tool)
 		}
@@ -158,11 +160,12 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 
 func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 	agent := &entities.Agent{
-		Name:         eCtx.FormValue("name"),
-		Endpoint:     eCtx.FormValue("endpoint"),
-		Model:        eCtx.FormValue("model"),
-		APIKey:       eCtx.FormValue("api_key"),
-		SystemPrompt: eCtx.FormValue("system_prompt"),
+		Name:            eCtx.FormValue("name"),
+		Endpoint:        eCtx.FormValue("endpoint"),
+		Model:           eCtx.FormValue("model"),
+		APIKey:          eCtx.FormValue("api_key"),
+		SystemPrompt:    eCtx.FormValue("system_prompt"),
+		ReasoningEffort: eCtx.FormValue("reasoning_effort"),
 	}
 
 	c.logger.Info("Creating agent",
@@ -265,12 +268,13 @@ func (c *AgentController) UpdateAgentHandler(eCtx echo.Context) error {
 	}
 
 	agent := &entities.Agent{
-		ID:           oid,
-		Name:         eCtx.FormValue("name"),
-		Endpoint:     eCtx.FormValue("endpoint"),
-		Model:        eCtx.FormValue("model"),
-		APIKey:       eCtx.FormValue("api_key"),
-		SystemPrompt: eCtx.FormValue("system_prompt"),
+		ID:              oid,
+		Name:            eCtx.FormValue("name"),
+		Endpoint:        eCtx.FormValue("endpoint"),
+		Model:           eCtx.FormValue("model"),
+		APIKey:          eCtx.FormValue("api_key"),
+		SystemPrompt:    eCtx.FormValue("system_prompt"),
+		ReasoningEffort: eCtx.FormValue("reasoning_effort"),
 	}
 
 	providerId := eCtx.FormValue("provider_id")

@@ -60,11 +60,22 @@
         <div class="form-group">
             <label for="max_tokens">Max Tokens (optional):</label>
             <input type="number" id="max_tokens" name="max_tokens" class="form-control" value="{{if .Agent.MaxTokens}}{{.Agent.MaxTokens}}{{end}}">
+            <small class="form-text">Defaults to 4096</small>
         </div>
         <div class="form-group">
             <label for="context_window">Context Window (optional):</label>
             <input type="number" id="context_window" name="context_window" class="form-control" value="{{if .Agent.ContextWindow}}{{.Agent.ContextWindow}}{{end}}">
             <small class="form-text">Will use model's default if not specified.</small>
+        </div>
+        <div class="form-group">
+            <label for="reasoning_effort">Reasoning Effort:</label>
+            <select id="reasoning_effort" name="reasoning_effort" class="form-control">
+              <option value="none" {{if (eq .Agent.ReasoningEffort "none")}}selected{{end}}>None</option>
+                <option value="low" {{if (eq .Agent.ReasoningEffort "low")}}selected{{end}}>Low</option>
+                <option value="medium" {{if (eq .Agent.ReasoningEffort "medium")}}selected{{end}}>Medium</option>
+                <option value="high" {{if (eq .Agent.ReasoningEffort "high")}}selected{{end}}>High</option>
+            </select>
+            <small class="form-text">Only certain models support reasoning effort.</small>
         </div>
         <div class="form-group">
             <label for="tools">Tools (optional):</label>

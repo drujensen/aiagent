@@ -1,8 +1,7 @@
 # AI Agent Codebase Guide
 
 ## Build Commands
-- Run HTTP server: `go run ./cmd/http`
-- Run Console: `go run ./cmd/console`
+- Run HTTP server: `go run ./cmd/server/main.go`
 - Run all tests: `go test ./...`
 - Run specific test: `go test ./path/to/package -run TestFunctionName`
 - Build and run with Docker: `docker-compose up --build`
@@ -20,8 +19,9 @@
 - **Testing**: Write unit tests for all service methods, use mocks for dependencies
 
 ## Project Structure
-- `cmd/`: Entry points for applications
-- `internal/`: Core code (domain, impl, UI)
-- `domain/`: Business entities, interfaces, services
-- `impl/`: External systems integration
-- `ui/`: User interface components
+- `cmd/server/main.go`: Entry points for applications
+- `internal/`: Core code (api, domain, impl, UI)
+- `internal/api/`: API handlers and routes
+- `internal/domain/`: Business entities, interfaces, services
+- `internal/impl/`: External systems integration
+- `internal/ui/`: User interface components

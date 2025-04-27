@@ -303,6 +303,9 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 	if agent.MaxTokens != nil {
 		options["max_tokens"] = *agent.MaxTokens
 	}
+	if agent.ReasoningEffort != "none" {
+		options["reasoning_effort"] = agent.ReasoningEffort
+	}
 
 	newMessages, err := aiModel.GenerateResponse(ctx, messagesToSend, tools, options)
 	if err != nil {
