@@ -166,7 +166,7 @@ definitions:
         description: Total tokens processed
         type: integer
     type: object
-host: localhost:8080
+host: drujensen.com
 info:
   contact:
     email: support@swagger.io
