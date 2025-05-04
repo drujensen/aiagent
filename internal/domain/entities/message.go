@@ -23,7 +23,7 @@ type Usage struct {
 }
 
 type Message struct {
-	ID         string     `json:"id" bson:"id"`
+	ID         string     `json:"id" bson:"_id"`
 	Role       string     `json:"role" bson:"role"`
 	Content    string     `json:"content" bson:"content"`
 	ToolCallID string     `json:"tool_call_id,omitempty" bson:"tool_call_id,omitempty"`

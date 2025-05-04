@@ -5,7 +5,7 @@
       <div class="agent-form">
           <h2>{{if .Chat.ID}}Edit a Conversation{{else}}Start a New Conversation{{end}}</h2>
           <form
-              {{if .Chat.ID}}hx-put="/chats/{{.Chat.ID}}"{{else}}hx-post="/chats"{{end}}
+              {{if .IsEdit}}hx-put="/chats/{{.Chat.ID}}"{{else}}hx-post="/chats"{{end}}
               hx-target="#response-message"
               hx-swap="innerHTML">
               <div class="form-group">
@@ -17,7 +17,7 @@
                   <select id="agent-select" name="agent-select" class="form-control" required>
                       <option value="">Select an AI Agent</option>
                       {{range .Agents}}
-                      <option value="{{.ID.Hex}}"{{if (eq .ID.Hex $.Chat.AgentID)}}selected{{end}}>{{.Name}}</option>
+                      <option value="{{.ID}}"{{if (eq .ID $.Chat.AgentID)}}selected{{end}}>{{.Name}}</option>
                       {{end}}
                   </select>
               </div>

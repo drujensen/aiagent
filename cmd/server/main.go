@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"html/template"
-	"strings"
 
 	apicontrollers "aiagent/internal/api/controllers"
 	"aiagent/internal/domain/services"
@@ -15,13 +14,11 @@ import (
 	uicontrollers "aiagent/internal/ui/controllers"
 
 	"github.com/dustin/go-humanize"
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"github.com/yuin/goldmark"
 	gfmext "github.com/yuin/goldmark/extension"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 
 	_ "aiagent/docs" // Import the generated docs package
@@ -89,29 +86,6 @@ func main() {
 		},
 		"formatNumber": func(num int) string {
 			return humanize.Comma(int64(num))
-		},
-		"compareUUIDtoObjectID": func(UUID string, objectID primitive.ObjectID) (bool, error) {
-			// Convert the ObjectID to a byte slice
-			bytes := objectID[:]
-
-			// Pad the byte slice with 4 additional bytes to make it 16 bytes long
-			paddedBytes := append(bytes, []byte{0, 0, 0, 0}...)
-
-			// Create a UUID from the padded bytes
-			u, err := uuid.FromBytes(paddedBytes)
-			if err != nil {
-				return false, err
-			}
-
-			// Convert the UUID to lowercase
-			lowerUUID := strings.ToLower(UUID)
-
-			logger.Debug("UUID", zap.String("UUID", lowerUUID), zap.String("ObjectID", u.String()))
-			// Compare the UUID with the string representation of the ObjectID
-			if lowerUUID[:12] == u.String()[:12] {
-				return true, nil
-			}
-			return false, nil
 		},
 	}
 

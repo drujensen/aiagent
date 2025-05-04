@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
@@ -84,12 +83,7 @@ func (r *ToolRepository) ListToolData(ctx context.Context) ([]*entities.ToolData
 
 func (r *ToolRepository) GetToolData(ctx context.Context, id string) (*entities.ToolData, error) {
 	var toolData entities.ToolData
-	oid, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, errors.NotFoundErrorf("toolData not found")
-	}
-
-	err = r.collection.FindOne(ctx, bson.M{"_id": oid}).Decode(&toolData)
+	err := r.collection.FindOne(ctx, bson.M{"_id": id}).Decode(&toolData)
 	if err == mongo.ErrNoDocuments {
 		return nil, errors.NotFoundErrorf("toolData not found")
 	}
@@ -101,19 +95,9 @@ func (r *ToolRepository) GetToolData(ctx context.Context, id string) (*entities.
 }
 
 func (t *ToolRepository) CreateToolData(ctx context.Context, toolData *entities.ToolData) error {
-	toolData.CreatedAt = time.Now()
-	toolData.UpdatedAt = time.Now()
-	toolData.ID = primitive.NewObjectID()
-
-	result, err := t.collection.InsertOne(ctx, toolData)
+	_, err := t.collection.InsertOne(ctx, toolData)
 	if err != nil {
 		return errors.InternalErrorf("failed to create toolData: %v", err)
-	}
-
-	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
-		toolData.ID = oid
-	} else {
-		return errors.ValidationErrorf("failed to convert InsertedID to ObjectID")
 	}
 
 	return t.reloadToolInstances()
@@ -122,29 +106,19 @@ func (t *ToolRepository) CreateToolData(ctx context.Context, toolData *entities.
 func (t *ToolRepository) UpdateToolData(ctx context.Context, toolData *entities.ToolData) error {
 	toolData.UpdatedAt = time.Now()
 
-	oid, err := primitive.ObjectIDFromHex(toolData.ID.Hex())
-	if err != nil {
-		return errors.NotFoundErrorf("toolData not found: %s", toolData.ID.Hex())
-	}
-
-	result, err := t.collection.UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": toolData})
+	result, err := t.collection.UpdateOne(ctx, bson.M{"_id": toolData.ID}, bson.M{"$set": toolData})
 	if err != nil {
 		return errors.InternalErrorf("failed to update toolData: %v", err)
 	}
 	if result.MatchedCount == 0 {
-		return errors.NotFoundErrorf("toolData not found: %s", toolData.ID.Hex())
+		return errors.NotFoundErrorf("toolData not found: %s", toolData.ID)
 	}
 
 	return t.reloadToolInstances()
 }
 
 func (t *ToolRepository) DeleteToolData(ctx context.Context, id string) error {
-	oid, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return errors.NotFoundErrorf("toolData not found")
-	}
-
-	result, err := t.collection.DeleteOne(ctx, bson.M{"_id": oid})
+	result, err := t.collection.DeleteOne(ctx, bson.M{"_id": id})
 	if err != nil {
 		return errors.InternalErrorf("failed to delete toolData: %v", err)
 	}

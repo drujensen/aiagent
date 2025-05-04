@@ -11,7 +11,6 @@ import (
 	"aiagent/internal/impl/tools"
 
 	"github.com/labstack/echo/v4"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
 
@@ -67,10 +66,7 @@ func (c *ToolController) ToolFormHandler(eCtx echo.Context) error {
 	}
 
 	if tool == nil {
-		tool = &entities.ToolData{
-			ID:            primitive.NilObjectID, // Explicitly set to zero-value
-			Configuration: make(map[string]string),
-		}
+		tool = entities.NewToolData("", "", "", nil)
 	}
 
 	data := map[string]interface{}{
@@ -78,7 +74,7 @@ func (c *ToolController) ToolFormHandler(eCtx echo.Context) error {
 		"ContentTemplate": "tool_form_content",
 		"Tool":            tool,
 		"ToolTypes":       factories,
-		"IsEdit":          isEdit, // Pass explicit flag
+		"IsEdit":          isEdit,
 	}
 
 	eCtx.Response().Header().Set("Content-Type", "text/html")
@@ -141,6 +137,7 @@ func (c *ToolController) GetToolTypeDefaultsHandler(eCtx echo.Context) error {
 
 func (c *ToolController) CreateToolHandler(eCtx echo.Context) error {
 	tool := &entities.ToolData{
+		ID:            eCtx.FormValue("id"),
 		ToolType:      eCtx.FormValue("tool_type"),
 		Name:          eCtx.FormValue("name"),
 		Description:   eCtx.FormValue("description"),
@@ -148,12 +145,6 @@ func (c *ToolController) CreateToolHandler(eCtx echo.Context) error {
 	}
 
 	c.logger.Debug("Creating tool", zap.String("name", tool.Name), zap.String("tool_type", tool.ToolType))
-
-	// Ensure ID is not set for new tools
-	if !tool.ID.IsZero() {
-		c.logger.Warn("Ignoring provided ID for new tool", zap.String("id", tool.ID.Hex()))
-		tool.ID = primitive.NilObjectID
-	}
 
 	// Parse dynamic configuration fields
 	configKeys := eCtx.Request().Form["config_key[]"]
@@ -182,14 +173,8 @@ func (c *ToolController) UpdateToolHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusBadRequest, "Tool ID is required")
 	}
 
-	oid, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		c.logger.Error("Invalid tool ID format", zap.String("id", id), zap.Error(err))
-		return eCtx.String(http.StatusBadRequest, "Invalid tool ID")
-	}
-
 	tool := &entities.ToolData{
-		ID:            oid,
+		ID:            id,
 		ToolType:      eCtx.FormValue("tool_type"),
 		Name:          eCtx.FormValue("name"),
 		Description:   eCtx.FormValue("description"),
@@ -226,12 +211,6 @@ func (c *ToolController) DeleteToolHandler(eCtx echo.Context) error {
 	if id == "" {
 		c.logger.Error("Tool ID is missing in delete request")
 		return eCtx.String(http.StatusBadRequest, "Tool ID is required")
-	}
-
-	_, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		c.logger.Error("Invalid tool ID format", zap.String("id", id), zap.Error(err))
-		return eCtx.String(http.StatusBadRequest, "Invalid tool ID")
 	}
 
 	if err := c.toolService.DeleteToolData(eCtx.Request().Context(), id); err != nil {

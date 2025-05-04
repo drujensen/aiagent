@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"aiagent/internal/domain/entities"
@@ -12,7 +11,6 @@ import (
 	"aiagent/internal/impl/integrations"
 
 	"github.com/google/uuid"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
 
@@ -79,12 +77,7 @@ func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*en
 		return nil, errors.ValidationErrorf("agent ID is required")
 	}
 
-	agentObjID, err := primitive.ObjectIDFromHex(agentID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid agent ID: %v", err)
-	}
-
-	chat := entities.NewChat(agentObjID, name)
+	chat := entities.NewChat(agentID, name)
 	if err := s.chatRepo.CreateChat(ctx, chat); err != nil {
 		return nil, err
 	}
@@ -156,40 +149,31 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 	}
 
 	// Generate AI response synchronously
-	agent, err := s.agentRepo.GetAgent(ctx, chat.AgentID.Hex())
+	agent, err := s.agentRepo.GetAgent(ctx, chat.AgentID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get the provider using agent's ProviderID (ObjectID)
-	provider, err := s.providerRepo.GetProvider(ctx, agent.ProviderID.Hex())
+	provider, err := s.providerRepo.GetProvider(ctx, agent.ProviderID)
 	if err != nil {
 		// Fallback to get provider by type if ID lookup fails
 		s.logger.Warn("Failed to get provider by ID, attempting to find by type",
-			zap.String("agent_id", agent.ID.Hex()),
-			zap.String("provider_id", agent.ProviderID.Hex()),
+			zap.String("agent_id", agent.ID),
+			zap.String("provider_id", agent.ProviderID),
 			zap.String("provider_type", string(agent.ProviderType)),
 			zap.Error(err))
 
 		providerByType, typeErr := s.providerRepo.GetProviderByType(ctx, agent.ProviderType)
 		if typeErr != nil {
-			return nil, errors.InternalErrorf("failed to get provider %s and fallback by type %s also failed: %v", agent.ProviderID.Hex(), agent.ProviderType, err)
+			return nil, errors.InternalErrorf("failed to get provider %s and fallback by type %s also failed: %v", agent.ProviderID, agent.ProviderType, err)
 		}
 
-		// Update the agent with the new provider ID for future calls
-		// Convert providerByType.ID (string UUID) to ObjectID
-		newProviderID, err := uuidToObjectID(providerByType.ID)
-		if err != nil {
-			s.logger.Error("Failed to convert provider UUID to ObjectID",
-				zap.String("provider_id", providerByType.ID),
-				zap.Error(err))
-		} else {
-			agent.ProviderID = newProviderID
-			if updateErr := s.agentRepo.UpdateAgent(ctx, agent); updateErr != nil {
-				s.logger.Error("Failed to update agent with new provider ID",
-					zap.String("agent_id", agent.ID.Hex()),
-					zap.Error(updateErr))
-			}
+		agent.ProviderID = providerByType.ID
+		if updateErr := s.agentRepo.UpdateAgent(ctx, agent); updateErr != nil {
+			s.logger.Error("Failed to update agent with new provider ID",
+				zap.String("agent_id", agent.ID),
+				zap.Error(updateErr))
 		}
 
 		provider = providerByType
@@ -197,8 +181,8 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 
 	resolvedAPIKey, err := s.config.ResolveEnvironmentVariable(agent.APIKey)
 	if err != nil {
-		s.logger.Error("Failed to resolve API key", zap.String("agent_id", agent.ID.Hex()), zap.Error(err))
-		return nil, errors.InternalErrorf("failed to resolve API key for agent %s: %v", agent.ID.Hex(), err)
+		s.logger.Error("Failed to resolve API key", zap.String("agent_id", agent.ID), zap.Error(err))
+		return nil, errors.InternalErrorf("failed to resolve API key for agent %s: %v", agent.ID, err)
 	}
 
 	// Resolve tool configurations
@@ -220,7 +204,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message entiti
 	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
 	aiModel, err := aiModelFactory.CreateModelIntegration(agent, provider, resolvedAPIKey)
 	if err != nil {
-		s.logger.Error("Failed to create AI model integration", zap.String("agent_id", agent.ID.Hex()), zap.Error(err))
+		s.logger.Error("Failed to create AI model integration", zap.String("agent_id", agent.ID), zap.Error(err))
 		return nil, errors.InternalErrorf("failed to initialize AI model: %v", err)
 	}
 
@@ -370,17 +354,6 @@ func (s *chatService) compressMessages(
 	// ... (unchanged from original) ...
 	// Note: No changes needed here as it uses the provider as-is
 	return nil, false, nil // Placeholder; actual implementation unchanged
-}
-
-// uuidToObjectID converts a UUID string to a MongoDB ObjectID (12 bytes)
-func uuidToObjectID(uuidStr string) (primitive.ObjectID, error) {
-	u, err := uuid.Parse(uuidStr)
-	if err != nil {
-		return primitive.ObjectID{}, err
-	}
-	// Use the first 12 bytes of the UUID (UUID is 16 bytes, ObjectID is 12)
-	bytes := u[0:12]
-	return primitive.ObjectIDFromHex(fmt.Sprintf("%x", bytes))
 }
 
 // verify that chatService implements ChatService

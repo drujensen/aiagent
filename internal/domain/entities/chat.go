@@ -3,7 +3,7 @@ package entities
 import (
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/google/uuid"
 )
 
 type ChatUsage struct {
@@ -14,19 +14,19 @@ type ChatUsage struct {
 }
 
 type Chat struct {
-	ID        primitive.ObjectID `json:"id" bson:"_id,omitempty"`
-	AgentID   primitive.ObjectID `json:"agent_id" bson:"agent_id"`
-	Name      string             `json:"name" bson:"name"`
-	Messages  []Message          `json:"messages" bson:"messages"`
-	Usage     *ChatUsage         `json:"usage,omitempty" bson:"usage,omitempty"`
-	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
-	UpdatedAt time.Time          `json:"updated_at" bson:"updated_at"`
-	Active    bool               `json:"active" bson:"active"`
+	ID        string     `json:"id" bson:"_id"`
+	AgentID   string     `json:"agent_id" bson:"agent_id"`
+	Name      string     `json:"name" bson:"name"`
+	Messages  []Message  `json:"messages" bson:"messages"`
+	Usage     *ChatUsage `json:"usage,omitempty" bson:"usage,omitempty"`
+	CreatedAt time.Time  `json:"created_at" bson:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at" bson:"updated_at"`
+	Active    bool       `json:"active" bson:"active"`
 }
 
-func NewChat(agentID primitive.ObjectID, name string) *Chat {
+func NewChat(agentID string, name string) *Chat {
 	return &Chat{
-		ID:        primitive.NewObjectID(),
+		ID:        uuid.New().String(),
 		AgentID:   agentID,
 		Name:      name, // Initialize with the provided name
 		Messages:  make([]Message, 0),

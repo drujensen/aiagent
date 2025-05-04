@@ -56,15 +56,15 @@ func (c *HomeController) ChatsPartialHandler(eCtx echo.Context) error {
 	processedChats := make([]map[string]string, 0, len(chats))
 
 	for _, chat := range chats {
-		agent, err := c.agentService.GetAgent(eCtx.Request().Context(), chat.AgentID.Hex())
+		agent, err := c.agentService.GetAgent(eCtx.Request().Context(), chat.AgentID)
 		if err != nil {
-			c.logger.Error("Failed to get agent for chat", zap.String("chatID", chat.ID.Hex()), zap.Error(err))
+			c.logger.Error("Failed to get agent for chat", zap.String("chatID", chat.ID), zap.Error(err))
 			continue // Skip this chat if we can't find the agent
 		}
 
 		// Create a new map for each chat with the required fields
 		chatData := map[string]string{
-			"ID":        chat.ID.Hex(),
+			"ID":        chat.ID,
 			"ChatName":  chat.Name,
 			"AgentName": agent.Name,
 		}

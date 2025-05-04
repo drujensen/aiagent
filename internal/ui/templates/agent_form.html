@@ -2,7 +2,7 @@
 <div class="agent-form">
     <h2>{{if .Agent.ID}}Edit Agent{{else}}Create Agent{{end}}</h2>
     <form
-        {{if .Agent.ID}}hx-put="/agents/{{.Agent.ID}}"{{else}}hx-post="/agents"{{end}}
+        {{if .IsEdit}}hx-put="/agents/{{.Agent.ID}}"{{else}}hx-post="/agents"{{end}}
         hx-target="#response-message"
         hx-swap="innerHTML">
         <input type="hidden" name="id" value="{{.Agent.ID}}">
@@ -15,7 +15,7 @@
             <select id="provider" name="provider_id" class="form-control" hx-get="/agents/provider-models" hx-target="#model" hx-swap="innerHTML" hx-trigger="change" hx-indicator="#provider-loading" required>
                 <option value="">Select Provider</option>
                 {{range .Providers}}
-                <option value="{{.ID}}" {{if (compareUUIDtoObjectID .ID $.Agent.ProviderID)}}selected{{end}}>{{if eq .Type "generic"}}Custom Provider{{else}}{{.Name}} ({{.Type}}){{end}}</option>
+                <option value="{{.ID}}" {{if (eq .ID $.Agent.ProviderID)}}selected{{end}}>{{if eq .Type "generic"}}Custom Provider{{else}}{{.Name}} ({{.Type}}){{end}}</option>
                 {{end}}
             </select>
             <div id="provider-loading" class="htmx-indicator">Loading models...</div>

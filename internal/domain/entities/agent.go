@@ -3,30 +3,30 @@ package entities
 import (
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/google/uuid"
 )
 
 type Agent struct {
-	ID              primitive.ObjectID `json:"id" bson:"_id,omitempty"`
-	Name            string             `json:"name" bson:"name"`
-	ProviderID      primitive.ObjectID `json:"provider_id" bson:"provider_id"`
-	ProviderType    ProviderType       `json:"provider_type" bson:"provider_type"` // Denormalized for easier access
-	Endpoint        string             `json:"endpoint" bson:"endpoint"`           // Will be populated automatically for known providers
-	Model           string             `json:"model" bson:"model"`
-	APIKey          string             `json:"api_key" bson:"api_key"`
-	SystemPrompt    string             `json:"system_prompt" bson:"system_prompt"`
-	Temperature     *float64           `json:"temperature,omitempty" bson:"temperature,omitempty"`
-	MaxTokens       *int               `json:"max_tokens,omitempty" bson:"max_tokens,omitempty"`
-	ContextWindow   *int               `json:"context_window,omitempty" bson:"context_window,omitempty"`
-	Tools           []string           `json:"tools,omitempty" bson:"tools,omitempty"`
-	ReasoningEffort string             `json:"reasoning_effort" bson:"reasoning_effort"` // low, medium, high, or none
-	CreatedAt       time.Time          `json:"created_at" bson:"created_at"`
-	UpdatedAt       time.Time          `json:"updated_at" bson:"updated_at"`
+	ID              string       `json:"id" bson:"_id"`
+	Name            string       `json:"name" bson:"name"`
+	ProviderID      string       `json:"provider_id" bson:"provider_id"`
+	ProviderType    ProviderType `json:"provider_type" bson:"provider_type"` // Denormalized for easier access
+	Endpoint        string       `json:"endpoint" bson:"endpoint"`           // Will be populated automatically for known providers
+	Model           string       `json:"model" bson:"model"`
+	APIKey          string       `json:"api_key" bson:"api_key"`
+	SystemPrompt    string       `json:"system_prompt" bson:"system_prompt"`
+	Temperature     *float64     `json:"temperature,omitempty" bson:"temperature,omitempty"`
+	MaxTokens       *int         `json:"max_tokens,omitempty" bson:"max_tokens,omitempty"`
+	ContextWindow   *int         `json:"context_window,omitempty" bson:"context_window,omitempty"`
+	Tools           []string     `json:"tools,omitempty" bson:"tools,omitempty"`
+	ReasoningEffort string       `json:"reasoning_effort" bson:"reasoning_effort"` // low, medium, high, or none
+	CreatedAt       time.Time    `json:"created_at" bson:"created_at"`
+	UpdatedAt       time.Time    `json:"updated_at" bson:"updated_at"`
 }
 
-func NewAgent(name, role string, providerID primitive.ObjectID, providerType ProviderType, endpoint, model, apiKey, systemPrompt string, tools []string) *Agent {
+func NewAgent(name, role string, providerID string, providerType ProviderType, endpoint, model, apiKey, systemPrompt string, tools []string) *Agent {
 	return &Agent{
-		ID:           primitive.NewObjectID(),
+		ID:           uuid.New().String(),
 		Name:         name,
 		ProviderID:   providerID,
 		ProviderType: providerType,
@@ -43,5 +43,5 @@ func NewAgent(name, role string, providerID primitive.ObjectID, providerType Pro
 func (a *Agent) FullSystemPrompt() string {
 	currentTime := time.Now()
 	formattedTime := currentTime.Format("2006-01-02 15:04:05")
-	return "Your name is " + a.Name + ". Current date and time is " + formattedTime + ". " + a.SystemPrompt
+	return "Your name is " + a.Name + "\nCurrent date and time is " + formattedTime + "\n" + a.SystemPrompt
 }

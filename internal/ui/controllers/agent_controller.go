@@ -16,7 +16,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
 
@@ -92,8 +91,8 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 			}
 		}
 
-		if !agent.ProviderID.IsZero() {
-			selectedProvider, err = c.providerService.GetProvider(eCtx.Request().Context(), agent.ProviderID.Hex())
+		if agent.ProviderID != "" {
+			selectedProvider, err = c.providerService.GetProvider(eCtx.Request().Context(), agent.ProviderID)
 			if err != nil {
 				switch err.(type) {
 				case *errors.NotFoundError:
@@ -108,7 +107,7 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 	agentData := struct {
 		ID              string
 		Name            string
-		ProviderID      primitive.ObjectID
+		ProviderID      string
 		ProviderType    entities.ProviderType
 		Endpoint        string
 		Model           string
@@ -123,7 +122,7 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 		Tools: []string{},
 	}
 	if agent != nil {
-		agentData.ID = agent.ID.Hex()
+		agentData.ID = agent.ID
 		agentData.Name = agent.Name
 		agentData.ProviderID = agent.ProviderID
 		agentData.ProviderType = agent.ProviderType
@@ -138,6 +137,8 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 		for _, tool := range agent.Tools {
 			agentData.Tools = append(agentData.Tools, tool)
 		}
+	} else {
+		agentData.ID = uuid.New().String()
 	}
 
 	var selectedProviderModels []entities.ModelPricing
@@ -154,6 +155,7 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 		"Providers":              providers,
 		"SelectedProvider":       selectedProvider,
 		"SelectedProviderModels": selectedProviderModels,
+		"IsEdit":                 isEdit,
 	}
 
 	eCtx.Response().Header().Set("Content-Type", "text/html")
@@ -162,6 +164,7 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 
 func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 	agent := &entities.Agent{
+		ID:              eCtx.FormValue("id"),
 		Name:            eCtx.FormValue("name"),
 		Endpoint:        eCtx.FormValue("endpoint"),
 		Model:           eCtx.FormValue("model"),
@@ -171,6 +174,7 @@ func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 	}
 
 	c.logger.Info("Creating agent",
+		zap.String("id", agent.ID),
 		zap.String("name", agent.Name),
 		zap.String("endpoint", agent.Endpoint),
 		zap.String("model", agent.Model),
@@ -178,33 +182,14 @@ func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 
 	providerId := eCtx.FormValue("provider_id")
 	if providerId != "" {
-		cleanProviderId := providerId
-		if strings.Contains(cleanProviderId, "ObjectID") {
-			start := strings.Index(cleanProviderId, "\"")
-			end := strings.LastIndex(cleanProviderId, "\"")
-			if start != -1 && end != -1 && end > start {
-				cleanProviderId = cleanProviderId[start+1 : end]
-				c.logger.Info("Cleaned provider ID",
-					zap.String("original", providerId),
-					zap.String("cleaned", cleanProviderId))
-			}
-		}
+		agent.ProviderID = providerId
 
-		oid, err := uuidToObjectID(cleanProviderId)
-		if err != nil {
-			c.logger.Error("Invalid provider ID",
-				zap.String("provider_id", cleanProviderId),
-				zap.Error(err))
-			return eCtx.String(http.StatusBadRequest, "Invalid provider ID: "+err.Error())
-		}
-		agent.ProviderID = oid
-
-		provider, err := c.providerService.GetProvider(eCtx.Request().Context(), cleanProviderId)
+		provider, err := c.providerService.GetProvider(eCtx.Request().Context(), providerId)
 		if err == nil && provider != nil {
 			agent.ProviderType = provider.Type
 		} else {
 			c.logger.Warn("Failed to get provider for setting provider type",
-				zap.String("provider_id", cleanProviderId),
+				zap.String("provider_id", providerId),
 				zap.Error(err))
 		}
 	}
@@ -235,11 +220,11 @@ func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 		agent.Tools = append(agent.Tools, tool)
 	}
 
-	if !agent.ProviderID.IsZero() {
-		provider, err := c.providerService.GetProvider(eCtx.Request().Context(), agent.ProviderID.Hex())
+	if agent.ProviderID != "" {
+		provider, err := c.providerService.GetProvider(eCtx.Request().Context(), agent.ProviderID)
 		if err != nil {
 			c.logger.Error("Failed to get provider",
-				zap.String("provider_id", agent.ProviderID.Hex()),
+				zap.String("provider_id", agent.ProviderID),
 				zap.Error(err))
 			return eCtx.String(http.StatusBadRequest, "Failed to get provider: "+err.Error())
 		} else {
@@ -264,13 +249,8 @@ func (c *AgentController) UpdateAgentHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusBadRequest, "Agent ID is required")
 	}
 
-	oid, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return eCtx.String(http.StatusBadRequest, "Invalid agent ID")
-	}
-
 	agent := &entities.Agent{
-		ID:              oid,
+		ID:              id,
 		Name:            eCtx.FormValue("name"),
 		Endpoint:        eCtx.FormValue("endpoint"),
 		Model:           eCtx.FormValue("model"),
@@ -281,33 +261,14 @@ func (c *AgentController) UpdateAgentHandler(eCtx echo.Context) error {
 
 	providerId := eCtx.FormValue("provider_id")
 	if providerId != "" {
-		cleanProviderId := providerId
-		if strings.Contains(cleanProviderId, "ObjectID") {
-			start := strings.Index(cleanProviderId, "\"")
-			end := strings.LastIndex(cleanProviderId, "\"")
-			if start != -1 && end != -1 && end > start {
-				cleanProviderId = cleanProviderId[start+1 : end]
-				c.logger.Info("Cleaned provider ID",
-					zap.String("original", providerId),
-					zap.String("cleaned", cleanProviderId))
-			}
-		}
+		agent.ProviderID = providerId
 
-		providerOid, err := uuidToObjectID(cleanProviderId)
-		if err != nil {
-			c.logger.Error("Invalid provider ID",
-				zap.String("provider_id", cleanProviderId),
-				zap.Error(err))
-			return eCtx.String(http.StatusBadRequest, "Invalid provider ID: "+err.Error())
-		}
-		agent.ProviderID = providerOid
-
-		provider, err := c.providerService.GetProvider(eCtx.Request().Context(), cleanProviderId)
+		provider, err := c.providerService.GetProvider(eCtx.Request().Context(), providerId)
 		if err == nil && provider != nil {
 			agent.ProviderType = provider.Type
 		} else {
 			c.logger.Warn("Failed to get provider for setting provider type",
-				zap.String("provider_id", cleanProviderId),
+				zap.String("provider_id", providerId),
 				zap.Error(err))
 		}
 	}
@@ -342,11 +303,11 @@ func (c *AgentController) UpdateAgentHandler(eCtx echo.Context) error {
 		agent.Tools = append(agent.Tools, tool)
 	}
 
-	if !agent.ProviderID.IsZero() {
-		provider, err := c.providerService.GetProvider(eCtx.Request().Context(), agent.ProviderID.Hex())
+	if agent.ProviderID != "" {
+		provider, err := c.providerService.GetProvider(eCtx.Request().Context(), agent.ProviderID)
 		if err != nil {
 			c.logger.Error("Failed to get provider",
-				zap.String("provider_id", agent.ProviderID.Hex()),
+				zap.String("provider_id", agent.ProviderID),
 				zap.Error(err))
 			return eCtx.String(http.StatusBadRequest, "Failed to get provider: "+err.Error())
 		} else {
@@ -453,15 +414,4 @@ func (c *AgentController) GetProviderModelsHandler(eCtx echo.Context) error {
 		zap.String("html_length", fmt.Sprintf("%d bytes", buf.Len())),
 		zap.String("provider_url", provider.BaseURL))
 	return eCtx.HTML(http.StatusOK, buf.String())
-}
-
-// uuidToObjectID converts a UUID string to a MongoDB ObjectID (12 bytes)
-func uuidToObjectID(uuidStr string) (primitive.ObjectID, error) {
-	u, err := uuid.Parse(uuidStr)
-	if err != nil {
-		return primitive.ObjectID{}, err
-	}
-	// Use the first 12 bytes of the UUID (UUID is 16 bytes, ObjectID is 12)
-	bytes := u[0:12]
-	return primitive.ObjectIDFromHex(fmt.Sprintf("%x", bytes))
 }

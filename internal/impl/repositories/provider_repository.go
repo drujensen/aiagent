@@ -3,7 +3,6 @@ package repositories
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -12,7 +11,6 @@ import (
 	"aiagent/internal/domain/interfaces"
 
 	"github.com/google/uuid"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type jsonProviderRepository struct {
@@ -69,13 +67,8 @@ func (r *jsonProviderRepository) ListProviders(ctx context.Context) ([]*entities
 }
 
 func (r *jsonProviderRepository) GetProvider(ctx context.Context, id string) (*entities.Provider, error) {
-	_, uuidErr := uuid.Parse(id)
-	_, oidErr := primitive.ObjectIDFromHex(id)
-	isUUID := uuidErr == nil
-	isObjectID := oidErr == nil
-
 	for _, provider := range r.providers {
-		if isUUID && provider.ID == id {
+		if provider.ID == id {
 			return &entities.Provider{
 				ID:         provider.ID,
 				Name:       provider.Name,
@@ -84,18 +77,6 @@ func (r *jsonProviderRepository) GetProvider(ctx context.Context, id string) (*e
 				APIKeyName: provider.APIKeyName,
 				Models:     provider.Models,
 			}, nil
-		} else if isObjectID {
-			oid, err := uuidToObjectID(provider.ID)
-			if err == nil && oid.Hex() == id {
-				return &entities.Provider{
-					ID:         provider.ID,
-					Name:       provider.Name,
-					Type:       provider.Type,
-					BaseURL:    provider.BaseURL,
-					APIKeyName: provider.APIKeyName,
-					Models:     provider.Models,
-				}, nil
-			}
 		}
 	}
 	return nil, errors.NotFoundErrorf("provider not found: %s", id)
@@ -115,17 +96,6 @@ func (r *jsonProviderRepository) GetProviderByType(ctx context.Context, provider
 		}
 	}
 	return nil, errors.NotFoundErrorf("provider type not found: %s", providerType)
-}
-
-// uuidToObjectID converts a UUID string to a MongoDB ObjectID (12 bytes)
-func uuidToObjectID(uuidStr string) (primitive.ObjectID, error) {
-	u, err := uuid.Parse(uuidStr)
-	if err != nil {
-		return primitive.ObjectID{}, err
-	}
-	// Use the first 12 bytes of the UUID (UUID is 16 bytes, ObjectID is 12)
-	bytes := u[0:12]
-	return primitive.ObjectIDFromHex(fmt.Sprintf("%x", bytes))
 }
 
 var _ interfaces.ProviderRepository = (*jsonProviderRepository)(nil)

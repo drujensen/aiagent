@@ -54,6 +54,9 @@ func (s *agentService) GetAgent(ctx context.Context, id string) (*entities.Agent
 }
 
 func (s *agentService) CreateAgent(ctx context.Context, agent *entities.Agent) error {
+	if agent.ID == "" {
+		return errors.ValidationErrorf("agent id is required")
+	}
 	if agent.Name == "" {
 		return errors.ValidationErrorf("agent name is required")
 	}
@@ -75,11 +78,11 @@ func (s *agentService) CreateAgent(ctx context.Context, agent *entities.Agent) e
 }
 
 func (s *agentService) UpdateAgent(ctx context.Context, agent *entities.Agent) error {
-	if agent.ID.IsZero() {
+	if agent.ID == "" {
 		return errors.ValidationErrorf("agent ID is required")
 	}
 
-	existing, err := s.agentRepo.GetAgent(ctx, agent.ID.Hex())
+	existing, err := s.agentRepo.GetAgent(ctx, agent.ID)
 	if err != nil {
 		return err
 	}

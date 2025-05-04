@@ -13,6 +13,7 @@ import (
 	"aiagent/internal/domain/errors"
 	"aiagent/internal/domain/services"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )
@@ -64,7 +65,7 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 		}
 	}
 
-	agent, err := c.agentService.GetAgent(eCtx.Request().Context(), chat.AgentID.Hex())
+	agent, err := c.agentService.GetAgent(eCtx.Request().Context(), chat.AgentID)
 	if err != nil {
 		switch err.(type) {
 		case *errors.NotFoundError:
@@ -121,9 +122,11 @@ func (c *ChatController) ChatFormHandler(eCtx echo.Context) error {
 	}{}
 
 	if chat != nil {
-		chatData.ID = chat.ID.Hex()
+		chatData.ID = chat.ID
 		chatData.Name = chat.Name
-		chatData.AgentID = chat.AgentID.Hex()
+		chatData.AgentID = chat.AgentID
+	} else {
+		chatData.ID = uuid.New().String()
 	}
 
 	data := map[string]interface{}{
@@ -131,6 +134,7 @@ func (c *ChatController) ChatFormHandler(eCtx echo.Context) error {
 		"ContentTemplate": "chat_form_content",
 		"Chat":            chatData,
 		"Agents":          agents,
+		"IsEdit":          isEdit,
 	}
 
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)
@@ -149,7 +153,7 @@ func (c *ChatController) CreateChatHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusInternalServerError, "Failed to create chat")
 	}
 
-	eCtx.Response().Header().Set("HX-Redirect", "/chats/"+chat.ID.Hex())
+	eCtx.Response().Header().Set("HX-Redirect", "/chats/"+chat.ID)
 	return eCtx.String(http.StatusOK, "Chat created successfully")
 }
 

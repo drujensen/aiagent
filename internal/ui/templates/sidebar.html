@@ -11,8 +11,8 @@
    <ul class="Chat-list">
        {{range .chats}}
        <li>
-           <a href="#" hx-get="/chat/{{.ID.Hex}}" hx-target="#content" hx-swap="innerHTML">
-               <i class="fas fa-comment-dots"></i> {{.Name}} (with Agent {{.AgentID.Hex}})
+           <a href="#" hx-get="/chat/{{.ID}}" hx-target="#content" hx-swap="innerHTML">
+               <i class="fas fa-comment-dots"></i> {{.Name}} (with Agent {{.AgentID}})
            </a>
        </li>
        {{end}}
@@ -28,7 +28,7 @@
    <ul class="agent-list">
        {{range .Agents}}
        <li>
-           <a href="/agents/edit/{{.ID.Hex}}">
+           <a href="/agents/edit/{{.ID}}">
                <i class="fas fa-user-robot"></i> {{.Name}}
            </a>
        </li>
@@ -45,7 +45,7 @@
    <ul class="tool-list">
        {{range .Tools}}
        <li>
-           <a href="/tools/edit/{{.ID.Hex}}">
+           <a href="/tools/edit/{{.ID}}">
                <i class="fas fa-wrench"></i> {{.Name}}
            </a>
        </li>

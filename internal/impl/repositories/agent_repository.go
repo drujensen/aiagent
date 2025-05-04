@@ -9,7 +9,6 @@ import (
 	"aiagent/internal/domain/interfaces"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -48,12 +47,7 @@ func (r *MongoAgentRepository) ListAgents(ctx context.Context) ([]*entities.Agen
 
 func (r *MongoAgentRepository) GetAgent(ctx context.Context, id string) (*entities.Agent, error) {
 	var agent entities.Agent
-	oid, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, errors.NotFoundErrorf("agent not found")
-	}
-
-	err = r.collection.FindOne(ctx, bson.M{"_id": oid}).Decode(&agent)
+	err := r.collection.FindOne(ctx, bson.M{"_id": id}).Decode(&agent)
 	if err == mongo.ErrNoDocuments {
 		return nil, errors.NotFoundErrorf("agent not found")
 	}
@@ -65,19 +59,9 @@ func (r *MongoAgentRepository) GetAgent(ctx context.Context, id string) (*entiti
 }
 
 func (r *MongoAgentRepository) CreateAgent(ctx context.Context, agent *entities.Agent) error {
-	agent.CreatedAt = time.Now()
-	agent.UpdatedAt = time.Now()
-	agent.ID = primitive.NewObjectID()
-
-	result, err := r.collection.InsertOne(ctx, agent)
+	_, err := r.collection.InsertOne(ctx, agent)
 	if err != nil {
 		return errors.InternalErrorf("failed to create agent: %v", err)
-	}
-
-	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
-		agent.ID = oid
-	} else {
-		return errors.ValidationErrorf("failed to convert InsertedID to ObjectID")
 	}
 
 	return nil
@@ -86,12 +70,6 @@ func (r *MongoAgentRepository) CreateAgent(ctx context.Context, agent *entities.
 func (r *MongoAgentRepository) UpdateAgent(ctx context.Context, agent *entities.Agent) error {
 	agent.UpdatedAt = time.Now()
 
-	oid, err := primitive.ObjectIDFromHex(agent.ID.Hex())
-	if err != nil {
-		return errors.NotFoundErrorf("agent not found: %s", agent.ID.Hex())
-	}
-
-	// Convert the agent struct to BSON
 	update, err := bson.Marshal(bson.M{
 		"$set": agent,
 	})
@@ -99,24 +77,19 @@ func (r *MongoAgentRepository) UpdateAgent(ctx context.Context, agent *entities.
 		return errors.InternalErrorf("failed to marshal agent: %v", err)
 	}
 
-	result, err := r.collection.UpdateOne(ctx, bson.M{"_id": oid}, update)
+	result, err := r.collection.UpdateOne(ctx, bson.M{"_id": agent.ID}, update)
 	if err != nil {
 		return errors.InternalErrorf("failed to update agent: %v", err)
 	}
 	if result.MatchedCount == 0 {
-		return errors.NotFoundErrorf("agent not found: %s", agent.ID.Hex())
+		return errors.NotFoundErrorf("agent not found: %s", agent.ID)
 	}
 
 	return nil
 }
 
 func (r *MongoAgentRepository) DeleteAgent(ctx context.Context, id string) error {
-	oid, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return errors.NotFoundErrorf("agent not found")
-	}
-
-	result, err := r.collection.DeleteOne(ctx, bson.M{"_id": oid})
+	result, err := r.collection.DeleteOne(ctx, bson.M{"_id": id})
 	if err != nil {
 		return errors.InternalErrorf("failed to delete agent: %v", err)
 	}

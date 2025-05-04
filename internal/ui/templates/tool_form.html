@@ -2,10 +2,10 @@
 <div class="agent-form">
     <h2>{{if .IsEdit}}Edit Tool{{else}}Create Tool{{end}}</h2>
     <form
-        {{if .IsEdit}}hx-put="/tools/{{.Tool.ID.Hex}}"{{else}}hx-post="/tools"{{end}}
+        {{if .IsEdit}}hx-put="/tools/{{.Tool.ID}}"{{else}}hx-post="/tools"{{end}}
         hx-target="#response-message"
         hx-swap="innerHTML">
-        <input type="hidden" name="id" value="{{.Tool.ID.Hex}}">
+        <input type="hidden" name="id" value="{{.Tool.ID}}">
         <div class="form-group">
             <label for="tooltype">Tool Type:</label>
             <select

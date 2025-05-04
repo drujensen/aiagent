@@ -58,6 +58,9 @@ func (s *toolService) GetToolData(ctx context.Context, id string) (*entities.Too
 }
 
 func (s *toolService) CreateToolData(ctx context.Context, tool *entities.ToolData) error {
+	if tool.ID == "" {
+		return errors.ValidationErrorf("tool id is required")
+	}
 	if tool.Name == "" {
 		return errors.ValidationErrorf("tool name is required")
 	}
@@ -76,11 +79,11 @@ func (s *toolService) CreateToolData(ctx context.Context, tool *entities.ToolDat
 }
 
 func (s *toolService) UpdateToolData(ctx context.Context, tool *entities.ToolData) error {
-	if tool.ID.IsZero() {
+	if tool.ID == "" {
 		return errors.ValidationErrorf("tool ID is required")
 	}
 
-	existing, err := s.toolRepo.GetToolData(ctx, tool.ID.Hex())
+	existing, err := s.toolRepo.GetToolData(ctx, tool.ID)
 	if err != nil {
 		return err
 	}

@@ -24,7 +24,7 @@ type ModelPricing struct {
 
 // Provider represents an AI model provider
 type Provider struct {
-	ID         string         `json:"id" bson:"id"` // UUID as string
+	ID         string         `json:"id" bson:"_id"` // UUID as string
 	Name       string         `json:"name" bson:"name"`
 	Type       ProviderType   `json:"type" bson:"type"`
 	BaseURL    string         `json:"base_url" bson:"base_url"`

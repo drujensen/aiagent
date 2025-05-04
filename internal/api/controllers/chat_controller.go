@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
 
@@ -101,13 +100,7 @@ func (c *ChatController) CreateChat(ctx echo.Context) error {
 		return c.handleError(ctx, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
 	}
 
-	// Convert AgentID string to ObjectID
-	agentID, err := primitive.ObjectIDFromHex(input.AgentID)
-	if err != nil {
-		return c.handleError(ctx, "Invalid agent_id format", http.StatusBadRequest)
-	}
-
-	chat, err := c.chatService.CreateChat(ctx.Request().Context(), agentID.Hex(), input.Name)
+	chat, err := c.chatService.CreateChat(ctx.Request().Context(), input.AgentID, input.Name)
 	if err != nil {
 		return c.handleError(ctx, err, http.StatusInternalServerError)
 	}
