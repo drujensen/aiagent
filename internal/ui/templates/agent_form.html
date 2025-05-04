@@ -79,12 +79,14 @@
         </div>
         <div class="form-group">
             <label for="tools">Tools (optional):</label>
-            <select multiple id="tools" name="tools" class="form-control">
+            <div class="tools-container">
                 {{range .Tools}}
-                <option value="{{.}}" {{if (inArray . $.Agent.Tools)}}selected{{end}}>{{.}}</option>
+                <label>
+                    <input type="checkbox" name="tools" value="{{.}}" id="tool-{{.}}" {{if (inArray . $.Agent.Tools)}}checked{{end}}> {{.}}
+                </label>
                 {{end}}
-            </select>
-            <small class="form-text">Hold Ctrl/Cmd to select multiple tools</small>
+            </div>
+            <small class="form-text">Check boxes to select tools</small>
         </div>
         <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Save Agent</button>
     </form>

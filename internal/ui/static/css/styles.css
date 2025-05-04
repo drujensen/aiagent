@@ -425,6 +425,13 @@ a:active, button:active, .message-content:active {
     flex: 1;
 }
 
+.tools-container {
+    display: grid; 
+    grid-template-columns: repeat(4, 1fr); 
+    gap: 10px;
+}
+
+
 #response-message {
     margin-top: 15px;
     text-align: center;

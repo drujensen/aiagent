@@ -340,11 +340,12 @@ func (t *FileTool) applyEdits(filePath string, edits []EditOperation, dryRun boo
 	modified := original
 
 	for _, edit := range edits {
-		if !strings.Contains(modified, edit.OldText) {
-			t.logger.Error("Edit text not found", zap.String("oldText", edit.OldText))
-			return "", fmt.Errorf("edit failed: text '%s' not found in file", edit.OldText)
+		if strings.Contains(modified, edit.OldText) {
+			modified = strings.ReplaceAll(modified, edit.OldText, edit.NewText)
+			t.logger.Info("Edit applied successfully", zap.String("oldText", edit.OldText))
+		} else {
+			t.logger.Warn("Edit text not found, skipping", zap.String("oldText", edit.OldText))
 		}
-		modified = strings.ReplaceAll(modified, edit.OldText, edit.NewText)
 	}
 
 	diff := difflib.UnifiedDiff{
@@ -360,7 +361,12 @@ func (t *FileTool) applyEdits(filePath string, edits []EditOperation, dryRun boo
 		return "", err
 	}
 
-	if !dryRun && modified != original {
+	if modified == original {
+		t.logger.Warn("No changes made to the file", zap.String("path", filePath))
+		return "oldText could not be found. No changes made to the file", nil
+	}
+
+	if !dryRun {
 		err = os.WriteFile(filePath, []byte(modified), 0644)
 		if err != nil {
 			t.logger.Error("Failed to write edited file", zap.String("path", filePath), zap.Error(err))

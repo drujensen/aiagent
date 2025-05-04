@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -64,6 +65,7 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 	for _, tool := range tools {
 		toolNames = append(toolNames, (*tool).Name())
 	}
+	sort.Strings(toolNames)
 
 	providers, err := c.providerService.ListProviders(eCtx.Request().Context())
 	if err != nil {
