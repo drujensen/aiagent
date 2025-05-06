@@ -244,8 +244,12 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 			}
 			formatted = append(formatted, prefix+" "+entry.Name())
 		}
+		results := strings.Join(formatted, "\n")
+		if len(results) > 16384 {
+			results = results[:16384] + "...truncated"
+		}
 		t.logger.Info("Directory listed successfully", zap.String("path", fullPath))
-		return strings.Join(formatted, "\n"), nil
+		return results, nil
 
 	case "directory_tree":
 		fullPath, err := t.validatePath(args.Path)
@@ -258,8 +262,12 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 			return "", err
 		}
 		jsonTree, _ := json.MarshalIndent(tree, "", "  ")
+		results := string(jsonTree)
+		if len(results) > 16384 {
+			results = results[:16384] + "...truncated"
+		}
 		t.logger.Info("Directory tree built successfully", zap.String("path", fullPath))
-		return string(jsonTree), nil
+		return results, nil
 
 	case "move":
 		if args.Destination == "" {
@@ -299,8 +307,12 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		if len(results) == 0 {
 			return "No matches found", nil
 		}
+		resultsStr := strings.Join(results, "\n")
+		if len(resultsStr) > 16384 {
+			resultsStr = resultsStr[:16384] + "...truncated"
+		}
 		t.logger.Info("Files searched successfully", zap.String("path", fullPath), zap.Int("matches", len(results)))
-		return strings.Join(results, "\n"), nil
+		return resultsStr, nil
 
 	case "get_info":
 		fullPath, err := t.validatePath(args.Path)
