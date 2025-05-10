@@ -147,8 +147,11 @@ func (t *ProcessTool) Execute(arguments string) (string, error) {
 
 	workspace := t.configuration["workspace"]
 	if workspace == "" {
-		t.logger.Error("Workspace configuration is missing")
-		return "", fmt.Errorf("workspace configuration is missing")
+		var err error
+		workspace, err = os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("could not get current directory: %v", err)
+		}
 	}
 
 	if args.Action == "" {

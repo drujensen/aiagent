@@ -190,7 +190,11 @@ func (t *MCPTool) StartMCPClient() error {
 	}
 	workspace, ok := t.configuration["workspace"]
 	if !ok {
-		return fmt.Errorf("workspace not found in configuration")
+		var err error
+		workspace, err = os.Getwd()
+		if err != nil {
+			return fmt.Errorf("could not get current directory: %v", err)
+		}
 	}
 	args := []string{}
 	if argStr, ok := t.configuration["args"]; ok {

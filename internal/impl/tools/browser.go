@@ -151,7 +151,11 @@ func (b *BrowserTool) Execute(arguments string) (string, error) {
 		}
 		workspace := b.configuration["workspace"]
 		if workspace == "" {
-			return "", fmt.Errorf("workspace is not configured")
+			var err error
+			workspace, err = os.Getwd()
+			if err != nil {
+				return "", fmt.Errorf("could not get current directory: %v", err)
+			}
 		}
 		filename := workspace + "/" + args.Filename
 		screenshot, err := b.page.Screenshot(true, nil)

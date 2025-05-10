@@ -131,8 +131,11 @@ type EditOperation struct {
 func (t *FileTool) validatePath(path string) (string, error) {
 	workspace := t.configuration["workspace"]
 	if workspace == "" {
-		t.logger.Error("Workspace configuration is missing")
-		return "", nil
+		var err error
+		workspace, err = os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("could not get current directory: %v", err)
+		}
 	}
 
 	fullPath := filepath.Join(workspace, path)
