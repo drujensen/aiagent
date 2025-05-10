@@ -102,6 +102,14 @@ The command is executed in the workspace directory.  The extraArgs are prepended
 		},
 	}
 
+	toolFactory.toolFactories["MCP"] = &ToolFactoryEntry{
+		Name:        "MCP",
+		Description: `This tool provides a command line interface for the MCP (Multi-Cloud Provider) API, allowing users to interact with various cloud services and perform operations such as creating, updating, and deleting resources across multiple cloud providers.`,
+		ConfigKeys:  []string{"workspace", "command", "args"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewMCPTool(name, description, configuration, logger)
+		},
+	}
 	return toolFactory, nil
 }
 
