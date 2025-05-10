@@ -59,12 +59,6 @@ func InitConfig() (*Config, error) {
 			logger.Error("Config unmarshal error", zap.Error(err))
 			return
 		}
-
-		if configInstance.MongoURI == "" {
-			initErr = fmt.Errorf("MONGO_URI is required but not set")
-			logger.Error("Missing required configuration", zap.String("field", "MONGO_URI"))
-			return
-		}
 	})
 
 	if initErr != nil {

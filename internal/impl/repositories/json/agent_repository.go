@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -93,13 +94,21 @@ func (r *jsonAgentRepository) ListAgents(ctx context.Context) ([]*entities.Agent
 	agentsCopy := make([]*entities.Agent, len(r.data))
 	for i, a := range r.data {
 		agentsCopy[i] = &entities.Agent{
-			ID:         a.ID,
-			Name:       a.Name,
-			ProviderID: a.ProviderID,
-			Model:      a.Model,
-			Tools:      append([]string{}, a.Tools...),
-			CreatedAt:  a.CreatedAt,
-			UpdatedAt:  a.UpdatedAt,
+			ID:              a.ID,
+			Name:            a.Name,
+			ProviderID:      a.ProviderID,
+			ProviderType:    a.ProviderType,
+			Endpoint:        a.Endpoint,
+			Model:           a.Model,
+			APIKey:          a.APIKey,
+			SystemPrompt:    a.SystemPrompt,
+			Temperature:     a.Temperature,
+			MaxTokens:       a.MaxTokens,
+			ContextWindow:   a.ContextWindow,
+			ReasoningEffort: a.ReasoningEffort,
+			Tools:           slices.Clone(a.Tools),
+			CreatedAt:       a.CreatedAt,
+			UpdatedAt:       a.UpdatedAt,
 		}
 	}
 	return agentsCopy, nil
@@ -112,13 +121,21 @@ func (r *jsonAgentRepository) GetAgent(ctx context.Context, id string) (*entitie
 	for _, agent := range r.data {
 		if agent.ID == id {
 			return &entities.Agent{
-				ID:         agent.ID,
-				Name:       agent.Name,
-				ProviderID: agent.ProviderID,
-				Model:      agent.Model,
-				Tools:      append([]string{}, agent.Tools...),
-				CreatedAt:  agent.CreatedAt,
-				UpdatedAt:  agent.UpdatedAt,
+				ID:              agent.ID,
+				Name:            agent.Name,
+				ProviderID:      agent.ProviderID,
+				ProviderType:    agent.ProviderType,
+				Endpoint:        agent.Endpoint,
+				Model:           agent.Model,
+				APIKey:          agent.APIKey,
+				SystemPrompt:    agent.SystemPrompt,
+				Temperature:     agent.Temperature,
+				MaxTokens:       agent.MaxTokens,
+				ContextWindow:   agent.ContextWindow,
+				ReasoningEffort: agent.ReasoningEffort,
+				Tools:           slices.Clone(agent.Tools),
+				CreatedAt:       agent.CreatedAt,
+				UpdatedAt:       agent.UpdatedAt,
 			}, nil
 		}
 	}
@@ -159,7 +176,7 @@ func (r *jsonAgentRepository) DeleteAgent(ctx context.Context, id string) error 
 
 	for i, a := range r.data {
 		if a.ID == id {
-			r.data = append(r.data[:i], r.data[i+1:]...)
+			r.data = slices.Delete(r.data, i, i+1)
 			return r.save()
 		}
 	}

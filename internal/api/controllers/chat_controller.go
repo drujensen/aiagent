@@ -135,7 +135,7 @@ func (c *ChatController) SendMessage(ctx echo.Context) error {
 
 	var message = entities.NewMessage(messageRequest.Role, messageRequest.Message)
 
-	newMessage, err := c.chatService.SendMessage(ctx.Request().Context(), id, *message)
+	newMessage, err := c.chatService.SendMessage(ctx.Request().Context(), id, message)
 	if err != nil {
 		switch err.(type) {
 		case *errors.NotFoundError:

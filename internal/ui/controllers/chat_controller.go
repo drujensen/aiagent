@@ -225,7 +225,7 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 	}()
 
 	// Send the message and get the AI responses
-	aiMessage, err := c.chatService.SendMessage(ctx, chatID, *userMessage)
+	aiMessage, err := c.chatService.SendMessage(ctx, chatID, userMessage)
 	if err != nil {
 		switch err.(type) {
 		case *errors.CanceledError:

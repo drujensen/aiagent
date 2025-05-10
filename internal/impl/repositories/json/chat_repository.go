@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"sync"
+	"slices"
 	"time"
 
 	"aiagent/internal/domain/entities"
@@ -18,7 +18,6 @@ import (
 type jsonChatRepository struct {
 	filePath string
 	data     []*entities.Chat
-	mu       sync.RWMutex
 }
 
 func NewJSONChatRepository(dataDir string) (interfaces.ChatRepository, error) {
@@ -36,9 +35,6 @@ func NewJSONChatRepository(dataDir string) (interfaces.ChatRepository, error) {
 }
 
 func (r *jsonChatRepository) load() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	data, err := os.ReadFile(r.filePath)
 	if os.IsNotExist(err) {
 		return nil // File doesn't exist yet, start with empty data
@@ -67,9 +63,6 @@ func (r *jsonChatRepository) load() error {
 }
 
 func (r *jsonChatRepository) save() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	data, err := json.MarshalIndent(r.data, "", "  ")
 	if err != nil {
 		return errors.InternalErrorf("failed to marshal chats: %v", err)
@@ -87,9 +80,6 @@ func (r *jsonChatRepository) save() error {
 }
 
 func (r *jsonChatRepository) ListChats(ctx context.Context) ([]*entities.Chat, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	chatsCopy := make([]*entities.Chat, len(r.data))
 	for i, c := range r.data {
 		messagesCopy := make([]entities.Message, len(c.Messages))
@@ -97,6 +87,7 @@ func (r *jsonChatRepository) ListChats(ctx context.Context) ([]*entities.Chat, e
 		chatsCopy[i] = &entities.Chat{
 			ID:        c.ID,
 			AgentID:   c.AgentID,
+			Name:      c.Name,
 			Messages:  messagesCopy,
 			CreatedAt: c.CreatedAt,
 			UpdatedAt: c.UpdatedAt,
@@ -106,9 +97,6 @@ func (r *jsonChatRepository) ListChats(ctx context.Context) ([]*entities.Chat, e
 }
 
 func (r *jsonChatRepository) GetChat(ctx context.Context, id string) (*entities.Chat, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	for _, chat := range r.data {
 		if chat.ID == id {
 			messagesCopy := make([]entities.Message, len(chat.Messages))
@@ -116,6 +104,7 @@ func (r *jsonChatRepository) GetChat(ctx context.Context, id string) (*entities.
 			return &entities.Chat{
 				ID:        chat.ID,
 				AgentID:   chat.AgentID,
+				Name:      chat.Name,
 				Messages:  messagesCopy,
 				CreatedAt: chat.CreatedAt,
 				UpdatedAt: chat.UpdatedAt,
@@ -126,9 +115,6 @@ func (r *jsonChatRepository) GetChat(ctx context.Context, id string) (*entities.
 }
 
 func (r *jsonChatRepository) CreateChat(ctx context.Context, chat *entities.Chat) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	if chat.ID == "" {
 		chat.ID = uuid.New().String()
 	}
@@ -140,9 +126,6 @@ func (r *jsonChatRepository) CreateChat(ctx context.Context, chat *entities.Chat
 }
 
 func (r *jsonChatRepository) UpdateChat(ctx context.Context, chat *entities.Chat) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	for i, c := range r.data {
 		if c.ID == chat.ID {
 			chat.UpdatedAt = time.Now()
@@ -154,12 +137,9 @@ func (r *jsonChatRepository) UpdateChat(ctx context.Context, chat *entities.Chat
 }
 
 func (r *jsonChatRepository) DeleteChat(ctx context.Context, id string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	for i, c := range r.data {
 		if c.ID == id {
-			r.data = append(r.data[:i], r.data[i+1:]...)
+			r.data = slices.Delete(r.data, i, i+1)
 			return r.save()
 		}
 	}

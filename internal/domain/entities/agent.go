@@ -18,8 +18,8 @@ type Agent struct {
 	Temperature     *float64     `json:"temperature,omitempty" bson:"temperature,omitempty"`
 	MaxTokens       *int         `json:"max_tokens,omitempty" bson:"max_tokens,omitempty"`
 	ContextWindow   *int         `json:"context_window,omitempty" bson:"context_window,omitempty"`
-	Tools           []string     `json:"tools,omitempty" bson:"tools,omitempty"`
 	ReasoningEffort string       `json:"reasoning_effort" bson:"reasoning_effort"` // low, medium, high, or none
+	Tools           []string     `json:"tools,omitempty" bson:"tools,omitempty"`
 	CreatedAt       time.Time    `json:"created_at" bson:"created_at"`
 	UpdatedAt       time.Time    `json:"updated_at" bson:"updated_at"`
 }

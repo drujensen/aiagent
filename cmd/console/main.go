@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	"aiagent/internal/cli"
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/services"
 	"aiagent/internal/impl/config"
@@ -63,14 +65,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	providerService := services.NewProviderService(providerRepo, logger)
-	agentService := services.NewAgentService(agentRepo, logger)
-	toolService := services.NewToolService(toolRepo, logger)
 	chatService := services.NewChatService(chatRepo, agentRepo, providerRepo, toolRepo, cfg, logger)
 
-	// wait for a command from cli interface
-	println("AI Agent is running. Press Ctrl+C to exit.")
-	select {}
+	// Select the first chat from the repository
+	chats, err := chatRepo.ListChats(context.Background())
+	if err != nil || len(chats) == 0 {
+		logger.Fatal("No chats available", zap.Error(err))
+	}
+	chatID := chats[0].ID
+
+	// Initialize and run the CLI
+	cli := cli.NewCLI(chatService, chatID, logger)
+	if err := cli.Run(context.Background()); err != nil {
+		logger.Fatal("CLI failed", zap.Error(err))
+	}
 }
 
 func init() {
@@ -115,13 +123,18 @@ func init() {
 	if _, err := os.Stat(agentsPath); os.IsNotExist(err) {
 		defaultAgents := []*entities.Agent{
 			{
-				ID:         "1A3F3DCB-255D-46B3-A4F4-E2E118FBA82B",
-				Name:       "Grok",
-				ProviderID: "820FE148-851B-4995-81E5-C6DB2E5E5270",
-				Model:      "grok-3-mini-beta",
-				Tools:      []string{"File", "Search"},
-				CreatedAt:  time.Now(),
-				UpdatedAt:  time.Now(),
+				ID:           "1A3F3DCB-255D-46B3-A4F4-E2E118FBA82B",
+				Name:         "Grok",
+				ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
+				ProviderType: "xai",
+				Endpoint:     "https://api.x.ai",
+				Model:        "grok-3-mini-beta",
+				APIKey:       "#{XAI_API_KEY}#",
+				SystemPrompt: "Help users with coding, debugging, and enhancing projects using tools like File, Bash, and others. Be concise, proactive, and persistent: analyze tasks quickly, use tools to edit files, run commands, and iterate until success. Keep responses short, directly addressing queries without preamble.",
+				Tools:        []string{"File", "Search"},
+
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
 			},
 		}
 		data, _ := json.MarshalIndent(defaultAgents, "", "  ")
