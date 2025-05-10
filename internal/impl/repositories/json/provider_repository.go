@@ -1,10 +1,11 @@
-package repositories
+package repositories_json
 
 import (
 	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/errors"
@@ -14,44 +15,87 @@ import (
 )
 
 type jsonProviderRepository struct {
-	providers []*entities.Provider
+	filePath string
+	data     []*entities.Provider
+	mu       sync.RWMutex
 }
 
-func NewJSONProviderRepository(configPath string) (interfaces.ProviderRepository, error) {
-	filePath := filepath.Join(configPath, "providers.json")
-	data, err := os.ReadFile(filePath)
+func NewJSONProviderRepository(dataDir string) (interfaces.ProviderRepository, error) {
+	filePath := filepath.Join(dataDir, ".aiagent", "providers.json")
+	repo := &jsonProviderRepository{
+		filePath: filePath,
+		data:     []*entities.Provider{},
+	}
+
+	if err := repo.load(); err != nil {
+		return nil, err
+	}
+
+	return repo, nil
+}
+
+func (r *jsonProviderRepository) load() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	data, err := os.ReadFile(r.filePath)
+	if os.IsNotExist(err) {
+		return nil // File doesn't exist yet, start with empty data
+	}
 	if err != nil {
-		return nil, errors.InternalErrorf("failed to read providers.json: %v", err)
+		return errors.InternalErrorf("failed to read providers.json: %v", err)
 	}
 
 	var providers []*entities.Provider
 	if err := json.Unmarshal(data, &providers); err != nil {
-		return nil, errors.InternalErrorf("failed to unmarshal providers.json: %v", err)
+		return errors.InternalErrorf("failed to unmarshal providers.json: %v", err)
 	}
 
 	// Validate UUIDs and ensure uniqueness
 	seenIDs := make(map[string]struct{})
 	for _, provider := range providers {
 		if provider.ID == "" {
-			return nil, errors.InternalErrorf("provider %s is missing an ID", provider.Name)
+			return errors.InternalErrorf("provider %s is missing an ID", provider.Name)
 		}
 		if _, err := uuid.Parse(provider.ID); err != nil {
-			return nil, errors.InternalErrorf("provider %s has an invalid UUID: %v", provider.Name, err)
+			return errors.InternalErrorf("provider %s has an invalid UUID: %v", provider.Name, err)
 		}
 		if _, exists := seenIDs[provider.ID]; exists {
-			return nil, errors.InternalErrorf("duplicate provider ID found: %s", provider.ID)
+			return errors.InternalErrorf("duplicate provider ID found: %s", provider.ID)
 		}
 		seenIDs[provider.ID] = struct{}{}
 	}
 
-	return &jsonProviderRepository{
-		providers: providers,
-	}, nil
+	r.data = providers
+	return nil
+}
+
+func (r *jsonProviderRepository) save() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	data, err := json.MarshalIndent(r.data, "", "  ")
+	if err != nil {
+		return errors.InternalErrorf("failed to marshal providers: %v", err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(r.filePath), 0755); err != nil {
+		return errors.InternalErrorf("failed to create directory: %v", err)
+	}
+
+	if err := os.WriteFile(r.filePath, data, 0644); err != nil {
+		return errors.InternalErrorf("failed to write providers.json: %v", err)
+	}
+
+	return nil
 }
 
 func (r *jsonProviderRepository) ListProviders(ctx context.Context) ([]*entities.Provider, error) {
-	providersCopy := make([]*entities.Provider, len(r.providers))
-	for i, p := range r.providers {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	providersCopy := make([]*entities.Provider, len(r.data))
+	for i, p := range r.data {
 		providersCopy[i] = &entities.Provider{
 			ID:         p.ID,
 			Name:       p.Name,
@@ -60,14 +104,15 @@ func (r *jsonProviderRepository) ListProviders(ctx context.Context) ([]*entities
 			APIKeyName: p.APIKeyName,
 			Models:     p.Models,
 		}
-		// Note: We’re not converting to ObjectID here since Provider.ID is a string UUID
-		// and Agent.ProviderID conversions are handled elsewhere (e.g., in controllers/services)
 	}
 	return providersCopy, nil
 }
 
 func (r *jsonProviderRepository) GetProvider(ctx context.Context, id string) (*entities.Provider, error) {
-	for _, provider := range r.providers {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, provider := range r.data {
 		if provider.ID == id {
 			return &entities.Provider{
 				ID:         provider.ID,
@@ -83,7 +128,10 @@ func (r *jsonProviderRepository) GetProvider(ctx context.Context, id string) (*e
 }
 
 func (r *jsonProviderRepository) GetProviderByType(ctx context.Context, providerType entities.ProviderType) (*entities.Provider, error) {
-	for _, provider := range r.providers {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, provider := range r.data {
 		if provider.Type == providerType {
 			return &entities.Provider{
 				ID:         provider.ID,

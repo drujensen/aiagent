@@ -1,4 +1,4 @@
-*.env
-*.env*
-mongo_data/
 .DS_Store
+.env*
+mongo_data/
+.aiagent/

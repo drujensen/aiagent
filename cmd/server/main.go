@@ -9,7 +9,7 @@ import (
 	"aiagent/internal/domain/services"
 	"aiagent/internal/impl/config"
 	"aiagent/internal/impl/database"
-	"aiagent/internal/impl/repositories"
+	repositories "aiagent/internal/impl/repositories/mongo"
 	"aiagent/internal/impl/tools"
 	uicontrollers "aiagent/internal/ui/controllers"
 

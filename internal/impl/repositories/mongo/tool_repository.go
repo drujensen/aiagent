@@ -1,4 +1,4 @@
-package repositories
+package repositories_mongo
 
 import (
 	"aiagent/internal/domain/entities"
