@@ -20,7 +20,9 @@ import (
 )
 
 func main() {
-	logger, err := zap.NewProduction()
+	cfg := zap.NewProductionConfig()
+cfg.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
+logger, err := cfg.Build()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
 		os.Exit(1)
@@ -138,7 +140,7 @@ func init() {
 				MaxTokens:       &maxTokens,
 				ContextWindow:   &contextWindow,
 				ReasoningEffort: "medium",
-				Tools:           []string{"File", "Search", "Bash"},
+				Tools:           []string{"File", "Search", "Bash", "Git", "Go", "Python"},
 				CreatedAt:       time.Now(),
 				UpdatedAt:       time.Now(),
 			},
@@ -179,6 +181,39 @@ func init() {
 				Configuration: map[string]string{
 					"command":   "bash",
 					"extraArgs": "-c",
+				},
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			},
+			{
+				ID:          "4EA3F4A2-EFCD-4E9A-A5F8-4DFFAFB018E7",
+				ToolType:    "Process",
+				Name:        "Git",
+				Description: "This tool executes a configured CLI command (e.g., bash, git, gcc, go, rustc, java, dotnet, python, ruby, node, mysql, psql, mongo, redis-cli, aws, az, docker, kubectl) with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory.  The extraArgs are prepended with the arguments passed to the tool.",
+				Configuration: map[string]string{
+					"command": "git",
+				},
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			},
+			{
+				ID:          "8C4E1573-59D9-463B-AF5F-1EA7620F469D",
+				ToolType:    "Process",
+				Name:        "Go",
+				Description: "This tool executes a configured CLI command (e.g., bash, git, gcc, go, rustc, java, dotnet, python, ruby, node, mysql, psql, mongo, redis-cli, aws, az, docker, kubectl) with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory.  The extraArgs are prepended with the arguments passed to the tool.",
+				Configuration: map[string]string{
+					"command": "go",
+				},
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			},
+			{
+				ID:          "50A77E90-D6D3-410C-A7B4-6A3E5E58253E",
+				ToolType:    "Process",
+				Name:        "Python",
+				Description: "This tool executes a configured CLI command (e.g., bash, git, gcc, go, rustc, java, dotnet, python, ruby, node, mysql, psql, mongo, redis-cli, aws, az, docker, kubectl) with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory.  The extraArgs are prepended with the arguments passed to the tool.",
+				Configuration: map[string]string{
+					"command": "python",
 				},
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
