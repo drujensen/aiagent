@@ -8,21 +8,14 @@ import (
 	"time"
 
 	"aiagent/internal/domain/entities"
-	"aiagent/internal/domain/interfaces"
+	"aiagent/internal/domain/services"
+	"aiagent/internal/impl/config"
 	repositories "aiagent/internal/impl/repositories/json"
 	"aiagent/internal/impl/tools"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
-
-type App struct {
-	ProviderRepo interfaces.ProviderRepository
-	AgentRepo    interfaces.AgentRepository
-	ChatRepo     interfaces.ChatRepository
-	ToolRepo     interfaces.ToolRepository
-	logger       *zap.Logger
-}
 
 func main() {
 	logger, err := zap.NewProduction()
@@ -32,51 +25,52 @@ func main() {
 	}
 	defer logger.Sync()
 
-	// Initialize application with JSON repositories
-	app, err := initializeApp(logger)
-	if err != nil {
-		logger.Fatal("Failed to initialize application", zap.Error(err))
-	}
-
-	// TODO: Implement CLI commands (e.g., using cobra or flag)
-	fmt.Println("AIAgent CLI started. Use commands to interact with chat sessions.", app)
-}
-
-func initializeApp(logger *zap.Logger) (*App, error) {
 	dataDir, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current directory: %v", err)
+		logger.Fatal("failed to get current directory", zap.Error(err))
+		os.Exit(1)
+	}
+
+	cfg, err := config.InitConfig()
+	if err != nil {
+		logger.Fatal("Failed to load config", zap.Error(err))
+		os.Exit(1)
 	}
 
 	// Initialize JSON repositories
 	providerRepo, err := repositories.NewJSONProviderRepository(dataDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize provider repository: %v", err)
+		logger.Fatal("failed to initialize provider repository", zap.Error(err))
+		os.Exit(1)
 	}
 
 	toolFactory, err := tools.NewToolFactory()
 	toolRepo, err := repositories.NewJSONToolRepository(dataDir, toolFactory, logger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize tool repository: %v", err)
+		logger.Fatal("failed to initialize tool repository", zap.Error(err))
+		os.Exit(1)
 	}
 
 	agentRepo, err := repositories.NewJSONAgentRepository(dataDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize agent repository: %v", err)
+		logger.Fatal("failed to initialize agent repository", zap.Error(err))
+		os.Exit(1)
 	}
 
 	chatRepo, err := repositories.NewJSONChatRepository(dataDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize chat repository: %v", err)
+		logger.Fatal("failed to initialize chat repository", zap.Error(err))
+		os.Exit(1)
 	}
 
-	return &App{
-		ProviderRepo: providerRepo,
-		AgentRepo:    agentRepo,
-		ChatRepo:     chatRepo,
-		ToolRepo:     toolRepo,
-		logger:       logger,
-	}, nil
+	providerService := services.NewProviderService(providerRepo, logger)
+	agentService := services.NewAgentService(agentRepo, logger)
+	toolService := services.NewToolService(toolRepo, logger)
+	chatService := services.NewChatService(chatRepo, agentRepo, providerRepo, toolRepo, cfg, logger)
+
+	// wait for a command from cli interface
+	println("AI Agent is running. Press Ctrl+C to exit.")
+	select {}
 }
 
 func init() {
