@@ -46,7 +46,7 @@ func InitConfig() (*Config, error) {
 				return
 			}
 		} else {
-			logger.Info("Successfully loaded .env file", zap.String("file", v.ConfigFileUsed()))
+			logger.Debug("Successfully loaded .env file", zap.String("file", v.ConfigFileUsed()))
 		}
 
 		configInstance = &Config{

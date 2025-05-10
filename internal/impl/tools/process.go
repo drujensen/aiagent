@@ -186,7 +186,7 @@ func splitShellArgs(input string) []string {
 	input = strings.TrimSpace(input)
 	runes := []rune(input)
 
-	for i := 0; i < len(runes); i++ {
+	for i := range runes {
 		ch := runes[i]
 
 		if escaped {
@@ -303,6 +303,7 @@ func (t *ProcessTool) runCommand(baseCommand string, args ProcessArgs, workspace
 					zap.String("command", baseCommand),
 					zap.Strings("arguments", cmdArgs),
 					zap.Error(err),
+					zap.String("stdout", out.String()),
 					zap.String("stderr", stderr.String()))
 				resp := ProcessResponse{
 					Stdout: out.String(),

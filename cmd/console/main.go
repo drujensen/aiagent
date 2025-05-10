@@ -119,22 +119,28 @@ func init() {
 	}
 
 	// Initialize agents.json
+	temperature := 1.0
+	maxTokens := 8192
+	contextWindow := 131072
 	agentsPath := filepath.Join(aiagentDir, "agents.json")
 	if _, err := os.Stat(agentsPath); os.IsNotExist(err) {
 		defaultAgents := []*entities.Agent{
 			{
-				ID:           "1A3F3DCB-255D-46B3-A4F4-E2E118FBA82B",
-				Name:         "Grok",
-				ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
-				ProviderType: "xai",
-				Endpoint:     "https://api.x.ai",
-				Model:        "grok-3-mini-beta",
-				APIKey:       "#{XAI_API_KEY}#",
-				SystemPrompt: "Help users with coding, debugging, and enhancing projects using tools like File, Bash, and others. Be concise, proactive, and persistent: analyze tasks quickly, use tools to edit files, run commands, and iterate until success. Keep responses short, directly addressing queries without preamble.",
-				Tools:        []string{"File", "Search"},
-
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
+				ID:              "1A3F3DCB-255D-46B3-A4F4-E2E118FBA82B",
+				Name:            "Grok",
+				ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
+				ProviderType:    "xai",
+				Endpoint:        "https://api.x.ai",
+				Model:           "grok-3-mini-beta",
+				APIKey:          "#{XAI_API_KEY}#",
+				SystemPrompt:    "Help users with coding, debugging, and enhancing projects using tools like File, Bash, and others. Be concise, proactive, and persistent: analyze tasks quickly, use tools to edit files, run commands, and iterate until success. Keep responses short, directly addressing queries without preamble.",
+				Temperature:     &temperature,
+				MaxTokens:       &maxTokens,
+				ContextWindow:   &contextWindow,
+				ReasoningEffort: "medium",
+				Tools:           []string{"File", "Search", "Bash"},
+				CreatedAt:       time.Now(),
+				UpdatedAt:       time.Now(),
 			},
 		}
 		data, _ := json.MarshalIndent(defaultAgents, "", "  ")
@@ -161,6 +167,18 @@ func init() {
 				Description: "This tool Searches the web using the Tavily API.",
 				Configuration: map[string]string{
 					"tavily_api_key": "#{TAVILY_API_KEY}#",
+				},
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			},
+			{
+				ID:          "AE3E4944-253D-4188-BEB0-F370A6F9DC6F",
+				ToolType:    "Process",
+				Name:        "Bash",
+				Description: "This tool executes a configured CLI command (e.g., bash, git, gcc, go, rustc, java, dotnet, python, ruby, node, mysql, psql, mongo, redis-cli, aws, az, docker, kubectl) with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory.  The extraArgs are prepended with the arguments passed to the tool.",
+				Configuration: map[string]string{
+					"command":   "bash",
+					"extraArgs": "-c",
 				},
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
