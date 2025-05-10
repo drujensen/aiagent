@@ -142,7 +142,7 @@ func init() {
 				ID:            "436F6B15-D874-4498-A243-A4711D09FB66",
 				ToolType:      "File",
 				Name:          "File",
-				Description:   "This tool provides you file system operations including reading, writing, editing, searching, and managing files and directories",
+				Description:   "This tool provides you file system operations including reading, writing, editing, searching, and managing files and directories. The workspace will be prepended to any directories or files specified.",
 				Configuration: map[string]string{},
 				CreatedAt:     time.Now(),
 				UpdatedAt:     time.Now(),

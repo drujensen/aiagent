@@ -34,7 +34,7 @@ The command is executed in the workspace directory.  The extraArgs are prepended
 	}
 	toolFactory.toolFactories["File"] = &ToolFactoryEntry{
 		Name:        "File",
-		Description: `This tool provides you file system operations including reading, writing, editing, searching, and managing files and directories`,
+		Description: `This tool provides you file system operations including reading, writing, editing, searching, and managing files and directories.  The workspace will be prepended to any directories or files specified.`,
 		ConfigKeys:  []string{"workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewFileTool(name, description, configuration, logger)
