@@ -20,9 +20,9 @@ import (
 )
 
 func main() {
-	cfg := zap.NewProductionConfig()
-cfg.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
-logger, err := cfg.Build()
+	log := zap.NewProductionConfig()
+	log.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
+	logger, err := log.Build()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
 		os.Exit(1)
@@ -49,6 +49,11 @@ logger, err := cfg.Build()
 	}
 
 	toolFactory, err := tools.NewToolFactory()
+	if err != nil {
+		logger.Fatal("failed to initialize tool factory", zap.Error(err))
+		os.Exit(1)
+	}
+
 	toolRepo, err := repositories.NewJSONToolRepository(dataDir, toolFactory, logger)
 	if err != nil {
 		logger.Fatal("failed to initialize tool repository", zap.Error(err))
