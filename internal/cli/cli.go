@@ -33,7 +33,7 @@ func NewCLI(chatService services.ChatService, chatID string, logger *zap.Logger)
 
 // Run starts the CLI interface, displaying chat history and handling user input.
 func (c *CLI) Run(ctx context.Context) error {
-	fmt.Println("AI Agent Console. Type 'exit' to quit.")
+	fmt.Println("AI Agent Console. Type '/help' for list of commands.")
 
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -72,7 +72,7 @@ func (c *CLI) Run(ctx context.Context) error {
 			userInput, err := prompt.Run()
 			if err != nil {
 				if err == promptui.ErrInterrupt {
-					fmt.Println("\nShutting down...")
+					fmt.Println("\nInterrupted. Shutting down...")
 					return nil
 				}
 				c.logger.Error("Prompt error", zap.Error(err))
@@ -80,17 +80,41 @@ func (c *CLI) Run(ctx context.Context) error {
 			}
 
 			userInput = strings.TrimSpace(userInput)
-			if userInput == "exit" {
+			if userInput == "/help" {
+				fmt.Println("Available commands:")
+				fmt.Println("/new - Start a new chat")
+				fmt.Println("/agents - List available agents")
+				fmt.Println("/tools - List available tools")
+				fmt.Println("/usage - Show usage information")
+				fmt.Println("/exit - Exit the application")
+				fmt.Println("/help - Show this help message")
+				continue
+			}
+
+			if strings.HasPrefix(userInput, "/new") {
+				fmt.Println("Starting a new chat...")
+				name, found := strings.CutPrefix(userInput, "/new ")
+				if !found || name == "" {
+					name = "New Chat"
+				}
+				chat, err = c.chatService.CreateChat(ctx, chat.AgentID, name)
+				if err != nil {
+					c.logger.Error("Failed to create new chat", zap.Error(err))
+					fmt.Println("Error creating new chat:", err)
+				}
+				continue
+			}
+
+			if userInput == "/exit" || userInput == "/quit" {
 				fmt.Println("Shutting down...")
 				return nil
 			}
 
 			// Create and save user message
 			message := entities.NewMessage("user", userInput)
-			c.displayMessage(*message)
 
 			// Generate assistant response
-			response, err := c.chatService.SendMessage(ctx, c.chatID, message)
+			response, err := c.chatService.SendMessage(ctx, chat.ID, message)
 			if err != nil {
 				c.logger.Error("Failed to generate response", zap.Error(err))
 				fmt.Println("Error generating response:", err)

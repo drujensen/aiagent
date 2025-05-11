@@ -11,11 +11,11 @@ services:
       - ~/workspace:/home/ubuntu/workspace
       - ~/.ssh:/home/ubuntu/.ssh
       - ~/.gitconfig:/home/ubuntu/.gitconfig
-    user: "1000:1000"
+    
 
   mongo:
     container_name: mongo
-    image: "mongo:latest"
+    image: "mongo:6.0"
     ports:
       - "27017:27017"
     volumes:
@@ -24,7 +24,7 @@ services:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: password
       MONGO_INITDB_DATABASE: aiagent
-    user: "1000:1000"
+    
 
 volumes:
   mongo_data:

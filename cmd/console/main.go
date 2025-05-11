@@ -74,12 +74,19 @@ func main() {
 
 	chatService := services.NewChatService(chatRepo, agentRepo, providerRepo, toolRepo, cfg, logger)
 
-	// Select the first chat from the repository
+	// Select the active chat from the repository
 	chats, err := chatRepo.ListChats(context.Background())
 	if err != nil || len(chats) == 0 {
 		logger.Fatal("No chats available", zap.Error(err))
 	}
 	chatID := chats[0].ID
+	for index, chat := range chats {
+		if chat.Active {
+			logger.Info("Found active chat", zap.String("chatID", chat.ID))
+			chatID = chats[index].ID
+			break
+		}
+	}
 
 	// Initialize and run the CLI
 	cli := cli.NewCLI(chatService, chatID, logger)
@@ -145,7 +152,7 @@ func init() {
 				MaxTokens:       &maxTokens,
 				ContextWindow:   &contextWindow,
 				ReasoningEffort: "medium",
-				Tools:           []string{"File", "Search", "Bash", "Git", "Go", "Python"},
+				Tools:           []string{"File", "Search", "Bash", "Git", "Go", "Python", "Grep", "Find"},
 				CreatedAt:       time.Now(),
 				UpdatedAt:       time.Now(),
 			},
@@ -219,6 +226,28 @@ func init() {
 				Description: "This tool executes a configured CLI command (e.g., bash, git, gcc, go, rustc, java, dotnet, python, ruby, node, mysql, psql, mongo, redis-cli, aws, az, docker, kubectl) with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory.  The extraArgs are prepended with the arguments passed to the tool.",
 				Configuration: map[string]string{
 					"command": "python",
+				},
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			},
+			{
+				ID:          "89637725-6050-44BA-B839-F41D1B6067A7",
+				ToolType:    "Process",
+				Name:        "Grep",
+				Description: "This tool executes a configured CLI command (e.g., bash, git, gcc, go, rustc, java, dotnet, python, ruby, node, mysql, psql, mongo, redis-cli, aws, az, docker, kubectl) with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory.  The extraArgs are prepended with the arguments passed to the tool.",
+				Configuration: map[string]string{
+					"command": "grep",
+				},
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			},
+			{
+				ID:          "F3C1455F-5E89-40F2-8E81-53AFAB096E9E",
+				ToolType:    "Process",
+				Name:        "Find",
+				Description: "This tool executes a configured CLI command (e.g., bash, git, gcc, go, rustc, java, dotnet, python, ruby, node, mysql, psql, mongo, redis-cli, aws, az, docker, kubectl) with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory.  The extraArgs are prepended with the arguments passed to the tool.",
+				Configuration: map[string]string{
+					"command": "find",
 				},
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
