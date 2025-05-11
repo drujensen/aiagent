@@ -38,7 +38,7 @@ func (c *HomeController) RegisterRoutes(e *echo.Echo) {
 func (c *HomeController) HomeHandler(eCtx echo.Context) error {
 	return eCtx.Redirect(http.StatusFound, "/chats/new")
 	// No longer fetch data here; let HTMX handle it
-	//data := map[string]interface{}{
+	//data := map[string]any{
 	//	"Title":           "AI Agents",
 	//	"ContentTemplate": "home_content",
 	//}
@@ -73,7 +73,7 @@ func (c *HomeController) ChatsPartialHandler(eCtx echo.Context) error {
 		processedChats = append(processedChats, chatData)
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Chats": processedChats,
 	}
 
@@ -86,7 +86,7 @@ func (c *HomeController) AgentsPartialHandler(eCtx echo.Context) error {
 		c.logger.Error("Failed to list agents", zap.Error(err))
 		return eCtx.String(http.StatusInternalServerError, "Failed to load agents")
 	}
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Agents": agents,
 	}
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_agents", data)
@@ -98,7 +98,7 @@ func (c *HomeController) ToolsPartialHandler(eCtx echo.Context) error {
 		c.logger.Error("Failed to list tools", zap.Error(err))
 		return eCtx.String(http.StatusInternalServerError, "Failed to load tools")
 	}
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Tools": tools,
 	}
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_tools", data)

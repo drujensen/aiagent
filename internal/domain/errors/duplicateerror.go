@@ -10,7 +10,7 @@ func (v *DuplicateError) Error() string {
 	return v.message
 }
 
-func DuplicateErrorf(format string, args ...interface{}) *DuplicateError {
+func DuplicateErrorf(format string, args ...any) *DuplicateError {
 	return &DuplicateError{
 		message: fmt.Sprintf(format, args...),
 	}

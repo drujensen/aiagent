@@ -75,7 +75,7 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 		}
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Title":           "AI Agents - Chat",
 		"ContentTemplate": "chat_content",
 		"ChatID":          chatID,
@@ -129,7 +129,7 @@ func (c *ChatController) ChatFormHandler(eCtx echo.Context) error {
 		chatData.ID = uuid.New().String()
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Title":           "AI Agents - New Chat",
 		"ContentTemplate": "chat_form_content",
 		"Chat":            chatData,
@@ -266,7 +266,7 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 	// Create data for the template
 	messageSessionID := fmt.Sprintf("message-session-%d", len(chat.Messages)/2) // Rough estimate of session count
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"UserMessage": userMessage,
 		"AIMessages":  aiMessages,
 		"SessionID":   messageSessionID,
@@ -303,7 +303,7 @@ func (c *ChatController) ChatCostHandler(eCtx echo.Context) error {
 		return eCtx.HTML(http.StatusInternalServerError, "<div class=\"chat-cost\">Tokens: 0 Cost: $0.00</div>")
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"TotalTokens": chat.Usage.TotalTokens,
 		"ChatCost":    chat.Usage.TotalCost,
 	}

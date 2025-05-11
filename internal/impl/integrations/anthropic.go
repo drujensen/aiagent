@@ -61,14 +61,14 @@ func (m *AnthropicIntegration) ProviderType() entities.ProviderType {
 }
 
 // convertToAnthropicMessages converts message entities to Anthropic API format
-func convertToAnthropicMessages(messages []*entities.Message) []map[string]interface{} {
-	apiMessages := make([]map[string]interface{}, 0, len(messages))
+func convertToAnthropicMessages(messages []*entities.Message) []map[string]any {
+	apiMessages := make([]map[string]any, 0, len(messages))
 	for _, msg := range messages {
 		if msg.Role == "system" { // Skip system for initial request
 			continue
 		}
 
-		apiMsg := map[string]interface{}{}
+		apiMsg := map[string]any{}
 
 		switch msg.Role {
 		case "user":
@@ -77,9 +77,9 @@ func convertToAnthropicMessages(messages []*entities.Message) []map[string]inter
 		case "assistant":
 			apiMsg["role"] = "assistant"
 			if len(msg.ToolCalls) > 0 {
-				content := make([]map[string]interface{}, 0)
+				content := make([]map[string]any, 0)
 				for _, tc := range msg.ToolCalls {
-					content = append(content, map[string]interface{}{
+					content = append(content, map[string]any{
 						"type":  "tool_use",
 						"id":    tc.ID,
 						"name":  tc.Function.Name,
@@ -92,7 +92,7 @@ func convertToAnthropicMessages(messages []*entities.Message) []map[string]inter
 			}
 		case "tool":
 			apiMsg["role"] = "user" // Use "user" role to report tool result as per Anthropic's convention
-			apiMsg["content"] = []map[string]interface{}{
+			apiMsg["content"] = []map[string]any{
 				{
 					"type":        "tool_result",
 					"tool_use_id": msg.ToolCallID,
@@ -107,9 +107,9 @@ func convertToAnthropicMessages(messages []*entities.Message) []map[string]inter
 }
 
 // GenerateResponse generates a response from the Anthropic API
-func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]interface{}) ([]*entities.Message, error) {
+func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]any) ([]*entities.Message, error) {
 	// Prepare tool definitions for Anthropic
-	tools := make([]map[string]interface{}, len(toolList))
+	tools := make([]map[string]any, len(toolList))
 	for i, tool := range toolList {
 		// Check for cancellation
 		if ctx.Err() == context.Canceled {
@@ -123,9 +123,9 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 			}
 		}
 
-		properties := make(map[string]interface{})
+		properties := make(map[string]any)
 		for _, param := range (*tool).Parameters() {
-			property := map[string]interface{}{
+			property := map[string]any{
 				"type":        param.Type,
 				"description": param.Description,
 			}
@@ -135,10 +135,10 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 			properties[param.Name] = property
 		}
 
-		tools[i] = map[string]interface{}{
+		tools[i] = map[string]any{
 			"name":        (*tool).Name(),
 			"description": (*tool).Description(),
-			"input_schema": map[string]interface{}{
+			"input_schema": map[string]any{
 				"type":       "object",
 				"properties": properties,
 				"required":   requiredFields,
@@ -156,7 +156,7 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 	}
 
 	// Format request body
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model":      m.model,
 		"max_tokens": options["max_tokens"],
 	}
@@ -366,9 +366,9 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 
 				// Append tool result to apiMessages for next iteration
 				if toolCall.ID != "" {
-					apiMessages = append(apiMessages, map[string]interface{}{
+					apiMessages = append(apiMessages, map[string]any{
 						"role": "assistant",
-						"content": []map[string]interface{}{
+						"content": []map[string]any{
 							{
 								"type":  "tool_use",
 								"id":    toolCall.ID,
@@ -377,9 +377,9 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 							},
 						},
 					})
-					apiMessages = append(apiMessages, map[string]interface{}{
+					apiMessages = append(apiMessages, map[string]any{
 						"role": "user", // Use "user" role to report tool result as per Anthropic's convention
-						"content": []map[string]interface{}{
+						"content": []map[string]any{
 							{
 								"type":        "tool_result",
 								"tool_use_id": toolCall.ID,

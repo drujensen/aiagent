@@ -10,7 +10,7 @@ func (v *InternalError) Error() string {
 	return v.message
 }
 
-func InternalErrorf(format string, args ...interface{}) *InternalError {
+func InternalErrorf(format string, args ...any) *InternalError {
 	return &InternalError{
 		message: fmt.Sprintf(format, args...),
 	}

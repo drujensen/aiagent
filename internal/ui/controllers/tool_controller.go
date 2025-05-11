@@ -69,7 +69,7 @@ func (c *ToolController) ToolFormHandler(eCtx echo.Context) error {
 		tool = entities.NewToolData("", "", "", nil)
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Title":           "AI Agents - Tool Form",
 		"ContentTemplate": "tool_form_content",
 		"Tool":            tool,

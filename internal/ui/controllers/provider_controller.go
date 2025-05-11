@@ -37,7 +37,7 @@ func (c *ProviderController) ListProvidersHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusInternalServerError, "Failed to load providers")
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Title":           "AI Agents - Providers",
 		"ContentTemplate": "providers_list_content",
 		"Providers":       providers,

@@ -31,7 +31,7 @@ func (c *AgentController) RegisterRoutes(e *echo.Group) {
 //	@Tags			agents
 //	@Produce		json
 //	@Success		200	{array}		entities.Agent			"Successfully retrieved list of agents"
-//	@Failure		500	{object}	map[string]interface{}	"Internal server error"
+//	@Failure		500	{object}	map[string]any	"Internal server error"
 //	@Router			/api/agents [get]
 func (c *AgentController) ListAgents(ctx echo.Context) error {
 	agents, err := c.agentService.ListAgents(ctx.Request().Context())
@@ -42,9 +42,9 @@ func (c *AgentController) ListAgents(ctx echo.Context) error {
 }
 
 // handleError handles errors and returns them in a consistent format
-func (c *AgentController) handleError(ctx echo.Context, err interface{}, statusCode int) error {
+func (c *AgentController) handleError(ctx echo.Context, err any, statusCode int) error {
 	c.logger.Error("Error occurred", zap.Any("error", err))
-	return ctx.JSON(statusCode, map[string]interface{}{
+	return ctx.JSON(statusCode, map[string]any{
 		"error": err,
 	})
 }

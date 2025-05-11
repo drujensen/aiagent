@@ -75,11 +75,11 @@ func NewMCPClient(command string, workspace string, args []string) *MCPClient {
 	}
 }
 
-func (c *MCPClient) InvokeMethod(method string, params interface{}) (interface{}, error) {
+func (c *MCPClient) InvokeMethod(method string, params any) (any, error) {
 	fmt.Printf("Invoking MCP method: %s\n", method)
 
 	// JSON-RPC request
-	req := map[string]interface{}{
+	req := map[string]any{
 		"jsonrpc": "2.0",
 		"method":  method,
 		"params":  params,
@@ -122,7 +122,7 @@ func (c *MCPClient) InvokeMethod(method string, params interface{}) (interface{}
 	fmt.Printf("Received response: %s\n", responseStr)
 
 	// Parse JSON-RPC response
-	var resp map[string]interface{}
+	var resp map[string]any
 	if err := json.Unmarshal([]byte(responseStr), &resp); err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
@@ -243,27 +243,27 @@ func (t *MCPTool) Parameters() []entities.Parameter {
 		return nil
 	}
 
-	toolsArray, ok := result.([]interface{})
+	toolsArray, ok := result.([]any)
 	if !ok {
 		t.logger.Error("Invalid response format for list_tools")
 		return nil
 	}
 
 	for _, toolInterface := range toolsArray {
-		tool, ok := toolInterface.(map[string]interface{})
+		tool, ok := toolInterface.(map[string]any)
 		if !ok {
 			continue
 		}
 		if toolName, ok := tool["name"].(string); ok && toolName == t.Name() {
 			// Found the matching tool, extract parameters
-			paramsSchema, ok := tool["parameters"].(map[string]interface{})
+			paramsSchema, ok := tool["parameters"].(map[string]any)
 			if !ok {
 				t.logger.Error("Invalid parameters schema for tool", zap.String("tool_name", t.Name()))
 				return nil
 			}
 			// Assume parameters schema has "properties" and "required"
-			properties, propOk := paramsSchema["properties"].(map[string]interface{})
-			requiredArray, reqOk := paramsSchema["required"].([]interface{})
+			properties, propOk := paramsSchema["properties"].(map[string]any)
+			requiredArray, reqOk := paramsSchema["required"].([]any)
 			if !propOk || !reqOk {
 				t.logger.Error("Invalid properties or required fields in parameters schema")
 				return nil
@@ -280,7 +280,7 @@ func (t *MCPTool) Parameters() []entities.Parameter {
 			// Extract and convert properties to []Parameter
 			var parameters []entities.Parameter
 			for name, propInterface := range properties {
-				prop, ok := propInterface.(map[string]interface{})
+				prop, ok := propInterface.(map[string]any)
 				if !ok {
 					continue // Skip invalid property
 				}
@@ -303,7 +303,7 @@ func (t *MCPTool) Parameters() []entities.Parameter {
 
 func (t *MCPTool) Execute(arguments string) (string, error) {
 	// Parse the arguments string as JSON to get params map
-	var params map[string]interface{}
+	var params map[string]any
 	if err := json.Unmarshal([]byte(arguments), &params); err != nil {
 		return "", fmt.Errorf("error parsing arguments JSON: %w", err)
 	}

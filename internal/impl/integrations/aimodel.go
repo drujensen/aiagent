@@ -65,10 +65,10 @@ func (m *AIModelIntegration) ProviderType() entities.ProviderType {
 }
 
 // convertToBaseMessages converts message entities to the Base API format
-func convertToBaseMessages(messages []*entities.Message) []map[string]interface{} {
-	apiMessages := make([]map[string]interface{}, 0, len(messages))
+func convertToBaseMessages(messages []*entities.Message) []map[string]any {
+	apiMessages := make([]map[string]any, 0, len(messages))
 	for _, msg := range messages {
-		apiMsg := map[string]interface{}{
+		apiMsg := map[string]any{
 			"role": msg.Role,
 		}
 		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
@@ -90,12 +90,12 @@ func convertToBaseMessages(messages []*entities.Message) []map[string]interface{
 	return apiMessages
 }
 
-func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]interface{}) ([]*entities.Message, error) {
+func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]any) ([]*entities.Message, error) {
 	if ctx.Err() == context.Canceled {
 		return nil, fmt.Errorf("operation canceled by user")
 	}
 
-	tools := make([]map[string]interface{}, len(toolList))
+	tools := make([]map[string]any, len(toolList))
 	for i, tool := range toolList {
 		if ctx.Err() == context.Canceled {
 			return nil, fmt.Errorf("operation canceled by user")
@@ -108,9 +108,9 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			}
 		}
 
-		properties := make(map[string]interface{})
+		properties := make(map[string]any)
 		for _, param := range (*tool).Parameters() {
-			property := map[string]interface{}{
+			property := map[string]any{
 				"type":        param.Type,
 				"description": param.Description,
 			}
@@ -118,19 +118,19 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				property["enum"] = param.Enum
 			}
 			if param.Type == "array" && len(param.Items) > 0 {
-				property["items"] = map[string]interface{}{
+				property["items"] = map[string]any{
 					"type": param.Items[0].Type,
 				}
 			}
 			properties[param.Name] = property
 		}
 
-		tools[i] = map[string]interface{}{
+		tools[i] = map[string]any{
 			"type": "function",
-			"function": map[string]interface{}{
+			"function": map[string]any{
 				"name":        (*tool).Name(),
 				"description": (*tool).FullDescription(),
-				"parameters": map[string]interface{}{
+				"parameters": map[string]any{
 					"type":       "object",
 					"properties": properties,
 					"required":   requiredFields,
@@ -139,7 +139,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		}
 	}
 
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model": m.model,
 	}
 	if len(tools) > 0 {
@@ -265,7 +265,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		}
 		newMessages = append(newMessages, toolCallMessage)
 
-		assistantMsg := map[string]interface{}{
+		assistantMsg := map[string]any{
 			"role":       "assistant",
 			"content":    contentMsg,
 			"tool_calls": toolCalls,
@@ -310,7 +310,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			}
 			newMessages = append(newMessages, newMessage)
 
-			toolResponseMsg := map[string]interface{}{
+			toolResponseMsg := map[string]any{
 				"role":         "tool",
 				"content":      newMessage.Content,
 				"tool_call_id": toolCall.ID,

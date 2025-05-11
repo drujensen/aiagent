@@ -146,7 +146,7 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 		selectedProviderModels = selectedProvider.Models
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Title":                  "AI Agents - Agent Form",
 		"ContentTemplate":        "agent_form_content",
 		"Agent":                  agentData,
@@ -347,7 +347,7 @@ func (c *AgentController) DeleteAgentHandler(eCtx echo.Context) error {
 		c.logger.Error("Failed to list agents", zap.Error(err))
 		return eCtx.String(http.StatusInternalServerError, "Failed to load agents")
 	}
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Agents": agents,
 	}
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_agents", data)
@@ -395,7 +395,7 @@ func (c *AgentController) GetProviderModelsHandler(eCtx echo.Context) error {
 			zap.String("name", model.Name))
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Models":   provider.Models,
 		"Provider": provider,
 	}

@@ -130,7 +130,7 @@ func (t *ImageTool) Execute(arguments string) (string, error) {
 
 	t.logger.Info("Attempting API call", zap.String("provider", provider), zap.String("baseURL", baseURL))
 	url := baseURL
-	body := map[string]interface{}{
+	body := map[string]any{
 		"prompt": args.Prompt,
 		"n":      args.N,
 		"model":  model,
@@ -162,15 +162,15 @@ func (t *ImageTool) Execute(arguments string) (string, error) {
 		return fmt.Sprintf("API error: %s", resp.Status), nil
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", err
 	}
 	t.logger.Debug("API response", zap.Any("result", result))
-	if data, ok := result["data"].([]interface{}); ok && len(data) > 0 {
+	if data, ok := result["data"].([]any); ok && len(data) > 0 {
 		var markdownLinks strings.Builder
 		for i, item := range data {
-			if image, ok := item.(map[string]interface{}); ok {
+			if image, ok := item.(map[string]any); ok {
 				if url, ok := image["url"].(string); ok {
 					markdownLinks.WriteString(fmt.Sprintf("![Image %d](%s)\n", i+1, url))
 					revisedPrompt := image["revised_prompt"].(string)

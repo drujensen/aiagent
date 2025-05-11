@@ -10,7 +10,7 @@ func (v *CanceledError) Error() string {
 	return v.message
 }
 
-func CanceledErrorf(format string, args ...interface{}) *CanceledError {
+func CanceledErrorf(format string, args ...any) *CanceledError {
 	return &CanceledError{
 		message: fmt.Sprintf(format, args...),
 	}

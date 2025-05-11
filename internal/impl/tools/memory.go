@@ -162,14 +162,14 @@ func (t *MemoryTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing memory operation", zap.String("arguments", arguments))
 
 	var args struct {
-		Operation    string                   `json:"operation"`
-		Entities     []Entity                 `json:"entities"`
-		Relations    []Relation               `json:"relations"`
-		Observations []map[string]interface{} `json:"observations"`
-		EntityNames  []string                 `json:"entityNames"`
-		Deletions    []map[string]interface{} `json:"deletions"`
-		Query        string                   `json:"query"`
-		Names        []string                 `json:"names"`
+		Operation    string           `json:"operation"`
+		Entities     []Entity         `json:"entities"`
+		Relations    []Relation       `json:"relations"`
+		Observations []map[string]any `json:"observations"`
+		EntityNames  []string         `json:"entityNames"`
+		Deletions    []map[string]any `json:"deletions"`
+		Query        string           `json:"query"`
+		Names        []string         `json:"names"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
@@ -282,16 +282,16 @@ func (t *MemoryTool) createRelations(ctx context.Context, relations []Relation) 
 	return string(result), nil
 }
 
-func (t *MemoryTool) addObservations(ctx context.Context, observations []map[string]interface{}) (string, error) {
+func (t *MemoryTool) addObservations(ctx context.Context, observations []map[string]any) (string, error) {
 	graph, err := t.loadGraph(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	var results []map[string]interface{}
+	var results []map[string]any
 	for _, obs := range observations {
 		entityName, _ := obs["entityName"].(string)
-		contents, _ := obs["contents"].([]interface{})
+		contents, _ := obs["contents"].([]any)
 		if entityName == "" || len(contents) == 0 {
 			continue
 		}
@@ -312,7 +312,7 @@ func (t *MemoryTool) addObservations(ctx context.Context, observations []map[str
 						graph.Entities[i].Observations = append(graph.Entities[i].Observations, content)
 					}
 				}
-				results = append(results, map[string]interface{}{
+				results = append(results, map[string]any{
 					"entityName":        entityName,
 					"addedObservations": added,
 				})
@@ -361,7 +361,7 @@ func (t *MemoryTool) deleteEntities(ctx context.Context, entityNames []string) (
 	return "Entities deleted successfully", nil
 }
 
-func (t *MemoryTool) deleteObservations(ctx context.Context, deletions []map[string]interface{}) (string, error) {
+func (t *MemoryTool) deleteObservations(ctx context.Context, deletions []map[string]any) (string, error) {
 	graph, err := t.loadGraph(ctx)
 	if err != nil {
 		return "", err
@@ -369,7 +369,7 @@ func (t *MemoryTool) deleteObservations(ctx context.Context, deletions []map[str
 
 	for _, del := range deletions {
 		entityName, _ := del["entityName"].(string)
-		observations, _ := del["observations"].([]interface{})
+		observations, _ := del["observations"].([]any)
 		var stringObs []string
 		for _, o := range observations {
 			if s, ok := o.(string); ok {

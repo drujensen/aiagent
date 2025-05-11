@@ -38,7 +38,7 @@ func (c *ChatController) RegisterRoutes(e *echo.Group) {
 //	@Tags			chats
 //	@Produce		json
 //	@Success		200	{array}		entities.Chat			"Successfully retrieved list of chats"
-//	@Failure		500	{object}	map[string]interface{}	"Internal server error"
+//	@Failure		500	{object}	map[string]any	"Internal server error"
 //	@Router			/api/chats [get]
 func (c *ChatController) ListChats(ctx echo.Context) error {
 	chats, err := c.chatService.ListChats(ctx.Request().Context())
@@ -56,9 +56,9 @@ func (c *ChatController) ListChats(ctx echo.Context) error {
 //	@Produce		json
 //	@Param			id	path		string					true	"Chat ID"
 //	@Success		200	{object}	entities.Chat			"Successfully retrieved chat"
-//	@Failure		400	{object}	map[string]interface{}	"Invalid chat ID"
-//	@Failure		404	{object}	map[string]interface{}	"Chat not found"
-//	@Failure		500	{object}	map[string]interface{}	"Internal server error"
+//	@Failure		400	{object}	map[string]any	"Invalid chat ID"
+//	@Failure		404	{object}	map[string]any	"Chat not found"
+//	@Failure		500	{object}	map[string]any	"Internal server error"
 //	@Router			/api/chats/{id} [get]
 func (c *ChatController) GetChat(ctx echo.Context) error {
 	id := ctx.Param("id")
@@ -88,8 +88,8 @@ func (c *ChatController) GetChat(ctx echo.Context) error {
 //	@Produce		json
 //	@Param			request	body		CreateChatRequest		true	"Chat information to create"
 //	@Success		201		{object}	entities.Chat			"Successfully created chat"
-//	@Failure		400		{object}	map[string]interface{}	"Invalid request body"
-//	@Failure		500		{object}	map[string]interface{}	"Internal server error"
+//	@Failure		400		{object}	map[string]any	"Invalid request body"
+//	@Failure		500		{object}	map[string]any	"Internal server error"
 //	@Router			/api/chats [post]
 func (c *ChatController) CreateChat(ctx echo.Context) error {
 	var input struct {
@@ -118,9 +118,9 @@ func (c *ChatController) CreateChat(ctx echo.Context) error {
 //	@Param			id		path		string					true	"Chat ID"
 //	@Param			request	body		SendMessageRequest		true	"Message to send"
 //	@Success		200		{object}	SendMessageResponse		"Successfully sent message"
-//	@Failure		400		{object}	map[string]interface{}	"Invalid request body or chat ID"
-//	@Failure		404		{object}	map[string]interface{}	"Chat not found"
-//	@Failure		500		{object}	map[string]interface{}	"Internal server error"
+//	@Failure		400		{object}	map[string]any	"Invalid request body or chat ID"
+//	@Failure		404		{object}	map[string]any	"Chat not found"
+//	@Failure		500		{object}	map[string]any	"Internal server error"
 //	@Router			/api/chats/{id}/messages [post]
 func (c *ChatController) SendMessage(ctx echo.Context) error {
 	id := ctx.Param("id")
@@ -154,7 +154,7 @@ func (c *ChatController) SendMessage(ctx echo.Context) error {
 }
 
 // handleError handles errors and returns them in a consistent format
-func (c *ChatController) handleError(ctx echo.Context, err interface{}, statusCode int) error {
+func (c *ChatController) handleError(ctx echo.Context, err any, statusCode int) error {
 	var errorMessage string
 	switch e := err.(type) {
 	case error:
@@ -165,7 +165,7 @@ func (c *ChatController) handleError(ctx echo.Context, err interface{}, statusCo
 		errorMessage = fmt.Sprintf("%v", e)
 	}
 	c.logger.Error("Error occurred", zap.String("error", errorMessage))
-	return ctx.JSON(statusCode, map[string]interface{}{
+	return ctx.JSON(statusCode, map[string]any{
 		"error": errorMessage,
 	})
 }

@@ -10,7 +10,7 @@ func (v *NotFoundError) Error() string {
 	return v.message
 }
 
-func NotFoundErrorf(format string, args ...interface{}) *NotFoundError {
+func NotFoundErrorf(format string, args ...any) *NotFoundError {
 	return &NotFoundError{
 		message: fmt.Sprintf(format, args...),
 	}
