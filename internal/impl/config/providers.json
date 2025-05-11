@@ -4,7 +4,7 @@
         "name": "OpenAI",
         "type": "openai",
         "base_url": "https://api.openai.com",
-        "api_key_name": "OpenAI API Key",
+        "api_key_name": "OPENAI_API_KEY",
         "models": [
             {
                 "name": "o1",
@@ -37,7 +37,7 @@
         "name": "Anthropic",
         "type": "anthropic",
         "base_url": "https://api.anthropic.com",
-        "api_key_name": "Anthropic API Key",
+        "api_key_name": "ANTHROPIC_API_KEY",
         "models": [
             {
                 "name": "claude-3-opus-20240229",
@@ -64,7 +64,7 @@
         "name": "X.AI",
         "type": "xai",
         "base_url": "https://api.x.ai",
-        "api_key_name": "X.AI API Key",
+        "api_key_name": "XAI_API_KEY",
         "models": [
             {
                 "name": "grok-3-beta",
@@ -91,7 +91,7 @@
         "name": "Google",
         "type": "google",
         "base_url": "https://generativelanguage.googleapis.com",
-        "api_key_name": "Gemini API Key",
+        "api_key_name": "GEMINI_API_KEY",
         "models": [
             {
                 "name": "gemini-2.5-pro-preview-03-25",
@@ -124,7 +124,7 @@
         "name": "DeepSeek",
         "type": "deepseek",
         "base_url": "https://api.deepseek.com",
-        "api_key_name": "DeepSeek API Key",
+        "api_key_name": "DEEPSEEK_API_KEY",
         "models": [
             {
                 "name": "deepseek-reasoner",
@@ -145,7 +145,7 @@
         "name": "Together",
         "type": "together",
         "base_url": "https://api.together.xyz",
-        "api_key_name": "Together API Key",
+        "api_key_name": "TOGETHER_API_KEY",
         "models": [
             {
                 "name": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
@@ -172,7 +172,7 @@
         "name": "Groq",
         "type": "groq",
         "base_url": "https://api.groq.com",
-        "api_key_name": "Groq API Key",
+        "api_key_name": "GROQ_API_KEY",
         "models": [
             {
                 "name": "llama-3.3-70b-versatile",
@@ -205,7 +205,7 @@
         "name": "Ollama",
         "type": "ollama",
         "base_url": "http://localhost:11434",
-        "api_key_name": "Local API Key (optional)",
+        "api_key_name": "LOCAL_API_KEY",
         "models": [
             {
                 "name": "llama3.1:8b",
@@ -250,7 +250,7 @@
         "name": "Custom Provider",
         "type": "generic",
         "base_url": "",
-        "api_key_name": "API Key",
+        "api_key_name": "API_KEY",
         "models": []
     }
 ]

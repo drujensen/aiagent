@@ -83,6 +83,20 @@ func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*en
 		return nil, err
 	}
 
+	// Set the other chat sessions to inactive
+	chats, err := s.chatRepo.ListChats(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range chats {
+		if c.ID != chat.ID {
+			c.Active = false
+			if err := s.chatRepo.UpdateChat(ctx, c); err != nil {
+				s.logger.Error("Failed to update chat status", zap.String("chat_id", c.ID), zap.Error(err))
+			}
+		}
+	}
+
 	return chat, nil
 }
 
@@ -288,7 +302,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 	if agent.MaxTokens != nil {
 		options["max_tokens"] = *agent.MaxTokens
 	}
-	if agent.ReasoningEffort != "none" {
+	if agent.ReasoningEffort != "none" && agent.ReasoningEffort != "" {
 		options["reasoning_effort"] = agent.ReasoningEffort
 	}
 
