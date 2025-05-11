@@ -18,15 +18,13 @@ import (
 // CLI manages the text-based user interface for the AI Agent console application.
 type CLI struct {
 	chatService services.ChatService
-	chatID      string
 	logger      *zap.Logger
 }
 
 // NewCLI creates a new CLI instance.
-func NewCLI(chatService services.ChatService, chatID string, logger *zap.Logger) *CLI {
+func NewCLI(chatService services.ChatService, logger *zap.Logger) *CLI {
 	return &CLI{
 		chatService: chatService,
-		chatID:      chatID,
 		logger:      logger,
 	}
 }
@@ -39,11 +37,17 @@ func (c *CLI) Run(ctx context.Context) error {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Load initial chat history
-	chat, err := c.chatService.GetChat(ctx, c.chatID)
-	if err != nil {
-		c.logger.Error("Failed to load chat", zap.Error(err))
-		return fmt.Errorf("failed to load chat: %v", err)
+	// Select the active chat from the repository
+	chats, err := c.chatService.ListChats(context.Background())
+	if err != nil || len(chats) == 0 {
+		c.logger.Fatal("No chats available", zap.Error(err))
+	}
+	chat := chats[0]
+	for _, activeChat := range chats {
+		if activeChat.Active {
+			chat = activeChat
+			break
+		}
 	}
 
 	// Display existing messages
@@ -127,16 +131,12 @@ func (c *CLI) Run(ctx context.Context) error {
 
 // displayMessage prints a message with role prefix and formatted content.
 func (c *CLI) displayMessage(msg entities.Message) {
-	prefix := "Uknown: "
 	switch msg.Role {
-	case "system":
-		prefix = "System: "
 	case "assistant":
-		prefix = "Assistant: "
+		fmt.Printf("Assistant: %s\n", msg.Content)
 	case "user":
-		prefix = "User: "
+		fmt.Printf("User: %s\n", msg.Content)
 	case "tool":
-		prefix = "Tool: "
+		fmt.Printf("Tool Called.\n")
 	}
-	fmt.Printf("%s%s\n", prefix, msg.Content)
 }

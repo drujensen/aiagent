@@ -89,6 +89,7 @@ func (r *jsonChatRepository) ListChats(ctx context.Context) ([]*entities.Chat, e
 			AgentID:   c.AgentID,
 			Name:      c.Name,
 			Messages:  messagesCopy,
+			Active:    c.Active,
 			CreatedAt: c.CreatedAt,
 			UpdatedAt: c.UpdatedAt,
 		}
@@ -106,6 +107,7 @@ func (r *jsonChatRepository) GetChat(ctx context.Context, id string) (*entities.
 				AgentID:   chat.AgentID,
 				Name:      chat.Name,
 				Messages:  messagesCopy,
+				Active:    chat.Active,
 				CreatedAt: chat.CreatedAt,
 				UpdatedAt: chat.UpdatedAt,
 			}, nil

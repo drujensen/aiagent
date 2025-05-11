@@ -74,22 +74,8 @@ func main() {
 
 	chatService := services.NewChatService(chatRepo, agentRepo, providerRepo, toolRepo, cfg, logger)
 
-	// Select the active chat from the repository
-	chats, err := chatRepo.ListChats(context.Background())
-	if err != nil || len(chats) == 0 {
-		logger.Fatal("No chats available", zap.Error(err))
-	}
-	chatID := chats[0].ID
-	for index, chat := range chats {
-		if chat.Active {
-			logger.Info("Found active chat", zap.String("chatID", chat.ID))
-			chatID = chats[index].ID
-			break
-		}
-	}
-
 	// Initialize and run the CLI
-	cli := cli.NewCLI(chatService, chatID, logger)
+	cli := cli.NewCLI(chatService, logger)
 	if err := cli.Run(context.Background()); err != nil {
 		logger.Fatal("CLI failed", zap.Error(err))
 	}
