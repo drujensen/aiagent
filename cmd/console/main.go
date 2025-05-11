@@ -73,9 +73,11 @@ func main() {
 	}
 
 	chatService := services.NewChatService(chatRepo, agentRepo, providerRepo, toolRepo, cfg, logger)
+	agentService := services.NewAgentService(agentRepo, logger)
+	toolService := services.NewToolService(toolRepo, logger)
 
 	// Initialize and run the CLI
-	cli := cli.NewCLI(chatService, logger)
+	cli := cli.NewCLI(chatService, agentService, toolService, logger)
 	if err := cli.Run(context.Background()); err != nil {
 		logger.Fatal("CLI failed", zap.Error(err))
 	}
@@ -126,14 +128,70 @@ func init() {
 	if _, err := os.Stat(agentsPath); os.IsNotExist(err) {
 		defaultAgents := []*entities.Agent{
 			{
-				ID:              "1A3F3DCB-255D-46B3-A4F4-E2E118FBA82B",
-				Name:            "Grok",
-				ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
-				ProviderType:    "xai",
-				Endpoint:        "https://api.x.ai",
-				Model:           "grok-3-mini-beta",
-				APIKey:          "#{XAI_API_KEY}#",
-				SystemPrompt:    "Help users with coding, debugging, and enhancing projects using tools like File, Bash, and others. Be concise, proactive, and persistent: analyze tasks quickly, use tools to edit files, run commands, and iterate until success. Keep responses short, directly addressing queries without preamble.",
+				ID:           "1A3F3DCB-255D-46B3-A4F4-E2E118FBA82B",
+				Name:         "Grok",
+				ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
+				ProviderType: "xai",
+				Endpoint:     "https://api.x.ai",
+				Model:        "grok-3-mini-beta",
+				APIKey:       "#{XAI_API_KEY}#",
+				SystemPrompt: `### Introduction and Role
+
+You are an interactive CLI tool that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
+
+### Memory
+
+If the current working directory contains a CLAUDE.md file, it is added to context for:
+
+1. Storing bash commands (e.g., build, test).
+2. Recording code style preferences.
+3. Maintaining codebase information.
+
+Proactively ask users to add commands or preferences to CLAUDE.md for future reference.
+
+### Tone and Style
+
+- Be concise, direct, and to the point.
+- Use GitHub-flavored Markdown for formatting.
+- Output text for user communication; use tools only for tasks.
+- If unable to help, offer alternatives in 1-2 sentences without explanations.
+- Minimize tokens: Respond in 1-3 sentences or a short paragraph, fewer than 4 lines unless detailed.
+- Avoid unnecessary preamble or postamble (e.g., no "The answer is..." unless asked).
+- Examples of concise responses:
+    - User: "2 + 2" → Assistant: "4"
+    - User: "Is 11 a prime number?" → Assistant: "true"
+
+### Proactiveness
+
+Be proactive only when directly asked. Balance actions with user confirmation. Do not explain code changes unless requested.
+
+### Synthetic Messages
+
+Ignore system-added messages like "[Request interrupted by user]"; do not generate them.
+
+### Following Conventions
+
+- Mimic existing code styles, libraries, and patterns.
+- Verify library availability before use.
+- Follow security best practices (e.g., never commit secrets).
+- Do not add comments to code unless requested.
+
+### Doing Tasks
+
+For software engineering tasks (e.g., bugs, features):
+
+1. Use search tools to understand the codebase.
+2. Implement using available tools.
+3. Verify with tests; check for testing commands.
+4. Run lint and typecheck commands if available; suggest adding to CLAUDE.md.
+
+- Never commit changes unless explicitly asked.
+
+### Tool Usage Policy
+
+- Prefer Agent for open-ended searches.
+- Make independent tool calls in the same block.
+- Be concise in responses.`,
 				Temperature:     &temperature,
 				MaxTokens:       &maxTokens,
 				ContextWindow:   &contextWindow,
@@ -251,6 +309,8 @@ func init() {
 				ID:        uuid.New().String(),
 				AgentID:   "1A3F3DCB-255D-46B3-A4F4-E2E118FBA82B",
 				Messages:  []entities.Message{},
+				Usage:     &entities.ChatUsage{},
+				Active:    true,
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
 			},

@@ -17,15 +17,19 @@ import (
 
 // CLI manages the text-based user interface for the AI Agent console application.
 type CLI struct {
-	chatService services.ChatService
-	logger      *zap.Logger
+	chatService  services.ChatService
+	agentService services.AgentService
+	toolService  services.ToolService
+	logger       *zap.Logger
 }
 
 // NewCLI creates a new CLI instance.
-func NewCLI(chatService services.ChatService, logger *zap.Logger) *CLI {
+func NewCLI(chatService services.ChatService, agentService services.AgentService, toolService services.ToolService, logger *zap.Logger) *CLI {
 	return &CLI{
-		chatService: chatService,
-		logger:      logger,
+		chatService:  chatService,
+		agentService: agentService,
+		toolService:  toolService,
+		logger:       logger,
 	}
 }
 
@@ -106,6 +110,40 @@ func (c *CLI) Run(ctx context.Context) error {
 					c.logger.Error("Failed to create new chat", zap.Error(err))
 					fmt.Println("Error creating new chat:", err)
 				}
+				continue
+			}
+
+			if userInput == "/agents" {
+				agents, err := c.agentService.ListAgents(ctx)
+				if err != nil {
+					c.logger.Error("Failed to list agents", zap.Error(err))
+					fmt.Println("Error listing agents:", err)
+					continue
+				}
+				fmt.Println("Available agents:")
+				for _, agent := range agents {
+					fmt.Printf("- %s (%s)\n", agent.Name, agent.ProviderType)
+				}
+				continue
+			}
+
+			if userInput == "/tools" {
+				tools, err := c.toolService.ListTools()
+				if err != nil {
+					c.logger.Error("Failed to list tools", zap.Error(err))
+					fmt.Println("Error listing tools:", err)
+					continue
+				}
+				fmt.Println("Available tools:")
+				for _, tool := range tools {
+					fmt.Printf("- %s\n", (*tool).Name())
+				}
+				continue
+			}
+
+			if userInput == "/usage" {
+				fmt.Printf("Chat Usage:\n- Prompt Tokens: %d\n- Completion Tokens: %d\n- Total Tokens: %d\n- Total Cost: $%.2f\n",
+					chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
 				continue
 			}
 
