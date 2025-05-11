@@ -109,7 +109,7 @@ func (c *CLI) Run(ctx context.Context) error {
 				continue
 			}
 
-			if userInput == "/exit" || userInput == "/quit" {
+			if userInput == "exit" || userInput == "quit" || userInput == "/exit" || userInput == "/quit" {
 				fmt.Println("Shutting down...")
 				return nil
 			}
