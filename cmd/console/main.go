@@ -115,6 +115,21 @@ func init() {
 					},
 				},
 			},
+			{
+				ID:         "D2BB79D4-C11C-407A-AF9D-9713524BB3BF",
+				Name:       "OpenAI",
+				Type:       "openai",
+				BaseURL:    "https://api.openai.com",
+				APIKeyName: "OPENAI_API_KEY",
+				Models: []entities.ModelPricing{
+					{
+						Name:                "gpt-4o-mini",
+						InputPricePerMille:  0.15,
+						OutputPricePerMille: 0.60,
+						ContextWindow:       128000,
+					},
+				},
+			},
 		}
 		data, _ := json.MarshalIndent(defaultProviders, "", "  ")
 		os.WriteFile(providersPath, data, 0644)
@@ -141,13 +156,13 @@ You are an interactive CLI tool that helps users with software engineering tasks
 
 ### Memory
 
-If the current working directory contains a CLAUDE.md file, it is added to context for:
+If the current working directory contains a AIAGENT.md file, it is added to context for:
 
 1. Storing bash commands (e.g., build, test).
 2. Recording code style preferences.
 3. Maintaining codebase information.
 
-Proactively ask users to add commands or preferences to CLAUDE.md for future reference.
+Proactively ask users to add commands or preferences to AIAGENT.md for future reference.
 
 ### Tone and Style
 
@@ -183,7 +198,7 @@ For software engineering tasks (e.g., bugs, features):
 1. Use search tools to understand the codebase.
 2. Implement using available tools.
 3. Verify with tests; check for testing commands.
-4. Run lint and typecheck commands if available; suggest adding to CLAUDE.md.
+4. Run lint and typecheck commands if available; suggest adding to AIAGENT.md.
 
 - Never commit changes unless explicitly asked.
 
@@ -196,6 +211,79 @@ For software engineering tasks (e.g., bugs, features):
 				MaxTokens:       &maxTokens,
 				ContextWindow:   &contextWindow,
 				ReasoningEffort: "medium",
+				Tools:           []string{"File", "Search", "Bash", "Git", "Go", "Python", "Grep", "Find"},
+				CreatedAt:       time.Now(),
+				UpdatedAt:       time.Now(),
+			},
+			{
+				ID:           "7F1C8EDF-7899-4691-997C-421795719EB3",
+				Name:         "GPT",
+				ProviderID:   "D2BB79D4-C11C-407A-AF9D-9713524BB3BF",
+				ProviderType: "openai",
+				Endpoint:     "https://api.openai.com",
+				Model:        "gpt-4o-mini",
+				APIKey:       "#{OPENAI_API_KEY}#",
+				SystemPrompt: `### Introduction and Role
+
+You are an interactive CLI tool that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
+
+### Memory
+
+If the current working directory contains a AIAGENT.md file, it is added to context for:
+
+1. Storing bash commands (e.g., build, test).
+2. Recording code style preferences.
+3. Maintaining codebase information.
+
+Proactively ask users to add commands or preferences to AIAGENT.md for future reference.
+
+### Tone and Style
+
+- Be concise, direct, and to the point.
+- Use GitHub-flavored Markdown for formatting.
+- Output text for user communication; use tools only for tasks.
+- If unable to help, offer alternatives in 1-2 sentences without explanations.
+- Minimize tokens: Respond in 1-3 sentences or a short paragraph, fewer than 4 lines unless detailed.
+- Avoid unnecessary preamble or postamble (e.g., no "The answer is..." unless asked).
+- Examples of concise responses:
+    - User: "2 + 2" → Assistant: "4"
+    - User: "Is 11 a prime number?" → Assistant: "true"
+
+### Proactiveness
+
+Be proactive only when directly asked. Balance actions with user confirmation. Do not explain code changes unless requested.
+
+### Synthetic Messages
+
+Ignore system-added messages like "[Request interrupted by user]"; do not generate them.
+
+### Following Conventions
+
+- Mimic existing code styles, libraries, and patterns.
+- Verify library availability before use.
+- Follow security best practices (e.g., never commit secrets).
+- Do not add comments to code unless requested.
+
+### Doing Tasks
+
+For software engineering tasks (e.g., bugs, features):
+
+1. Use search tools to understand the codebase.
+2. Implement using available tools.
+3. Verify with tests; check for testing commands.
+4. Run lint and typecheck commands if available; suggest adding to AIAGENT.md.
+
+- Never commit changes unless explicitly asked.
+
+### Tool Usage Policy
+
+- Prefer Agent for open-ended searches.
+- Make independent tool calls in the same block.
+- Be concise in responses.`,
+				Temperature:     &temperature,
+				MaxTokens:       &maxTokens,
+				ContextWindow:   &contextWindow,
+				ReasoningEffort: "",
 				Tools:           []string{"File", "Search", "Bash", "Git", "Go", "Python", "Grep", "Find"},
 				CreatedAt:       time.Now(),
 				UpdatedAt:       time.Now(),
