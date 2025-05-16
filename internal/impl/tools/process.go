@@ -132,7 +132,6 @@ type ProcessArgs struct {
 
 func (t *ProcessTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing process", zap.String("arguments", arguments))
-	fmt.Println("Executing process with arguments:", arguments)
 
 	var args ProcessArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
@@ -154,6 +153,8 @@ func (t *ProcessTool) Execute(arguments string) (string, error) {
 			return "", fmt.Errorf("could not get current directory: %v", err)
 		}
 	}
+
+	fmt.Println("Executing", baseCommand, "with arguments:", args.Arguments)
 
 	if args.Action == "" {
 		args.Action = "run"
