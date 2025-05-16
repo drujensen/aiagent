@@ -90,6 +90,7 @@ type SwaggerResponse struct {
 
 func (t *SwaggerTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing Swagger tool", zap.String("arguments", arguments))
+	fmt.Println("Executing Swagger tool", arguments)
 
 	var args struct {
 		Fetch bool `json:"fetch"`

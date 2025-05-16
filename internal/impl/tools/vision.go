@@ -58,7 +58,7 @@ func (v *VisionTool) Parameters() []entities.Parameter {
 }
 
 func (v *VisionTool) Execute(arguments string) (string, error) {
-	// Parse arguments: Assume JSON string with fields like {"model": "grok-2-vision-latest", "image_path": "path", "image_url": "url", "prompt": "What's in this image?"}
+	fmt.Println("Executing VisionTool with arguments:", arguments)
 	var args map[string]string
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return "", fmt.Errorf("invalid arguments: %v", err)

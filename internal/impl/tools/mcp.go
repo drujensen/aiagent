@@ -47,7 +47,6 @@ func NewMCPClient(command string, workspace string, args []string) *MCPClient {
 	if err := cmd.Start(); err != nil {
 		panic(fmt.Sprintf("Error starting command: %v", err))
 	}
-	fmt.Printf("MCP server started with PID: %d\n", cmd.Process.Pid)
 
 	go func() {
 		scanner := bufio.NewScanner(stderr)
@@ -76,7 +75,6 @@ func NewMCPClient(command string, workspace string, args []string) *MCPClient {
 }
 
 func (c *MCPClient) InvokeMethod(method string, params any) (any, error) {
-	fmt.Printf("Invoking MCP method: %s\n", method)
 
 	// JSON-RPC request
 	req := map[string]any{
@@ -91,7 +89,6 @@ func (c *MCPClient) InvokeMethod(method string, params any) (any, error) {
 	}
 
 	// Write request to stdin with newline
-	fmt.Printf("Writing request: %s\n", string(reqJSON))
 	if _, err := fmt.Fprintln(c.stdin, string(reqJSON)); err != nil {
 		return nil, fmt.Errorf("error writing to stdin: %w", err)
 	}
@@ -302,6 +299,9 @@ func (t *MCPTool) Parameters() []entities.Parameter {
 }
 
 func (t *MCPTool) Execute(arguments string) (string, error) {
+	t.logger.Debug("Executing MCP tool", zap.String("arguments", arguments))
+	fmt.Println("Executing MCP tool", arguments)
+
 	// Parse the arguments string as JSON to get params map
 	var params map[string]any
 	if err := json.Unmarshal([]byte(arguments), &params); err != nil {

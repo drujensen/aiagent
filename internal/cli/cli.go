@@ -201,6 +201,8 @@ func (c *CLI) Run(ctx context.Context) error {
 
 			if userInput == "exit" || userInput == "quit" || userInput == "/exit" || userInput == "/quit" {
 				fmt.Println("Shutting down...")
+				fmt.Printf("Chat Usage:\n- Prompt Tokens: %d\n- Completion Tokens: %d\n- Total Tokens: %d\n- Total Cost: $%.2f\n",
+					chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
 				return nil
 			}
 

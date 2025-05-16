@@ -149,6 +149,7 @@ func (t *FileTool) validatePath(path string) (string, error) {
 
 func (t *FileTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing file operation", zap.String("arguments", arguments))
+	fmt.Println("Executing file operation", arguments)
 
 	var args struct {
 		Operation       string          `json:"operation"`
@@ -186,7 +187,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		if len(results) > 16384 {
 			results = results[:16384] + "...truncated"
 		}
-		return string(data), nil
+		return results, nil
 
 	case "write":
 		if args.Content == "" {
@@ -214,7 +215,8 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return t.applyEdits(fullPath, args.Edits, args.DryRun)
+		results, err := t.applyEdits(fullPath, args.Edits, args.DryRun)
+		return results, err
 
 	case "create_directory":
 		fullPath, err := t.validatePath(args.Path)

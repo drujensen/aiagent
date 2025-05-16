@@ -76,6 +76,7 @@ func (t *ImageTool) Parameters() []entities.Parameter {
 
 func (t *ImageTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing image generation", zap.String("arguments", arguments))
+	fmt.Println("Executing image generation with arguments:", arguments)
 	var args struct {
 		Prompt string `json:"prompt"`
 		N      int    `json:"n"`

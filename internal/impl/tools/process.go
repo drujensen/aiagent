@@ -132,6 +132,7 @@ type ProcessArgs struct {
 
 func (t *ProcessTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing process", zap.String("arguments", arguments))
+	fmt.Println("Executing process with arguments:", arguments)
 
 	var args ProcessArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {

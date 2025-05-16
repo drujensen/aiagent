@@ -103,6 +103,8 @@ func (t *FetchTool) Parameters() []entities.Parameter {
 
 func (t *FetchTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing fetch operation", zap.String("arguments", arguments))
+	fmt.Println("Executing fetch operation", arguments)
+
 	var args struct {
 		Operation string   `json:"operation"`
 		Url       string   `json:"url"`
