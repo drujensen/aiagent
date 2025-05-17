@@ -3,18 +3,21 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"html/template"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
-	"encoding/json"
+
 	"github.com/google/uuid"
 
-	"aiagent/internal/api/controllers"
+	apicontrollers "aiagent/internal/api/controllers"
 	"aiagent/internal/cli"
-	"aiagent/internal/domain/entities"; "aiagent/internal/domain/interfaces"
+	"aiagent/internal/domain/entities"
+	"aiagent/internal/domain/interfaces"
 	"aiagent/internal/domain/services"
 	"aiagent/internal/impl/config"
 	"aiagent/internal/impl/database"
@@ -133,12 +136,7 @@ func main() {
 		funcMap := template.FuncMap{
 			"renderMarkdown": renderMarkdown,
 			"inArray": func(value string, array []string) bool {
-				for _, item := range array {
-					if item == value {
-						return true
-					}
-				}
-				return false
+				return slices.Contains(array, value)
 			},
 			"add": func(a, b int) int {
 				return a + b
@@ -298,14 +296,14 @@ func init() {
 		contextWindow := 131072
 		defaultAgents := []*entities.Agent{
 			{
-				ID:           "1A3F3DCB-255D-46B3-A4F4-E2E118FBA82B",
-				Name:         "Grok",
-				ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
-				ProviderType: "xai",
-				Endpoint:     "https://api.x.ai",
-				Model:        "grok-3-mini-beta",
-				APIKey:       "#{XAI_API_KEY}#",
-				SystemPrompt: `...`, // Replace with the actual system prompt content
+				ID:              "1A3F3DCB-255D-46B3-A4F4-E2E118FBA82B",
+				Name:            "Grok",
+				ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
+				ProviderType:    "xai",
+				Endpoint:        "https://api.x.ai",
+				Model:           "grok-3-mini-beta",
+				APIKey:          "#{XAI_API_KEY}#",
+				SystemPrompt:    `...`, // Replace with the actual system prompt content
 				Temperature:     &temperature,
 				MaxTokens:       &maxTokens,
 				ContextWindow:   &contextWindow,
