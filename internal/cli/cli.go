@@ -276,7 +276,7 @@ func (c *CLI) Run(ctx context.Context) error {
 func (c *CLI) displayMessage(msg entities.Message) {
 	switch msg.Role {
 	case "assistant":
-		fmt.Printf("Assistant: %s\n", msg.Content)
+		fmt.Printf("Assistant:\n%s\n", msg.Content)
 	case "user":
 		fmt.Printf("User: %s\n", msg.Content)
 	case "tool":

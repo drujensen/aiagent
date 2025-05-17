@@ -133,6 +133,7 @@ type BashArgs struct {
 
 func (t *BashTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing bash command", zap.String("arguments", arguments))
+	fmt.Println("Executing bash command", arguments)
 
 	var args BashArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
