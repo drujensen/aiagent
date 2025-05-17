@@ -84,18 +84,6 @@ func (t *FileTool) Parameters() []entities.Parameter {
 			Required:    true,
 		},
 		{
-			Name:        "start_line",
-			Type:        "integer",
-			Description: "The start line for the read operation",
-			Required:    false,
-		},
-		{
-			Name:        "end_line",
-			Type:        "integer",
-			Description: "The end line for the read operation",
-			Required:    false,
-		},
-		{
 			Name:        "content",
 			Type:        "string",
 			Description: "Content to write (for write operation)",
@@ -118,6 +106,18 @@ func (t *FileTool) Parameters() []entities.Parameter {
 			Name:        "destination",
 			Type:        "string",
 			Description: "Destination path (for move operation)",
+			Required:    false,
+		},
+		{
+			Name:        "start_line",
+			Type:        "integer",
+			Description: "The start line (for read operation)",
+			Required:    false,
+		},
+		{
+			Name:        "end_line",
+			Type:        "integer",
+			Description: "The end line (for read operation)",
 			Required:    false,
 		},
 		{
@@ -167,12 +167,12 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	var args struct {
 		Operation       string          `json:"operation"`
 		Path            string          `json:"path"`
-		StartLine       int             `json:"start_line"`
-		EndLine         int             `json:"end_line"`
 		Content         string          `json:"content"`
 		Edits           []EditOperation `json:"edits"`
 		DryRun          bool            `json:"dry_run"`
 		Destination     string          `json:"destination"`
+		StartLine       int             `json:"start_line"`
+		EndLine         int             `json:"end_line"`
 		Pattern         string          `json:"pattern"`
 		ExcludePatterns []string        `json:"exclude_patterns"`
 	}
@@ -236,11 +236,6 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		return results, nil
 
 	case "write":
-		if args.Operation == "write" && args.Content == "" {
-			t.logger.Error("Content is required for write operation")
-			return "", fmt.Errorf("content is required")
-		}
-
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
 			return "", err
