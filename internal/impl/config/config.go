@@ -24,7 +24,9 @@ func InitConfig() (*Config, error) {
 	var initErr error
 
 	once.Do(func() {
-		logger, err := zap.NewProduction()
+		config := zap.NewDevelopmentConfig()
+		config.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
+		logger, err := config.Build()
 		if err != nil {
 			logger = zap.NewNop()
 			initErr = fmt.Errorf("failed to initialize logger: %w", err)

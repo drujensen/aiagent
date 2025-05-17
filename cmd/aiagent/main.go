@@ -57,7 +57,9 @@ func main() {
 		flag.PrintDefaults()
 	}
 
-	logger, err := zap.NewDevelopment()
+	logConfig := zap.NewDevelopmentConfig()
+	logConfig.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
+	logger, err := logConfig.Build()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
 		os.Exit(1)
