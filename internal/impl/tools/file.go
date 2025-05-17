@@ -162,7 +162,7 @@ func (t *FileTool) validatePath(path string) (string, error) {
 
 func (t *FileTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing file operation", zap.String("arguments", arguments))
-	fmt.Println("Executing file operation", arguments)
+	fmt.Println("\rExecuting file operation", arguments)
 
 	var args struct {
 		Operation       string          `json:"operation"`

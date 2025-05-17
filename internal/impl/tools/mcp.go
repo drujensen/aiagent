@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"strings"
@@ -227,9 +228,7 @@ func (t *MCPTool) Configuration() map[string]string {
 }
 
 func (t *MCPTool) UpdateConfiguration(config map[string]string) {
-	for k, v := range config {
-		t.configuration[k] = v // Update the map
-	}
+	maps.Copy(t.configuration, config)
 	t.StartMCPClient()
 }
 
@@ -300,7 +299,7 @@ func (t *MCPTool) Parameters() []entities.Parameter {
 
 func (t *MCPTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing MCP tool", zap.String("arguments", arguments))
-	fmt.Println("Executing MCP tool", arguments)
+	fmt.Println("\rExecuting MCP tool", arguments)
 
 	// Parse the arguments string as JSON to get params map
 	var params map[string]any

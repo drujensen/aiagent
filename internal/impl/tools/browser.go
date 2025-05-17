@@ -98,7 +98,7 @@ func (b *BrowserTool) Parameters() []entities.Parameter {
 
 func (b *BrowserTool) Execute(arguments string) (string, error) {
 	b.logger.Debug("Executing browser operation", zap.String("arguments", arguments))
-	fmt.Println("Executing browser operation", arguments)
+	fmt.Println("\rExecuting browser operation", arguments)
 
 	if err := b.initializeBrowser(); err != nil {
 		b.logger.Error("Failed to initialize browser", zap.Error(err))
