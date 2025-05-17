@@ -318,16 +318,13 @@ For software engineering tasks (e.g., bugs, features):
 				UpdatedAt: time.Now(),
 			},
 			{
-				ID:          "AE3E4944-253D-4188-BEB0-F370A6F9DC6F",
-				ToolType:    "Process",
-				Name:        "Bash",
-				Description: "This tool executes a configured CLI command (e.g., bash, git, gcc, go, rustc, java, dotnet, python, ruby, node, mysql, psql, mongo, redis-cli, aws, az, docker, kubectl) with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory.  The extraArgs are prepended with the arguments passed to the tool.",
-				Configuration: map[string]string{
-					"command":   "bash",
-					"extraArgs": "-c",
-				},
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
+				ID:            "AE3E4944-253D-4188-BEB0-F370A6F9DC6F",
+				ToolType:      "Bash",
+				Name:          "Bash",
+				Description:   "This tool executes a bash command with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory.",
+				Configuration: map[string]string{},
+				CreatedAt:     time.Now(),
+				UpdatedAt:     time.Now(),
 			},
 			{
 				ID:          "4EA3F4A2-EFCD-4E9A-A5F8-4DFFAFB018E7",

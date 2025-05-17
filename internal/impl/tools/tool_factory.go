@@ -22,9 +22,19 @@ func NewToolFactory() (*ToolFactory, error) {
 	toolFactory := &ToolFactory{}
 	toolFactory.toolFactories = make(map[string]*ToolFactoryEntry)
 
+	toolFactory.toolFactories["Bash"] = &ToolFactoryEntry{
+		Name: "Bash",
+		Description: `This tool executes the bash command with support for background processes, timeouts, and full output.
+
+The command is executed in the workspace directory.`,
+		ConfigKeys: []string{"workspace"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewBashTool(name, description, configuration, logger)
+		},
+	}
 	toolFactory.toolFactories["Process"] = &ToolFactoryEntry{
 		Name: "Process",
-		Description: `This tool executes a configured CLI command (e.g., bash, git, gcc, go, rustc, java, dotnet, python, ruby, node, mysql, psql, mongo, redis-cli, aws, az, docker, kubectl) with support for background processes, timeouts, and full output.
+		Description: `This tool executes a configured CLI command (e.g., git, gcc, go, rustc, java, dotnet, python, ruby, node, mysql, psql, mongo, redis-cli, aws, az, docker, kubectl) with support for background processes, timeouts, and full output.
 
 The command is executed in the workspace directory.  The extraArgs are prepended with the arguments passed to the tool.`,
 		ConfigKeys: []string{"workspace", "command", "extraArgs"},
@@ -101,7 +111,6 @@ The command is executed in the workspace directory.  The extraArgs are prepended
 			}
 		},
 	}
-
 	toolFactory.toolFactories["MCP"] = &ToolFactoryEntry{
 		Name:        "MCP",
 		Description: `This tool provides a command line interface for the MCP (Multi-Cloud Provider) API, allowing users to interact with various cloud services and perform operations such as creating, updating, and deleting resources across multiple cloud providers.`,
