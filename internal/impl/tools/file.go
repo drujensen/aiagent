@@ -216,16 +216,16 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 
 		for scanner.Scan() {
 			lineNum++
-			if startLine > 0 && lineNum < startLine {
+			if startLine > 0 && lineNum <= startLine-1 {
 				continue
 			}
-			if endLine > 0 && lineNum > endLine {
+			if endLine > 0 && lineNum >= endLine {
 				break
 			}
 			lines = append(lines, scanner.Text())
 		}
 
-		if len(lines) == 0 {
+		if len(lines) == 0 || (startLine > 0 && len(lines) < startLine) {
 			return "", fmt.Errorf("no lines found in file")
 		}
 		results := strings.Join(lines, "\n")
@@ -404,7 +404,7 @@ func (t *FileTool) applyEdits(filePath string, edits []EditOperation, dryRun boo
 	modified := original
 
 	for _, edit := range edits {
-		if strings.Contains(modified, edit.OldText) {
+		if strings.Count(modified, edit.OldText) > 0 {
 			modified = strings.ReplaceAll(modified, edit.OldText, edit.NewText)
 			t.logger.Info("Edit applied successfully", zap.String("oldText", edit.OldText))
 		} else {
