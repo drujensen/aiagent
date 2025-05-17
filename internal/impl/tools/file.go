@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -83,6 +84,18 @@ func (t *FileTool) Parameters() []entities.Parameter {
 			Required:    true,
 		},
 		{
+			Name:        "start_line",
+			Type:        "integer",
+			Description: "The start line for the read operation",
+			Required:    false,
+		},
+		{
+			Name:        "end_line",
+			Type:        "integer",
+			Description: "The end line for the read operation",
+			Required:    false,
+		},
+		{
 			Name:        "content",
 			Type:        "string",
 			Description: "Content to write (for write operation)",
@@ -154,6 +167,8 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	var args struct {
 		Operation       string          `json:"operation"`
 		Path            string          `json:"path"`
+		StartLine       int             `json:"start_line"`
+		EndLine         int             `json:"end_line"`
 		Content         string          `json:"content"`
 		Edits           []EditOperation `json:"edits"`
 		DryRun          bool            `json:"dry_run"`
@@ -166,7 +181,14 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		return "", err
 	}
 
-	if args.Operation == "" || args.Path == "" {
+	if args.Operation == "" {
+			t.logger.Error("Operation is required")
+			return "", fmt.Errorf("operation is required")
+		}
+		if args.Path == "" {
+			t.logger.Error("Path is required")
+			return "", fmt.Errorf("path is required")
+		}
 		t.logger.Error("Operation and path are required")
 		return "", fmt.Errorf("operation and path are required")
 	}
@@ -177,20 +199,47 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		data, err := os.ReadFile(fullPath)
+		file, err := os.Open(fullPath)
 		if err != nil {
-			t.logger.Error("Failed to read file", zap.String("path", fullPath), zap.Error(err))
 			return "", err
 		}
-		t.logger.Info("File read successfully", zap.String("path", fullPath))
-		results := string(data)
+		defer file.Close()
+		startLine := args.StartLine
+		if startLine == 0 {
+			startLine = 1
+		}
+		endLine := args.EndLine
+		if endLine == 0 {
+			endLine = startLine + 1000
+		}
+
+		var lines []string
+		scanner := bufio.NewScanner(file)
+		lineNum := 0
+
+		for scanner.Scan() {
+			lineNum++
+			if startLine > 0 && lineNum < startLine {
+				continue
+			}
+			if endLine > 0 && lineNum > endLine {
+				break
+			}
+			lines = append(lines, scanner.Text())
+		}
+
+		if len(lines) == 0 {
+			return "", fmt.Errorf("no lines found in file")
+		}
+		results := strings.Join(lines, "\n")
 		if len(results) > 16384 {
 			results = results[:16384] + "...truncated"
 		}
+
 		return results, nil
 
 	case "write":
-		if args.Content == "" {
+		if args.Operation == "write" && args.Content == "" {
 			t.logger.Error("Content is required for write operation")
 			return "", fmt.Errorf("content is required")
 		}
@@ -207,7 +256,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		return "File written successfully", nil
 
 	case "edit":
-		if len(args.Edits) == 0 {
+		if args.Operation == "edit" && len(args.Edits) == 0 {
 			t.logger.Error("Edits array is required for edit operation")
 			return "", fmt.Errorf("edits array is required")
 		}
@@ -275,7 +324,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		return results, nil
 
 	case "move":
-		if args.Destination == "" {
+		if args.Operation == "move" && args.Destination == "" {
 			t.logger.Error("Destination is required for move operation")
 			return "", fmt.Errorf("destination is required")
 		}
@@ -296,7 +345,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		return "File moved successfully", nil
 
 	case "search":
-		if args.Pattern == "" {
+		if args.Operation == "search" && args.Pattern == "" {
 			t.logger.Error("Pattern is required for search operation")
 			return "", fmt.Errorf("pattern is required")
 		}
