@@ -6,7 +6,9 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
+	"time"
 
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/services"
@@ -57,6 +59,30 @@ func (c *CLI) Run(ctx context.Context) error {
 	// Display existing messages
 	for _, msg := range chat.Messages {
 		c.displayMessage(msg)
+	}
+
+	// Spinner functions
+	var wg sync.WaitGroup
+	stopSpinner := make(chan bool)
+
+	startSpinner := func() {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			spinner := []string{"-", "\\", "|", "/"}
+			idx := 0
+			for {
+				select {
+				case <-stopSpinner:
+					fmt.Print("\r") // Clear the spinner
+					return
+				default:
+					fmt.Printf("\r%s Thinking...", spinner[idx])
+					idx = (idx + 1) % len(spinner)
+					time.Sleep(100 * time.Millisecond)
+				}
+			}
+		}()
 	}
 
 	// Main interaction loop
@@ -209,8 +235,16 @@ func (c *CLI) Run(ctx context.Context) error {
 			// Create and save user message
 			message := entities.NewMessage("user", userInput)
 
+			// Start the spinner
+			startSpinner()
+
 			// Generate assistant response
 			response, err := c.chatService.SendMessage(ctx, chat.ID, message)
+
+			// Stop the spinner
+			stopSpinner <- true
+			wg.Wait()
+
 			if err != nil {
 				c.logger.Error("Failed to generate response", zap.Error(err))
 				fmt.Println("Error generating response:", err)

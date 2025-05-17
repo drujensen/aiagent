@@ -140,9 +140,9 @@ func (t *BashTool) Execute(arguments string) (string, error) {
 		return "", err
 	}
 
-	if args.Command == "" && args.Action == "" {
-		t.logger.Error("Command or action is required")
-		return "", fmt.Errorf("command or action is required")
+	if args.Command == "" {
+		t.logger.Error("Command is required")
+		return "", fmt.Errorf("command is required")
 	}
 
 	workspace := t.configuration["workspace"]
