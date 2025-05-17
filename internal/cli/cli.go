@@ -216,6 +216,23 @@ func (c *CLI) Run(ctx context.Context) error {
 				fmt.Println("Error generating response:", err)
 				continue
 			}
+
+			// Strip any <think>*</think> tags from the response including the content
+			responseContent := response.Content
+			for {
+				start := strings.Index(responseContent, "<think>")
+				end := strings.Index(responseContent, "</think>")
+				if start == -1 || end == -1 {
+					break
+				}
+
+				// Remove the <think></think> section, turning the string into "before" + "after"
+				responseContent = responseContent[:start] + responseContent[end+len("</think>"):]
+			}
+
+			// Update the response Content
+			response.Content = responseContent
+
 			c.displayMessage(*response)
 		}
 	}
