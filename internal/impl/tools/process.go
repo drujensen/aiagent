@@ -154,7 +154,7 @@ func (t *ProcessTool) Execute(arguments string) (string, error) {
 		}
 	}
 
-	fmt.Println("Executing", baseCommand, "with arguments:", args.Arguments)
+	fmt.Println("Executing", baseCommand, args.Arguments)
 
 	if args.Action == "" {
 		args.Action = "run"

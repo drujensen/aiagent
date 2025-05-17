@@ -58,7 +58,7 @@ func (v *VisionTool) Parameters() []entities.Parameter {
 }
 
 func (v *VisionTool) Execute(arguments string) (string, error) {
-	fmt.Println("Executing VisionTool with arguments:", arguments)
+	fmt.Println("Executing VisionTool:", arguments)
 	var args map[string]string
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return "", fmt.Errorf("invalid arguments: %v", err)

@@ -182,15 +182,12 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	}
 
 	if args.Operation == "" {
-			t.logger.Error("Operation is required")
-			return "", fmt.Errorf("operation is required")
-		}
-		if args.Path == "" {
-			t.logger.Error("Path is required")
-			return "", fmt.Errorf("path is required")
-		}
-		t.logger.Error("Operation and path are required")
-		return "", fmt.Errorf("operation and path are required")
+		t.logger.Error("Operation is required")
+		return "", fmt.Errorf("operation is required")
+	}
+	if args.Path == "" {
+		t.logger.Error("Path is required")
+		return "", fmt.Errorf("path is required")
 	}
 
 	switch args.Operation {
@@ -243,6 +240,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 			t.logger.Error("Content is required for write operation")
 			return "", fmt.Errorf("content is required")
 		}
+
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
 			return "", err
