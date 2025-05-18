@@ -55,8 +55,19 @@ func (t *FileTool) FullDescription() string {
 	b.WriteString(t.Description())
 	b.WriteString("\n\n")
 
+	// Add detailed usage instructions
+	b.WriteString("## Usage Instructions\n")
+	b.WriteString("This tool supports various file operations. Below are the key operations and their parameters:\n\n")
+	b.WriteString("- **read**: Reads content from a file. Use `start_line` and `end_line` to specify a range of lines to read.\n")
+	b.WriteString("- **write**: Writes or overwrites content to a file. Provide `content` to specify the new file content.\n")
+	b.WriteString("- **edit**: Modifies specific lines in a file. Use `start_line`, `end_line`, and `content` to replace the specified lines. The `search` operation can help identify line numbers.\n")
+	b.WriteString("  - Example: To edit lines 5 to 7, set `start_line=5`, `end_line=7`, and provide the new `content` for those lines.\n")
+	b.WriteString("  - Use `dry_run=true` to preview changes without applying them.\n")
+	b.WriteString("- **search**: Searches files for a pattern. Returns file paths and line numbers, useful for identifying edit locations.\n")
+	b.WriteString("- **create_directory**, **list_directory**, **directory_tree**, **move**, **get_info**: Perform directory and file management tasks.\n\n")
+
 	// Add configuration header
-	b.WriteString("Configuration for this tool:\n")
+	b.WriteString("## Configuration\n")
 	b.WriteString("| Key           | Value         |\n")
 	b.WriteString("|---------------|---------------|\n")
 
@@ -86,14 +97,7 @@ func (t *FileTool) Parameters() []entities.Parameter {
 		{
 			Name:        "content",
 			Type:        "string",
-			Description: "Content to write (for write operation)",
-			Required:    false,
-		},
-		{
-			Name:        "edits",
-			Type:        "array",
-			Items:       []entities.Item{{Type: "object"}},
-			Description: "Array of edit operations with oldText and newText (for edit operation)",
+			Description: "Content to write or edit (for write or edit operations)",
 			Required:    false,
 		},
 		{
@@ -111,13 +115,13 @@ func (t *FileTool) Parameters() []entities.Parameter {
 		{
 			Name:        "start_line",
 			Type:        "integer",
-			Description: "The start line (for read operation)",
+			Description: "The start line for reading or editing",
 			Required:    false,
 		},
 		{
 			Name:        "end_line",
 			Type:        "integer",
-			Description: "The end line (for read operation)",
+			Description: "The end line for reading or editing",
 			Required:    false,
 		},
 		{
@@ -134,11 +138,6 @@ func (t *FileTool) Parameters() []entities.Parameter {
 			Required:    false,
 		},
 	}
-}
-
-type EditOperation struct {
-	OldText string  `json:"oldText"`
-	NewText *string `json:"newText,omitempty"`
 }
 
 func (t *FileTool) validatePath(path string) (string, error) {
@@ -165,16 +164,15 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	fmt.Println("\rExecuting file operation", arguments)
 
 	var args struct {
-		Operation       string          `json:"operation"`
-		Path            string          `json:"path"`
-		Content         string          `json:"content"`
-		Edits           []EditOperation `json:"edits"`
-		DryRun          bool            `json:"dry_run"`
-		Destination     string          `json:"destination"`
-		StartLine       int             `json:"start_line"`
-		EndLine         int             `json:"end_line"`
-		Pattern         string          `json:"pattern"`
-		ExcludePatterns []string        `json:"exclude_patterns"`
+		Operation       string   `json:"operation"`
+		Path            string   `json:"path"`
+		Content         string   `json:"content"`
+		DryRun          bool     `json:"dry_run"`
+		Destination     string   `json:"destination"`
+		StartLine       int      `json:"start_line"`
+		EndLine         int      `json:"end_line"`
+		Pattern         string   `json:"pattern"`
+		ExcludePatterns []string `json:"exclude_patterns"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
@@ -249,15 +247,19 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		return "File written successfully", nil
 
 	case "edit":
-		if args.Operation == "edit" && len(args.Edits) == 0 {
-			t.logger.Error("Edits array is required for edit operation")
-			return "", fmt.Errorf("edits array is required")
+		if args.StartLine <= 0 || args.EndLine < args.StartLine {
+			t.logger.Error("Invalid line range for edit", zap.Int("start_line", args.StartLine), zap.Int("end_line", args.EndLine))
+			return "", fmt.Errorf("start_line and end_line must be positive and end_line >= start_line")
+		}
+		if args.Content == "" {
+			t.logger.Error("Content is required for edit operation")
+			return "", fmt.Errorf("content is required for edit operation")
 		}
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
 			return "", err
 		}
-		results, err := t.applyEdits(fullPath, args.Edits, args.DryRun)
+		results, err := t.applyLineEdit(fullPath, args.StartLine, args.EndLine, args.Content, args.DryRun)
 		return results, err
 
 	case "create_directory":
@@ -317,7 +319,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		return results, nil
 
 	case "move":
-		if args.Operation == "move" && args.Destination == "" {
+		if args.Destination == "" {
 			t.logger.Error("Destination is required for move operation")
 			return "", fmt.Errorf("destination is required")
 		}
@@ -338,7 +340,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		return "File moved successfully", nil
 
 	case "search":
-		if args.Operation == "search" && args.Pattern == "" {
+		if args.Pattern == "" {
 			t.logger.Error("Pattern is required for search operation")
 			return "", fmt.Errorf("pattern is required")
 		}
@@ -373,9 +375,9 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		}
 		result := []string{
 			"size: " + formatSize(info.Size()),
-			"created: " + info.ModTime().Format(time.RFC3339), // Note: Go doesn't provide birth time
+			"created: " + info.ModTime().Format(time.RFC3339),
 			"modified: " + info.ModTime().Format(time.RFC3339),
-			"accessed: " + info.ModTime().Format(time.RFC3339), // Note: Go doesn't provide last access time
+			"accessed: " + info.ModTime().Format(time.RFC3339),
 			"isDirectory: " + boolToString(info.IsDir()),
 			"isFile: " + boolToString(!info.IsDir()),
 			"permissions: " + info.Mode().String(),
@@ -389,25 +391,43 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	}
 }
 
-func (t *FileTool) applyEdits(filePath string, edits []EditOperation, dryRun bool) (string, error) {
-	content, err := os.ReadFile(filePath)
+func (t *FileTool) applyLineEdit(filePath string, startLine, endLine int, content string, dryRun bool) (string, error) {
+	file, err := os.Open(filePath)
 	if err != nil {
 		t.logger.Error("Failed to read file for edit", zap.String("path", filePath), zap.Error(err))
 		return "", err
 	}
-	original := string(content)
-	modified := original
-	empty := ""
-	for _, edit := range edits {
-		if strings.Count(modified, edit.OldText) > 0 {
-			if edit.NewText == nil {
-				edit.NewText = &empty
-			}
-			modified = strings.ReplaceAll(modified, edit.OldText, *edit.NewText)
-			t.logger.Info("Edit applied successfully", zap.String("oldText", edit.OldText))
-		} else {
-			t.logger.Warn("Edit text not found, skipping", zap.String("oldText", edit.OldText))
-		}
+	defer file.Close()
+
+	var originalLines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		originalLines = append(originalLines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		t.logger.Error("Error reading file lines", zap.Error(err))
+		return "", err
+	}
+
+	if startLine > len(originalLines) {
+		t.logger.Error("Start line exceeds file length", zap.Int("start_line", startLine), zap.Int("file_lines", len(originalLines)))
+		return "", fmt.Errorf("start_line %d exceeds file length %d", startLine, len(originalLines))
+	}
+
+	newContentLines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
+	var modifiedLines []string
+	modifiedLines = append(modifiedLines, originalLines[:startLine-1]...)
+	modifiedLines = append(modifiedLines, newContentLines...)
+	if endLine < len(originalLines) {
+		modifiedLines = append(modifiedLines, originalLines[endLine:]...)
+	}
+
+	original := strings.Join(originalLines, "\n")
+	modified := strings.Join(modifiedLines, "\n")
+
+	if modified == original {
+		t.logger.Warn("No changes made to the file", zap.String("path", filePath))
+		return "No changes made to the file", nil
 	}
 
 	diff := difflib.UnifiedDiff{
@@ -423,13 +443,8 @@ func (t *FileTool) applyEdits(filePath string, edits []EditOperation, dryRun boo
 		return "", err
 	}
 
-	if modified == original {
-		t.logger.Warn("No changes made to the file", zap.String("path", filePath))
-		return "oldText could not be found. No changes made to the file", nil
-	}
-
 	if !dryRun {
-		err = os.WriteFile(filePath, []byte(modified), 0644)
+		err = os.WriteFile(filePath, []byte(modified+"\n"), 0644)
 		if err != nil {
 			t.logger.Error("Failed to write edited file", zap.String("path", filePath), zap.Error(err))
 			return "", err
@@ -462,7 +477,7 @@ func (t *FileTool) buildDirectoryTree(path string) ([]TreeEntry, error) {
 			treeEntry.Type = "directory"
 			children, err := t.buildDirectoryTree(filepath.Join(path, entry.Name()))
 			if err != nil {
-				continue // Skip invalid subdirectories
+				continue
 			}
 			treeEntry.Children = children
 		}
