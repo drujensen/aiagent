@@ -50,25 +50,23 @@ func (c *CLI) Run(ctx context.Context) error {
 	chats, err := c.chatService.ListChats(context.Background())
 	var chat *entities.Chat
 	if err != nil || len(chats) == 0 {
-		chatName := "New Chat"
-		agents, err := c.agentService.ListAgents(ctx)
-		if err != nil {
-			c.logger.Error("Failed to list agents", zap.Error(err))
-			fmt.Println("Error listing agents:", err)
-		}
-		var selectedAgent = agents[0]
-		_, err = c.chatService.CreateChat(ctx, selectedAgent.ID, chatName)
+		userInput := "/new New Chat"
+		chat, err = c.NewChatCommand(ctx, userInput)
 		if err != nil {
 			c.logger.Error("Failed to create new chat", zap.Error(err))
 			fmt.Println("Error creating new chat:", err)
+			return err
 		}
 	}
-	chat = chats[0]
 	for _, activeChat := range chats {
 		if activeChat.Active {
 			chat = activeChat
 			break
 		}
+	}
+	// If no active chat is found, use the first chat. This shouldn't happen in normal operation.
+	if chat == nil {
+		chat = chats[0]
 	}
 
 	// Display existing messages
@@ -153,7 +151,7 @@ func (c *CLI) Run(ctx context.Context) error {
 			}
 
 			if strings.HasPrefix(userInput, "/new") {
-				newChat, err := c.handleNewCommand(ctx, userInput)
+				newChat, err := c.NewChatCommand(ctx, userInput)
 				if err != nil {
 					c.logger.Error("Failed to create new chat", zap.Error(err))
 					fmt.Println("Error creating new chat:", err)
@@ -243,7 +241,7 @@ func (c *CLI) Run(ctx context.Context) error {
 	}
 }
 
-func (c *CLI) handleNewCommand(ctx context.Context, userInput string) (*entities.Chat, error) {
+func (c *CLI) NewChatCommand(ctx context.Context, userInput string) (*entities.Chat, error) {
 	fmt.Println("Starting a new chat...")
 
 	// Get list of agents
