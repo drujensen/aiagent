@@ -377,8 +377,69 @@ func init() {
 	agentsPath := filepath.Join(aiagentDir, "agents.json")
 	if _, err := os.Stat(agentsPath); os.IsNotExist(err) {
 		temperature := 1.0
+		systemPrompt := `
+### Introduction and Role
+
+You are an interactive CLI tool that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
+
+### Memory
+
+If the current working directory contains a AIAGENT.md file, it is added to context for:
+
+1. Storing bash commands (e.g., build, test).
+2. Recording code style preferences.
+3. Maintaining codebase information.
+
+Proactively ask users to add commands or preferences to AIAGENT.md for future reference.
+
+### Tone and Style
+
+- Be concise, direct, and to the point.
+- Use GitHub-flavored Markdown for formatting.
+- Output text for user communication; use tools only for tasks.
+- If unable to help, offer alternatives in 1-2 sentences without explanations.
+- Minimize tokens: Respond in 1-3 sentences or a short paragraph, fewer than 4 lines unless detailed.
+- Avoid unnecessary preamble or postamble (e.g., no "The answer is..." unless asked).
+- Examples of concise responses:
+	- User: "2 + 2" -> Assistant: "4"
+  - User: "Is 11 a prime number?" -> Assistant: "true"
+
+	### Proactiveness
+
+	Be proactive only when directly asked. Balance actions with user confirmation. Do not explain code changes unless requested.
+
+	### Synthetic Messages
+
+	Ignore system-added messages like "[Request interrupted by user]"; do not generate them.
+
+	### Following Conventions
+	- Mimic existing code styles, libraries, and patterns.
+	- Verify library availability before use.
+	- Follow security best practices (e.g., never commit secrets).
+	- Do not add comments to code unless requested.
+
+	### Doing Tasks
+
+	For software engineering tasks (e.g., bugs, features):
+
+	1. Use search tools to understand the codebase.
+	2. Implement using available tools.
+	3. Verify with tests; check for testing commands.
+	4. Run lint and typecheck commands if available; suggest adding to AIAGENT.md.
+
+	- Never commit changes unless explicitly asked.
+
+	### Tool Usage Policy
+
+	- Prefer Agent for open-ended searches.
+	- Make independent tool calls in the same block.
+	- Be concise in responses.
+`
 		maxTokens := 8192
 		contextWindow := 131072
+		localSystemPrompt := `
+Help users with coding, debugging, and enhancing projects using tools like File, Bash, and others. Be concise, proactive, and persistent: analyze tasks quickly, use tools to edit files, run commands, and iterate until success. Keep responses short, directly addressing queries without preamble.
+`
 		localMaxTokens := 4096
 		localContextWindow := 8192
 		defaultAgents := []entities.Agent{
@@ -390,6 +451,7 @@ func init() {
 				Endpoint:        "https://api.x.ai",
 				Model:           "grok-3-mini",
 				APIKey:          "#{XAI_API_KEY}#",
+				SystemPrompt:    systemPrompt,
 				Temperature:     &temperature,
 				MaxTokens:       &maxTokens,
 				ContextWindow:   &contextWindow,
@@ -406,6 +468,7 @@ func init() {
 				Endpoint:        "https://api.openai.com",
 				Model:           "gpt-4o-mini",
 				APIKey:          "#{OPENAI_API_KEY}#",
+				SystemPrompt:    systemPrompt,
 				Temperature:     &temperature,
 				MaxTokens:       &maxTokens,
 				ContextWindow:   &contextWindow,
@@ -422,6 +485,7 @@ func init() {
 				Endpoint:        "https://api.anthropic.com",
 				Model:           "claude-3-haiku-20240307",
 				APIKey:          "#{ANTHROPIC_API_KEY}#",
+				SystemPrompt:    systemPrompt,
 				Temperature:     &temperature,
 				MaxTokens:       &maxTokens,
 				ContextWindow:   &contextWindow,
@@ -438,6 +502,7 @@ func init() {
 				Endpoint:        "https://generativelanguage.googleapis.com",
 				Model:           "gemini-2.0-flash",
 				APIKey:          "#{GEMINI_API_KEY}#",
+				SystemPrompt:    systemPrompt,
 				Temperature:     &temperature,
 				MaxTokens:       &maxTokens,
 				ContextWindow:   &contextWindow,
@@ -454,6 +519,7 @@ func init() {
 				Endpoint:        "http://localhost:11434",
 				Model:           "qwen3",
 				APIKey:          "n/a",
+				SystemPrompt:    localSystemPrompt,
 				Temperature:     &temperature,
 				MaxTokens:       &localMaxTokens,
 				ContextWindow:   &localContextWindow,
@@ -470,6 +536,7 @@ func init() {
 				Endpoint:        "http://localhost:11434",
 				Model:           "cogito",
 				APIKey:          "n/a",
+				SystemPrompt:    localSystemPrompt,
 				Temperature:     &temperature,
 				MaxTokens:       &localMaxTokens,
 				ContextWindow:   &localContextWindow,
@@ -486,6 +553,7 @@ func init() {
 				Endpoint:        "http://localhost:11434",
 				Model:           "llama3.2",
 				APIKey:          "n/a",
+				SystemPrompt:    localSystemPrompt,
 				Temperature:     &temperature,
 				MaxTokens:       &localMaxTokens,
 				ContextWindow:   &localContextWindow,
@@ -555,6 +623,15 @@ func init() {
 				Name:          "Python",
 				Description:   "This tool executes a configured CLI command with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory. The extraArgs are prepended with the arguments passed to the tool.",
 				Configuration: map[string]string{"command": "python"},
+				CreatedAt:     time.Now(),
+				UpdatedAt:     time.Now(),
+			},
+			{
+				ID:            "50A77E90-D6D3-410C-A7B4-6A3E5E58253E",
+				ToolType:      "Process",
+				Name:          "Node",
+				Description:   "This tool executes a configured CLI command with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory. The extraArgs are prepended with the arguments passed to the tool.",
+				Configuration: map[string]string{"command": "node"},
 				CreatedAt:     time.Now(),
 				UpdatedAt:     time.Now(),
 			},
