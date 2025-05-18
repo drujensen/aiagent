@@ -135,8 +135,9 @@ func (c *CLI) Run(ctx context.Context) error {
 				}),
 			)
 			userInput = strings.TrimSpace(userInput)
-			if userInput == "/help" {
+			if userInput == "?" {
 				fmt.Println("Available commands:")
+				fmt.Println("? - Show this help message")
 				fmt.Println("!<command> - Execute a shell command")
 				fmt.Println("/new {name} - Start a new chat")
 				fmt.Println("/history - Select from all available chats")
@@ -144,7 +145,6 @@ func (c *CLI) Run(ctx context.Context) error {
 				fmt.Println("/tools - List available tools")
 				fmt.Println("/usage - Show usage information")
 				fmt.Println("/exit - Exit the application")
-				fmt.Println("/help - Show this help message")
 				continue
 			}
 
@@ -269,8 +269,8 @@ func (c *CLI) Run(ctx context.Context) error {
 func completer(d prompt.Document) []prompt.Suggest {
 	// List of all possible suggestions
 	suggestions := []prompt.Suggest{
+		{Text: "?", Description: "Show help information"},
 		{Text: "!{cmd}", Description: "Execute a shell command"},
-		{Text: "/help", Description: "Show help information"},
 		{Text: "/new {name}", Description: "Start a new chat"},
 		{Text: "/history", Description: "Select from all available chats"},
 		{Text: "/agents", Description: "List available agents"},
