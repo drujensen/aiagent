@@ -189,8 +189,14 @@ func (c *CLI) Run(ctx context.Context) error {
 			}
 
 			if userInput == "/usage" {
-				fmt.Printf("Chat Usage:\n- Prompt Tokens: %d\n- Completion Tokens: %d\n- Total Tokens: %d\n- Total Cost: $%.2f\n",
-					chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
+				agent, err := c.agentService.GetAgent(ctx, chat.AgentID)
+				if err != nil {
+					c.logger.Error("Failed to get agent", zap.Error(err))
+					fmt.Println("Error getting agent:", err)
+					continue
+				}
+				fmt.Printf("Chat Usage:\n- Provider: %s\n- Model: %s\n- Prompt Tokens: %d\n- Completion Tokens: %d\n- Total Tokens: %d\n- Total Cost: $%.2f\n",
+					agent.ProviderType, agent.Model, chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
 				continue
 			}
 
