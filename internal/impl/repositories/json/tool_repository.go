@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"sync"
+	"slices"
 	"time"
 
 	"aiagent/internal/domain/entities"
@@ -23,7 +23,6 @@ type jsonToolRepository struct {
 	toolInstances map[string]*entities.Tool
 	toolFactory   *tools.ToolFactory
 	logger        *zap.Logger
-	mu            sync.RWMutex
 }
 
 func NewJSONToolRepository(dataDir string, toolFactory *tools.ToolFactory, logger *zap.Logger) (interfaces.ToolRepository, error) {
@@ -48,9 +47,6 @@ func NewJSONToolRepository(dataDir string, toolFactory *tools.ToolFactory, logge
 }
 
 func (r *jsonToolRepository) load() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	data, err := os.ReadFile(r.filePath)
 	if os.IsNotExist(err) {
 		return nil // File doesn't exist yet, start with empty data
@@ -79,9 +75,6 @@ func (r *jsonToolRepository) load() error {
 }
 
 func (r *jsonToolRepository) save() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	data, err := json.MarshalIndent(r.data, "", "  ")
 	if err != nil {
 		return errors.InternalErrorf("failed to marshal tools: %v", err)
@@ -99,9 +92,6 @@ func (r *jsonToolRepository) save() error {
 }
 
 func (r *jsonToolRepository) reloadToolInstances() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	r.toolInstances = make(map[string]*entities.Tool)
 	for _, toolData := range r.data {
 		toolFactoryEntry, err := r.toolFactory.GetFactoryByName(toolData.ToolType)
@@ -116,9 +106,6 @@ func (r *jsonToolRepository) reloadToolInstances() error {
 }
 
 func (r *jsonToolRepository) ListTools() ([]*entities.Tool, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	var tools []*entities.Tool
 	for _, tool := range r.toolInstances {
 		tools = append(tools, tool)
@@ -127,9 +114,6 @@ func (r *jsonToolRepository) ListTools() ([]*entities.Tool, error) {
 }
 
 func (r *jsonToolRepository) GetToolByName(name string) (*entities.Tool, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	tool, exists := r.toolInstances[name]
 	if !exists {
 		return nil, nil
@@ -138,9 +122,6 @@ func (r *jsonToolRepository) GetToolByName(name string) (*entities.Tool, error) 
 }
 
 func (r *jsonToolRepository) RegisterTool(name string, tool *entities.Tool) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	if _, exists := r.toolInstances[name]; exists {
 		return errors.DuplicateErrorf("tool with the same name already exists")
 	}
@@ -149,9 +130,6 @@ func (r *jsonToolRepository) RegisterTool(name string, tool *entities.Tool) erro
 }
 
 func (r *jsonToolRepository) ListToolData(ctx context.Context) ([]*entities.ToolData, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	toolDataCopy := make([]*entities.ToolData, len(r.data))
 	for i, t := range r.data {
 		toolDataCopy[i] = &entities.ToolData{
@@ -168,9 +146,6 @@ func (r *jsonToolRepository) ListToolData(ctx context.Context) ([]*entities.Tool
 }
 
 func (r *jsonToolRepository) GetToolData(ctx context.Context, id string) (*entities.ToolData, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	for _, toolData := range r.data {
 		if toolData.ID == id {
 			return &entities.ToolData{
@@ -188,9 +163,6 @@ func (r *jsonToolRepository) GetToolData(ctx context.Context, id string) (*entit
 }
 
 func (r *jsonToolRepository) CreateToolData(ctx context.Context, toolData *entities.ToolData) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	if toolData.ID == "" {
 		toolData.ID = uuid.New().String()
 	}
@@ -205,9 +177,6 @@ func (r *jsonToolRepository) CreateToolData(ctx context.Context, toolData *entit
 }
 
 func (r *jsonToolRepository) UpdateToolData(ctx context.Context, toolData *entities.ToolData) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	for i, t := range r.data {
 		if t.ID == toolData.ID {
 			toolData.UpdatedAt = time.Now()
@@ -222,12 +191,9 @@ func (r *jsonToolRepository) UpdateToolData(ctx context.Context, toolData *entit
 }
 
 func (r *jsonToolRepository) DeleteToolData(ctx context.Context, id string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	for i, t := range r.data {
-		if t.ID == id {
-			r.data = append(r.data[:i], r.data[i+1:]...)
+	for index, tool := range r.data {
+		if tool.ID == id {
+			r.data = slices.Delete(r.data, index, index+1)
 			if err := r.save(); err != nil {
 				return err
 			}

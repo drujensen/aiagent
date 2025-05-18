@@ -12,8 +12,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/google/uuid"
-
 	apicontrollers "aiagent/internal/api/controllers"
 	"aiagent/internal/cli"
 	"aiagent/internal/domain/entities"
@@ -336,22 +334,5 @@ func init() {
 		}
 		data, _ := json.MarshalIndent(defaultTools, "", "  ")
 		os.WriteFile(toolsPath, data, 0644)
-	}
-
-	chatsPath := filepath.Join(aiagentDir, "chats.json")
-	if _, err := os.Stat(chatsPath); os.IsNotExist(err) {
-		defaultChats := []*entities.Chat{
-			{
-				ID:        uuid.New().String(),
-				AgentID:   "1A3F3DCB-255D-46B3-A4F4-E2E118FBA82B",
-				Messages:  []entities.Message{},
-				Usage:     &entities.ChatUsage{},
-				Active:    true,
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
-			},
-		}
-		data, _ := json.MarshalIndent(defaultChats, "", "  ")
-		os.WriteFile(chatsPath, data, 0644)
 	}
 }

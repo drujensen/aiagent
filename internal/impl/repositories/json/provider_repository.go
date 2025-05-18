@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/errors"
@@ -17,7 +16,6 @@ import (
 type jsonProviderRepository struct {
 	filePath string
 	data     []*entities.Provider
-	mu       sync.RWMutex
 }
 
 func NewJSONProviderRepository(dataDir string) (interfaces.ProviderRepository, error) {
@@ -35,9 +33,6 @@ func NewJSONProviderRepository(dataDir string) (interfaces.ProviderRepository, e
 }
 
 func (r *jsonProviderRepository) load() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	data, err := os.ReadFile(r.filePath)
 	if os.IsNotExist(err) {
 		return nil // File doesn't exist yet, start with empty data
@@ -71,9 +66,6 @@ func (r *jsonProviderRepository) load() error {
 }
 
 func (r *jsonProviderRepository) save() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	data, err := json.MarshalIndent(r.data, "", "  ")
 	if err != nil {
 		return errors.InternalErrorf("failed to marshal providers: %v", err)
@@ -91,9 +83,6 @@ func (r *jsonProviderRepository) save() error {
 }
 
 func (r *jsonProviderRepository) ListProviders(ctx context.Context) ([]*entities.Provider, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	providersCopy := make([]*entities.Provider, len(r.data))
 	for i, p := range r.data {
 		providersCopy[i] = &entities.Provider{
@@ -109,9 +98,6 @@ func (r *jsonProviderRepository) ListProviders(ctx context.Context) ([]*entities
 }
 
 func (r *jsonProviderRepository) GetProvider(ctx context.Context, id string) (*entities.Provider, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	for _, provider := range r.data {
 		if provider.ID == id {
 			return &entities.Provider{
@@ -128,9 +114,6 @@ func (r *jsonProviderRepository) GetProvider(ctx context.Context, id string) (*e
 }
 
 func (r *jsonProviderRepository) GetProviderByType(ctx context.Context, providerType entities.ProviderType) (*entities.Provider, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	for _, provider := range r.data {
 		if provider.Type == providerType {
 			return &entities.Provider{

@@ -48,10 +48,22 @@ func (c *CLI) Run(ctx context.Context) error {
 
 	// Select the active chat from the repository
 	chats, err := c.chatService.ListChats(context.Background())
+	var chat *entities.Chat
 	if err != nil || len(chats) == 0 {
-		c.logger.Fatal("No chats available", zap.Error(err))
+		chatName := "New Chat"
+		agents, err := c.agentService.ListAgents(ctx)
+		if err != nil {
+			c.logger.Error("Failed to list agents", zap.Error(err))
+			fmt.Println("Error listing agents:", err)
+		}
+		var selectedAgent = agents[0]
+		_, err = c.chatService.CreateChat(ctx, selectedAgent.ID, chatName)
+		if err != nil {
+			c.logger.Error("Failed to create new chat", zap.Error(err))
+			fmt.Println("Error creating new chat:", err)
+		}
 	}
-	chat := chats[0]
+	chat = chats[0]
 	for _, activeChat := range chats {
 		if activeChat.Active {
 			chat = activeChat
@@ -119,6 +131,7 @@ func (c *CLI) Run(ctx context.Context) error {
 			userInput = strings.TrimSpace(userInput)
 			if userInput == "/help" {
 				fmt.Println("Available commands:")
+				fmt.Println("!<command> - Execute a shell command")
 				fmt.Println("/new - Start a new chat")
 				fmt.Println("/agents - List available agents")
 				fmt.Println("/tools - List available tools")
@@ -136,17 +149,6 @@ func (c *CLI) Run(ctx context.Context) error {
 				} else {
 					fmt.Println(output)
 				}
-				continue
-			}
-
-			if userInput == "/help" {
-				fmt.Println("Available commands:")
-				fmt.Println("/new - Start a new chat")
-				fmt.Println("/agents - List available agents")
-				fmt.Println("/tools - List available tools")
-				fmt.Println("/usage - Show usage information")
-				fmt.Println("/exit - Exit the application")
-				fmt.Println("/help - Show this help message")
 				continue
 			}
 

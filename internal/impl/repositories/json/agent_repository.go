@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sync"
 	"time"
 
 	"aiagent/internal/domain/entities"
@@ -19,7 +18,6 @@ import (
 type jsonAgentRepository struct {
 	filePath string
 	data     []*entities.Agent
-	mu       sync.RWMutex
 }
 
 func NewJSONAgentRepository(dataDir string) (interfaces.AgentRepository, error) {
@@ -37,9 +35,6 @@ func NewJSONAgentRepository(dataDir string) (interfaces.AgentRepository, error) 
 }
 
 func (r *jsonAgentRepository) load() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	data, err := os.ReadFile(r.filePath)
 	if os.IsNotExist(err) {
 		return nil // File doesn't exist yet, start with empty data
@@ -68,9 +63,6 @@ func (r *jsonAgentRepository) load() error {
 }
 
 func (r *jsonAgentRepository) save() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	data, err := json.MarshalIndent(r.data, "", "  ")
 	if err != nil {
 		return errors.InternalErrorf("failed to marshal agents: %v", err)
@@ -88,9 +80,6 @@ func (r *jsonAgentRepository) save() error {
 }
 
 func (r *jsonAgentRepository) ListAgents(ctx context.Context) ([]*entities.Agent, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	agentsCopy := make([]*entities.Agent, len(r.data))
 	for i, a := range r.data {
 		agentsCopy[i] = &entities.Agent{
@@ -115,9 +104,6 @@ func (r *jsonAgentRepository) ListAgents(ctx context.Context) ([]*entities.Agent
 }
 
 func (r *jsonAgentRepository) GetAgent(ctx context.Context, id string) (*entities.Agent, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	for _, agent := range r.data {
 		if agent.ID == id {
 			return &entities.Agent{
@@ -143,9 +129,6 @@ func (r *jsonAgentRepository) GetAgent(ctx context.Context, id string) (*entitie
 }
 
 func (r *jsonAgentRepository) CreateAgent(ctx context.Context, agent *entities.Agent) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	if agent.ID == "" {
 		agent.ID = uuid.New().String()
 	}
@@ -157,9 +140,6 @@ func (r *jsonAgentRepository) CreateAgent(ctx context.Context, agent *entities.A
 }
 
 func (r *jsonAgentRepository) UpdateAgent(ctx context.Context, agent *entities.Agent) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	for i, a := range r.data {
 		if a.ID == agent.ID {
 			agent.UpdatedAt = time.Now()
@@ -171,9 +151,6 @@ func (r *jsonAgentRepository) UpdateAgent(ctx context.Context, agent *entities.A
 }
 
 func (r *jsonAgentRepository) DeleteAgent(ctx context.Context, id string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	for i, a := range r.data {
 		if a.ID == id {
 			r.data = slices.Delete(r.data, i, i+1)
