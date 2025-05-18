@@ -87,6 +87,7 @@ func (c *CLI) Run(ctx context.Context) error {
 	}
 
 	// Display existing messages
+	fmt.Println(chat.Name)
 	for _, msg := range chat.Messages {
 		c.displayMessage(msg)
 	}
@@ -260,7 +261,6 @@ func completer(d prompt.Document) []prompt.Suggest {
 		return []prompt.Suggest{
 			{Text: "!{cmd}", Description: "Execute a shell command"},
 			{Text: "/new {name}", Description: "Start a new chat"},
-			{Text: "/history", Description: "Show chat history"},
 			{Text: "/agents", Description: "List available agents"},
 			{Text: "/tools", Description: "List available tools"},
 			{Text: "/usage", Description: "Show usage information"},
