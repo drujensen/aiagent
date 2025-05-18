@@ -85,6 +85,11 @@ func main() {
 	var providerRepo interfaces.ProviderRepository
 	var toolRepo interfaces.ToolRepository
 
+	dataDir, err := os.Getwd()
+	if err != nil {
+		logger.Fatal("Failed to get current directory", zap.Error(err))
+	}
+
 	if *storage == "mongo" {
 		db, err := database.NewMongoDB(cfg.MongoURI, "aiagent", logger)
 		if err != nil {
@@ -94,7 +99,7 @@ func main() {
 
 		agentRepo = repositoriesMongo.NewMongoAgentRepository(db.Collection("agents"))
 		chatRepo = repositoriesMongo.NewMongoChatRepository(db.Collection("chats"))
-		providerRepo, err = repositoriesJson.NewJSONProviderRepository("internal/impl/config")
+		providerRepo, err = repositoriesJson.NewJSONProviderRepository(dataDir)
 		if err != nil {
 			logger.Fatal("Failed to initialize provider repository", zap.Error(err))
 		}
@@ -107,10 +112,6 @@ func main() {
 			logger.Fatal("Failed to initialize tools", zap.Error(err))
 		}
 	} else {
-		dataDir, err := os.Getwd()
-		if err != nil {
-			logger.Fatal("Failed to get current directory", zap.Error(err))
-		}
 
 		providerRepo, err = repositoriesJson.NewJSONProviderRepository(dataDir)
 		if err != nil {
@@ -264,22 +265,8 @@ func init() {
 
 	providersPath := filepath.Join(aiagentDir, "providers.json")
 	if _, err := os.Stat(providersPath); os.IsNotExist(err) {
+
 		defaultProviders := []*entities.Provider{
-			{
-				ID:         "820FE148-851B-4995-81E5-C6DB2E5E5270",
-				Name:       "X.AI",
-				Type:       "xai",
-				BaseURL:    "https://api.x.ai",
-				APIKeyName: "XAI_API_KEY",
-				Models: []entities.ModelPricing{
-					{
-						Name:                "grok-3-mini-beta",
-						InputPricePerMille:  0.30,
-						OutputPricePerMille: 0.50,
-						ContextWindow:       131072,
-					},
-				},
-			},
 			{
 				ID:         "D2BB79D4-C11C-407A-AF9D-9713524BB3BF",
 				Name:       "OpenAI",
@@ -287,15 +274,110 @@ func init() {
 				BaseURL:    "https://api.openai.com",
 				APIKeyName: "OPENAI_API_KEY",
 				Models: []entities.ModelPricing{
-					{
-						Name:                "gpt-4o-mini",
-						InputPricePerMille:  0.15,
-						OutputPricePerMille: 0.60,
-						ContextWindow:       128000,
-					},
+					{Name: "o1", InputPricePerMille: 15.00, OutputPricePerMille: 60.00, ContextWindow: 200000},
+					{Name: "o3-mini", InputPricePerMille: 1.10, OutputPricePerMille: 4.40, ContextWindow: 200000},
+					{Name: "gpt-4o", InputPricePerMille: 2.50, OutputPricePerMille: 10.00, ContextWindow: 128000},
+					{Name: "gpt-4o-mini", InputPricePerMille: 0.15, OutputPricePerMille: 0.60, ContextWindow: 128000},
 				},
 			},
+			{
+				ID:         "28451B8D-1937-422A-BA93-9795204EC5A5",
+				Name:       "Anthropic",
+				Type:       "anthropic",
+				BaseURL:    "https://api.anthropic.com",
+				APIKeyName: "ANTHROPIC_API_KEY",
+				Models: []entities.ModelPricing{
+					{Name: "claude-3-opus-20240229", InputPricePerMille: 15.00, OutputPricePerMille: 75.00, ContextWindow: 200000},
+					{Name: "claude-3-7-sonnet-20250219", InputPricePerMille: 3.00, OutputPricePerMille: 15.00, ContextWindow: 200000},
+					{Name: "claude-3-haiku-20240307", InputPricePerMille: 0.25, OutputPricePerMille: 1.25, ContextWindow: 200000},
+				},
+			},
+			{
+				ID:         "820FE148-851B-4995-81E5-C6DB2E5E5270",
+				Name:       "X.AI",
+				Type:       "xai",
+				BaseURL:    "https://api.x.ai",
+				APIKeyName: "XAI_API_KEY",
+				Models: []entities.ModelPricing{
+					{Name: "grok-3-beta", InputPricePerMille: 3.00, OutputPricePerMille: 15.00, ContextWindow: 131072},
+					{Name: "grok-3-mini-beta", InputPricePerMille: 0.30, OutputPricePerMille: 0.50, ContextWindow: 131072},
+					{Name: "grok-2", InputPricePerMille: 2.50, OutputPricePerMille: 7.50, ContextWindow: 131072},
+				},
+			},
+			{
+				ID:         "2BD2B8A5-5A2A-439B-8D02-C6BE34705011",
+				Name:       "Google",
+				Type:       "google",
+				BaseURL:    "https://generativelanguage.googleapis.com",
+				APIKeyName: "GEMINI_API_KEY",
+				Models: []entities.ModelPricing{
+					{Name: "gemini-2.5-pro-preview-03-25", InputPricePerMille: 2.50, OutputPricePerMille: 15.00, ContextWindow: 1000000},
+					{Name: "gemini-2.0-flash", InputPricePerMille: 0.10, OutputPricePerMille: 0.40, ContextWindow: 1000000},
+					{Name: "gemini-2.0-flash-lite", InputPricePerMille: 0.075, OutputPricePerMille: 0.30, ContextWindow: 1000000},
+					{Name: "gemma-3-27b-it", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000},
+				},
+			},
+			{
+				ID:         "276F9470-664F-4402-98E0-755C342ADFC4",
+				Name:       "DeepSeek",
+				Type:       "deepseek",
+				BaseURL:    "https://api.deepseek.com",
+				APIKeyName: "DEEPSEEK_API_KEY",
+				Models: []entities.ModelPricing{
+					{Name: "deepseek-reasoner", InputPricePerMille: 0.55, OutputPricePerMille: 2.19, ContextWindow: 64000},
+					{Name: "deepseek-chat", InputPricePerMille: 0.07, OutputPricePerMille: 1.10, ContextWindow: 64000},
+				},
+			},
+			{
+				ID:         "8F2CC161-E463-43B1-9656-8E484A0D7709",
+				Name:       "Together",
+				Type:       "together",
+				BaseURL:    "https://api.together.xyz",
+				APIKeyName: "TOGETHER_API_KEY",
+				Models: []entities.ModelPricing{
+					{Name: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8", InputPricePerMille: 0.27, OutputPricePerMille: 0.85, ContextWindow: 131072},
+					{Name: "meta-llama/Llama-4-Scout-17B-16E-Instruct", InputPricePerMille: 0.18, OutputPricePerMille: 0.59, ContextWindow: 131072},
+					{Name: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 131072},
+				},
+			},
+			{
+				ID:         "CFA9E279-2CD3-4929-A92E-EC4584DC5089",
+				Name:       "Groq",
+				Type:       "groq",
+				BaseURL:    "https://api.groq.com",
+				APIKeyName: "GROQ_API_KEY",
+				Models: []entities.ModelPricing{
+					{Name: "llama-3.3-70b-versatile", InputPricePerMille: 0.59, OutputPricePerMille: 0.79, ContextWindow: 128000},
+					{Name: "meta-llama/llama-4-maverick-17b-128e-instruct", InputPricePerMille: 0.27, OutputPricePerMille: 0.85, ContextWindow: 131072},
+					{Name: "meta-llama/llama-4-scout-17b-16e-instruct", InputPricePerMille: 0.11, OutputPricePerMille: 0.34, ContextWindow: 131072},
+					{Name: "deepseek-r1-distill-llama-70b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000},
+				},
+			},
+			{
+				ID:         "3B369D62-BB4E-4B4F-8C75-219796E9521A",
+				Name:       "Ollama",
+				Type:       "ollama",
+				BaseURL:    "http://localhost:11434",
+				APIKeyName: "LOCAL_API_KEY",
+				Models: []entities.ModelPricing{
+					{Name: "llama3.1:8b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
+					{Name: "qwen2.5-coder:14b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
+					{Name: "mistral-nemo:12b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
+					{Name: "cogito:14b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
+					{Name: "gemma:12b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
+					{Name: "deepcoder:14b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
+				},
+			},
+			{
+				ID:         "7214F2BF-88E9-4DC6-BB5E-1BE38D3743C8",
+				Name:       "Custom Provider",
+				Type:       "generic",
+				BaseURL:    "",
+				APIKeyName: "API_KEY",
+				Models:     []entities.ModelPricing{},
+			},
 		}
+
 		data, _ := json.MarshalIndent(defaultProviders, "", "  ")
 		os.WriteFile(providersPath, data, 0644)
 	}
