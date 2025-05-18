@@ -58,13 +58,15 @@ func (t *FileTool) FullDescription() string {
 	// Add detailed usage instructions
 	b.WriteString("## Usage Instructions\n")
 	b.WriteString("This tool supports various file operations. Below are the key operations and their parameters:\n\n")
+	b.WriteString("- **get_info**: Retrieves file information such as size, creation date, modification date, and permissions.\n")
+	b.WriteString("- **search**: Searches for text within a file using a pattern. Returns line numbers and matching lines.\n")
 	b.WriteString("- **read**: Reads content from a file. Use `start_line` and `end_line` to specify a range of lines to read.\n")
 	b.WriteString("- **write**: Writes or overwrites content to a file. Provide `content` to specify the new file content.\n")
 	b.WriteString("- **edit**: Modifies specific lines in a file. Use `start_line`, `end_line`, and `content` to replace the specified lines. The `search` operation can help identify line numbers.\n")
 	b.WriteString("  - Example: To edit lines 5 to 7, set `start_line=5`, `end_line=7`, and provide the new `content` for those lines.\n")
 	b.WriteString("  - Use `dry_run=true` to preview changes without applying them.\n")
-	b.WriteString("- **search**: Searches files for a pattern. Returns file paths and line numbers, useful for identifying edit locations.\n")
-	b.WriteString("- **create_directory**, **list_directory**, **directory_tree**, **move**, **get_info**: Perform directory and file management tasks.\n\n")
+	b.WriteString("This tool also supports various directory operations.:\n\n")
+	b.WriteString("- **directory_tree**, **create_directory**, **list_directory**, **move**: Perform directory and file management tasks.\n\n")
 
 	// Add configuration header
 	b.WriteString("## Configuration\n")
@@ -95,21 +97,15 @@ func (t *FileTool) Parameters() []entities.Parameter {
 			Required:    true,
 		},
 		{
+			Name:        "pattern",
+			Type:        "string",
+			Description: "Search pattern (for search operation)",
+			Required:    false,
+		},
+		{
 			Name:        "content",
 			Type:        "string",
 			Description: "Content to write or edit (for write or edit operations)",
-			Required:    false,
-		},
-		{
-			Name:        "dry_run",
-			Type:        "boolean",
-			Description: "Preview changes without applying them (for edit operation)",
-			Required:    false,
-		},
-		{
-			Name:        "destination",
-			Type:        "string",
-			Description: "Destination path (for move operation)",
 			Required:    false,
 		},
 		{
@@ -125,16 +121,15 @@ func (t *FileTool) Parameters() []entities.Parameter {
 			Required:    false,
 		},
 		{
-			Name:        "pattern",
-			Type:        "string",
-			Description: "Search pattern (for search operation)",
+			Name:        "dry_run",
+			Type:        "boolean",
+			Description: "Preview changes without applying them (for edit operation)",
 			Required:    false,
 		},
 		{
-			Name:        "exclude_patterns",
-			Type:        "array",
-			Items:       []entities.Item{{Type: "string"}},
-			Description: "Patterns to exclude (for search operation)",
+			Name:        "destination",
+			Type:        "string",
+			Description: "Destination path (for move operation)",
 			Required:    false,
 		},
 	}
@@ -164,15 +159,14 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	fmt.Println("\rExecuting file operation", arguments)
 
 	var args struct {
-		Operation       string   `json:"operation"`
-		Path            string   `json:"path"`
-		Content         string   `json:"content"`
-		DryRun          bool     `json:"dry_run"`
-		Destination     string   `json:"destination"`
-		StartLine       int      `json:"start_line"`
-		EndLine         int      `json:"end_line"`
-		Pattern         string   `json:"pattern"`
-		ExcludePatterns []string `json:"exclude_patterns"`
+		Operation   string `json:"operation"`
+		Path        string `json:"path"`
+		Pattern     string `json:"pattern"`
+		Content     string `json:"content"`
+		DryRun      bool   `json:"dry_run"`
+		StartLine   int    `json:"start_line"`
+		EndLine     int    `json:"end_line"`
+		Destination string `json:"destination"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
@@ -189,6 +183,52 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	}
 
 	switch args.Operation {
+	case "get_info":
+		fullPath, err := t.validatePath(args.Path)
+		if err != nil {
+			return "", err
+		}
+		info, err := os.Stat(fullPath)
+		if err != nil {
+			t.logger.Error("Failed to get file info", zap.String("path", fullPath), zap.Error(err))
+			return "", err
+		}
+		result := []string{
+			"size: " + formatSize(info.Size()),
+			"created: " + info.ModTime().Format(time.RFC3339),
+			"modified: " + info.ModTime().Format(time.RFC3339),
+			"accessed: " + info.ModTime().Format(time.RFC3339),
+			"isDirectory: " + boolToString(info.IsDir()),
+			"isFile: " + boolToString(!info.IsDir()),
+			"permissions: " + info.Mode().String(),
+		}
+		t.logger.Info("File info retrieved successfully", zap.String("path", fullPath))
+		return strings.Join(result, "\n"), nil
+
+	case "search":
+		if args.Pattern == "" {
+			t.logger.Error("Pattern is required for search operation")
+			return "", fmt.Errorf("pattern is required")
+		}
+		fullPath, err := t.validatePath(args.Path)
+		if err != nil {
+			return "", err
+		}
+		results, err := t.search(fullPath, args.Pattern)
+		if err != nil {
+			t.logger.Error("Failed to search file", zap.String("path", fullPath), zap.Error(err))
+			return "", err
+		}
+		if len(results) == 0 {
+			return "No matches found", nil
+		}
+		resultsStr := strings.Join(results, "\n")
+		if len(resultsStr) > 16384 {
+			resultsStr = resultsStr[:16384] + "...truncated"
+		}
+		t.logger.Info("File searched successfully", zap.String("path", fullPath), zap.Int("matches", len(results)))
+		return resultsStr, nil
+
 	case "read":
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
@@ -339,52 +379,6 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		t.logger.Info("File moved successfully", zap.String("source", srcPath), zap.String("dest", dstPath))
 		return "File moved successfully", nil
 
-	case "search":
-		if args.Pattern == "" {
-			t.logger.Error("Pattern is required for search operation")
-			return "", fmt.Errorf("pattern is required")
-		}
-		fullPath, err := t.validatePath(args.Path)
-		if err != nil {
-			return "", err
-		}
-		results, err := t.searchFiles(fullPath, args.Pattern, args.ExcludePatterns)
-		if err != nil {
-			t.logger.Error("Failed to search files", zap.String("path", fullPath), zap.Error(err))
-			return "", err
-		}
-		if len(results) == 0 {
-			return "No matches found", nil
-		}
-		resultsStr := strings.Join(results, "\n")
-		if len(resultsStr) > 16384 {
-			resultsStr = resultsStr[:16384] + "...truncated"
-		}
-		t.logger.Info("Files searched successfully", zap.String("path", fullPath), zap.Int("matches", len(results)))
-		return resultsStr, nil
-
-	case "get_info":
-		fullPath, err := t.validatePath(args.Path)
-		if err != nil {
-			return "", err
-		}
-		info, err := os.Stat(fullPath)
-		if err != nil {
-			t.logger.Error("Failed to get file info", zap.String("path", fullPath), zap.Error(err))
-			return "", err
-		}
-		result := []string{
-			"size: " + formatSize(info.Size()),
-			"created: " + info.ModTime().Format(time.RFC3339),
-			"modified: " + info.ModTime().Format(time.RFC3339),
-			"accessed: " + info.ModTime().Format(time.RFC3339),
-			"isDirectory: " + boolToString(info.IsDir()),
-			"isFile: " + boolToString(!info.IsDir()),
-			"permissions: " + info.Mode().String(),
-		}
-		t.logger.Info("File info retrieved successfully", zap.String("path", fullPath))
-		return strings.Join(result, "\n"), nil
-
 	default:
 		t.logger.Error("Unknown operation", zap.String("operation", args.Operation))
 		return "", fmt.Errorf("unknown operation: %s", args.Operation)
@@ -486,35 +480,36 @@ func (t *FileTool) buildDirectoryTree(path string) ([]TreeEntry, error) {
 	return result, nil
 }
 
-func (t *FileTool) searchFiles(rootPath, pattern string, excludePatterns []string) ([]string, error) {
-	var results []string
-	err := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		relPath, _ := filepath.Rel(rootPath, path)
-		for _, exclude := range excludePatterns {
-			if matched, _ := filepath.Match(exclude, relPath); matched {
-				if info.IsDir() {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-		}
-		if strings.Contains(strings.ToLower(info.Name()), strings.ToLower(pattern)) {
-			results = append(results, path)
-		}
-		return nil
-	})
+func (t *FileTool) search(filePath, pattern string) ([]string, error) {
+	file, err := os.Open(filePath)
 	if err != nil {
-		t.logger.Error("Failed to search files", zap.String("path", rootPath), zap.Error(err))
+		t.logger.Error("Failed to open file for search", zap.String("path", filePath), zap.Error(err))
 		return nil, err
 	}
-	if len(results) == 0 {
-		t.logger.Warn("No matches found during file search", zap.String("pattern", pattern), zap.String("path", rootPath))
-		return nil, fmt.Errorf("no matches found for pattern '%s' in path '%s'", pattern, rootPath)
+	defer file.Close()
+
+	var results []string
+	scanner := bufio.NewScanner(file)
+	lineNum := 0
+	lowerPattern := strings.ToLower(pattern)
+
+	for scanner.Scan() {
+		lineNum++
+		line := scanner.Text()
+		if strings.Contains(strings.ToLower(line), lowerPattern) {
+			results = append(results, fmt.Sprintf("Line %d: %s", lineNum, line))
+		}
 	}
-	t.logger.Info("Files searched successfully", zap.String("path", rootPath), zap.Int("matches", len(results)))
+	if err := scanner.Err(); err != nil {
+		t.logger.Error("Error reading file during search", zap.String("path", filePath), zap.Error(err))
+		return nil, err
+	}
+
+	if len(results) == 0 {
+		t.logger.Warn("No matches found during file search", zap.String("pattern", pattern), zap.String("path", filePath))
+		return nil, fmt.Errorf("no matches found for pattern '%s' in file '%s'", pattern, filePath)
+	}
+	t.logger.Info("File searched successfully", zap.String("path", filePath), zap.Int("matches", len(results)))
 	return results, nil
 }
 
