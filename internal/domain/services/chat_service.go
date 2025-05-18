@@ -18,6 +18,7 @@ import (
 type ChatService interface {
 	ListChats(ctx context.Context) ([]*entities.Chat, error)
 	GetChat(ctx context.Context, id string) (*entities.Chat, error)
+	SetActiveChat(ctx context.Context, chatID string) error
 	CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error)
 	UpdateChat(ctx context.Context, id, name string) (*entities.Chat, error)
 	DeleteChat(ctx context.Context, id string) error
@@ -98,6 +99,33 @@ func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*en
 	}
 
 	return chat, nil
+}
+
+func (s *chatService) SetActiveChat(ctx context.Context, chatID string) error {
+	if chatID == "" {
+		return errors.ValidationErrorf("chat ID is required")
+	}
+	chat, err := s.chatRepo.GetChat(ctx, chatID)
+	if err != nil {
+		return err
+	}
+	// Set the other chat sessions to inactive
+	chats, err := s.chatRepo.ListChats(ctx)
+	if err != nil {
+		for _, c := range chats {
+			if c.ID != chat.ID {
+				c.Active = false
+				if err := s.chatRepo.UpdateChat(ctx, c); err != nil {
+					s.logger.Error("Failed to update chat status", zap.String("chat_id", c.ID), zap.Error(err))
+				}
+			}
+		}
+	}
+	chat.Active = true
+	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
+		s.logger.Error("Failed to update chat status", zap.String("chat_id", chat.ID), zap.Error(err))
+	}
+	return nil
 }
 
 func (s *chatService) UpdateChat(ctx context.Context, id, name string) (*entities.Chat, error) {

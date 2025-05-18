@@ -139,11 +139,13 @@ func (c *CLI) Run(ctx context.Context) error {
 				fmt.Println("Available commands:")
 				fmt.Println("!<command> - Execute a shell command")
 				fmt.Println("/new {name} - Start a new chat")
+				fmt.Println("/history - Select from all available chats")
 				fmt.Println("/agents - List available agents")
 				fmt.Println("/tools - List available tools")
 				fmt.Println("/usage - Show usage information")
 				fmt.Println("/exit - Exit the application")
 				fmt.Println("/help - Show this help message")
+				fmt.Println("/history - Select from all the available chats")
 				continue
 			}
 
@@ -154,6 +156,15 @@ func (c *CLI) Run(ctx context.Context) error {
 					fmt.Printf("Error executing command: %s\n", err)
 				} else {
 					fmt.Println(output)
+				}
+				continue
+			}
+
+			if userInput == "/history" {
+				err := c.HistoryCommand(ctx)
+				if err != nil {
+					c.logger.Error("Failed to select chat", zap.Error(err))
+					fmt.Println("Error selecting chat:", err)
 				}
 				continue
 			}
@@ -261,6 +272,7 @@ func completer(d prompt.Document) []prompt.Suggest {
 		return []prompt.Suggest{
 			{Text: "!{cmd}", Description: "Execute a shell command"},
 			{Text: "/new {name}", Description: "Start a new chat"},
+			{Text: "/history", Description: "Select from all available chats"},
 			{Text: "/agents", Description: "List available agents"},
 			{Text: "/tools", Description: "List available tools"},
 			{Text: "/usage", Description: "Show usage information"},
@@ -335,6 +347,48 @@ func (c *CLI) NewChatCommand(ctx context.Context, userInput string) (*entities.C
 		return nil, err
 	}
 	return chat, nil
+}
+
+func (c *CLI) HistoryCommand(ctx context.Context) error {
+	chats, err := c.chatService.ListChats(ctx)
+	if err != nil {
+		c.logger.Error("Failed to list chats", zap.Error(err))
+		fmt.Println("Error listing chats:", err)
+		return err
+	}
+
+	chatNames := make([]string, len(chats))
+	for i, chat := range chats {
+		chatNames[i] = chat.Name
+	}
+
+	prompt := promptui.Select{
+		Label: "Select a Chat",
+		Items: chatNames,
+	}
+
+	i, _, err := prompt.Run()
+	if err != nil {
+		c.logger.Error("Prompt error", zap.Error(err))
+		fmt.Println("Error selecting chat:", err)
+		return err
+	}
+
+	selectedChat := chats[i]
+
+	err = c.chatService.SetActiveChat(ctx, selectedChat.ID)
+	if err != nil {
+		c.logger.Error("Failed to set active chat", zap.Error(err))
+		fmt.Println("Error setting active chat:", err)
+		return err
+	}
+
+	fmt.Println(selectedChat.Name)
+	for _, msg := range selectedChat.Messages {
+		c.displayMessage(msg)
+	}
+
+	return nil
 }
 
 func (cli *CLI) RunBashCommand(cmd string) (string, error) {
