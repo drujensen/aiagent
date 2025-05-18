@@ -145,7 +145,6 @@ func (c *CLI) Run(ctx context.Context) error {
 				fmt.Println("/usage - Show usage information")
 				fmt.Println("/exit - Exit the application")
 				fmt.Println("/help - Show this help message")
-				fmt.Println("/history - Select from all the available chats")
 				continue
 			}
 
@@ -268,17 +267,25 @@ func (c *CLI) Run(ctx context.Context) error {
 }
 
 func completer(d prompt.Document) []prompt.Suggest {
-	if d.TextBeforeCursor() == "" || d.TextBeforeCursor() == "!" || d.TextBeforeCursor() == "/" {
-		return []prompt.Suggest{
-			{Text: "!{cmd}", Description: "Execute a shell command"},
-			{Text: "/new {name}", Description: "Start a new chat"},
-			{Text: "/history", Description: "Select from all available chats"},
-			{Text: "/agents", Description: "List available agents"},
-			{Text: "/tools", Description: "List available tools"},
-			{Text: "/usage", Description: "Show usage information"},
-			{Text: "/exit", Description: "Exit the application"},
-			{Text: "/help", Description: "Show help information"},
-		}
+	// List of all possible suggestions
+	suggestions := []prompt.Suggest{
+		{Text: "!{cmd}", Description: "Execute a shell command"},
+		{Text: "/help", Description: "Show help information"},
+		{Text: "/new {name}", Description: "Start a new chat"},
+		{Text: "/history", Description: "Select from all available chats"},
+		{Text: "/agents", Description: "List available agents"},
+		{Text: "/tools", Description: "List available tools"},
+		{Text: "/usage", Description: "Show usage information"},
+		{Text: "/exit", Description: "Exit the application"},
+	}
+
+	// Get the text before the cursor
+	text := d.TextBeforeCursor()
+
+	// Check if the text starts with "/"
+	if d.TextBeforeCursor() == "" || d.TextBeforeCursor() == "/" ||
+		d.TextBeforeCursor()[0] == '/' {
+		return prompt.FilterHasPrefix(suggestions, text, true)
 	}
 
 	return []prompt.Suggest{}
