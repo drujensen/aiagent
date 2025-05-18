@@ -36,13 +36,24 @@ import (
 )
 
 func main() {
-	mode := flag.String("mode", "console", "Application mode: console or server")
 	storage := flag.String("storage", "file", "Storage type: file or mongo")
 	flag.Parse()
-	if *mode == "console" || *mode == "server" {
-	} else {
-		flag.Usage()
-		os.Exit(1)
+
+	modeStr := "console"
+	if len(flag.Args()) > 0 {
+		if len(flag.Args()) > 1 {
+			fmt.Fprintf(os.Stderr, "Too many arguments\n")
+			flag.Usage()
+			os.Exit(1)
+		}
+		arg := flag.Args()[0]
+		if arg == "serve" {
+			modeStr = "serve"
+		} else {
+			fmt.Fprintf(os.Stderr, "Invalid command: %s\n", arg)
+			flag.Usage()
+			os.Exit(1)
+		}
 	}
 	if *storage == "file" || *storage == "mongo" {
 	} else {
@@ -132,7 +143,7 @@ func main() {
 	toolService := services.NewToolService(toolRepo, logger)
 	chatService := services.NewChatService(chatRepo, agentRepo, providerRepo, toolRepo, cfg, logger)
 
-	if *mode == "server" {
+	if modeStr == "serve" {
 		funcMap := template.FuncMap{
 			"renderMarkdown": renderMarkdown,
 			"inArray": func(value string, array []string) bool {
