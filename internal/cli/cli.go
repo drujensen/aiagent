@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 	"sync"
@@ -18,11 +20,13 @@ import (
 )
 
 // CLI manages the text-based user interface for the AI Agent console application.
+
 type CLI struct {
-	chatService  services.ChatService
-	agentService services.AgentService
-	toolService  services.ToolService
-	logger       *zap.Logger
+	chatService    services.ChatService
+	agentService   services.AgentService
+	toolService    services.ToolService
+	runBashCommand func(string) (string, error)
+	logger         *zap.Logger
 }
 
 // NewCLI creates a new CLI instance.
@@ -31,8 +35,43 @@ func NewCLI(chatService services.ChatService, agentService services.AgentService
 		chatService:  chatService,
 		agentService: agentService,
 		toolService:  toolService,
-		logger:       logger,
+		runBashCommand: func(cmd string) (string, error) {
+			output, err := Bash(cmd)
+			if err != nil {
+				return "", err
+			}
+
+			stdoutBytes, ok := output["Stdout"]
+			if !ok {
+				return "", fmt.Errorf("missing Stdout in output")
+			}
+
+			return string(stdoutBytes), nil
+		},
+		logger: logger,
 	}
+}
+
+func Bash(cmd string) (map[string][]byte, error) {
+	var out, stderr bytes.Buffer
+
+	// Create a new bash command
+	command := exec.Command("bash", "-c", cmd)
+
+	// Set the output destinations
+	command.Stdout = &out
+	command.Stderr = &stderr
+
+	// Run the command
+	err := command.Run()
+	if err != nil {
+		return nil, fmt.Errorf("command execution failed: %v", err)
+	}
+
+	return map[string][]byte{
+		"Stdout": out.Bytes(),
+		"Stderr": stderr.Bytes(),
+	}, nil
 }
 
 // Run starts the CLI interface, displaying chat history and handling user input.
@@ -114,6 +153,28 @@ func (c *CLI) Run(ctx context.Context) error {
 			}
 
 			userInput = strings.TrimSpace(userInput)
+			if userInput == "/help" {
+				fmt.Println("Available commands:")
+				fmt.Println("/new - Start a new chat")
+				fmt.Println("/agents - List available agents")
+				fmt.Println("/tools - List available tools")
+				fmt.Println("/usage - Show usage information")
+				fmt.Println("/exit - Exit the application")
+				fmt.Println("/help - Show this help message")
+				continue
+			}
+
+			if strings.HasPrefix(userInput, "!") {
+				cmd := userInput[1:]
+				output, err := c.runBashCommand(cmd)
+				if err != nil {
+					fmt.Printf("Error executing command: %s\n", err)
+				} else {
+					fmt.Println(output)
+				}
+				continue
+			}
+
 			if userInput == "/help" {
 				fmt.Println("Available commands:")
 				fmt.Println("/new - Start a new chat")
