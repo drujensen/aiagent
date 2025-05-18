@@ -137,8 +137,8 @@ func (t *FileTool) Parameters() []entities.Parameter {
 }
 
 type EditOperation struct {
-	OldText string `json:"oldText"`
-	NewText string `json:"newText"`
+	OldText string  `json:"oldText"`
+	NewText *string `json:"newText,omitempty"`
 }
 
 func (t *FileTool) validatePath(path string) (string, error) {
@@ -397,10 +397,13 @@ func (t *FileTool) applyEdits(filePath string, edits []EditOperation, dryRun boo
 	}
 	original := string(content)
 	modified := original
-
+	empty := ""
 	for _, edit := range edits {
 		if strings.Count(modified, edit.OldText) > 0 {
-			modified = strings.ReplaceAll(modified, edit.OldText, edit.NewText)
+			if edit.NewText == nil {
+				edit.NewText = &empty
+			}
+			modified = strings.ReplaceAll(modified, edit.OldText, *edit.NewText)
 			t.logger.Info("Edit applied successfully", zap.String("oldText", edit.OldText))
 		} else {
 			t.logger.Warn("Edit text not found, skipping", zap.String("oldText", edit.OldText))

@@ -15,11 +15,27 @@ import (
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/services"
 
+	"github.com/c-bata/go-prompt"
 	"github.com/manifoldco/promptui"
 	"go.uber.org/zap"
+	"golang.org/x/term"
 )
 
-// CLI manages the text-based user interface for the AI Agent console application.
+var termState *term.State
+
+func saveTermState() {
+	oldState, err := term.GetState(int(os.Stdin.Fd()))
+	if err != nil {
+		return
+	}
+	termState = oldState
+}
+
+func restoreTermState() {
+	if termState != nil {
+		term.Restore(int(os.Stdin.Fd()), termState)
+	}
+}
 
 type CLI struct {
 	chatService  services.ChatService
@@ -28,7 +44,6 @@ type CLI struct {
 	logger       *zap.Logger
 }
 
-// NewCLI creates a new CLI instance.
 func NewCLI(chatService services.ChatService, agentService services.AgentService, toolService services.ToolService, logger *zap.Logger) *CLI {
 	return &CLI{
 		chatService:  chatService,
@@ -40,6 +55,7 @@ func NewCLI(chatService services.ChatService, agentService services.AgentService
 
 // Run starts the CLI interface, displaying chat history and handling user input.
 func (c *CLI) Run(ctx context.Context) error {
+	saveTermState()
 	fmt.Println("AI Agent Console. Type '/help' for list of commands.")
 
 	// Set up signal handling for graceful shutdown
@@ -55,6 +71,7 @@ func (c *CLI) Run(ctx context.Context) error {
 		if err != nil {
 			c.logger.Error("Failed to create new chat", zap.Error(err))
 			fmt.Println("Error creating new chat:", err)
+			restoreTermState()
 			return err
 		}
 	}
@@ -105,32 +122,22 @@ func (c *CLI) Run(ctx context.Context) error {
 			fmt.Println("\nShutting down...")
 			return nil
 		default:
-			// Prompt for user input
-			prompt := promptui.Prompt{
-				Label: ">",
-				Validate: func(input string) error {
-					if strings.TrimSpace(input) == "" {
-						return fmt.Errorf("input cannot be empty")
-					}
-					return nil
-				},
-			}
-
-			userInput, err := prompt.Run()
-			if err != nil {
-				if err == promptui.ErrInterrupt {
-					fmt.Println("\nInterrupted. Shutting down...")
-					return nil
-				}
-				c.logger.Error("Prompt error", zap.Error(err))
-				continue
-			}
-
+			userInput := prompt.Input(">: ", completer,
+				prompt.OptionPrefixTextColor(prompt.Blue),
+				prompt.OptionAddKeyBind(prompt.KeyBind{
+					Key: prompt.ControlC,
+					Fn: func(buf *prompt.Buffer) {
+						fmt.Println("\nShutting down...")
+						restoreTermState()
+						os.Exit(0)
+					},
+				}),
+			)
 			userInput = strings.TrimSpace(userInput)
 			if userInput == "/help" {
 				fmt.Println("Available commands:")
 				fmt.Println("!<command> - Execute a shell command")
-				fmt.Println("/new - Start a new chat")
+				fmt.Println("/new {name} - Start a new chat")
 				fmt.Println("/agents - List available agents")
 				fmt.Println("/tools - List available tools")
 				fmt.Println("/usage - Show usage information")
@@ -201,6 +208,7 @@ func (c *CLI) Run(ctx context.Context) error {
 			}
 
 			if userInput == "exit" || userInput == "quit" || userInput == "/exit" || userInput == "/quit" {
+				restoreTermState()
 				fmt.Println("Shutting down...")
 				fmt.Printf("Chat Usage:\n- Prompt Tokens: %d\n- Completion Tokens: %d\n- Total Tokens: %d\n- Total Cost: $%.2f\n",
 					chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
@@ -245,6 +253,23 @@ func (c *CLI) Run(ctx context.Context) error {
 			c.displayMessage(*response)
 		}
 	}
+}
+
+func completer(d prompt.Document) []prompt.Suggest {
+	if d.TextBeforeCursor() == "" || d.TextBeforeCursor() == "!" || d.TextBeforeCursor() == "/" {
+		return []prompt.Suggest{
+			{Text: "!{cmd}", Description: "Execute a shell command"},
+			{Text: "/new {name}", Description: "Start a new chat"},
+			{Text: "/history", Description: "Show chat history"},
+			{Text: "/agents", Description: "List available agents"},
+			{Text: "/tools", Description: "List available tools"},
+			{Text: "/usage", Description: "Show usage information"},
+			{Text: "/exit", Description: "Exit the application"},
+			{Text: "/help", Description: "Show help information"},
+		}
+	}
+
+	return []prompt.Suggest{}
 }
 
 func (c *CLI) NewChatCommand(ctx context.Context, userInput string) (*entities.Chat, error) {
@@ -352,7 +377,7 @@ func Bash(cmd string) (map[string][]byte, error) {
 func (c *CLI) displayMessage(msg entities.Message) {
 	switch msg.Role {
 	case "assistant":
-		fmt.Printf("Assistant:\n%s\n", msg.Content)
+		fmt.Printf("\rAssistant:\n%s\n", msg.Content)
 	case "user":
 		fmt.Printf("User: %s\n", msg.Content)
 	case "tool":
