@@ -62,16 +62,20 @@ func (t *FileTool) FullDescription() string {
 
 	// Add detailed usage instructions
 	b.WriteString("## Usage Instructions\n")
-	b.WriteString("This tool supports various file operations. Below are the key operations and their parameters:\n\n")
+	b.WriteString("This tool supports various file operations with size and line limits for large files. Below are the key operations and their parameters:\n\n")
 	b.WriteString("- **get_info**: Retrieves file information such as size, creation date, modification date, and permissions.\n")
-	b.WriteString("- **search**: Searches for text within a file or directory using a pattern. Returns a JSON array with line numbers and matching lines. Use `all_files=true` to search all files in a directory recursively.\n")
+	b.WriteString("- **search**: Searches for text within a file or directory using a pattern. Returns a JSON array with line numbers and matching lines. Use `all_files=true` to search all files in a directory recursively. Limited to 1000 lines or 10MB per file.\n")
 	b.WriteString("  - Example: Search single file: `operation='search', path='file.txt', pattern='text'`\n")
 	b.WriteString("  - Example: Search all files: `operation='search', path='.', pattern='text', all_files=true`\n")
-	b.WriteString("- **read**: Reads content from a file. Returns a JSON array with line numbers and text. Use `start_line` and `end_line` to specify a range of lines to read.\n")
-	b.WriteString("- **write**: Writes or overwrites content to a file. Provide `content` to specify the new file content.\n")
-	b.WriteString("- **edit**: Modifies specific lines in a file. Use `start_line`, `end_line`, and `content` to replace the specified lines.\n")
-	b.WriteString("  - Example: To edit lines 5 to 7, set `start_line=5`, `end_line=7`, and provide the new `content` for those lines.\n")
-	b.WriteString("  - Use `dry_run=true` to preview changes without applying them.\n")
+	b.WriteString("- **read**: Reads content from a file. Returns a JSON array with line numbers and text. Use `start_line` and `end_line` to specify a range of lines to read. Limited to 1000 lines or 10MB per file.\n")
+	b.WriteString("- **write**: Overwrites or creates a file with new content. Provide `content` to specify the full file content. For line-specific changes, use `edit`, `insert`, or `delete`.\n")
+	b.WriteString("- **edit**: Replaces specific lines in a file with new content. Use `start_line`, `end_line`, and `content` to replace the specified lines. For full file replacement, use `write` instead.\n")
+	b.WriteString("  - Example: To replace lines 5 to 7, set `operation='edit', start_line=5, end_line=7`, and provide the new `content` for those lines.\n")
+	b.WriteString("- **insert**: Inserts new content at a specific line. Use `start_line` and `content` to insert the content before the specified line.\n")
+	b.WriteString("  - Example: To insert content at line 5, set `operation='insert', start_line=5`, and provide the `content` to insert.\n")
+	b.WriteString("- **delete**: Deletes specific lines in a file. Use `start_line` and `end_line` to specify the lines to delete.\n")
+	b.WriteString("  - Example: To delete lines 5 to 7, set `operation='delete', start_line=5, end_line=7`.\n")
+	b.WriteString("  - Use `dry_run=true` to preview changes without applying them for `edit`, `insert`, or `delete` operations.\n")
 	b.WriteString("This tool also supports various directory operations:\n\n")
 	b.WriteString("- **directory_tree**, **create_directory**, **list_directory**, **move**: Perform directory and file management tasks.\n\n")
 
@@ -93,7 +97,7 @@ func (t *FileTool) Parameters() []entities.Parameter {
 		{
 			Name:        "operation",
 			Type:        "string",
-			Enum:        []string{"read", "write", "edit", "create_directory", "list_directory", "directory_tree", "move", "search", "get_info"},
+			Enum:        []string{"read", "write", "edit", "insert", "delete", "create_directory", "list_directory", "directory_tree", "move", "search", "get_info"},
 			Description: "The file operation to perform",
 			Required:    true,
 		},
@@ -112,25 +116,25 @@ func (t *FileTool) Parameters() []entities.Parameter {
 		{
 			Name:        "content",
 			Type:        "string",
-			Description: "Content to write or edit (for write or edit operations)",
+			Description: "Content to write, edit, or insert (for write, edit, or insert operations)",
 			Required:    false,
 		},
 		{
 			Name:        "start_line",
 			Type:        "integer",
-			Description: "The start line for reading or editing",
+			Description: "The start line for reading, editing, inserting, or deleting",
 			Required:    false,
 		},
 		{
 			Name:        "end_line",
 			Type:        "integer",
-			Description: "The end line for reading or editing",
+			Description: "The end line for reading, editing, or deleting",
 			Required:    false,
 		},
 		{
 			Name:        "dry_run",
 			Type:        "boolean",
-			Description: "Preview changes without applying them (for edit operation)",
+			Description: "Preview changes without applying them (for edit, insert, or delete operations)",
 			Required:    false,
 		},
 		{
@@ -162,14 +166,26 @@ func (t *FileTool) validatePath(path string) (string, error) {
 	rel, err := filepath.Rel(workspace, fullPath)
 	if err != nil || strings.HasPrefix(rel, "..") {
 		t.logger.Error("Path is outside workspace", zap.String("path", path))
-		return "", nil
+		return "", fmt.Errorf("path is outside workspace")
 	}
 	return fullPath, nil
 }
 
+func (t *FileTool) checkFileSize(path string) (bool, error) {
+	const maxFileSize = 10 * 1024 * 1024 // 10MB
+	info, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+	if info.Size() > maxFileSize {
+		t.logger.Error("File size exceeds limit", zap.String("path", path), zap.Int64("size", info.Size()), zap.Int64("limit", maxFileSize))
+		return false, fmt.Errorf("file size %s exceeds limit of %s", humanize.Bytes(uint64(info.Size())), humanize.Bytes(maxFileSize))
+	}
+	return true, nil
+}
+
 func (t *FileTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing file operation", zap.String("arguments", arguments))
-	fmt.Println("\rExecuting file operation", arguments)
 
 	var args struct {
 		Operation   string `json:"operation"`
@@ -184,7 +200,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
-		return "", err
+		return "", fmt.Errorf("failed to parse arguments: %v", err)
 	}
 
 	if args.Operation == "" {
@@ -205,7 +221,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		info, err := os.Stat(fullPath)
 		if err != nil {
 			t.logger.Error("Failed to get file info", zap.String("path", fullPath), zap.Error(err))
-			return "", err
+			return "", fmt.Errorf("failed to get file info: %v", err)
 		}
 		result := []string{
 			"size: " + formatSize(info.Size()),
@@ -244,7 +260,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 			jsonResponse, err = json.Marshal(response)
 			if err != nil {
 				t.logger.Error("Failed to marshal multi-file search results", zap.Error(err))
-				return "", err
+				return "", fmt.Errorf("failed to marshal multi-file search results: %v", err)
 			}
 		} else {
 			results, err := t.search(fullPath, args.Pattern)
@@ -261,7 +277,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 			jsonResponse, err = json.Marshal(response)
 			if err != nil {
 				t.logger.Error("Failed to marshal search results", zap.Error(err))
-				return "", err
+				return "", fmt.Errorf("failed to marshal search results: %v", err)
 			}
 		}
 		resultsStr := string(jsonResponse)
@@ -276,13 +292,17 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		if ok, err := t.checkFileSize(fullPath); !ok {
+			return "", err
+		}
 		file, err := os.Open(fullPath)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("failed to open file: %v", err)
 		}
 		defer file.Close()
 		startLine := args.StartLine
 		endLine := args.EndLine
+		const maxLines = 1000
 
 		var lines []LineResult
 		scanner := bufio.NewScanner(file)
@@ -290,6 +310,10 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 
 		for scanner.Scan() {
 			lineNum++
+			if lineNum > maxLines {
+				t.logger.Warn("Line count exceeds limit", zap.String("path", fullPath), zap.Int("limit", maxLines))
+				return "", fmt.Errorf("file exceeds line limit of %d lines", maxLines)
+			}
 			if startLine > 0 && lineNum < startLine {
 				continue
 			}
@@ -304,7 +328,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 
 		if err := scanner.Err(); err != nil {
 			t.logger.Error("Error reading file", zap.String("path", fullPath), zap.Error(err))
-			return "Error reading file", err
+			return "", fmt.Errorf("error reading file: %v", err)
 		}
 
 		if len(lines) == 0 {
@@ -314,7 +338,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		jsonResponse, err := json.Marshal(lines)
 		if err != nil {
 			t.logger.Error("Failed to marshal read results", zap.Error(err))
-			return "Invalid json format", err
+			return "", fmt.Errorf("failed to marshal read results: %v", err)
 		}
 
 		results := string(jsonResponse)
@@ -328,36 +352,51 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	case "write":
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
-			return "Path not found", err
+			return "", fmt.Errorf("invalid path: %v", err)
 		}
 		err = os.WriteFile(fullPath, []byte(args.Content), 0644)
 		if err != nil {
 			t.logger.Error("Failed to write file", zap.String("path", fullPath), zap.Error(err))
-			return "Failed to write file", err
+			return "", fmt.Errorf("failed to write file: %v", err)
 		}
 		t.logger.Info("File written successfully", zap.String("path", fullPath))
 		return "File written successfully", nil
 
-	case "edit":
+	case "edit", "insert", "delete":
 		if args.StartLine == 0 {
 			args.StartLine = 1
 		}
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
-			return "Invalid Path", err
+			return "", fmt.Errorf("invalid path: %v", err)
 		}
-		results, err := t.applyLineEdit(fullPath, args.StartLine, args.EndLine, args.Content, args.DryRun)
+		if args.Operation == "edit" && args.EndLine == 0 {
+			t.logger.Error("End line is required for edit operation")
+			return "", fmt.Errorf("end_line is required for edit operation")
+		}
+		if args.Operation == "edit" && args.Content == "" {
+			t.logger.Error("Content is required for edit operation")
+			return "", fmt.Errorf("content is required for edit operation")
+		}
+		if args.Operation == "insert" && args.Content == "" {
+			t.logger.Error("Content is required for insert operation")
+			return "", fmt.Errorf("content is required for insert operation")
+		}
+		if args.Operation == "delete" && args.EndLine == 0 {
+			args.EndLine = args.StartLine
+		}
+		results, err := t.applyLineEdit(fullPath, args.Operation, args.StartLine, args.EndLine, args.Content, args.DryRun)
 		return results, err
 
 	case "create_directory":
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
-			return "Invalid Path", err
+			return "", fmt.Errorf("invalid path: %v", err)
 		}
 		err = os.MkdirAll(fullPath, 0755)
 		if err != nil {
 			t.logger.Error("Failed to create directory", zap.String("path", fullPath), zap.Error(err))
-			return "Failed to create directory", err
+			return "", fmt.Errorf("failed to create directory: %v", err)
 		}
 		t.logger.Info("Directory created successfully", zap.String("path", fullPath))
 		return "Directory created successfully", nil
@@ -365,12 +404,12 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	case "list_directory":
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
-			return "Invalid Path", err
+			return "", fmt.Errorf("invalid path: %v", err)
 		}
 		entries, err := os.ReadDir(fullPath)
 		if err != nil {
 			t.logger.Error("Failed to list directory", zap.String("path", fullPath), zap.Error(err))
-			return "Failed to list directory", err
+			return "", fmt.Errorf("failed to list directory: %v", err)
 		}
 		var formatted []string
 		for _, entry := range entries {
@@ -390,12 +429,12 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	case "directory_tree":
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
-			return "Invalid Path", err
+			return "", fmt.Errorf("invalid path: %v", err)
 		}
 		tree, err := t.buildDirectoryTree(fullPath)
 		if err != nil {
 			t.logger.Error("Failed to build directory tree", zap.String("path", fullPath), zap.Error(err))
-			return "Failed to build tree", err
+			return "", fmt.Errorf("failed to build directory tree: %v", err)
 		}
 		jsonTree, _ := json.MarshalIndent(tree, "", "  ")
 		results := string(jsonTree)
@@ -408,35 +447,35 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 	case "move":
 		if args.Destination == "" {
 			t.logger.Error("Destination is required for move operation")
-			return "Destination is required", fmt.Errorf("destination is required")
+			return "", fmt.Errorf("destination is required")
 		}
 		srcPath, err := t.validatePath(args.Path)
 		if err != nil {
-			return "Invalid Source Path", err
+			return "", fmt.Errorf("invalid source path: %v", err)
 		}
 		dstPath, err := t.validatePath(args.Destination)
 		if err != nil {
-			return "Invalid Destination Path", err
+			return "", fmt.Errorf("invalid destination path: %v", err)
 		}
 		err = os.Rename(srcPath, dstPath)
 		if err != nil {
 			t.logger.Error("Failed to move file", zap.String("source", srcPath), zap.String("dest", dstPath), zap.Error(err))
-			return "Failed to move file", err
+			return "", fmt.Errorf("failed to move file: %v", err)
 		}
 		t.logger.Info("File moved successfully", zap.String("source", srcPath), zap.String("dest", dstPath))
 		return "File moved successfully", nil
 
 	default:
 		t.logger.Error("Unknown operation", zap.String("operation", args.Operation))
-		return "Unknown operation", fmt.Errorf("unknown operation: %s", args.Operation)
+		return "", fmt.Errorf("unknown operation: %s", args.Operation)
 	}
 }
 
-func (t *FileTool) applyLineEdit(filePath string, startLine, endLine int, content string, dryRun bool) (string, error) {
+func (t *FileTool) applyLineEdit(filePath, operation string, startLine, endLine int, content string, dryRun bool) (string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		t.logger.Error("Failed to read file for edit", zap.String("path", filePath), zap.Error(err))
-		return "Failed to read file for edit", err
+		return "", fmt.Errorf("failed to read file: %v", err)
 	}
 	defer file.Close()
 
@@ -447,20 +486,41 @@ func (t *FileTool) applyLineEdit(filePath string, startLine, endLine int, conten
 	}
 	if err := scanner.Err(); err != nil {
 		t.logger.Error("Error reading file lines", zap.Error(err))
-		return "Error reading file lines", err
+		return "", fmt.Errorf("error reading file lines: %v", err)
 	}
 
-	if startLine > len(originalLines) {
-		t.logger.Error("Start line exceeds file length", zap.Int("start_line", startLine), zap.Int("file_lines", len(originalLines)))
-		return "start exceeds file length", fmt.Errorf("start_line %d exceeds file length %d", startLine, len(originalLines))
+	if startLine > len(originalLines)+1 || startLine < 1 {
+		t.logger.Error("Invalid start line", zap.Int("start_line", startLine), zap.Int("file_lines", len(originalLines)))
+		return "", fmt.Errorf("start_line %d is invalid, must be between 1 and %d", startLine, len(originalLines)+1)
+	}
+	if (operation == "edit" || operation == "delete") && endLine > len(originalLines) {
+		t.logger.Error("End line exceeds file length", zap.Int("end_line", endLine), zap.Int("file_lines", len(originalLines)))
+		return "", fmt.Errorf("end_line %d exceeds file length %d", endLine, len(originalLines))
+	}
+	if (operation == "edit" || operation == "delete") && endLine < startLine {
+		t.logger.Error("End line is less than start line", zap.Int("start_line", startLine), zap.Int("end_line", endLine))
+		return "", fmt.Errorf("end_line %d is less than start_line %d", endLine, startLine)
 	}
 
-	newContentLines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
 	var modifiedLines []string
-	modifiedLines = append(modifiedLines, originalLines[:startLine-1]...)
-	modifiedLines = append(modifiedLines, newContentLines...)
-	if endLine < len(originalLines) {
-		modifiedLines = append(modifiedLines, originalLines[endLine:]...)
+	switch operation {
+	case "edit":
+		newContentLines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
+		modifiedLines = append(modifiedLines, originalLines[:startLine-1]...)
+		modifiedLines = append(modifiedLines, newContentLines...)
+		if endLine < len(originalLines) {
+			modifiedLines = append(modifiedLines, originalLines[endLine:]...)
+		}
+	case "insert":
+		newContentLines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
+		modifiedLines = append(modifiedLines, originalLines[:startLine-1]...)
+		modifiedLines = append(modifiedLines, newContentLines...)
+		modifiedLines = append(modifiedLines, originalLines[startLine-1:]...)
+	case "delete":
+		modifiedLines = append(modifiedLines, originalLines[:startLine-1]...)
+		if endLine < len(originalLines) {
+			modifiedLines = append(modifiedLines, originalLines[endLine:]...)
+		}
 	}
 
 	original := strings.Join(originalLines, "\n")
@@ -481,16 +541,16 @@ func (t *FileTool) applyLineEdit(filePath string, startLine, endLine int, conten
 	diffStr, err := difflib.GetUnifiedDiffString(diff)
 	if err != nil {
 		t.logger.Error("Failed to generate diff", zap.Error(err))
-		return "Failed to generate diff", err
+		return "", fmt.Errorf("failed to generate diff: %v", err)
 	}
 
 	if !dryRun {
 		err = os.WriteFile(filePath, []byte(modified+"\n"), 0644)
 		if err != nil {
 			t.logger.Error("Failed to write edited file", zap.String("path", filePath), zap.Error(err))
-			return "Failed to write to file", err
+			return "", fmt.Errorf("failed to write to file: %v", err)
 		}
-		t.logger.Info("File edited successfully", zap.String("path", filePath))
+		t.logger.Info("File edited successfully", zap.String("path", filePath), zap.String("operation", operation))
 	}
 
 	return "```diff\n" + diffStr + "\n```", nil
@@ -528,10 +588,13 @@ func (t *FileTool) buildDirectoryTree(path string) ([]TreeEntry, error) {
 }
 
 func (t *FileTool) search(filePath, pattern string) ([]LineResult, error) {
+	if ok, err := t.checkFileSize(filePath); !ok {
+		return nil, err
+	}
 	file, err := os.Open(filePath)
 	if err != nil {
 		t.logger.Error("Failed to open file for search", zap.String("path", filePath), zap.Error(err))
-		return nil, err
+		return nil, fmt.Errorf("failed to open file: %v", err)
 	}
 	defer file.Close()
 
@@ -539,9 +602,14 @@ func (t *FileTool) search(filePath, pattern string) ([]LineResult, error) {
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
 	lowerPattern := strings.ToLower(pattern)
+	const maxLines = 1000
 
 	for scanner.Scan() {
 		lineNum++
+		if lineNum > maxLines {
+			t.logger.Warn("Line count exceeds limit", zap.String("path", filePath), zap.Int("limit", maxLines))
+			return nil, fmt.Errorf("file exceeds line limit of %d lines", maxLines)
+		}
 		line := scanner.Text()
 		if strings.Contains(strings.ToLower(line), lowerPattern) {
 			results = append(results, LineResult{
@@ -552,7 +620,7 @@ func (t *FileTool) search(filePath, pattern string) ([]LineResult, error) {
 	}
 	if err := scanner.Err(); err != nil {
 		t.logger.Error("Error reading file during search", zap.String("path", filePath), zap.Error(err))
-		return nil, err
+		return nil, fmt.Errorf("error reading file: %v", err)
 	}
 
 	if len(results) == 0 {
