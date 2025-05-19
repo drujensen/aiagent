@@ -38,19 +38,21 @@ func restoreTermState() {
 }
 
 type CLI struct {
-	chatService  services.ChatService
-	agentService services.AgentService
-	toolService  services.ToolService
-	logger       *zap.Logger
-	cancel       context.CancelFunc
+	chatService     services.ChatService
+	agentService    services.AgentService
+	toolService     services.ToolService
+	providerService services.ProviderService
+	logger          *zap.Logger
+	cancel          context.CancelFunc
 }
 
-func NewCLI(chatService services.ChatService, agentService services.AgentService, toolService services.ToolService, logger *zap.Logger) *CLI {
+func NewCLI(chatService services.ChatService, agentService services.AgentService, toolService services.ToolService, providerService services.ProviderService, logger *zap.Logger) *CLI {
 	return &CLI{
-		chatService:  chatService,
-		agentService: agentService,
-		toolService:  toolService,
-		logger:       logger,
+		chatService:     chatService,
+		agentService:    agentService,
+		toolService:     toolService,
+		providerService: providerService,
+		logger:          logger,
 	}
 }
 
