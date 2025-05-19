@@ -1,18 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"html/template"
 	"os"
 	"path/filepath"
-	"slices"
 	"time"
 
-	apicontrollers "aiagent/internal/api/controllers"
 	"aiagent/internal/cli"
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/interfaces"
@@ -22,14 +18,8 @@ import (
 	repositoriesJson "aiagent/internal/impl/repositories/json"
 	repositoriesMongo "aiagent/internal/impl/repositories/mongo"
 	"aiagent/internal/impl/tools"
-	uiapicontrollers "aiagent/internal/ui/controllers"
+	"aiagent/internal/ui"
 
-	"github.com/dustin/go-humanize"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
-	echoSwagger "github.com/swaggo/echo-swagger"
-	"github.com/yuin/goldmark"
-	gfmext "github.com/yuin/goldmark/extension"
 	"go.uber.org/zap"
 
 	_ "aiagent/docs"
@@ -145,94 +135,9 @@ func main() {
 	chatService := services.NewChatService(chatRepo, agentRepo, providerRepo, toolRepo, cfg, logger)
 
 	if modeStr == "serve" {
-		funcMap := template.FuncMap{
-			"renderMarkdown": renderMarkdown,
-			"inArray": func(value string, array []string) bool {
-				return slices.Contains(array, value)
-			},
-			"add": func(a, b int) int {
-				return a + b
-			},
-			"sub": func(a, b int) int {
-				return a - b
-			},
-			"formatNumber": func(num int) string {
-				return humanize.Comma(int64(num))
-			},
-		}
-
-		tmpl, err := template.New("").Funcs(funcMap).ParseFiles(
-			"internal/ui/templates/layout.html",
-			"internal/ui/templates/header.html",
-			"internal/ui/templates/sidebar.html",
-			"internal/ui/templates/home.html",
-			"internal/ui/templates/sidebar_chats.html",
-			"internal/ui/templates/sidebar_agents.html",
-			"internal/ui/templates/sidebar_tools.html",
-			"internal/ui/templates/chat_form.html",
-			"internal/ui/templates/agent_form.html",
-			"internal/ui/templates/tool_form.html",
-			"internal/ui/templates/chat.html",
-			"internal/ui/templates/messages_partial.html",
-			"internal/ui/templates/message_session_partial.html",
-			"internal/ui/templates/provider_models_partial.html",
-			"internal/ui/templates/providers_list_content.html",
-			"internal/ui/templates/chat_cost_partial.html",
-			"internal/ui/templates/message_controls.html",
-		)
-		if err != nil {
-			logger.Fatal("Failed to parse templates", zap.Error(err))
-		}
-
-		homeController := uiapicontrollers.NewHomeController(logger, tmpl, chatService, agentService, toolService)
-		agentController := uiapicontrollers.NewAgentController(logger, tmpl, agentService, toolService, providerService)
-		chatController := uiapicontrollers.NewChatController(logger, tmpl, chatService, agentService)
-		toolFactory, err := tools.NewToolFactory()
-		if err != nil {
-			logger.Fatal("Failed to initialize tool factory", zap.Error(err))
-		}
-		toolController := uiapicontrollers.NewToolController(logger, tmpl, toolService, toolFactory)
-		providerController := uiapicontrollers.NewProviderController(logger, tmpl, providerService)
-
-		apiAgentController := apicontrollers.NewAgentController(logger, agentService)
-		apiChatController := apicontrollers.NewChatController(logger, chatService)
-
-		e := echo.New()
-		e.Use(middleware.Logger())
-		e.Use(middleware.Recover())
-		e.Use(middleware.RequestID())
-		e.Use(middleware.CORS())
-		e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-			return func(c echo.Context) error {
-				c.Set("logger", logger)
-				return next(c)
-			}
-		})
-
-		e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-			return func(c echo.Context) error {
-				c.Response().Header().Set("Content-Language", "en")
-				return next(c)
-			}
-		})
-
-		e.Static("/static", "internal/ui/static")
-
-		homeController.RegisterRoutes(e)
-		agentController.RegisterRoutes(e)
-		chatController.RegisterRoutes(e)
-		toolController.RegisterRoutes(e)
-		providerController.RegisterRoutes(e)
-
-		api := e.Group("/api")
-		apiAgentController.RegisterRoutes(api)
-		apiChatController.RegisterRoutes(api)
-
-		e.GET("/swagger/*", echoSwagger.WrapHandler)
-
-		logger.Info("Starting HTTP server on :8080")
-		if err := e.Start(":8080"); err != nil {
-			logger.Fatal("Failed to start server", zap.Error(err))
+		uiApp := ui.NewUI(chatService, agentService, toolService, providerService, logger)
+		if err := uiApp.Run(context.Background()); err != nil {
+			logger.Fatal("UI failed", zap.Error(err))
 		}
 	} else {
 		cliApp := cli.NewCLI(chatService, agentService, toolService, logger)
@@ -240,14 +145,6 @@ func main() {
 			logger.Fatal("CLI failed", zap.Error(err))
 		}
 	}
-}
-
-func renderMarkdown(markdown string) (template.HTML, error) {
-	var buf bytes.Buffer
-	if err := goldmark.New(goldmark.WithExtensions(gfmext.GFM)).Convert([]byte(markdown), &buf); err != nil {
-		return "", err
-	}
-	return template.HTML(buf.String()), nil
 }
 
 func init() {
