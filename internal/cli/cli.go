@@ -139,7 +139,7 @@ func (c *CLI) Run(ctx context.Context) error {
 				fmt.Println("Available commands:")
 				fmt.Println("? - Show this help message")
 				fmt.Println("!<command> - Execute a shell command")
-				fmt.Println("/new {name} - Start a new chat")
+				fmt.Println("/new <name> - Start a new chat")
 				fmt.Println("/history - Select from all available chats")
 				fmt.Println("/agents - List available agents")
 				fmt.Println("/tools - List available tools")
@@ -270,8 +270,8 @@ func completer(d prompt.Document) []prompt.Suggest {
 	// List of all possible suggestions
 	suggestions := []prompt.Suggest{
 		{Text: "?", Description: "Show help information"},
-		{Text: "!{cmd}", Description: "Execute a shell command"},
-		{Text: "/new {name}", Description: "Start a new chat"},
+		{Text: "!<command>", Description: "Execute a shell command"},
+		{Text: "/new <name>", Description: "Start a new chat"},
 		{Text: "/history", Description: "Select from all available chats"},
 		{Text: "/agents", Description: "List available agents"},
 		{Text: "/tools", Description: "List available tools"},
