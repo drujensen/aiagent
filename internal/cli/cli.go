@@ -42,6 +42,7 @@ type CLI struct {
 	agentService services.AgentService
 	toolService  services.ToolService
 	logger       *zap.Logger
+	cancel       context.CancelFunc
 }
 
 func NewCLI(chatService services.ChatService, agentService services.AgentService, toolService services.ToolService, logger *zap.Logger) *CLI {
@@ -56,11 +57,29 @@ func NewCLI(chatService services.ChatService, agentService services.AgentService
 // Run starts the CLI interface, displaying chat history and handling user input.
 func (c *CLI) Run(ctx context.Context) error {
 	saveTermState()
-	fmt.Println("AI Agent Console. Type '/help' for list of commands.")
+	// convert the context to a cancellable context
+	ctx, cancel := context.WithCancel(ctx)
+	c.cancel = cancel
+
+	fmt.Println("AI Agent Console. Type '?' for help.")
 
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	var wg sync.WaitGroup
+	stopSpinner := make(chan bool)
+
+	// Handle interrupt signal in a separate goroutine
+	go func() {
+		<-sigChan
+		close(stopSpinner)
+		wg.Wait()
+		restoreTermState()
+		fmt.Println("\nReceived interrupt signal. Shutting down...")
+		cancel()
+		os.Exit(0)
+	}()
 
 	// Select the active chat from the repository
 	chats, err := c.chatService.ListChats(context.Background())
@@ -92,10 +111,6 @@ func (c *CLI) Run(ctx context.Context) error {
 		c.displayMessage(msg)
 	}
 
-	// Spinner functions
-	var wg sync.WaitGroup
-	stopSpinner := make(chan bool)
-
 	startSpinner := func() {
 		wg.Add(1)
 		go func() {
@@ -118,151 +133,148 @@ func (c *CLI) Run(ctx context.Context) error {
 
 	// Main interaction loop
 	for {
-		select {
-		case <-sigChan:
-			fmt.Println("\nShutting down...")
-			return nil
-		default:
-			userInput := prompt.Input(">: ", completer,
-				prompt.OptionPrefixTextColor(prompt.Blue),
-				prompt.OptionAddKeyBind(prompt.KeyBind{
-					Key: prompt.ControlC,
-					Fn: func(buf *prompt.Buffer) {
-						fmt.Println("\nShutting down...")
-						restoreTermState()
-						os.Exit(0)
-					},
-				}),
-			)
-			userInput = strings.TrimSpace(userInput)
-			if userInput == "?" {
-				fmt.Println("Available commands:")
-				fmt.Println("? - Show this help message")
-				fmt.Println("!<command> - Execute a shell command")
-				fmt.Println("/new <name> - Start a new chat")
-				fmt.Println("/history - Select from all available chats")
-				fmt.Println("/agents - List available agents")
-				fmt.Println("/tools - List available tools")
-				fmt.Println("/usage - Show usage information")
-				fmt.Println("/exit - Exit the application")
-				continue
-			}
-
-			if strings.HasPrefix(userInput, "!") {
-				cmd := userInput[1:]
-				output, err := c.RunBashCommand(cmd)
-				if err != nil {
-					fmt.Printf("Error executing command: %s\n", err)
-				} else {
-					fmt.Println(output)
-				}
-				continue
-			}
-
-			if userInput == "/history" {
-				err := c.HistoryCommand(ctx)
-				if err != nil {
-					c.logger.Error("Failed to select chat", zap.Error(err))
-					fmt.Println("Error selecting chat:", err)
-				}
-				continue
-			}
-
-			if strings.HasPrefix(userInput, "/new") {
-				newChat, err := c.NewChatCommand(ctx, userInput)
-				if err != nil {
-					c.logger.Error("Failed to create new chat", zap.Error(err))
-					fmt.Println("Error creating new chat:", err)
-				}
-				chat = newChat
-				continue
-			}
-
-			if userInput == "/agents" {
-				agents, err := c.agentService.ListAgents(ctx)
-				if err != nil {
-					c.logger.Error("Failed to list agents", zap.Error(err))
-					fmt.Println("Error listing agents:", err)
-					continue
-				}
-				fmt.Println("Available agents:")
-				for _, agent := range agents {
-					fmt.Printf("- %s (%s)\n", agent.Name, agent.ProviderType)
-				}
-				continue
-			}
-
-			if userInput == "/tools" {
-				tools, err := c.toolService.ListTools()
-				if err != nil {
-					c.logger.Error("Failed to list tools", zap.Error(err))
-					fmt.Println("Error listing tools:", err)
-					continue
-				}
-				fmt.Println("Available tools:")
-				for _, tool := range tools {
-					fmt.Printf("- %s\n", (*tool).Name())
-				}
-				continue
-			}
-
-			if userInput == "/usage" {
-				agent, err := c.agentService.GetAgent(ctx, chat.AgentID)
-				if err != nil {
-					c.logger.Error("Failed to get agent", zap.Error(err))
-					fmt.Println("Error getting agent:", err)
-					continue
-				}
-				fmt.Printf("Chat Usage:\n- Provider: %s\n- Model: %s\n- Prompt Tokens: %d\n- Completion Tokens: %d\n- Total Tokens: %d\n- Total Cost: $%.2f\n",
-					agent.ProviderType, agent.Model, chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
-				continue
-			}
-
-			if userInput == "exit" || userInput == "quit" || userInput == "/exit" || userInput == "/quit" {
-				restoreTermState()
-				fmt.Println("Shutting down...")
-				fmt.Printf("Chat Usage:\n- Prompt Tokens: %d\n- Completion Tokens: %d\n- Total Tokens: %d\n- Total Cost: $%.2f\n",
-					chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
-				return nil
-			}
-
-			// Create and save user message
-			message := entities.NewMessage("user", userInput)
-
-			// Start the spinner
-			startSpinner()
-
-			// Generate assistant response
-			response, err := c.chatService.SendMessage(ctx, chat.ID, message)
-
-			// Stop the spinner
-			stopSpinner <- true
-			wg.Wait()
-
-			if err != nil {
-				c.logger.Error("Failed to generate response", zap.Error(err))
-				fmt.Println("Error generating response:", err)
-				continue
-			}
-
-			// Strip any <think>*</think> tags from the response including the content
-			responseContent := response.Content
-			for {
-				start := strings.Index(responseContent, "<think>")
-				end := strings.Index(responseContent, "</think>")
-				if start == -1 || end == -1 {
-					break
-				}
-
-				// Remove the <think></think> section, turning the string into "before" + "after"
-				responseContent = responseContent[:start] + responseContent[end+len("</think>"):]
-			}
-
-			// Update the response Content
-			response.Content = responseContent
-
-			c.displayMessage(*response)
+		userInput := prompt.Input(">: ", completer,
+			prompt.OptionPrefixTextColor(prompt.Blue),
+			prompt.OptionAddKeyBind(prompt.KeyBind{
+				Key: prompt.ControlC,
+				Fn: func(buf *prompt.Buffer) {
+					fmt.Println("\nRecieved CTRL+C. Shutting down...")
+					close(stopSpinner)
+					wg.Wait()
+					restoreTermState()
+					c.cancel()
+					os.Exit(0)
+				},
+			}),
+		)
+		userInput = strings.TrimSpace(userInput)
+		if userInput == "?" {
+			fmt.Println("Available commands:")
+			fmt.Println("? - Show this help message")
+			fmt.Println("!<command> - Execute a shell command")
+			fmt.Println("/new <name> - Start a new chat")
+			fmt.Println("/history - Select from all available chats")
+			fmt.Println("/agents - List available agents")
+			fmt.Println("/tools - List available tools")
+			fmt.Println("/usage - Show usage information")
+			fmt.Println("/exit - Exit the application")
+			continue
 		}
+
+		if strings.HasPrefix(userInput, "!") {
+			cmd := userInput[1:]
+			output, err := c.RunBashCommand(cmd)
+			if err != nil {
+				fmt.Printf("Error executing command: %s\n", err)
+			} else {
+				fmt.Println(output)
+			}
+			continue
+		}
+
+		if userInput == "/history" {
+			err := c.HistoryCommand(ctx)
+			if err != nil {
+				c.logger.Error("Failed to select chat", zap.Error(err))
+				fmt.Println("Error selecting chat:", err)
+			}
+			continue
+		}
+
+		if strings.HasPrefix(userInput, "/new") {
+			newChat, err := c.NewChatCommand(ctx, userInput)
+			if err != nil {
+				c.logger.Error("Failed to create new chat", zap.Error(err))
+				fmt.Println("Error creating new chat:", err)
+			}
+			chat = newChat
+			continue
+		}
+
+		if userInput == "/agents" {
+			agents, err := c.agentService.ListAgents(ctx)
+			if err != nil {
+				c.logger.Error("Failed to list agents", zap.Error(err))
+				fmt.Println("Error listing agents:", err)
+				continue
+			}
+			fmt.Println("Available agents:")
+			for _, agent := range agents {
+				fmt.Printf("- %s (%s)\n", agent.Name, agent.ProviderType)
+			}
+			continue
+		}
+
+		if userInput == "/tools" {
+			tools, err := c.toolService.ListTools()
+			if err != nil {
+				c.logger.Error("Failed to list tools", zap.Error(err))
+				fmt.Println("Error listing tools:", err)
+				continue
+			}
+			fmt.Println("Available tools:")
+			for _, tool := range tools {
+				fmt.Printf("- %s\n", (*tool).Name())
+			}
+			continue
+		}
+
+		if userInput == "/usage" {
+			agent, err := c.agentService.GetAgent(ctx, chat.AgentID)
+			if err != nil {
+				c.logger.Error("Failed to get agent", zap.Error(err))
+				fmt.Println("Error getting agent:", err)
+				continue
+			}
+			fmt.Printf("Chat Usage:\n- Provider: %s\n- Model: %s\n- Prompt Tokens: %d\n- Completion Tokens: %d\n- Total Tokens: %d\n- Total Cost: $%.2f\n",
+				agent.ProviderType, agent.Model, chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
+			continue
+		}
+
+		if userInput == "exit" || userInput == "quit" || userInput == "/exit" || userInput == "/quit" {
+			restoreTermState()
+			fmt.Println("Shutting down...")
+			fmt.Printf("Chat Usage:\n- Prompt Tokens: %d\n- Completion Tokens: %d\n- Total Tokens: %d\n- Total Cost: $%.2f\n",
+				chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
+			return nil
+		}
+
+		// Create and save user message
+		message := entities.NewMessage("user", userInput)
+
+		// Start the spinner
+		startSpinner()
+
+		// Generate assistant response
+		response, err := c.chatService.SendMessage(ctx, chat.ID, message)
+
+		// Stop the spinner
+		stopSpinner <- true
+		wg.Wait()
+
+		if err != nil {
+			c.logger.Error("Failed to generate response", zap.Error(err))
+			fmt.Println("Error generating response:", err)
+			continue
+		}
+
+		// Strip any <think>*</think> tags from the response including the content
+		responseContent := response.Content
+		for {
+			start := strings.Index(responseContent, "<think>")
+			end := strings.Index(responseContent, "</think>")
+			if start == -1 || end == -1 {
+				break
+			}
+
+			// Remove the <think></think> section, turning the string into "before" + "after"
+			responseContent = responseContent[:start] + responseContent[end+len("</think>"):]
+		}
+
+		// Update the response Content
+		response.Content = responseContent
+
+		c.displayMessage(*response)
 	}
 }
 
