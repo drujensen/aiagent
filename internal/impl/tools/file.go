@@ -344,10 +344,6 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 			t.logger.Error("Invalid line range for edit", zap.Int("start_line", args.StartLine), zap.Int("end_line", args.EndLine))
 			return "", fmt.Errorf("start_line and end_line must be positive and end_line >= start_line")
 		}
-		if args.Content == "" {
-			t.logger.Error("Content is required for edit operation")
-			return "", fmt.Errorf("content is required for edit operation")
-		}
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
 			return "", err
