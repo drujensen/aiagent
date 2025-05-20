@@ -28,6 +28,11 @@ type LineResult struct {
 	Text string `json:"text"`
 }
 
+type RefreshResult struct {
+	LineCount int          `json:"line_count"`
+	Preview   []LineResult `json:"preview,omitempty"`
+}
+
 func NewFileTool(name, description string, configuration map[string]string, logger *zap.Logger) *FileTool {
 	return &FileTool{
 		name:          name,
@@ -62,19 +67,21 @@ func (t *FileTool) FullDescription() string {
 
 	// Add detailed usage instructions
 	b.WriteString("## Usage Instructions\n")
-	b.WriteString("This tool supports various file operations with size and line limits for large files. Below are the key operations and their parameters:\n\n")
+	b.WriteString("This tool supports various file operations with size and line limits for large files. **Important**: After performing `edit`, `insert`, or `delete` operations, always use `read` or `refresh` to get the updated line numbers before making further changes, as line numbers may shift.\n\n")
 	b.WriteString("- **get_info**: Retrieves file information such as size, creation date, modification date, and permissions.\n")
 	b.WriteString("- **search**: Searches for text within a file or directory using a pattern. Returns a JSON array with line numbers and matching lines. Use `all_files=true` to search all files in a directory recursively. Limited to 1000 lines or 10MB per file.\n")
 	b.WriteString("  - Example: Search single file: `operation='search', path='file.txt', pattern='text'`\n")
 	b.WriteString("  - Example: Search all files: `operation='search', path='.', pattern='text', all_files=true`\n")
 	b.WriteString("- **read**: Reads content from a file. Returns a JSON array with line numbers and text. Use `start_line` and `end_line` to specify a range of lines to read. Limited to 1000 lines or 10MB per file.\n")
+	b.WriteString("- **refresh**: Retrieves the current line count of a file and optionally a preview of up to 10 lines. Use this to sync line numbers after modifications without reading the entire file.\n")
+	b.WriteString("  - Example: Get line count and preview: `operation='refresh', path='file.txt', preview=true`\n")
 	b.WriteString("- **write**: Overwrites or creates a file with new content. Provide `content` to specify the full file content. For line-specific changes, use `edit`, `insert`, or `delete`.\n")
 	b.WriteString("- **edit**: Replaces specific lines in a file with new content. Use `start_line`, `end_line`, and `content` to replace the specified lines. For full file replacement, use `write` instead.\n")
-	b.WriteString("  - Example: To replace lines 5 to 7, set `operation='edit', start_line=5, end_line=7`, and provide the new `content` for those lines.\n")
+	b.WriteString("  - Example: To replace lines 5 to 7, set `operation='edit', start_line=5, end_line=7`, and provide the new `content` for those lines. Then use `refresh` or `read` to get updated line numbers.\n")
 	b.WriteString("- **insert**: Inserts new content at a specific line. Use `start_line` and `content` to insert the content before the specified line.\n")
-	b.WriteString("  - Example: To insert content at line 5, set `operation='insert', start_line=5`, and provide the `content` to insert.\n")
+	b.WriteString("  - Example: To insert content at line 5, set `operation='insert', start_line=5`, and provide the `content` to insert. Then use `refresh` or `read` to get updated line numbers.\n")
 	b.WriteString("- **delete**: Deletes specific lines in a file. Use `start_line` and `end_line` to specify the lines to delete.\n")
-	b.WriteString("  - Example: To delete lines 5 to 7, set `operation='delete', start_line=5, end_line=7`.\n")
+	b.WriteString("  - Example: To delete lines 5 to 7, set `operation='delete', start_line=5, end_line=7`. Then use `refresh` or `read` to get updated line numbers.\n")
 	b.WriteString("  - Use `dry_run=true` to preview changes without applying them for `edit`, `insert`, or `delete` operations.\n")
 	b.WriteString("This tool also supports various directory operations:\n\n")
 	b.WriteString("- **directory_tree**, **create_directory**, **list_directory**, **move**: Perform directory and file management tasks.\n\n")
@@ -97,7 +104,7 @@ func (t *FileTool) Parameters() []entities.Parameter {
 		{
 			Name:        "operation",
 			Type:        "string",
-			Enum:        []string{"read", "write", "edit", "insert", "delete", "create_directory", "list_directory", "directory_tree", "move", "search", "get_info"},
+			Enum:        []string{"read", "write", "edit", "insert", "delete", "create_directory", "list_directory", "directory_tree", "move", "search", "get_info", "refresh"},
 			Description: "The file operation to perform",
 			Required:    true,
 		},
@@ -149,6 +156,12 @@ func (t *FileTool) Parameters() []entities.Parameter {
 			Description: "Search all files in directory recursively (for search operation)",
 			Required:    false,
 		},
+		{
+			Name:        "preview",
+			Type:        "boolean",
+			Description: "Include a preview of up to 10 lines (for refresh operation)",
+			Required:    false,
+		},
 	}
 }
 
@@ -185,8 +198,7 @@ func (t *FileTool) checkFileSize(path string) (bool, error) {
 }
 
 func (t *FileTool) Execute(arguments string) (string, error) {
-	t.logger.Debug("Executing file command", zap.String("arguments", arguments))
-	fmt.Println("\rExecuting file command", arguments)
+	t.logger.Debug("Executing file operation", zap.String("arguments", arguments))
 
 	var args struct {
 		Operation   string `json:"operation"`
@@ -198,6 +210,7 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		EndLine     int    `json:"end_line"`
 		Destination string `json:"destination"`
 		AllFiles    bool   `json:"all_files"`
+		Preview     bool   `json:"preview"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
@@ -350,6 +363,52 @@ func (t *FileTool) Execute(arguments string) (string, error) {
 		t.logger.Info("File read successfully", zap.String("path", fullPath), zap.Int("lines", len(lines)))
 		return results, nil
 
+	case "refresh":
+		fullPath, err := t.validatePath(args.Path)
+		if err != nil {
+			return "", err
+		}
+		if ok, err := t.checkFileSize(fullPath); !ok {
+			return "", err
+		}
+		file, err := os.Open(fullPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to open file: %v", err)
+		}
+		defer file.Close()
+
+		var preview []LineResult
+		lineCount := 0
+		scanner := bufio.NewScanner(file)
+		const maxPreviewLines = 10
+
+		for scanner.Scan() {
+			lineCount++
+			if args.Preview && lineCount <= maxPreviewLines {
+				preview = append(preview, LineResult{
+					Line: lineCount,
+					Text: scanner.Text(),
+				})
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			t.logger.Error("Error reading file for refresh", zap.String("path", fullPath), zap.Error(err))
+			return "", fmt.Errorf("error reading file: %v", err)
+		}
+
+		result := RefreshResult{
+			LineCount: lineCount,
+			Preview:   preview,
+		}
+		jsonResponse, err := json.Marshal(result)
+		if err != nil {
+			t.logger.Error("Failed to marshal refresh results", zap.Error(err))
+			return "", fmt.Errorf("failed to marshal refresh results: %v", err)
+		}
+
+		t.logger.Info("File refreshed successfully", zap.String("path", fullPath), zap.Int("line_count", lineCount))
+		return string(jsonResponse), nil
+
 	case "write":
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
@@ -492,11 +551,11 @@ func (t *FileTool) applyLineEdit(filePath, operation string, startLine, endLine 
 
 	if startLine > len(originalLines)+1 || startLine < 1 {
 		t.logger.Error("Invalid start line", zap.Int("start_line", startLine), zap.Int("file_lines", len(originalLines)))
-		return "", fmt.Errorf("start_line %d is invalid, must be between 1 and %d", startLine, len(originalLines)+1)
+		return "", fmt.Errorf("start_line %d is invalid, must be between 1 and %d. Use 'read' or 'refresh' to get current line numbers", startLine, len(originalLines)+1)
 	}
 	if (operation == "edit" || operation == "delete") && endLine > len(originalLines) {
 		t.logger.Error("End line exceeds file length", zap.Int("end_line", endLine), zap.Int("file_lines", len(originalLines)))
-		return "", fmt.Errorf("end_line %d exceeds file length %d", endLine, len(originalLines))
+		return "", fmt.Errorf("end_line %d exceeds file length %d. Use 'read' or 'refresh' to get current line numbers", endLine, len(originalLines))
 	}
 	if (operation == "edit" || operation == "delete") && endLine < startLine {
 		t.logger.Error("End line is less than start line", zap.Int("start_line", startLine), zap.Int("end_line", endLine))
@@ -529,7 +588,7 @@ func (t *FileTool) applyLineEdit(filePath, operation string, startLine, endLine 
 
 	if modified == original {
 		t.logger.Warn("No changes made to the file", zap.String("path", filePath))
-		return "No changes made to the file", nil
+		return fmt.Sprintf("No changes made to the file\nLine count: %d", len(originalLines)), nil
 	}
 
 	diff := difflib.UnifiedDiff{
@@ -554,7 +613,20 @@ func (t *FileTool) applyLineEdit(filePath, operation string, startLine, endLine 
 		t.logger.Info("File edited successfully", zap.String("path", filePath), zap.String("operation", operation))
 	}
 
-	return "```diff\n" + diffStr + "\n```", nil
+	result := struct {
+		Diff      string `json:"diff"`
+		LineCount int    `json:"line_count"`
+	}{
+		Diff:      "```diff\n" + diffStr + "\n```",
+		LineCount: len(modifiedLines),
+	}
+	jsonResponse, err := json.Marshal(result)
+	if err != nil {
+		t.logger.Error("Failed to marshal edit results", zap.Error(err))
+		return "", fmt.Errorf("failed to marshal edit results: %v", err)
+	}
+
+	return string(jsonResponse), nil
 }
 
 type TreeEntry struct {
