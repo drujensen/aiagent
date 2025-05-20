@@ -26,35 +26,38 @@ import (
 )
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: aiagent [serve] [-storage=type]\n")
+		flag.PrintDefaults()
+	}
+
 	storage := flag.String("storage", "file", "Storage type: file or mongo")
+
+	// Preserve the flags by not calling flag.Parse() yet
+	flag.CommandLine.Parse([]string{})
+
+	// Default mode is "console"
+	modeStr := "console"
+
+	// Check the first non-flag argument for the mode
+	if len(os.Args) > 1 && os.Args[1] == "serve" {
+		modeStr = "serve"
+		// Recreate the argument list stripping the "serve" part
+		// Exclude the program name argument (index 0) and "serve" (index 1)
+		os.Args = append(os.Args[:1], os.Args[2:]...)
+	}
+
+	// Parse the remaining arguments which are flags
 	flag.Parse()
 
-	modeStr := "console"
-	if len(flag.Args()) > 0 {
-		if len(flag.Args()) > 1 {
-			fmt.Fprintf(os.Stderr, "Too many arguments\n")
-			flag.Usage()
-			os.Exit(1)
-		}
-		arg := flag.Args()[0]
-		if arg == "serve" {
-			modeStr = "serve"
-		} else {
-			fmt.Fprintf(os.Stderr, "Invalid command: %s\n", arg)
-			flag.Usage()
-			os.Exit(1)
-		}
-	}
-	if *storage == "file" || *storage == "mongo" {
-	} else {
+	if *storage != "file" && *storage != "mongo" {
+		fmt.Fprintf(os.Stderr, "Invalid storage type: %s\n", *storage)
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: aiagent [flags]\n")
-		flag.PrintDefaults()
-	}
+	fmt.Printf("Running in mode: %s\n", modeStr)
+	fmt.Printf("Using storage: %s\n", *storage)
 
 	logConfig := zap.NewDevelopmentConfig()
 	logConfig.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
