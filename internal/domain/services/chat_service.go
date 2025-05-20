@@ -361,6 +361,9 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 
 	// Append all new messages to the chat's message history
 	for _, msg := range newMessages {
+		if msg.Content == "" {
+			msg.Content = "Unknown Error: No response generated"
+		}
 		chat.Messages = append(chat.Messages, *msg)
 	}
 
