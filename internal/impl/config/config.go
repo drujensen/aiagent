@@ -2,17 +2,17 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 
-	"github.com/spf13/viper"
+	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 )
 
 type Config struct {
-	MongoURI string `mapstructure:"MONGO_URI"`
+	MongoURI string
 	logger   *zap.Logger
-	viper    *viper.Viper
 }
 
 var (
@@ -33,33 +33,28 @@ func InitConfig() (*Config, error) {
 		}
 		defer logger.Sync()
 
-		v := viper.New()
-		v.SetConfigName(".env")
-		v.SetConfigType("env")
-		v.AddConfigPath(".")
-		v.AutomaticEnv()
-
-		if err := v.ReadInConfig(); err != nil {
-			if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		// Load .env file
+		if err := godotenv.Load(); err != nil {
+			if os.IsNotExist(err) {
 				logger.Warn("No .env file found; falling back to system environment variables")
 			} else {
-				initErr = fmt.Errorf("failed to read .env file: %w", err)
-				logger.Error("Config file read error", zap.Error(err))
+				initErr = fmt.Errorf("failed to load .env file: %w", err)
+				logger.Error("Config file load error", zap.Error(err))
 				return
 			}
 		} else {
-			logger.Debug("Successfully loaded .env file", zap.String("file", v.ConfigFileUsed()))
+			logger.Debug("Successfully loaded .env file")
+		}
+
+		// Read MONGO_URI from environment variables
+		mongoURI := os.Getenv("MONGO_URI")
+		if mongoURI == "" {
+			logger.Warn("MONGO_URI not set in environment variables")
 		}
 
 		configInstance = &Config{
-			logger: logger,
-			viper:  v,
-		}
-
-		if err := v.Unmarshal(configInstance); err != nil {
-			initErr = fmt.Errorf("failed to unmarshal config: %w", err)
-			logger.Error("Config unmarshal error", zap.Error(err))
-			return
+			MongoURI: mongoURI,
+			logger:   logger,
 		}
 	})
 
@@ -81,7 +76,7 @@ func (c *Config) ResolveEnvironmentVariable(value string) (string, error) {
 			return "", fmt.Errorf("empty variable name in reference: %s", value)
 		}
 
-		resolved := c.viper.GetString(varName)
+		resolved := os.Getenv(varName)
 		if resolved == "" {
 			c.logger.Warn("Environment variable not found for reference",
 				zap.String("reference", value),

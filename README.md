@@ -7,7 +7,7 @@ AIAgent is a Go-based project designed to dynamically configure AI agents with v
 To build the project, ensure you have Go installed and set up on your machine. Navigate to the project directory and run:
 
 ```bash
-cd workspace/go/aiagent
+go build -o aiagent ./cmd/aiagent/main.go
 ```
 
 ### Running the Application
@@ -17,7 +17,7 @@ The application can run in either `console` or `serve` mode.
 To run in console mode, execute:
 
 ```bash
-go run ./cmd/aiagent -storage=[file|mongo]
+go run ./cmd/aiagent/main.go -storage=[file|mongo]
 ```
 
 To run the HTTP server, execute:

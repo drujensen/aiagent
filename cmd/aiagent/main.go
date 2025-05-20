@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"aiagent/internal/cli"
@@ -22,7 +23,7 @@ import (
 
 	"go.uber.org/zap"
 
-	_ "aiagent/docs"
+	_ "aiagent/api"
 )
 
 func main() {
@@ -44,7 +45,7 @@ func main() {
 		modeStr = "serve"
 		// Recreate the argument list stripping the "serve" part
 		// Exclude the program name argument (index 0) and "serve" (index 1)
-		os.Args = append(os.Args[:1], os.Args[2:]...)
+		os.Args = slices.Delete(os.Args, 0, 1)
 	}
 
 	// Parse the remaining arguments which are flags
