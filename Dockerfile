@@ -158,8 +158,8 @@ RUN go mod download
 COPY --chown=ubuntu:ubuntu . .
 
 # Build the Go application
-RUN go build -o main cmd/server/main.go
+RUN go build -o main cmd/aiagent/main.go
 
 EXPOSE 8080
 
-CMD ["./main"]
+CMD ["./main", "-storage=mongo"]

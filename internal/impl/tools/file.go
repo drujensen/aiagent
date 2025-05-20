@@ -499,11 +499,11 @@ func (t *FileTool) applyLineEdit(filePath, operation string, startLine, endLine 
 
 	if startLine > len(originalLines)+1 || startLine < 1 {
 		t.logger.Error("Invalid start line", zap.Int("start_line", startLine), zap.Int("file_lines", len(originalLines)))
-		return "", fmt.Errorf("start_line %d is invalid, must be between 1 and %d. Use 'read' or 'refresh' to get current line numbers", startLine, len(originalLines)+1)
+		return "", fmt.Errorf("start_line %d is invalid, must be between 1 and %d. Use 'read' to get current line numbers", startLine, len(originalLines)+1)
 	}
 	if (operation == "edit" || operation == "delete") && endLine > len(originalLines) {
 		t.logger.Error("End line exceeds file length", zap.Int("end_line", endLine), zap.Int("file_lines", len(originalLines)))
-		return "", fmt.Errorf("end_line %d exceeds file length %d. Use 'read' or 'refresh' to get current line numbers", endLine, len(originalLines))
+		return "", fmt.Errorf("end_line %d exceeds file length %d. Use 'read' to get current line numbers", endLine, len(originalLines))
 	}
 	if (operation == "edit" || operation == "delete") && endLine < startLine {
 		t.logger.Error("End line is less than start line", zap.Int("start_line", startLine), zap.Int("end_line", endLine))

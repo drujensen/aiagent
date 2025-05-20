@@ -10,12 +10,20 @@ To build the project, ensure you have Go installed and set up on your machine. N
 cd workspace/go/aiagent
 ```
 
-## Running the Application
-### HTTP Server
+### Running the Application
+
+The application can run in either `console` or `serve` mode.
+
+To run in console mode, execute:
+
+```bash
+go run ./cmd/aiagent -storage=[file|mongo]
+```
+
 To run the HTTP server, execute:
 
 ```bash
-go run ./cmd/http
+go run ./cmd/aiagent -storage=[file|mongo] serve
 ```
 
 Access the server at `http://localhost:8080/hello`.
