@@ -465,22 +465,7 @@ func (s *chatService) compressMessages(
 	}
 
 	// Create new array with summary message + recent messages to keep
-	var newMessages []entities.Message
-	newMessages = append(newMessages, *summaryMsg)
-	newMessages = append(newMessages, recentMessagesToKeep...)
-
-	// Replace the chat's messages with the compressed version
-	chat.Messages = newMessages
-
-	// Prepare the messages to return for the current message processing
-	var compressedMessages []*entities.Message
-	compressedMessages = append(compressedMessages, summaryMsg)
-
-	// Add recent messages to keep
-	for i := range recentMessagesToKeep {
-		msg := recentMessagesToKeep[i]
-		compressedMessages = append(compressedMessages, &msg)
-	}
+	chat.Messages = append([]entities.Message{*summaryMsg}, recentMessagesToKeep...)
 
 	// Verify we're not exceeding token limit
 	currentTokens := estimateTokens(summaryMsg)
