@@ -3,7 +3,7 @@
   <div class="home-content">
       <h1>Welcome to the AI Chat Application</h1>
       <div class="agent-form">
-          <h2>{{if .Chat.ID}}Edit a Conversation{{else}}Start a New Conversation{{end}}</h2>
+          <h2>{{if .IsEdit}}Edit a Conversation{{else}}Start a New Conversation{{end}}</h2>
           <form
               {{if .IsEdit}}hx-put="/chats/{{.Chat.ID}}"{{else}}hx-post="/chats"{{end}}
               hx-target="#response-message"
