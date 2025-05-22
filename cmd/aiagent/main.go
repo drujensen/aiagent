@@ -261,6 +261,20 @@ func init() {
 				},
 			},
 			{
+				ID:         "CFA9E279-2CD3-4929-A92E-EC4584DC5089",
+				Name:       "Mistral",
+				Type:       "mistral",
+				BaseURL:    "https://api.mistral.ai",
+				APIKeyName: "MISTRAL_API_KEY",
+				Models: []entities.ModelPricing{
+					{Name: "codestral-2501", InputPricePerMille: 0.59, OutputPricePerMille: 0.79, ContextWindow: 256000},
+					{Name: "mistral-medium-2505", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000},
+					{Name: "mistral-large-02411", InputPricePerMille: 0.27, OutputPricePerMille: 0.85, ContextWindow: 128000},
+					{Name: "pixtral-large-2411", InputPricePerMille: 0.11, OutputPricePerMille: 0.34, ContextWindow: 128000},
+					{Name: "ministral-8b-2410", InputPricePerMille: 0.11, OutputPricePerMille: 0.34, ContextWindow: 128000},
+				},
+			},
+			{
 				ID:         "3B369D62-BB4E-4B4F-8C75-219796E9521A",
 				Name:       "Ollama",
 				Type:       "ollama",
