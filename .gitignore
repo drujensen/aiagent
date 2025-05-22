@@ -1,4 +1,4 @@
 .DS_Store
 .env*
-mongo_data/
 .aiagent/
+output.log
