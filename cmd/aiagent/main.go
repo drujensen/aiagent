@@ -267,11 +267,11 @@ func init() {
 				BaseURL:    "https://api.mistral.ai",
 				APIKeyName: "MISTRAL_API_KEY",
 				Models: []entities.ModelPricing{
-					{Name: "codestral-2501", InputPricePerMille: 0.59, OutputPricePerMille: 0.79, ContextWindow: 256000},
-					{Name: "mistral-medium-2505", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000},
-					{Name: "mistral-large-02411", InputPricePerMille: 0.27, OutputPricePerMille: 0.85, ContextWindow: 128000},
-					{Name: "pixtral-large-2411", InputPricePerMille: 0.11, OutputPricePerMille: 0.34, ContextWindow: 128000},
-					{Name: "ministral-8b-2410", InputPricePerMille: 0.11, OutputPricePerMille: 0.34, ContextWindow: 128000},
+					{Name: "mistral-large-latest", InputPricePerMille: 2.00, OutputPricePerMille: 6.00, ContextWindow: 128000},
+					{Name: "mistral-medium-latest", InputPricePerMille: 0.40, OutputPricePerMille: 2.00, ContextWindow: 128000},
+					{Name: "mstral-small-latest", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000},
+					{Name: "codestral-latest", InputPricePerMille: 0.20, OutputPricePerMille: 0.60, ContextWindow: 256000},
+					{Name: "devstral-small-latest", InputPricePerMille: 0.10, OutputPricePerMille: 0.30, ContextWindow: 128000},
 				},
 			},
 			{
@@ -290,6 +290,8 @@ func init() {
 					{Name: "qwen2.5-coder", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
 					{Name: "mistral", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
 					{Name: "mistral-nemo", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
+					{Name: "devstral", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
+					{Name: "mixtral", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
 					{Name: "nemotron", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
 					{Name: "cogito", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
 					{Name: "granite3.3", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
@@ -297,7 +299,6 @@ func init() {
 					{Name: "command-r", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
 					{Name: "hermes3", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
 					{Name: "phi4-mini", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-					{Name: "mixtral", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
 				},
 			},
 			{
