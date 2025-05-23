@@ -35,13 +35,7 @@ func InitConfig() (*Config, error) {
 
 		// Load .env file
 		if err := godotenv.Load(); err != nil {
-			if os.IsNotExist(err) {
-				logger.Warn("No .env file found; falling back to system environment variables")
-			} else {
-				initErr = fmt.Errorf("failed to load .env file: %w", err)
-				logger.Error("Config file load error", zap.Error(err))
-				return
-			}
+			logger.Debug("No .env file found, using environment variables")
 		} else {
 			logger.Debug("Successfully loaded .env file")
 		}
