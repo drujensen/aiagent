@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -157,6 +158,7 @@ func (c *CLI) Run(ctx context.Context) error {
 			fmt.Println("Available commands:")
 			fmt.Println("? - Show this help message")
 			fmt.Println("!<command> - Execute a shell command")
+			fmt.Println("@<file or dir> - Include a file or directory")
 			fmt.Println("/new <name> - Start a new chat")
 			fmt.Println("/history - Select from all available chats")
 			fmt.Println("/agents - List available agents")
@@ -284,7 +286,9 @@ func (c *CLI) Run(ctx context.Context) error {
 }
 
 func completer(d prompt.Document) []prompt.Suggest {
-	// List of all possible suggestions
+	text := strings.TrimSpace(d.TextBeforeCursor())
+
+	// Static command suggestions
 	suggestions := []prompt.Suggest{
 		{Text: "?", Description: "Show help information"},
 		{Text: "!<command>", Description: "Execute a shell command"},
@@ -296,16 +300,114 @@ func completer(d prompt.Document) []prompt.Suggest {
 		{Text: "/exit", Description: "Exit the application"},
 	}
 
-	// Get the text before the cursor
-	text := d.TextBeforeCursor()
-
-	// Check if the text starts with "/"
-	if d.TextBeforeCursor() == "" || d.TextBeforeCursor() == "/" ||
-		d.TextBeforeCursor()[0] == '/' {
+	// Handle empty input or command suggestions
+	if text == "" || strings.HasPrefix(text, "/") {
 		return prompt.FilterHasPrefix(suggestions, text, true)
 	}
 
+	// Handle bash command completion for ! prefix (only at start)
+	if strings.HasPrefix(text, "!") {
+		cmdText := strings.TrimSpace(strings.TrimPrefix(text, "!"))
+		return bashCompleter(cmdText)
+	}
+
+	// Handle file/directory completion for @ anywhere in the input
+	lastAt := strings.LastIndex(text, "@")
+	if lastAt != -1 {
+		pathText := strings.TrimSpace(text[lastAt+1:])
+		// Only trigger file completion if @ is followed by a path or nothing (not another command)
+		if pathText == "" || !strings.HasPrefix(pathText, "/") && !strings.HasPrefix(pathText, "!") {
+			return fileCompleter(pathText)
+		}
+	}
+
 	return []prompt.Suggest{}
+}
+
+// bashCompleter generates bash command and path completions using compgen
+func bashCompleter(input string) []prompt.Suggest {
+	var suggestions []prompt.Suggest
+
+	// Split input to separate command and arguments
+	parts := strings.Fields(input)
+	if len(parts) == 0 {
+		// Suggest available commands
+		output, err := exec.Command("bash", "-c", "compgen -c").Output()
+		if err != nil {
+			return suggestions
+		}
+		commands := strings.Split(strings.TrimSpace(string(output)), "\n")
+		for _, cmd := range commands {
+			suggestions = append(suggestions, prompt.Suggest{
+				Text:        "!" + cmd,
+				Description: "Shell command",
+			})
+		}
+		return suggestions
+	}
+
+	// For arguments, suggest files and directories
+	lastPart := parts[len(parts)-1]
+	cmd := fmt.Sprintf("compgen -f %s", lastPart)
+	output, err := exec.Command("bash", "-c", cmd).Output()
+	if err != nil {
+		return suggestions
+	}
+
+	paths := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for _, path := range paths {
+		desc := "File"
+		if info, err := os.Stat(path); err == nil && info.IsDir() {
+			desc = "Directory"
+			path = path + "/"
+		}
+		suggestions = append(suggestions, prompt.Suggest{
+			Text:        "!" + strings.Join(parts[:len(parts)-1], " ") + " " + path,
+			Description: desc,
+		})
+	}
+	return suggestions
+}
+
+// fileCompleter generates file and directory suggestions for @ prefix
+func fileCompleter(input string) []prompt.Suggest {
+	var suggestions []prompt.Suggest
+	dir := "."
+	base := input
+
+	// If input contains a path, split into directory and base
+	if strings.Contains(input, "/") {
+		lastSlash := strings.LastIndex(input, "/")
+		dir = input[:lastSlash]
+		base = input[lastSlash+1:]
+		if dir == "" {
+			dir = "/"
+		}
+	}
+
+	// Read directory contents
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return suggestions
+	}
+
+	for _, entry := range entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, base) {
+			desc := "File"
+			fullPath := filepath.Join(dir, name)
+			if entry.IsDir() {
+				desc = "Directory"
+				fullPath = fullPath + "/"
+			}
+			// Only include @ and the completed path in the suggestion
+			suggestions = append(suggestions, prompt.Suggest{
+				Text:        "@" + fullPath,
+				Description: desc,
+			})
+		}
+	}
+	return suggestions
 }
 
 func (c *CLI) NewChatCommand(ctx context.Context, userInput string) (*entities.Chat, error) {
