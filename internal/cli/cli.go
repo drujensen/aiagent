@@ -119,13 +119,16 @@ func (c *CLI) Run(ctx context.Context) error {
 			defer wg.Done()
 			spinner := []string{"-", "\\", "|", "/"}
 			idx := 0
+			startTime := time.Now()
+
 			for {
 				select {
 				case <-stopSpinner:
 					fmt.Print("\r") // Clear the spinner
 					return
 				default:
-					fmt.Printf("\r%s Thinking...", spinner[idx])
+					elapsed := time.Since(startTime).Seconds()
+					fmt.Printf("\r%s Thinking... (%.0fs)", spinner[idx], elapsed)
 					idx = (idx + 1) % len(spinner)
 					time.Sleep(100 * time.Millisecond)
 				}
