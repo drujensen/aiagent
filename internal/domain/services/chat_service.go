@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"aiagent/internal/domain/entities"
@@ -322,6 +323,9 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 
 	newMessages, err := aiModel.GenerateResponse(ctx, messagesToSend, tools, options)
 	if err != nil {
+		if strings.Contains(err.Error(), "canceled") {
+			return nil, errors.CanceledErrorf("message processing was canceled")
+		}
 		return nil, errors.InternalErrorf("failed to generate AI response: %v", err)
 	}
 
@@ -435,6 +439,9 @@ func (s *chatService) compressMessages(
 
 	summaryResponse, err := aiModel.GenerateResponse(ctx, historyMsgs, nil, options)
 	if err != nil {
+		if strings.Contains(err.Error(), "canceled") {
+			return nil, false, errors.CanceledErrorf("message summarization was canceled")
+		}
 		return nil, false, errors.InternalErrorf("failed to generate summary: %v", err)
 	}
 

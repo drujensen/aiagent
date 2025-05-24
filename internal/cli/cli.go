@@ -61,7 +61,7 @@ func NewCLI(chatService services.ChatService, agentService services.AgentService
 // Run starts the CLI interface, displaying chat history and handling user input.
 func (c *CLI) Run(ctx context.Context) error {
 	saveTermState()
-	// convert the context to a cancellable context
+	// Convert the context to a cancellable context
 	ctx, cancel := context.WithCancel(ctx)
 	c.cancel = cancel
 
@@ -138,23 +138,13 @@ func (c *CLI) Run(ctx context.Context) error {
 		}()
 	}
 
-	// Main interaction loop
-	for {
-		userInput := prompt.Input(">: ", completer,
-			prompt.OptionPrefixTextColor(prompt.Blue),
-			prompt.OptionAddKeyBind(prompt.KeyBind{
-				Key: prompt.ControlC,
-				Fn: func(buf *prompt.Buffer) {
-					fmt.Println("\nRecieved CTRL+C. Shutting down...")
-					close(stopSpinner)
-					wg.Wait()
-					restoreTermState()
-					c.cancel()
-					os.Exit(0)
-				},
-			}),
-		)
-		userInput = strings.TrimSpace(userInput)
+	// Executor function for go-prompt
+	executor := func(input string) {
+		userInput := strings.TrimSpace(input)
+		if userInput == "" {
+			return
+		}
+
 		if userInput == "?" {
 			fmt.Println("Available commands:")
 			fmt.Println("? - Show this help message")
@@ -166,7 +156,7 @@ func (c *CLI) Run(ctx context.Context) error {
 			fmt.Println("/tools - List available tools")
 			fmt.Println("/usage - Show usage information")
 			fmt.Println("/exit - Exit the application")
-			continue
+			return
 		}
 
 		if strings.HasPrefix(userInput, "!") {
@@ -177,7 +167,7 @@ func (c *CLI) Run(ctx context.Context) error {
 			} else {
 				fmt.Println(output)
 			}
-			continue
+			return
 		}
 
 		if userInput == "/history" {
@@ -186,7 +176,7 @@ func (c *CLI) Run(ctx context.Context) error {
 				c.logger.Error("Failed to select chat", zap.Error(err))
 				fmt.Println("Error selecting chat:", err)
 			}
-			continue
+			return
 		}
 
 		if strings.HasPrefix(userInput, "/new") {
@@ -194,9 +184,11 @@ func (c *CLI) Run(ctx context.Context) error {
 			if err != nil {
 				c.logger.Error("Failed to create new chat", zap.Error(err))
 				fmt.Println("Error creating new chat:", err)
+			} else {
+				chat = newChat
+				fmt.Println(chat.Name)
 			}
-			chat = newChat
-			continue
+			return
 		}
 
 		if userInput == "/agents" {
@@ -204,13 +196,13 @@ func (c *CLI) Run(ctx context.Context) error {
 			if err != nil {
 				c.logger.Error("Failed to list agents", zap.Error(err))
 				fmt.Println("Error listing agents:", err)
-				continue
+				return
 			}
 			fmt.Println("Available agents:")
 			for _, agent := range agents {
 				fmt.Printf("- %s (%s)\n", agent.Name, agent.ProviderType)
 			}
-			continue
+			return
 		}
 
 		if userInput == "/tools" {
@@ -218,13 +210,13 @@ func (c *CLI) Run(ctx context.Context) error {
 			if err != nil {
 				c.logger.Error("Failed to list tools", zap.Error(err))
 				fmt.Println("Error listing tools:", err)
-				continue
+				return
 			}
 			fmt.Println("Available tools:")
 			for _, tool := range tools {
 				fmt.Printf("- %s\n", (*tool).Name())
 			}
-			continue
+			return
 		}
 
 		if userInput == "/usage" {
@@ -232,19 +224,21 @@ func (c *CLI) Run(ctx context.Context) error {
 			if err != nil {
 				c.logger.Error("Failed to get agent", zap.Error(err))
 				fmt.Println("Error getting agent:", err)
-				continue
+				return
 			}
 			fmt.Printf("Chat Usage:\n- Provider: %s\n- Model: %s\n- Prompt Tokens: %d\n- Completion Tokens: %d\n- Total Tokens: %d\n- Total Cost: $%.2f\n",
 				agent.ProviderType, agent.Model, chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
-			continue
+			return
 		}
 
 		if userInput == "exit" || userInput == "quit" || userInput == "/exit" || userInput == "/quit" {
-			restoreTermState()
 			fmt.Println("Shutting down...")
 			fmt.Printf("Chat Usage:\n- Prompt Tokens: %d\n- Completion Tokens: %d\n- Total Tokens: %d\n- Total Cost: $%.2f\n",
 				chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
-			return nil
+			close(stopSpinner)
+			wg.Wait()
+			restoreTermState()
+			os.Exit(0)
 		}
 
 		// Process @ for file/directory completion
@@ -252,8 +246,9 @@ func (c *CLI) Run(ctx context.Context) error {
 		if err != nil {
 			c.logger.Error("Failed to process file references", zap.Error(err))
 			fmt.Println("Error processing file references:", err)
-			continue
+			return
 		}
+
 		// Create and save user message
 		message := entities.NewMessage("user", processedInput)
 
@@ -270,7 +265,7 @@ func (c *CLI) Run(ctx context.Context) error {
 		if err != nil {
 			c.logger.Error("Failed to generate response", zap.Error(err))
 			fmt.Println("Error generating response:", err)
-			continue
+			return
 		}
 
 		// Strip any <think>*</think> tags from the response including the content
@@ -281,8 +276,7 @@ func (c *CLI) Run(ctx context.Context) error {
 			if start == -1 || end == -1 {
 				break
 			}
-
-			// Remove the <think></think> section, turning the string into "before" + "after"
+			// Remove the <think></think> section
 			responseContent = responseContent[:start] + responseContent[end+len("</think>"):]
 		}
 
@@ -291,6 +285,42 @@ func (c *CLI) Run(ctx context.Context) error {
 
 		c.displayMessage(*response)
 	}
+
+	// Run the prompt with executor and key bindings
+	p := prompt.New(
+		executor,
+		completer,
+		prompt.OptionPrefix(">: "),
+		prompt.OptionPrefixTextColor(prompt.Blue),
+		prompt.OptionAddKeyBind(
+			prompt.KeyBind{
+				Key: prompt.ControlC,
+				Fn: func(*prompt.Buffer) {
+					fmt.Println("\nReceived CTRL+C. Shutting down...")
+					close(stopSpinner)
+					wg.Wait()
+					restoreTermState()
+					c.cancel()
+					os.Exit(0)
+				},
+			},
+			prompt.KeyBind{
+				Key: prompt.Escape,
+				Fn: func(*prompt.Buffer) {
+					fmt.Println("\nCanceling operation...")
+					close(stopSpinner)
+					wg.Wait()
+					c.cancel()
+					// Create a new cancellable context for the next operation
+					ctx, cancel = context.WithCancel(context.Background())
+					c.cancel = cancel
+				},
+			},
+		),
+	)
+	p.Run()
+
+	return nil
 }
 
 func completer(d prompt.Document) []prompt.Suggest {
