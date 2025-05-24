@@ -4,7 +4,6 @@ import (
 	"aiagent/internal/domain/services"
 	"aiagent/internal/impl/tools"
 	"bytes"
-	"context"
 	"html/template"
 	"slices"
 
@@ -27,7 +26,6 @@ type UI struct {
 	toolService     services.ToolService
 	providerService services.ProviderService
 	logger          *zap.Logger
-	cancel          context.CancelFunc
 }
 
 func NewUI(chatService services.ChatService, agentService services.AgentService, toolService services.ToolService, providerService services.ProviderService, logger *zap.Logger) *UI {
@@ -40,7 +38,7 @@ func NewUI(chatService services.ChatService, agentService services.AgentService,
 	}
 }
 
-func (u *UI) Run(ctx context.Context) error {
+func (u *UI) Run() error {
 	funcMap := template.FuncMap{
 		"renderMarkdown": renderMarkdown,
 		"inArray": func(value string, array []string) bool {

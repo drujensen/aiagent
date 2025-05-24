@@ -134,12 +134,12 @@ func main() {
 
 	if modeStr == "serve" {
 		uiApp := ui.NewUI(chatService, agentService, toolService, providerService, logger)
-		if err := uiApp.Run(context.Background()); err != nil {
+		if err := uiApp.Run(); err != nil {
 			logger.Fatal("UI failed", zap.Error(err))
 		}
 	} else {
 		cliApp := cli.NewCLI(chatService, agentService, toolService, providerService, logger)
-		if err := cliApp.Run(context.Background()); err != nil {
+		if err := cliApp.Run(); err != nil {
 			logger.Fatal("CLI failed", zap.Error(err))
 		}
 	}

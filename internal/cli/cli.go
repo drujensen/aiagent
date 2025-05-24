@@ -59,11 +59,10 @@ func NewCLI(chatService services.ChatService, agentService services.AgentService
 }
 
 // Run starts the CLI interface, displaying chat history and handling user input.
-func (c *CLI) Run(ctx context.Context) error {
+func (c *CLI) Run() error {
 	saveTermState()
-	// Convert the context to a cancellable context
-	ctx, cancel := context.WithCancel(ctx)
-	c.cancel = cancel
+
+	ctx := context.Background()
 
 	fmt.Println("AI Agent Console. Type '?' for help.")
 
@@ -81,7 +80,6 @@ func (c *CLI) Run(ctx context.Context) error {
 		wg.Wait()
 		restoreTermState()
 		fmt.Println("\nReceived interrupt signal. Shutting down...")
-		cancel()
 		os.Exit(0)
 	}()
 
@@ -252,6 +250,10 @@ func (c *CLI) Run(ctx context.Context) error {
 		// Create and save user message
 		message := entities.NewMessage("user", processedInput)
 
+		// Create a new cancellable context for the next operation
+		ctx, cancel := context.WithCancel(context.Background())
+		c.cancel = cancel
+
 		// Start the spinner
 		startSpinner()
 
@@ -261,6 +263,7 @@ func (c *CLI) Run(ctx context.Context) error {
 		// Stop the spinner
 		stopSpinner <- true
 		wg.Wait()
+		c.cancel = nil
 
 		if err != nil {
 			c.logger.Error("Failed to generate response", zap.Error(err))
@@ -307,13 +310,13 @@ func (c *CLI) Run(ctx context.Context) error {
 			prompt.KeyBind{
 				Key: prompt.Escape,
 				Fn: func(*prompt.Buffer) {
-					fmt.Println("\nCanceling operation...")
-					close(stopSpinner)
-					wg.Wait()
-					c.cancel()
-					// Create a new cancellable context for the next operation
-					ctx, cancel = context.WithCancel(context.Background())
-					c.cancel = cancel
+					if c.cancel != nil {
+						fmt.Println("\nCanceling operation...")
+						close(stopSpinner)
+						wg.Wait()
+						c.cancel()
+						c.cancel = nil
+					}
 				},
 			},
 		),
