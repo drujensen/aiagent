@@ -13,14 +13,14 @@ import (
 	"github.com/google/uuid"
 )
 
-type jsonProviderRepository struct {
+type JsonProviderRepository struct {
 	filePath string
 	data     []*entities.Provider
 }
 
 func NewJSONProviderRepository(dataDir string) (interfaces.ProviderRepository, error) {
 	filePath := filepath.Join(dataDir, ".aiagent", "providers.json")
-	repo := &jsonProviderRepository{
+	repo := &JsonProviderRepository{
 		filePath: filePath,
 		data:     []*entities.Provider{},
 	}
@@ -32,7 +32,7 @@ func NewJSONProviderRepository(dataDir string) (interfaces.ProviderRepository, e
 	return repo, nil
 }
 
-func (r *jsonProviderRepository) load() error {
+func (r *JsonProviderRepository) load() error {
 	data, err := os.ReadFile(r.filePath)
 	if os.IsNotExist(err) {
 		return nil // File doesn't exist yet, start with empty data
@@ -65,7 +65,7 @@ func (r *jsonProviderRepository) load() error {
 	return nil
 }
 
-func (r *jsonProviderRepository) save() error {
+func (r *JsonProviderRepository) save() error {
 	data, err := json.MarshalIndent(r.data, "", "  ")
 	if err != nil {
 		return errors.InternalErrorf("failed to marshal providers: %v", err)
@@ -82,7 +82,7 @@ func (r *jsonProviderRepository) save() error {
 	return nil
 }
 
-func (r *jsonProviderRepository) ListProviders(ctx context.Context) ([]*entities.Provider, error) {
+func (r *JsonProviderRepository) ListProviders(ctx context.Context) ([]*entities.Provider, error) {
 	providersCopy := make([]*entities.Provider, len(r.data))
 	for i, p := range r.data {
 		providersCopy[i] = &entities.Provider{
@@ -97,7 +97,7 @@ func (r *jsonProviderRepository) ListProviders(ctx context.Context) ([]*entities
 	return providersCopy, nil
 }
 
-func (r *jsonProviderRepository) GetProvider(ctx context.Context, id string) (*entities.Provider, error) {
+func (r *JsonProviderRepository) GetProvider(ctx context.Context, id string) (*entities.Provider, error) {
 	for _, provider := range r.data {
 		if provider.ID == id {
 			return &entities.Provider{
@@ -113,20 +113,20 @@ func (r *jsonProviderRepository) GetProvider(ctx context.Context, id string) (*e
 	return nil, errors.NotFoundErrorf("provider not found: %s", id)
 }
 
-func (r *jsonProviderRepository) GetProviderByType(ctx context.Context, providerType entities.ProviderType) (*entities.Provider, error) {
-	for _, provider := range r.data {
-		if provider.Type == providerType {
-			return &entities.Provider{
-				ID:         provider.ID,
-				Name:       provider.Name,
-				Type:       provider.Type,
-				BaseURL:    provider.BaseURL,
-				APIKeyName: provider.APIKeyName,
-				Models:     provider.Models,
-			}, nil
+func (r *JsonProviderRepository) CreateProvider(ctx context.Context, provider *entities.Provider) error {
+	if provider.ID == "" {
+		provider.ID = uuid.New().String()
+	}
+
+	// Check for duplicate ID
+	for _, existing := range r.data {
+		if existing.ID == provider.ID {
+			return errors.DuplicateErrorf("provider with ID %s already exists", provider.ID)
 		}
 	}
-	return nil, errors.NotFoundErrorf("provider type not found: %s", providerType)
+
+	r.data = append(r.data, provider)
+	return r.save()
 }
 
-var _ interfaces.ProviderRepository = (*jsonProviderRepository)(nil)
+var _ interfaces.ProviderRepository = (*JsonProviderRepository)(nil)

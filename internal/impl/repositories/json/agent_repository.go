@@ -15,14 +15,14 @@ import (
 	"github.com/google/uuid"
 )
 
-type jsonAgentRepository struct {
+type JsonAgentRepository struct {
 	filePath string
 	data     []*entities.Agent
 }
 
 func NewJSONAgentRepository(dataDir string) (interfaces.AgentRepository, error) {
 	filePath := filepath.Join(dataDir, ".aiagent", "agents.json")
-	repo := &jsonAgentRepository{
+	repo := &JsonAgentRepository{
 		filePath: filePath,
 		data:     []*entities.Agent{},
 	}
@@ -34,7 +34,7 @@ func NewJSONAgentRepository(dataDir string) (interfaces.AgentRepository, error) 
 	return repo, nil
 }
 
-func (r *jsonAgentRepository) load() error {
+func (r *JsonAgentRepository) load() error {
 	data, err := os.ReadFile(r.filePath)
 	if os.IsNotExist(err) {
 		return nil // File doesn't exist yet, start with empty data
@@ -62,7 +62,7 @@ func (r *jsonAgentRepository) load() error {
 	return nil
 }
 
-func (r *jsonAgentRepository) save() error {
+func (r *JsonAgentRepository) save() error {
 	data, err := json.MarshalIndent(r.data, "", "  ")
 	if err != nil {
 		return errors.InternalErrorf("failed to marshal agents: %v", err)
@@ -79,7 +79,7 @@ func (r *jsonAgentRepository) save() error {
 	return nil
 }
 
-func (r *jsonAgentRepository) ListAgents(ctx context.Context) ([]*entities.Agent, error) {
+func (r *JsonAgentRepository) ListAgents(ctx context.Context) ([]*entities.Agent, error) {
 	agentsCopy := make([]*entities.Agent, len(r.data))
 	for i, a := range r.data {
 		agentsCopy[i] = &entities.Agent{
@@ -103,7 +103,7 @@ func (r *jsonAgentRepository) ListAgents(ctx context.Context) ([]*entities.Agent
 	return agentsCopy, nil
 }
 
-func (r *jsonAgentRepository) GetAgent(ctx context.Context, id string) (*entities.Agent, error) {
+func (r *JsonAgentRepository) GetAgent(ctx context.Context, id string) (*entities.Agent, error) {
 	for _, agent := range r.data {
 		if agent.ID == id {
 			return &entities.Agent{
@@ -128,7 +128,7 @@ func (r *jsonAgentRepository) GetAgent(ctx context.Context, id string) (*entitie
 	return nil, errors.NotFoundErrorf("agent not found: %s", id)
 }
 
-func (r *jsonAgentRepository) CreateAgent(ctx context.Context, agent *entities.Agent) error {
+func (r *JsonAgentRepository) CreateAgent(ctx context.Context, agent *entities.Agent) error {
 	if agent.ID == "" {
 		agent.ID = uuid.New().String()
 	}
@@ -139,7 +139,7 @@ func (r *jsonAgentRepository) CreateAgent(ctx context.Context, agent *entities.A
 	return r.save()
 }
 
-func (r *jsonAgentRepository) UpdateAgent(ctx context.Context, agent *entities.Agent) error {
+func (r *JsonAgentRepository) UpdateAgent(ctx context.Context, agent *entities.Agent) error {
 	for i, a := range r.data {
 		if a.ID == agent.ID {
 			agent.UpdatedAt = time.Now()
@@ -150,7 +150,7 @@ func (r *jsonAgentRepository) UpdateAgent(ctx context.Context, agent *entities.A
 	return errors.NotFoundErrorf("agent not found: %s", agent.ID)
 }
 
-func (r *jsonAgentRepository) DeleteAgent(ctx context.Context, id string) error {
+func (r *JsonAgentRepository) DeleteAgent(ctx context.Context, id string) error {
 	for i, a := range r.data {
 		if a.ID == id {
 			r.data = slices.Delete(r.data, i, i+1)
@@ -160,4 +160,4 @@ func (r *jsonAgentRepository) DeleteAgent(ctx context.Context, id string) error 
 	return errors.NotFoundErrorf("agent not found: %s", id)
 }
 
-var _ interfaces.AgentRepository = (*jsonAgentRepository)(nil)
+var _ interfaces.AgentRepository = (*JsonAgentRepository)(nil)

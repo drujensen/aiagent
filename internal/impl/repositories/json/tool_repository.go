@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type jsonToolRepository struct {
+type JsonToolRepository struct {
 	filePath      string
 	data          []*entities.ToolData
 	toolInstances map[string]*entities.Tool
@@ -27,7 +27,7 @@ type jsonToolRepository struct {
 
 func NewJSONToolRepository(dataDir string, toolFactory *tools.ToolFactory, logger *zap.Logger) (interfaces.ToolRepository, error) {
 	filePath := filepath.Join(dataDir, ".aiagent", "tools.json")
-	repo := &jsonToolRepository{
+	repo := &JsonToolRepository{
 		filePath:      filePath,
 		data:          []*entities.ToolData{},
 		toolInstances: make(map[string]*entities.Tool),
@@ -46,7 +46,7 @@ func NewJSONToolRepository(dataDir string, toolFactory *tools.ToolFactory, logge
 	return repo, nil
 }
 
-func (r *jsonToolRepository) load() error {
+func (r *JsonToolRepository) load() error {
 	data, err := os.ReadFile(r.filePath)
 	if os.IsNotExist(err) {
 		return nil // File doesn't exist yet, start with empty data
@@ -74,7 +74,7 @@ func (r *jsonToolRepository) load() error {
 	return nil
 }
 
-func (r *jsonToolRepository) save() error {
+func (r *JsonToolRepository) save() error {
 	data, err := json.MarshalIndent(r.data, "", "  ")
 	if err != nil {
 		return errors.InternalErrorf("failed to marshal tools: %v", err)
@@ -91,7 +91,7 @@ func (r *jsonToolRepository) save() error {
 	return nil
 }
 
-func (r *jsonToolRepository) reloadToolInstances() error {
+func (r *JsonToolRepository) reloadToolInstances() error {
 	r.toolInstances = make(map[string]*entities.Tool)
 	for _, toolData := range r.data {
 		toolFactoryEntry, err := r.toolFactory.GetFactoryByName(toolData.ToolType)
@@ -105,7 +105,7 @@ func (r *jsonToolRepository) reloadToolInstances() error {
 	return nil
 }
 
-func (r *jsonToolRepository) ListTools() ([]*entities.Tool, error) {
+func (r *JsonToolRepository) ListTools() ([]*entities.Tool, error) {
 	var tools []*entities.Tool
 	for _, tool := range r.toolInstances {
 		tools = append(tools, tool)
@@ -113,7 +113,7 @@ func (r *jsonToolRepository) ListTools() ([]*entities.Tool, error) {
 	return tools, nil
 }
 
-func (r *jsonToolRepository) GetToolByName(name string) (*entities.Tool, error) {
+func (r *JsonToolRepository) GetToolByName(name string) (*entities.Tool, error) {
 	tool, exists := r.toolInstances[name]
 	if !exists {
 		return nil, nil
@@ -121,7 +121,7 @@ func (r *jsonToolRepository) GetToolByName(name string) (*entities.Tool, error) 
 	return tool, nil
 }
 
-func (r *jsonToolRepository) RegisterTool(name string, tool *entities.Tool) error {
+func (r *JsonToolRepository) RegisterTool(name string, tool *entities.Tool) error {
 	if _, exists := r.toolInstances[name]; exists {
 		return errors.DuplicateErrorf("tool with the same name already exists")
 	}
@@ -129,7 +129,7 @@ func (r *jsonToolRepository) RegisterTool(name string, tool *entities.Tool) erro
 	return nil
 }
 
-func (r *jsonToolRepository) ListToolData(ctx context.Context) ([]*entities.ToolData, error) {
+func (r *JsonToolRepository) ListToolData(ctx context.Context) ([]*entities.ToolData, error) {
 	toolDataCopy := make([]*entities.ToolData, len(r.data))
 	for i, t := range r.data {
 		toolDataCopy[i] = &entities.ToolData{
@@ -145,7 +145,7 @@ func (r *jsonToolRepository) ListToolData(ctx context.Context) ([]*entities.Tool
 	return toolDataCopy, nil
 }
 
-func (r *jsonToolRepository) GetToolData(ctx context.Context, id string) (*entities.ToolData, error) {
+func (r *JsonToolRepository) GetToolData(ctx context.Context, id string) (*entities.ToolData, error) {
 	for _, toolData := range r.data {
 		if toolData.ID == id {
 			return &entities.ToolData{
@@ -162,7 +162,7 @@ func (r *jsonToolRepository) GetToolData(ctx context.Context, id string) (*entit
 	return nil, errors.NotFoundErrorf("toolData not found: %s", id)
 }
 
-func (r *jsonToolRepository) CreateToolData(ctx context.Context, toolData *entities.ToolData) error {
+func (r *JsonToolRepository) CreateToolData(ctx context.Context, toolData *entities.ToolData) error {
 	if toolData.ID == "" {
 		toolData.ID = uuid.New().String()
 	}
@@ -176,7 +176,7 @@ func (r *jsonToolRepository) CreateToolData(ctx context.Context, toolData *entit
 	return r.reloadToolInstances()
 }
 
-func (r *jsonToolRepository) UpdateToolData(ctx context.Context, toolData *entities.ToolData) error {
+func (r *JsonToolRepository) UpdateToolData(ctx context.Context, toolData *entities.ToolData) error {
 	for i, t := range r.data {
 		if t.ID == toolData.ID {
 			toolData.UpdatedAt = time.Now()
@@ -190,7 +190,7 @@ func (r *jsonToolRepository) UpdateToolData(ctx context.Context, toolData *entit
 	return errors.NotFoundErrorf("toolData not found: %s", toolData.ID)
 }
 
-func (r *jsonToolRepository) DeleteToolData(ctx context.Context, id string) error {
+func (r *JsonToolRepository) DeleteToolData(ctx context.Context, id string) error {
 	for index, tool := range r.data {
 		if tool.ID == id {
 			r.data = slices.Delete(r.data, index, index+1)
@@ -203,4 +203,4 @@ func (r *jsonToolRepository) DeleteToolData(ctx context.Context, id string) erro
 	return errors.NotFoundErrorf("toolData not found: %s", id)
 }
 
-var _ interfaces.ToolRepository = (*jsonToolRepository)(nil)
+var _ interfaces.ToolRepository = (*JsonToolRepository)(nil)

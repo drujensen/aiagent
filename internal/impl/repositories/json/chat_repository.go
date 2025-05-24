@@ -15,14 +15,14 @@ import (
 	"github.com/google/uuid"
 )
 
-type jsonChatRepository struct {
+type JsonChatRepository struct {
 	filePath string
 	data     []*entities.Chat
 }
 
 func NewJSONChatRepository(dataDir string) (interfaces.ChatRepository, error) {
 	filePath := filepath.Join(dataDir, ".aiagent", "chats.json")
-	repo := &jsonChatRepository{
+	repo := &JsonChatRepository{
 		filePath: filePath,
 		data:     []*entities.Chat{},
 	}
@@ -34,7 +34,7 @@ func NewJSONChatRepository(dataDir string) (interfaces.ChatRepository, error) {
 	return repo, nil
 }
 
-func (r *jsonChatRepository) load() error {
+func (r *JsonChatRepository) load() error {
 	data, err := os.ReadFile(r.filePath)
 	if os.IsNotExist(err) {
 		return nil // File doesn't exist yet, start with empty data
@@ -62,7 +62,7 @@ func (r *jsonChatRepository) load() error {
 	return nil
 }
 
-func (r *jsonChatRepository) save() error {
+func (r *JsonChatRepository) save() error {
 	data, err := json.MarshalIndent(r.data, "", "  ")
 	if err != nil {
 		return errors.InternalErrorf("failed to marshal chats: %v", err)
@@ -79,7 +79,7 @@ func (r *jsonChatRepository) save() error {
 	return nil
 }
 
-func (r *jsonChatRepository) ListChats(ctx context.Context) ([]*entities.Chat, error) {
+func (r *JsonChatRepository) ListChats(ctx context.Context) ([]*entities.Chat, error) {
 	chatsCopy := make([]*entities.Chat, len(r.data))
 	for i, c := range r.data {
 		messagesCopy := make([]entities.Message, len(c.Messages))
@@ -98,7 +98,7 @@ func (r *jsonChatRepository) ListChats(ctx context.Context) ([]*entities.Chat, e
 	return chatsCopy, nil
 }
 
-func (r *jsonChatRepository) GetChat(ctx context.Context, id string) (*entities.Chat, error) {
+func (r *JsonChatRepository) GetChat(ctx context.Context, id string) (*entities.Chat, error) {
 	for _, chat := range r.data {
 		if chat.ID == id {
 			messagesCopy := make([]entities.Message, len(chat.Messages))
@@ -118,7 +118,7 @@ func (r *jsonChatRepository) GetChat(ctx context.Context, id string) (*entities.
 	return nil, errors.NotFoundErrorf("chat not found: %s", id)
 }
 
-func (r *jsonChatRepository) CreateChat(ctx context.Context, chat *entities.Chat) error {
+func (r *JsonChatRepository) CreateChat(ctx context.Context, chat *entities.Chat) error {
 	if chat.ID == "" {
 		chat.ID = uuid.New().String()
 	}
@@ -129,7 +129,7 @@ func (r *jsonChatRepository) CreateChat(ctx context.Context, chat *entities.Chat
 	return r.save()
 }
 
-func (r *jsonChatRepository) UpdateChat(ctx context.Context, chat *entities.Chat) error {
+func (r *JsonChatRepository) UpdateChat(ctx context.Context, chat *entities.Chat) error {
 	for i, c := range r.data {
 		if c.ID == chat.ID {
 			chat.UpdatedAt = time.Now()
@@ -140,7 +140,7 @@ func (r *jsonChatRepository) UpdateChat(ctx context.Context, chat *entities.Chat
 	return errors.NotFoundErrorf("chat not found: %s", chat.ID)
 }
 
-func (r *jsonChatRepository) DeleteChat(ctx context.Context, id string) error {
+func (r *JsonChatRepository) DeleteChat(ctx context.Context, id string) error {
 	for i, c := range r.data {
 		if c.ID == id {
 			r.data = slices.Delete(r.data, i, i+1)
@@ -150,4 +150,4 @@ func (r *jsonChatRepository) DeleteChat(ctx context.Context, id string) error {
 	return errors.NotFoundErrorf("chat not found: %s", id)
 }
 
-var _ interfaces.ChatRepository = (*jsonChatRepository)(nil)
+var _ interfaces.ChatRepository = (*JsonChatRepository)(nil)

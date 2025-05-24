@@ -200,26 +200,12 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 	// Get the provider using agent's ProviderID (ObjectID)
 	provider, err := s.providerRepo.GetProvider(ctx, agent.ProviderID)
 	if err != nil {
-		// Fallback to get provider by type if ID lookup fails
-		s.logger.Warn("Failed to get provider by ID, attempting to find by type",
+		s.logger.Warn("failed to get provider by ID",
 			zap.String("agent_id", agent.ID),
 			zap.String("provider_id", agent.ProviderID),
 			zap.String("provider_type", string(agent.ProviderType)),
 			zap.Error(err))
-
-		providerByType, typeErr := s.providerRepo.GetProviderByType(ctx, agent.ProviderType)
-		if typeErr != nil {
-			return nil, errors.InternalErrorf("failed to get provider %s and fallback by type %s also failed: %v", agent.ProviderID, agent.ProviderType, err)
-		}
-
-		agent.ProviderID = providerByType.ID
-		if updateErr := s.agentRepo.UpdateAgent(ctx, agent); updateErr != nil {
-			s.logger.Error("Failed to update agent with new provider ID",
-				zap.String("agent_id", agent.ID),
-				zap.Error(updateErr))
-		}
-
-		provider = providerByType
+		return nil, errors.InternalErrorf("failed to get provider for agent %s: %v", agent.ID, err)
 	}
 
 	resolvedAPIKey, err := s.config.ResolveEnvironmentVariable(agent.APIKey)

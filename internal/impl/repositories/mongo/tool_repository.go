@@ -1,12 +1,13 @@
 package repositories_mongo
 
 import (
+	"context"
+	"time"
+
 	"aiagent/internal/domain/entities"
 	"aiagent/internal/domain/errors"
 	"aiagent/internal/domain/interfaces"
 	"aiagent/internal/impl/tools"
-	"context"
-	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -23,7 +24,7 @@ type ToolRepository struct {
 func NewToolRepository(collection *mongo.Collection, toolFactory *tools.ToolFactory, logger *zap.Logger) (*ToolRepository, error) {
 	toolRepository := &ToolRepository{
 		collection:    collection,
-		toolInstances: make(map[string]*entities.Tool), // Initialize here
+		toolInstances: make(map[string]*entities.Tool),
 		toolFactory:   toolFactory,
 		logger:        logger,
 	}

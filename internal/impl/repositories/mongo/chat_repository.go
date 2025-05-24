@@ -47,7 +47,6 @@ func (r *MongoChatRepository) ListChats(ctx context.Context) ([]*entities.Chat, 
 
 func (r *MongoChatRepository) GetChat(ctx context.Context, id string) (*entities.Chat, error) {
 	var chat entities.Chat
-
 	err := r.collection.FindOne(ctx, bson.M{"_id": id}).Decode(&chat)
 	if err == mongo.ErrNoDocuments {
 		return nil, errors.NotFoundErrorf("chat not found: %s", id)

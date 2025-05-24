@@ -7,7 +7,7 @@ import (
 )
 
 type ProviderRepository interface {
-	GetProvider(ctx context.Context, id string) (*entities.Provider, error)
-	GetProviderByType(ctx context.Context, providerType entities.ProviderType) (*entities.Provider, error)
 	ListProviders(ctx context.Context) ([]*entities.Provider, error)
+	GetProvider(ctx context.Context, id string) (*entities.Provider, error)
+	CreateProvider(ctx context.Context, provider *entities.Provider) error
 }
