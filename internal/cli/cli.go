@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -158,7 +159,7 @@ func (c *CLI) Run(ctx context.Context) error {
 			fmt.Println("Available commands:")
 			fmt.Println("? - Show this help message")
 			fmt.Println("!<command> - Execute a shell command")
-			fmt.Println("@<file or dir> - Include a file or directory")
+			fmt.Println("@<file> - Include a file or directory")
 			fmt.Println("/new <name> - Start a new chat")
 			fmt.Println("/history - Select from all available chats")
 			fmt.Println("/agents - List available agents")
@@ -246,8 +247,15 @@ func (c *CLI) Run(ctx context.Context) error {
 			return nil
 		}
 
+		// Process @ for file/directory completion
+		processedInput, err := c.processFileReferences(userInput)
+		if err != nil {
+			c.logger.Error("Failed to process file references", zap.Error(err))
+			fmt.Println("Error processing file references:", err)
+			continue
+		}
 		// Create and save user message
-		message := entities.NewMessage("user", userInput)
+		message := entities.NewMessage("user", processedInput)
 
 		// Start the spinner
 		startSpinner()
@@ -292,6 +300,7 @@ func completer(d prompt.Document) []prompt.Suggest {
 	suggestions := []prompt.Suggest{
 		{Text: "?", Description: "Show help information"},
 		{Text: "!<command>", Description: "Execute a shell command"},
+		{Text: "@<file>", Description: "Include a file or directory"},
 		{Text: "/new <name>", Description: "Start a new chat"},
 		{Text: "/history", Description: "Select from all available chats"},
 		{Text: "/agents", Description: "List available agents"},
@@ -305,12 +314,6 @@ func completer(d prompt.Document) []prompt.Suggest {
 		return prompt.FilterHasPrefix(suggestions, text, true)
 	}
 
-	// Handle bash command completion for ! prefix (only at start)
-	if strings.HasPrefix(text, "!") {
-		cmdText := strings.TrimSpace(strings.TrimPrefix(text, "!"))
-		return bashCompleter(cmdText)
-	}
-
 	// Handle file/directory completion for @ anywhere in the input
 	lastAt := strings.LastIndex(text, "@")
 	if lastAt != -1 {
@@ -322,51 +325,6 @@ func completer(d prompt.Document) []prompt.Suggest {
 	}
 
 	return []prompt.Suggest{}
-}
-
-// bashCompleter generates bash command and path completions using compgen
-func bashCompleter(input string) []prompt.Suggest {
-	var suggestions []prompt.Suggest
-
-	// Split input to separate command and arguments
-	parts := strings.Fields(input)
-	if len(parts) == 0 {
-		// Suggest available commands
-		output, err := exec.Command("bash", "-c", "compgen -c").Output()
-		if err != nil {
-			return suggestions
-		}
-		commands := strings.Split(strings.TrimSpace(string(output)), "\n")
-		for _, cmd := range commands {
-			suggestions = append(suggestions, prompt.Suggest{
-				Text:        "!" + cmd,
-				Description: "Shell command",
-			})
-		}
-		return suggestions
-	}
-
-	// For arguments, suggest files and directories
-	lastPart := parts[len(parts)-1]
-	cmd := fmt.Sprintf("compgen -f %s", lastPart)
-	output, err := exec.Command("bash", "-c", cmd).Output()
-	if err != nil {
-		return suggestions
-	}
-
-	paths := strings.Split(strings.TrimSpace(string(output)), "\n")
-	for _, path := range paths {
-		desc := "File"
-		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			desc = "Directory"
-			path = path + "/"
-		}
-		suggestions = append(suggestions, prompt.Suggest{
-			Text:        "!" + strings.Join(parts[:len(parts)-1], " ") + " " + path,
-			Description: desc,
-		})
-	}
-	return suggestions
 }
 
 // fileCompleter generates file and directory suggestions for @ prefix
@@ -408,6 +366,31 @@ func fileCompleter(input string) []prompt.Suggest {
 		}
 	}
 	return suggestions
+}
+
+// processFileReferences replaces @path with the resolved file/directory path if valid
+func (c *CLI) processFileReferences(input string) (string, error) {
+	// Regex to match @ followed by a path-like string (e.g., @./test, @/home, @test.txt)
+	pathRegex := regexp.MustCompile(`@([./~][^@\s]*|[a-zA-Z0-9][^@\s]*)`)
+
+	// Replace all matches
+	result := pathRegex.ReplaceAllStringFunc(input, func(match string) string {
+		path := strings.TrimPrefix(match, "@")
+		// Check if the path exists
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			// If path is invalid, keep the original @path
+			return match
+		}
+		_, err = os.Stat(absPath)
+		if err != nil {
+			// If file/directory doesn't exist, keep the original @path
+			return match
+		}
+		return path
+	})
+
+	return result, nil
 }
 
 func (c *CLI) NewChatCommand(ctx context.Context, userInput string) (*entities.Chat, error) {
