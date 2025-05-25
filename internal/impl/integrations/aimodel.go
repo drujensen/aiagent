@@ -41,7 +41,7 @@ func NewAIModelIntegration(baseURL, apiKey, model string, toolRepo interfaces.To
 	return &AIModelIntegration{
 		baseURL:    baseURL,
 		apiKey:     apiKey,
-		httpClient: &http.Client{Timeout: 600 * time.Second},
+		httpClient: &http.Client{Timeout: 300 * time.Second},
 		model:      model,
 		toolRepo:   toolRepo,
 		logger:     logger,
@@ -180,6 +180,9 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 
 			resp, err = m.httpClient.Do(req)
 			if err != nil {
+				if ctx.Err() == context.Canceled {
+					return nil, fmt.Errorf("operation canceled by user")
+				}
 				if attempt < 2 {
 					m.logger.Warn("Error making request, retrying", zap.Error(err))
 					time.Sleep(time.Duration(attempt+1) * time.Second)
@@ -299,9 +302,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				toolResult = fmt.Sprintf("Tool %s not found", toolName)
 			}
 
-			var newMessage *entities.Message
-
-			newMessage = &entities.Message{
+			var newMessage = &entities.Message{
 				ID:         uuid.New().String(),
 				Role:       "tool",
 				Content:    fmt.Sprintf("Tool %s responded: %s", toolName, toolResult),
