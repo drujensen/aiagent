@@ -34,7 +34,7 @@ The command is executed in the workspace directory.`,
 	}
 	toolFactory.toolFactories["Process"] = &ToolFactoryEntry{
 		Name: "Process",
-		Description: `This tool executes a configured CLI command (e.g., git, gcc, go, rustc, java, dotnet, python, ruby, node, mysql, psql, mongo, redis-cli, aws, az, docker, kubectl) with support for background processes, timeouts, and full output.
+		Description: `This tool executes a configured CLI command with support for background processes, timeouts, and full output.
 
 The command is executed in the workspace directory.  The extraArgs are prepended with the arguments passed to the tool.`,
 		ConfigKeys: []string{"workspace", "command", "extraArgs"},
@@ -100,7 +100,7 @@ The command is executed in the workspace directory.  The extraArgs are prepended
 	}
 	toolFactory.toolFactories["Vision"] = &ToolFactoryEntry{
 		Name:        "Vision",
-		Description: "This tool provides image understanding capabilities using providers like x.ai or OpenAI, allowing processing of images via base64 or URLs combined with text prompts.",
+		Description: "This tool provides image understanding capabilities using providers like XAI or OpenAI, allowing processing of images via base64 or URLs combined with text prompts.",
 		ConfigKeys:  []string{"provider", "api_key", "base_url", "model"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return &VisionTool{
