@@ -61,6 +61,7 @@ func NewCLI(chatService services.ChatService, agentService services.AgentService
 // Run starts the CLI interface, displaying chat history and handling user input.
 func (c *CLI) Run() error {
 	saveTermState()
+	// Ensure terminal state is restored on Exit
 	defer restoreTermState()
 
 	ctx := context.Background()
@@ -307,6 +308,13 @@ func (c *CLI) Run() error {
 			prompt.KeyBind{
 				Key: prompt.Escape,
 				Fn: func(*prompt.Buffer) {
+					if c.cancel != nil {
+						fmt.Println("\nCanceling operation...")
+						close(stopSpinner)
+						wg.Wait()
+						c.cancel()
+						c.cancel = nil
+					}
 				},
 			},
 		),
@@ -314,16 +322,6 @@ func (c *CLI) Run() error {
 	p.Run()
 
 	return nil
-}
-
-func (c *CLI) Cancel() {
-	if c.cancel != nil {
-		fmt.Println("\nCanceling operation...")
-		close(stopSpinner)
-		wg.Wait()
-		c.cancel()
-		c.cancel = nil
-	}
 }
 
 func completer(d prompt.Document) []prompt.Suggest {
