@@ -61,6 +61,7 @@ func NewCLI(chatService services.ChatService, agentService services.AgentService
 // Run starts the CLI interface, displaying chat history and handling user input.
 func (c *CLI) Run() error {
 	saveTermState()
+	defer restoreTermState()
 
 	ctx := context.Background()
 
@@ -78,7 +79,6 @@ func (c *CLI) Run() error {
 		<-sigChan
 		close(stopSpinner)
 		wg.Wait()
-		restoreTermState()
 		fmt.Println("\nReceived interrupt signal. Shutting down...")
 		os.Exit(0)
 	}()
@@ -92,7 +92,6 @@ func (c *CLI) Run() error {
 		if err != nil {
 			c.logger.Error("Failed to create new chat", zap.Error(err))
 			fmt.Println("Error creating new chat:", err)
-			restoreTermState()
 			return err
 		}
 	}
@@ -159,7 +158,7 @@ func (c *CLI) Run() error {
 
 		if strings.HasPrefix(userInput, "!") {
 			cmd := userInput[1:]
-			output, err := c.RunBashCommand(cmd)
+			output, err := c.BashCommand(cmd)
 			if err != nil {
 				fmt.Printf("Error executing command: %s\n", err)
 			} else {
@@ -235,7 +234,6 @@ func (c *CLI) Run() error {
 				chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
 			close(stopSpinner)
 			wg.Wait()
-			restoreTermState()
 			os.Exit(0)
 		}
 
@@ -302,7 +300,6 @@ func (c *CLI) Run() error {
 					fmt.Println("\nReceived CTRL+C. Shutting down...")
 					close(stopSpinner)
 					wg.Wait()
-					restoreTermState()
 					c.cancel()
 					os.Exit(0)
 				},
@@ -310,13 +307,6 @@ func (c *CLI) Run() error {
 			prompt.KeyBind{
 				Key: prompt.Escape,
 				Fn: func(*prompt.Buffer) {
-					if c.cancel != nil {
-						fmt.Println("\nCanceling operation...")
-						close(stopSpinner)
-						wg.Wait()
-						c.cancel()
-						c.cancel = nil
-					}
 				},
 			},
 		),
@@ -324,6 +314,16 @@ func (c *CLI) Run() error {
 	p.Run()
 
 	return nil
+}
+
+func (c *CLI) Cancel() {
+	if c.cancel != nil {
+		fmt.Println("\nCanceling operation...")
+		close(stopSpinner)
+		wg.Wait()
+		c.cancel()
+		c.cancel = nil
+	}
 }
 
 func completer(d prompt.Document) []prompt.Suggest {
@@ -533,7 +533,7 @@ func (c *CLI) HistoryCommand(ctx context.Context) error {
 	return nil
 }
 
-func (cli *CLI) RunBashCommand(cmd string) (string, error) {
+func (cli *CLI) BashCommand(cmd string) (string, error) {
 	output, err := Bash(cmd)
 	if err != nil {
 		return "", err
