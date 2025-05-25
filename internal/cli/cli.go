@@ -81,6 +81,7 @@ func (c *CLI) Run() error {
 		close(stopSpinner)
 		wg.Wait()
 		fmt.Println("\nReceived interrupt signal. Shutting down...")
+		restoreTermState()
 		os.Exit(0)
 	}()
 
@@ -93,6 +94,7 @@ func (c *CLI) Run() error {
 		if err != nil {
 			c.logger.Error("Failed to create new chat", zap.Error(err))
 			fmt.Println("Error creating new chat:", err)
+			restoreTermState()
 			return err
 		}
 	}
@@ -117,6 +119,47 @@ func (c *CLI) Run() error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+
+			// Save the current terminal state and restore it on exit
+			oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+			if err != nil {
+				return
+			}
+			defer term.Restore(int(os.Stdin.Fd()), oldState) // Ensure terminal state is restored
+
+			// Goroutine to listen for key presses
+			go func() {
+				buffer := make([]byte, 1)
+				for {
+					select {
+					case <-ctx.Done():
+						// Context cancelled, stop listening
+						return
+					default:
+						// Read one byte from stdin
+						n, readErr := os.Stdin.Read(buffer)
+						if readErr != nil {
+							// Handle read error (e.g., EOF on Ctrl+D)
+							// In a real app, you might want more robust error handling
+							if readErr.Error() == "EOF" {
+								c.cancel()
+							} else {
+								fmt.Printf("Read error: %v\n", readErr)
+							}
+							return // Exit goroutine on error
+						}
+						if n > 0 {
+							// Check for Escape key (ASCII 27, hexadecimal 0x1b)
+							if buffer[0] == 0x1b {
+								fmt.Println("\nEscape key pressed!")
+								c.cancel()
+								return
+							}
+						}
+					}
+				}
+			}()
+
 			spinner := []string{"-", "\\", "|", "/"}
 			idx := 0
 			startTime := time.Now()
@@ -235,6 +278,7 @@ func (c *CLI) Run() error {
 				chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
 			close(stopSpinner)
 			wg.Wait()
+			restoreTermState()
 			os.Exit(0)
 		}
 
