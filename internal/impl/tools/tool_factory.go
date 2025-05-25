@@ -2,7 +2,7 @@ package tools
 
 import (
 	"aiagent/internal/domain/entities"
-	"aiagent/internal/domain/errors"
+	"aiagent/internal/domain/errs"
 
 	"go.uber.org/zap"
 )

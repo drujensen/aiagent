@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"aiagent/internal/domain/entities"
-	"aiagent/internal/domain/errors"
+	"aiagent/internal/domain/errs"
 	"aiagent/internal/domain/services"
 	"aiagent/internal/impl/tools"
 

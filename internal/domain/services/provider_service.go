@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"aiagent/internal/domain/entities"
-	"aiagent/internal/domain/errors"
+	"aiagent/internal/domain/errs"
 	"aiagent/internal/domain/interfaces"
 
 	"go.uber.org/zap"

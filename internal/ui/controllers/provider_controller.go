@@ -4,7 +4,7 @@ import (
 	"html/template"
 	"net/http"
 
-	"aiagent/internal/domain/errors"
+	"aiagent/internal/domain/errs"
 	"aiagent/internal/domain/services"
 
 	"github.com/labstack/echo/v4"

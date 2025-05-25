@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"aiagent/internal/domain/entities"
-	"aiagent/internal/domain/errors"
+	"aiagent/internal/domain/errs"
 	"aiagent/internal/domain/interfaces"
 
 	"github.com/google/uuid"

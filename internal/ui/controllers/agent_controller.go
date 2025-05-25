@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"aiagent/internal/domain/entities"
-	"aiagent/internal/domain/errors"
+	"aiagent/internal/domain/errs"
 	"aiagent/internal/domain/services"
 
 	"github.com/google/uuid"
