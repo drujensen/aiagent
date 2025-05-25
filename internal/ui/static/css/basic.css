@@ -32,11 +32,11 @@ pre {
     border-radius: 5px;
     overflow-x: auto;
     position: relative;
-    white-space: pre-wrap; /* Allow text to wrap on smaller screens */
-    word-break: break-word; /* Break long words to fit container */
-    box-sizing: border-box; /* Ensure padding doesn't cause overflow */
-    font-family: monospace, monospace; /* Explicitly set monospace font */
-    margin: 0; /* Remove default margin to avoid spacing issues */
+    white-space: pre;
+    word-wrap: normal;
+    box-sizing: border-box;
+    font-family: monospace, monospace;
+    margin: 0;
 }
 
 /* Responsive adjustments for mobile */
