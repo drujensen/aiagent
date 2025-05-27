@@ -351,18 +351,6 @@ func (c *CLI) Run() error {
 					os.Exit(0)
 				},
 			},
-			prompt.KeyBind{
-				Key: prompt.Escape,
-				Fn: func(*prompt.Buffer) {
-					if c.cancel != nil {
-						fmt.Println("\nCanceling operation...")
-						close(stopSpinner)
-						wg.Wait()
-						c.cancel()
-						c.cancel = nil
-					}
-				},
-			},
 		),
 	)
 	p.Run()
