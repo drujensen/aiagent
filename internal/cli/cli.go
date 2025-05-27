@@ -127,38 +127,39 @@ func (c *CLI) Run() error {
 			}
 			defer term.Restore(int(os.Stdin.Fd()), oldState) // Ensure terminal state is restored
 
+			// Create a channel to listen for the escape key
+			escapeChan := make(chan bool)
+
 			// Goroutine to listen for key presses
-			//		go func() {
-			//			buffer := make([]byte, 1)
-			//			for {
-			//				select {
-			//				case <-ctx.Done():
-			//					// Context cancelled, stop listening
-			//					return
-			//				default:
-			//					// Read one byte from stdin
-			//					n, readErr := os.Stdin.Read(buffer)
-			//					if readErr != nil {
-			//						// Handle read error (e.g., EOF on Ctrl+D)
-			//						// In a real app, you might want more robust error handling
-			//						if readErr.Error() == "EOF" {
-			//							c.cancel()
-			//						} else {
-			//							fmt.Printf("Read error: %v\n", readErr)
-			//						}
-			//						return // Exit goroutine on error
-			//					}
-			//					if n > 0 {
-			//						// Check for Escape key (ASCII 27, hexadecimal 0x1b)
-			//						if buffer[0] == 0x1b {
-			//							fmt.Println("\nEscape key pressed!")
-			//							c.cancel()
-			//							return
-			//						}
-			//					}
-			//				}
-			//			}
-			//		}()
+			go func() {
+				buffer := make([]byte, 1)
+				for {
+					select {
+					case <-escapeChan:
+						return
+					default:
+						n, readErr := os.Stdin.Read(buffer)
+						if readErr != nil {
+							// Handle read error (e.g., EOF on Ctrl+D)
+							if readErr.Error() == "EOF" {
+								c.cancel()
+								return
+							} else {
+								fmt.Printf("Read error: %v\n", readErr)
+							}
+							return
+						}
+						if n > 0 {
+							// Check for Escape key (ASCII 27, hexadecimal 0x1b)
+							if buffer[0] == 0x1b {
+								fmt.Println("\rEscape key pressed!")
+								c.cancel()
+								return
+							}
+						}
+					}
+				}
+			}()
 
 			spinner := []string{"-", "\\", "|", "/"}
 			idx := 0
@@ -167,6 +168,7 @@ func (c *CLI) Run() error {
 			for {
 				select {
 				case <-stopSpinner:
+					close(escapeChan)
 					fmt.Print("\r") // Clear the spinner
 					return
 				default:
