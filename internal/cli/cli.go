@@ -188,7 +188,7 @@ func (c *CLI) Run() error {
 			return
 		}
 
-		if userInput == "?" {
+		if userInput == "?" || userInput == "help" {
 			fmt.Println("Available commands:")
 			fmt.Println("? - Show this help message")
 			fmt.Println("!<command> - Execute a shell command")
@@ -374,8 +374,8 @@ func completer(d prompt.Document) []prompt.Suggest {
 		{Text: "/exit", Description: "Exit the application"},
 	}
 
-	// Handle empty input or command suggestions
-	if text == "" || strings.HasPrefix(text, "/") {
+	// Handle command suggestions
+	if strings.HasPrefix(text, "?") || strings.HasPrefix(text, "!") || strings.HasPrefix(text, "/") {
 		return prompt.FilterHasPrefix(suggestions, text, true)
 	}
 
