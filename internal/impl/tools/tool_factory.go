@@ -2,7 +2,7 @@ package tools
 
 import (
 	"aiagent/internal/domain/entities"
-	"aiagent/internal/domain/errs"
+	errors "aiagent/internal/domain/errs"
 
 	"go.uber.org/zap"
 )
@@ -117,6 +117,14 @@ The command is executed in the workspace directory.  The extraArgs are prepended
 		ConfigKeys:  []string{"workspace", "command", "args"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewMCPTool(name, description, configuration, logger)
+		},
+	}
+	toolFactory.toolFactories["Project"] = &ToolFactoryEntry{
+		Name:        "Project",
+		Description: `This tool reads project details from a configurable markdown file to provide context for AI agents.`,
+		ConfigKeys:  []string{"workspace", "project_file"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewProjectTool(name, description, configuration, logger)
 		},
 	}
 	return toolFactory, nil
