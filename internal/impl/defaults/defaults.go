@@ -480,7 +480,7 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     time.Now(),
 		},
 		{
-			ID:            "70523B6A-18CD-4EE2-8661-4782EBD34A0F",
+			ID:            "8C2DBDF3-790C-472D-A8EB-F679EB0F887B",
 			ToolType:      "Project",
 			Name:          "Project",
 			Description:   "This tool reads project details from a configurable markdown file to provide context for AI agents.",
