@@ -20,11 +20,11 @@ jobs:
       - name: Build binaries
         run: |
           # Build for each platform
-          GOOS=linux GOARCH=amd64 go build -o aiagent-linux-x86_64
-          GOOS=linux GOARCH=arm64 go build -o aiagent-linux-arm64
-          GOOS=windows GOARCH=amd64 go build -o aiagent-windows-x86_64.exe
-          GOOS=darwin GOARCH=amd64 go build -o aiagent-macos-x86_64
-          GOOS=darwin GOARCH=arm64 go build -o aiagent-macos-arm64
+          GOOS=linux GOARCH=amd64 go build -o aiagent-linux-x86_64 cmd/aiagent/main.go
+          GOOS=linux GOARCH=arm64 go build -o aiagent-linux-arm64 cmd/aiagent/main.go
+          GOOS=windows GOARCH=amd64 go build -o aiagent-windows-x86_64.exe cmd/aiagent/main.go
+          GOOS=darwin GOARCH=amd64 go build -o aiagent-macos-x86_64 cmd/aiagent/main.go
+          GOOS=darwin GOARCH=arm64 go build -o aiagent-macos-arm64 cmd/aiagent/main.go
 
       - name: Upload binaries to release
         uses: softprops/action-gh-release@v1
