@@ -4,6 +4,7 @@ import (
 	"aiagent/internal/domain/services"
 	"aiagent/internal/impl/tools"
 	"bytes"
+	"embed"
 	"html/template"
 	"slices"
 
@@ -19,6 +20,9 @@ import (
 
 	"go.uber.org/zap"
 )
+
+//go:embed static/* templates/*
+var embeddedFiles embed.FS
 
 type UI struct {
 	chatService     services.ChatService
@@ -55,25 +59,7 @@ func (u *UI) Run() error {
 		},
 	}
 
-	tmpl, err := template.New("").Funcs(funcMap).ParseFiles(
-		"internal/ui/templates/layout.html",
-		"internal/ui/templates/header.html",
-		"internal/ui/templates/sidebar.html",
-		"internal/ui/templates/home.html",
-		"internal/ui/templates/sidebar_chats.html",
-		"internal/ui/templates/sidebar_agents.html",
-		"internal/ui/templates/sidebar_tools.html",
-		"internal/ui/templates/chat_form.html",
-		"internal/ui/templates/agent_form.html",
-		"internal/ui/templates/tool_form.html",
-		"internal/ui/templates/chat.html",
-		"internal/ui/templates/messages_partial.html",
-		"internal/ui/templates/message_session_partial.html",
-		"internal/ui/templates/provider_models_partial.html",
-		"internal/ui/templates/providers_list_content.html",
-		"internal/ui/templates/chat_cost_partial.html",
-		"internal/ui/templates/message_controls.html",
-	)
+	tmpl, err := template.New("").Funcs(funcMap).ParseFS(embeddedFiles, "templates/*.html")
 	if err != nil {
 		u.logger.Fatal("Failed to parse templates", zap.Error(err))
 	}
@@ -110,7 +96,16 @@ func (u *UI) Run() error {
 		}
 	})
 
-	e.Static("/static", "internal/ui/static")
+	// serve static files from embedded
+	e.GET("/static/*", func(c echo.Context) error {
+		path := c.Param("*")
+		file, err := embeddedFiles.Open("static/" + path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		return c.Stream(200, "application/octet-stream", file)
+	})
 
 	homeController.RegisterRoutes(e)
 	agentController.RegisterRoutes(e)
