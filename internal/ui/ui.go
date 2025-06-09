@@ -6,6 +6,10 @@ import (
 	"bytes"
 	"embed"
 	"html/template"
+	"io"
+	"mime"
+	"net/http"
+	"path/filepath"
 	"slices"
 
 	apicontrollers "aiagent/internal/api/controllers"
@@ -99,12 +103,29 @@ func (u *UI) Run() error {
 	// serve static files from embedded
 	e.GET("/static/*", func(c echo.Context) error {
 		path := c.Param("*")
-		file, err := embeddedFiles.Open("static/" + path)
+		filePath := "static/" + path
+		file, err := embeddedFiles.Open(filePath)
 		if err != nil {
-			return err
+			u.logger.Error("Failed to open static file", zap.String("path", filePath), zap.Error(err))
+			return echo.NewHTTPError(http.StatusNotFound, "File not found")
 		}
 		defer file.Close()
-		return c.Stream(200, "application/octet-stream", file)
+
+		// Determine MIME type based on file extension
+		ext := filepath.Ext(path)
+		mimeType := mime.TypeByExtension(ext)
+		if mimeType == "" {
+			mimeType = "application/octet-stream" // Fallback MIME type
+		}
+
+		// Read file content
+		content, err := io.ReadAll(file)
+		if err != nil {
+			u.logger.Error("Failed to read static file", zap.String("path", filePath), zap.Error(err))
+			return echo.NewHTTPError(http.StatusInternalServerError, "Failed to read file")
+		}
+
+		return c.Blob(http.StatusOK, mimeType, content)
 	})
 
 	homeController.RegisterRoutes(e)
