@@ -23,36 +23,48 @@ func NewToolFactory() (*ToolFactory, error) {
 	toolFactory.toolFactories = make(map[string]*ToolFactoryEntry)
 
 	toolFactory.toolFactories["Bash"] = &ToolFactoryEntry{
-		Name: "Bash",
-		Description: `This tool executes the bash command with support for background processes, timeouts, and full output.
-
-The command is executed in the workspace directory.`,
-		ConfigKeys: []string{"workspace"},
+		Name:        "Bash",
+		Description: `This tool executes the bash command with support for background processes, timeouts, and full output. The command is executed in the workspace directory.`,
+		ConfigKeys:  []string{"workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewBashTool(name, description, configuration, logger)
 		},
 	}
 	toolFactory.toolFactories["Process"] = &ToolFactoryEntry{
-		Name: "Process",
-		Description: `This tool executes a configured CLI command with support for background processes, timeouts, and full output.
-
-The command is executed in the workspace directory.  The extraArgs are prepended with the arguments passed to the tool.`,
-		ConfigKeys: []string{"workspace", "command", "extraArgs"},
+		Name:        "Process",
+		Description: `This tool executes a configured CLI command with support for background processes, timeouts, and full output. The command is executed in the workspace directory. The extraArgs are prepended with the arguments passed to the tool.`,
+		ConfigKeys:  []string{"workspace", "command", "extraArgs"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewProcessTool(name, description, configuration, logger)
 		},
 	}
-	toolFactory.toolFactories["File"] = &ToolFactoryEntry{
-		Name:        "File",
-		Description: `This tool provides you file system operations including reading, writing, editing, searching, and managing files and directories.  The workspace will be prepended to any directories or files specified.`,
+	toolFactory.toolFactories["FileRead"] = &ToolFactoryEntry{
+		Name:        "FileRead",
+		Description: `This tool provides file reading and searching operations, including reading file content, searching for text, and retrieving file metadata. The workspace directory is prepended to any file paths specified.`,
 		ConfigKeys:  []string{"workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
-			return NewFileTool(name, description, configuration, logger)
+			return NewFileReadTool(name, description, configuration, logger)
+		},
+	}
+	toolFactory.toolFactories["FileWrite"] = &ToolFactoryEntry{
+		Name:        "FileWrite",
+		Description: `This tool provides file writing and modification operations, including overwriting, editing, inserting, and deleting content in files. The workspace directory is prepended to any file paths specified.`,
+		ConfigKeys:  []string{"workspace"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewFileWriteTool(name, description, configuration, logger)
+		},
+	}
+	toolFactory.toolFactories["Directory"] = &ToolFactoryEntry{
+		Name:        "Directory",
+		Description: `This tool provides directory and file management operations, including creating directories, listing directory contents, building directory trees, and moving files or directories. The workspace directory is prepended to any paths specified.`,
+		ConfigKeys:  []string{"workspace"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewDirectoryTool(name, description, configuration, logger)
 		},
 	}
 	toolFactory.toolFactories["Search"] = &ToolFactoryEntry{
 		Name:        "Search",
-		Description: `This tool Searches the web using the Tavily API.`,
+		Description: `This tool searches the web using the Tavily API.`,
 		ConfigKeys:  []string{"tavily_api_key"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewSearchTool(name, description, configuration, logger)
@@ -107,7 +119,7 @@ The command is executed in the workspace directory.  The extraArgs are prepended
 				NameField:            name,
 				DescriptionField:     description,
 				FullDescriptionField: description,
-				ConfigurationField:   configuration, // Now includes provider, api_key, etc.
+				ConfigurationField:   configuration,
 			}
 		},
 	}
