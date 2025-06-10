@@ -4,6 +4,11 @@ import (
 	"github.com/dustin/go-humanize"
 )
 
+type LineResult struct {
+	Line int    `json:"line"`
+	Text string `json:"text"`
+}
+
 func formatSize(size int64) string {
 	return humanize.Bytes(uint64(size))
 }

@@ -38,9 +38,17 @@ func NewToolFactory() (*ToolFactory, error) {
 			return NewProcessTool(name, description, configuration, logger)
 		},
 	}
+	toolFactory.toolFactories["FileSearch"] = &ToolFactoryEntry{
+		Name:        "FileSearch",
+		Description: `This tool provides the ability to search for text in files. The workspace directory is prepended to any file paths specified.`,
+		ConfigKeys:  []string{"workspace"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewFileSearchTool(name, description, configuration, logger)
+		},
+	}
 	toolFactory.toolFactories["FileRead"] = &ToolFactoryEntry{
 		Name:        "FileRead",
-		Description: `This tool provides file reading and searching operations, including reading file content, searching for text, and retrieving file metadata. The workspace directory is prepended to any file paths specified.`,
+		Description: `This tool provides the ability to read files. The workspace directory is prepended to any file paths specified.`,
 		ConfigKeys:  []string{"workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewFileReadTool(name, description, configuration, logger)
@@ -62,12 +70,12 @@ func NewToolFactory() (*ToolFactory, error) {
 			return NewDirectoryTool(name, description, configuration, logger)
 		},
 	}
-	toolFactory.toolFactories["Search"] = &ToolFactoryEntry{
-		Name:        "Search",
+	toolFactory.toolFactories["WebSearch"] = &ToolFactoryEntry{
+		Name:        "WebSearch",
 		Description: `This tool searches the web using the Tavily API.`,
 		ConfigKeys:  []string{"tavily_api_key"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
-			return NewSearchTool(name, description, configuration, logger)
+			return NewWebSearchTool(name, description, configuration, logger)
 		},
 	}
 	toolFactory.toolFactories["Fetch"] = &ToolFactoryEntry{

@@ -13,17 +13,17 @@ import (
 	"go.uber.org/zap"
 )
 
-// SearchTool represents a tool for searching using the Tavily API.
-type SearchTool struct {
+// WebSearchTool represents a tool for searching using the Tavily API.
+type WebSearchTool struct {
 	name          string
 	description   string
 	configuration map[string]string
 	logger        *zap.Logger
 }
 
-// NewSearchTool creates a new instance of SearchTool.
-func NewSearchTool(name, description string, configuration map[string]string, logger *zap.Logger) *SearchTool {
-	return &SearchTool{
+// NewWebSearchTool creates a new instance of WebSearchTool.
+func NewWebSearchTool(name, description string, configuration map[string]string, logger *zap.Logger) *WebSearchTool {
+	return &WebSearchTool{
 		name:          name,
 		description:   description,
 		configuration: configuration,
@@ -31,23 +31,23 @@ func NewSearchTool(name, description string, configuration map[string]string, lo
 	}
 }
 
-func (t *SearchTool) Name() string {
+func (t *WebSearchTool) Name() string {
 	return t.name
 }
 
-func (t *SearchTool) Description() string {
+func (t *WebSearchTool) Description() string {
 	return t.description
 }
 
-func (t *SearchTool) Configuration() map[string]string {
+func (t *WebSearchTool) Configuration() map[string]string {
 	return t.configuration
 }
 
-func (t *SearchTool) UpdateConfiguration(config map[string]string) {
+func (t *WebSearchTool) UpdateConfiguration(config map[string]string) {
 	t.configuration = config
 }
 
-func (t *SearchTool) FullDescription() string {
+func (t *WebSearchTool) FullDescription() string {
 	var b strings.Builder
 
 	// Add description
@@ -67,7 +67,7 @@ func (t *SearchTool) FullDescription() string {
 	return b.String()
 }
 
-func (t *SearchTool) Parameters() []entities.Parameter {
+func (t *WebSearchTool) Parameters() []entities.Parameter {
 	return []entities.Parameter{
 		{
 			Name:        "query",
@@ -79,7 +79,7 @@ func (t *SearchTool) Parameters() []entities.Parameter {
 }
 
 // Execute performs the search and returns both the answer and results.
-func (t *SearchTool) Execute(arguments string) (string, error) {
+func (t *WebSearchTool) Execute(arguments string) (string, error) {
 	// Log the search query
 	t.logger.Debug("Executing search", zap.String("arguments", arguments))
 	fmt.Println("\rExecuting search", arguments)
@@ -200,4 +200,4 @@ func (t *SearchTool) Execute(arguments string) (string, error) {
 	return output, nil
 }
 
-var _ entities.Tool = (*SearchTool)(nil)
+var _ entities.Tool = (*WebSearchTool)(nil)

@@ -1,7 +1,8 @@
 # AI Agent Codebase Guide
 
 ## Build Commands
-- Run HTTP server: `go run ./cmd/server/main.go`
+- Run CLI: `go run ./cmd/aiagent/main.go [-storage=file|mongo]`
+- Run web server: `go run ./cmd/aiagent/main.go serve [-storage=file|mongo]`
 - Run all tests: `go test ./...`
 - Run specific test: `go test ./path/to/package -run TestFunctionName`
 - Build and run with Docker: `docker-compose up --build`
