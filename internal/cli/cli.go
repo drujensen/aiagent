@@ -169,7 +169,7 @@ func (c *CLI) Run() error {
 				select {
 				case <-stopSpinner:
 					close(escapeChan)
-					fmt.Print("\r") // Clear the spinner
+					fmt.Print("\r\033[K") // Clear the spinner
 					return
 				default:
 					elapsed := time.Since(startTime).Seconds()
