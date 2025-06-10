@@ -91,7 +91,7 @@ func (t *FileWriteTool) Parameters() []entities.Parameter {
 			Name:        "content",
 			Type:        "string",
 			Description: "Content to write, edit, or insert",
-			Required:    false,
+			Required:    true,
 		},
 		{
 			Name:        "start_line",
