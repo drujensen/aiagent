@@ -3,7 +3,9 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -15,11 +17,13 @@ import (
 	"time"
 
 	"aiagent/internal/domain/entities"
+	errs "aiagent/internal/domain/errs"
 	"aiagent/internal/domain/services"
 
 	"github.com/c-bata/go-prompt"
 	"github.com/manifoldco/promptui"
 	"go.uber.org/zap"
+	"golang.org/x/sys/unix"
 	"golang.org/x/term"
 )
 
@@ -133,26 +137,33 @@ func (c *CLI) Run() error {
 			// Goroutine to listen for key presses
 			go func() {
 				buffer := make([]byte, 1)
+				fd := int(os.Stdin.Fd())
+
+				// Set non-blocking mode
+				err := unix.SetNonblock(fd, true)
+				if err != nil {
+					fmt.Printf("Error setting nonblock: %v\n", err)
+					return
+				}
+				defer unix.SetNonblock(fd, false) // Restore blocking mode on exit
+
 				for {
 					select {
 					case <-escapeChan:
-						return
+						return // Exit when escapeChan is closed
 					default:
 						n, readErr := os.Stdin.Read(buffer)
 						if readErr != nil {
-							// Handle read error (e.g., EOF on Ctrl+D)
-							if readErr.Error() == "EOF" {
+							if readErr == io.EOF {
 								c.cancel()
 								return
 							} else {
-								fmt.Printf("Read error: %v\n", readErr)
+								time.Sleep(10 * time.Millisecond)
+								continue
 							}
-							return
 						}
 						if n > 0 {
-							// Check for Escape key (ASCII 27, hexadecimal 0x1b)
 							if buffer[0] == 0x1b {
-								fmt.Println("\rEscape key pressed!")
 								c.cancel()
 								return
 							}
@@ -169,7 +180,7 @@ func (c *CLI) Run() error {
 				select {
 				case <-stopSpinner:
 					close(escapeChan)
-					fmt.Print("\r\033[K") // Clear the spinner
+					fmt.Print("\r") // Clear the spinner
 					return
 				default:
 					elapsed := time.Since(startTime).Seconds()
@@ -311,6 +322,10 @@ func (c *CLI) Run() error {
 		c.cancel = nil
 
 		if err != nil {
+			if isCanceledError(err) {
+				fmt.Println("\rRequest canceled by user.")
+				return
+			}
 			c.logger.Error("Failed to generate response", zap.Error(err))
 			fmt.Println("Error generating response:", err)
 			return
@@ -611,4 +626,9 @@ func (c *CLI) displayMessage(msg entities.Message) {
 	case "tool":
 		fmt.Printf("Tool Called.\n")
 	}
+}
+
+func isCanceledError(err error) bool {
+	var cancelErr *errs.CanceledError
+	return errors.As(err, &cancelErr)
 }
