@@ -21,9 +21,19 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	version = "unknown"
+)
+
 func main() {
+	// Check version flag first
+	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
+		fmt.Println(version)
+		os.Exit(0)
+	}
+
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: aiagent [serve] [-storage=type]\n")
+		fmt.Fprintf(os.Stderr, "Usage: aiagent [serve] [--storage=type]\n")
 		flag.PrintDefaults()
 	}
 
