@@ -9,9 +9,9 @@ import (
 	"strings"
 	"sync"
 
-	"aiagent/internal/domain/entities"
-	"aiagent/internal/domain/errs"
-	"aiagent/internal/domain/services"
+	"github.com/drujensen/aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/domain/errs"
+	"github.com/drujensen/aiagent/internal/domain/services"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"

@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/domain/entities"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"

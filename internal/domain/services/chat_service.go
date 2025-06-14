@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"aiagent/internal/domain/entities"
-	"aiagent/internal/domain/errs"
-	"aiagent/internal/domain/interfaces"
-	"aiagent/internal/impl/config"
-	"aiagent/internal/impl/integrations"
+	"github.com/drujensen/aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/domain/errs"
+	"github.com/drujensen/aiagent/internal/domain/interfaces"
+	"github.com/drujensen/aiagent/internal/impl/config"
+	"github.com/drujensen/aiagent/internal/impl/integrations"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"

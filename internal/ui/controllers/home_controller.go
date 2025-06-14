@@ -4,7 +4,7 @@ import (
 	"html/template"
 	"net/http"
 
-	"aiagent/internal/domain/services"
+	"github.com/drujensen/aiagent/internal/domain/services"
 
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"

@@ -3,7 +3,7 @@ package defaults
 import (
 	"time"
 
-	"aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/domain/entities"
 )
 
 // DefaultProviders returns the default list of providers.

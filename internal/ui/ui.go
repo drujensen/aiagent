@@ -1,8 +1,8 @@
 package ui
 
 import (
-	"aiagent/internal/domain/services"
-	"aiagent/internal/impl/tools"
+	"github.com/drujensen/aiagent/internal/domain/services"
+	"github.com/drujensen/aiagent/internal/impl/tools"
 	"bytes"
 	"embed"
 	"html/template"
@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"slices"
 
-	apicontrollers "aiagent/internal/api/controllers"
-	uiapicontrollers "aiagent/internal/ui/controllers"
+	apicontrollers "github.com/drujensen/aiagent/internal/api/controllers"
+	uiapicontrollers "github.com/drujensen/aiagent/internal/ui/controllers"
 
 	"github.com/dustin/go-humanize"
 	"github.com/labstack/echo/v4"

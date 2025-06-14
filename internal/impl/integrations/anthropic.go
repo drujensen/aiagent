@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	"aiagent/internal/domain/entities"
-	"aiagent/internal/domain/interfaces"
+	"github.com/drujensen/aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/domain/interfaces"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"

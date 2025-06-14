@@ -3,7 +3,7 @@ package interfaces
 import (
 	"context"
 
-	"aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/domain/entities"
 )
 
 // AIModelIntegration defines the interface for AI model providers

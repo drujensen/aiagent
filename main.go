@@ -7,20 +7,18 @@ import (
 	"os"
 	"slices"
 
-	"aiagent/internal/cli"
-	"aiagent/internal/domain/interfaces"
-	"aiagent/internal/domain/services"
-	"aiagent/internal/impl/config"
-	"aiagent/internal/impl/database"
-	"aiagent/internal/impl/defaults"
-	repositoriesJson "aiagent/internal/impl/repositories/json"
-	repositoriesMongo "aiagent/internal/impl/repositories/mongo"
-	"aiagent/internal/impl/tools"
-	"aiagent/internal/ui"
+	"github.com/drujensen/aiagent/internal/cli"
+	"github.com/drujensen/aiagent/internal/domain/interfaces"
+	"github.com/drujensen/aiagent/internal/domain/services"
+	"github.com/drujensen/aiagent/internal/impl/config"
+	"github.com/drujensen/aiagent/internal/impl/database"
+	"github.com/drujensen/aiagent/internal/impl/defaults"
+	repositoriesJson "github.com/drujensen/aiagent/internal/impl/repositories/json"
+	repositoriesMongo "github.com/drujensen/aiagent/internal/impl/repositories/mongo"
+	"github.com/drujensen/aiagent/internal/impl/tools"
+	"github.com/drujensen/aiagent/internal/ui"
 
 	"go.uber.org/zap"
-
-	_ "aiagent/api"
 )
 
 func main() {

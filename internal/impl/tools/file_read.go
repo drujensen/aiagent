@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/domain/entities"
 
 	"go.uber.org/zap"
 )

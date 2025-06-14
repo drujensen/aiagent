@@ -1,7 +1,7 @@
 package apicontrollers
 
 import (
-	"aiagent/internal/domain/services"
+	"github.com/drujensen/aiagent/internal/domain/services"
 	"net/http"
 
 	"github.com/labstack/echo/v4"

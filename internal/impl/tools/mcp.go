@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/domain/entities"
 	"bufio"
 	"context"
 	"encoding/json"

@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"aiagent/internal/domain/entities"
-	"aiagent/internal/domain/errs"
-	"aiagent/internal/domain/interfaces"
+	"github.com/drujensen/aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/domain/errs"
+	"github.com/drujensen/aiagent/internal/domain/interfaces"
 
 	"go.uber.org/zap"
 )

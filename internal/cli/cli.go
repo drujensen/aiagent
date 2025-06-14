@@ -16,9 +16,9 @@ import (
 	"syscall"
 	"time"
 
-	"aiagent/internal/domain/entities"
-	errs "aiagent/internal/domain/errs"
-	"aiagent/internal/domain/services"
+	"github.com/drujensen/aiagent/internal/domain/entities"
+	errs "github.com/drujensen/aiagent/internal/domain/errs"
+	"github.com/drujensen/aiagent/internal/domain/services"
 
 	"github.com/c-bata/go-prompt"
 	"github.com/manifoldco/promptui"

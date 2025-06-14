@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"aiagent/internal/domain/entities"
-	"aiagent/internal/domain/errs"
-	"aiagent/internal/domain/interfaces"
-	"aiagent/internal/impl/tools"
+	"github.com/drujensen/aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/domain/errs"
+	"github.com/drujensen/aiagent/internal/domain/interfaces"
+	"github.com/drujensen/aiagent/internal/impl/tools"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"

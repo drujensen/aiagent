@@ -1,8 +1,8 @@
 package tools
 
 import (
-	"aiagent/internal/domain/entities"
-	errors "aiagent/internal/domain/errs"
+	"github.com/drujensen/aiagent/internal/domain/entities"
+	errors "github.com/drujensen/aiagent/internal/domain/errs"
 
 	"go.uber.org/zap"
 )
