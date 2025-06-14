@@ -21,25 +21,18 @@ go build -o aiagent main.go
 
 ## Running the Application
 
-### Using Go Install
-After installation, you can run the application:
-
-```bash
-aiagent --storage=[file|mongo]
-```
-
 ### Running in Console Mode
 To run in console mode, execute:
 
 ```bash
-go run main.go --storage=[file|mongo]
+aiagent --storage=[file|mongo]
 ```
 
 ### Running HTTP Server
 To run the HTTP server, execute:
 
 ```bash
-go run main.go --storage=[file|mongo] serve
+aiagent --storage=[file|mongo] serve
 ```
 
 Access the server at `http://localhost:8080/hello`.
