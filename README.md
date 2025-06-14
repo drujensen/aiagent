@@ -3,37 +3,46 @@
 ## Project Description
 AIAgent is a Go-based project designed to dynamically configure AI agents with various tools and prompts. It follows Domain-Driven Design (DDD) principles to maintain a clean and modular architecture.
 
-## Build Instructions
+## Installation
+
+### Using Go Install
+To install the latest version of AIAgent, run:
+
+```bash
+go install github.com/drujensen/aiagent@latest
+```
+
+### Build from Source
 To build the project, ensure you have Go installed and set up on your machine. Navigate to the project directory and run:
 
 ```bash
-go build -o aiagent ./cmd/aiagent/main.go
+go build -o aiagent main.go
 ```
 
-### Running the Application
+## Running the Application
 
-The application can run in either `console` or `serve` mode.
+### Using Go Install
+After installation, you can run the application:
 
+```bash
+aiagent --storage=[file|mongo]
+```
+
+### Running in Console Mode
 To run in console mode, execute:
 
 ```bash
-go run ./cmd/aiagent/main.go -storage=[file|mongo]
+go run main.go --storage=[file|mongo]
 ```
 
+### Running HTTP Server
 To run the HTTP server, execute:
 
 ```bash
-go run ./cmd/aiagent -storage=[file|mongo] serve
+go run main.go --storage=[file|mongo] serve
 ```
 
 Access the server at `http://localhost:8080/hello`.
-
-### Console Application
-To run the console application, execute:
-
-```bash
-go run ./cmd/console
-```
 
 ## Docker and Docker Compose
 ### Using Docker Compose
