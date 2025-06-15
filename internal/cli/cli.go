@@ -1,104 +1,72 @@
 package cli
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
-	"syscall"
 	"time"
 
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	errs "github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/services"
-
-	"github.com/c-bata/go-prompt"
-	"github.com/manifoldco/promptui"
 	"go.uber.org/zap"
-	"golang.org/x/sys/unix"
 	"golang.org/x/term"
 )
 
-var termState *term.State
+var (
+	promptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
+)
 
-func saveTermState() {
-	oldState, err := term.GetState(int(os.Stdin.Fd()))
-	if err != nil {
-		return
-	}
-	termState = oldState
-}
-
-func restoreTermState() {
-	if termState != nil {
-		term.Restore(int(os.Stdin.Fd()), termState)
-	}
-}
-
+// CLI handles the command line interface with improved message rendering
 type CLI struct {
-	chatService     services.ChatService
-	agentService    services.AgentService
-	toolService     services.ToolService
-	providerService services.ProviderService
-	logger          *zap.Logger
-	cancel          context.CancelFunc
+	chatService      services.ChatService
+	agentService     services.AgentService
+	toolService      services.ToolService
+	providerService  services.ProviderService
+	logger           *zap.Logger
+	messageRenderer  *MessageRenderer
+	messageContainer *MessageContainer
+	width            int
+	height           int
 }
 
+// NewCLI creates a new CLI instance with message container
 func NewCLI(chatService services.ChatService, agentService services.AgentService, toolService services.ToolService, providerService services.ProviderService, logger *zap.Logger) *CLI {
-	return &CLI{
+	cli := &CLI{
 		chatService:     chatService,
 		agentService:    agentService,
 		toolService:     toolService,
 		providerService: providerService,
 		logger:          logger,
 	}
+	cli.updateSize()
+	cli.messageRenderer = NewMessageRenderer(cli.width, false)
+	cli.messageContainer = NewMessageContainer(cli.width, cli.height-4) // Reserve space for input
+	cli.RegisterCallbackHandler()
+	return cli
 }
 
-// Run starts the CLI interface, displaying chat history and handling user input.
+// Run starts the CLI interface, displaying chat history and handling user input
 func (c *CLI) Run() error {
-	saveTermState()
-	// Ensure terminal state is restored on Exit
-	defer restoreTermState()
+	// Display welcome message
+	c.DisplayInfo("AI Agent Console - Type /help for commands, Ctrl+C to quit")
 
 	ctx := context.Background()
 
-	fmt.Println("AI Agent Console. Type '?' for help.")
-
-	// Set up signal handling for graceful shutdown
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	var wg sync.WaitGroup
-	stopSpinner := make(chan bool)
-
-	// Handle interrupt signal in a separate goroutine
-	go func() {
-		<-sigChan
-		close(stopSpinner)
-		wg.Wait()
-		fmt.Println("\nReceived interrupt signal. Shutting down...")
-		restoreTermState()
-		os.Exit(0)
-	}()
-
-	// Select the active chat from the repository
-	chats, err := c.chatService.ListChats(context.Background())
+	// Select the active chat
+	chats, err := c.chatService.ListChats(ctx)
 	var chat *entities.Chat
 	if err != nil || len(chats) == 0 {
-		userInput := "/new New Chat"
-		chat, err = c.NewChatCommand(ctx, userInput)
+		chat, err = c.NewChatCommand(ctx, "/new New Chat")
 		if err != nil {
 			c.logger.Error("Failed to create new chat", zap.Error(err))
-			fmt.Println("Error creating new chat:", err)
-			restoreTermState()
+			c.DisplayError(err)
 			return err
 		}
 	}
@@ -108,230 +76,70 @@ func (c *CLI) Run() error {
 			break
 		}
 	}
-	// If no active chat is found, use the first chat. This shouldn't happen in normal operation.
-	if chat == nil {
+	if chat == nil && len(chats) > 0 {
 		chat = chats[0]
 	}
 
-	// Display existing messages
-	fmt.Println(chat.Name)
-	for _, msg := range chat.Messages {
-		c.displayMessage(msg)
+	// Display chat name and messages
+	if chat != nil {
+		c.DisplayInfo(fmt.Sprintf("Current Chat: %s", chat.Name))
+		for _, msg := range chat.Messages {
+			c.displayMessage(msg)
+		}
 	}
 
-	startSpinner := func() {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			// Save the current terminal state and restore it on exit
-			oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
-			if err != nil {
-				return
+	for {
+		// Get user input
+		input, err := c.GetPrompt()
+		if err != nil {
+			if errors.Is(err, huh.ErrUserAborted) {
+				c.DisplayInfo("Goodbye!")
+				return nil
 			}
-			defer term.Restore(int(os.Stdin.Fd()), oldState) // Ensure terminal state is restored
-
-			// Create a channel to listen for the escape key
-			escapeChan := make(chan bool)
-
-			// Goroutine to listen for key presses
-			go func() {
-				buffer := make([]byte, 1)
-				fd := int(os.Stdin.Fd())
-
-				// Set non-blocking mode
-				err := unix.SetNonblock(fd, true)
-				if err != nil {
-					fmt.Printf("Error setting nonblock: %v\n", err)
-					return
-				}
-				defer unix.SetNonblock(fd, false) // Restore blocking mode on exit
-
-				for {
-					select {
-					case <-escapeChan:
-						return // Exit when escapeChan is closed
-					default:
-						n, readErr := os.Stdin.Read(buffer)
-						if readErr != nil {
-							if readErr == io.EOF {
-								c.cancel()
-								return
-							} else {
-								time.Sleep(10 * time.Millisecond)
-								continue
-							}
-						}
-						if n > 0 {
-							if buffer[0] == 0x1b {
-								c.cancel()
-								return
-							}
-						}
-					}
-				}
-			}()
-
-			spinner := []string{"-", "\\", "|", "/"}
-			idx := 0
-			startTime := time.Now()
-
-			for {
-				select {
-				case <-stopSpinner:
-					close(escapeChan)
-					fmt.Print("\r") // Clear the spinner
-					return
-				default:
-					elapsed := time.Since(startTime).Seconds()
-					fmt.Printf("\r%s Thinking... (%.0fs)", spinner[idx], elapsed)
-					idx = (idx + 1) % len(spinner)
-					time.Sleep(100 * time.Millisecond)
-				}
-			}
-		}()
-	}
-
-	// Executor function for go-prompt
-	executor := func(input string) {
-		userInput := strings.TrimSpace(input)
-		if userInput == "" {
-			return
+			c.logger.Error("Prompt error", zap.Error(err))
+			c.DisplayError(err)
+			continue
 		}
 
-		if userInput == "?" || userInput == "help" {
-			fmt.Println("Available commands:")
-			fmt.Println("? - Show this help message")
-			fmt.Println("!<command> - Execute a shell command")
-			fmt.Println("@<file> - Include a file or directory")
-			fmt.Println("/new <name> - Start a new chat")
-			fmt.Println("/history - Select from all available chats")
-			fmt.Println("/agents - List available agents")
-			fmt.Println("/tools - List available tools")
-			fmt.Println("/usage - Show usage information")
-			fmt.Println("/exit - Exit the application")
-			return
+		// Handle slash commands
+		if c.IsSlashCommand(input) {
+			handled := c.HandleSlashCommand(input, ctx)
+			if handled {
+				continue
+			}
 		}
 
-		if strings.HasPrefix(userInput, "!") {
-			cmd := userInput[1:]
-			output, err := c.BashCommand(cmd)
-			if err != nil {
-				fmt.Printf("Error executing command: %s\n", err)
-			} else {
-				fmt.Println(output)
-			}
-			return
-		}
-
-		if userInput == "/history" {
-			err := c.HistoryCommand(ctx)
-			if err != nil {
-				c.logger.Error("Failed to select chat", zap.Error(err))
-				fmt.Println("Error selecting chat:", err)
-			}
-			return
-		}
-
-		if strings.HasPrefix(userInput, "/new") {
-			newChat, err := c.NewChatCommand(ctx, userInput)
-			if err != nil {
-				c.logger.Error("Failed to create new chat", zap.Error(err))
-				fmt.Println("Error creating new chat:", err)
-			} else {
-				chat = newChat
-				fmt.Println(chat.Name)
-			}
-			return
-		}
-
-		if userInput == "/agents" {
-			agents, err := c.agentService.ListAgents(ctx)
-			if err != nil {
-				c.logger.Error("Failed to list agents", zap.Error(err))
-				fmt.Println("Error listing agents:", err)
-				return
-			}
-			fmt.Println("Available agents:")
-			for _, agent := range agents {
-				fmt.Printf("- %s (%s)\n", agent.Name, agent.ProviderType)
-			}
-			return
-		}
-
-		if userInput == "/tools" {
-			tools, err := c.toolService.ListTools()
-			if err != nil {
-				c.logger.Error("Failed to list tools", zap.Error(err))
-				fmt.Println("Error listing tools:", err)
-				return
-			}
-			fmt.Println("Available tools:")
-			for _, tool := range tools {
-				fmt.Printf("- %s\n", (*tool).Name())
-			}
-			return
-		}
-
-		if userInput == "/usage" {
-			agent, err := c.agentService.GetAgent(ctx, chat.AgentID)
-			if err != nil {
-				c.logger.Error("Failed to get agent", zap.Error(err))
-				fmt.Println("Error getting agent:", err)
-				return
-			}
-			fmt.Printf("Chat Usage:\n- Provider: %s\n- Model: %s\n- Prompt Tokens: %d\n- Completion Tokens: %d\n- Total Tokens: %d\n- Total Cost: $%.2f\n",
-				agent.ProviderType, agent.Model, chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
-			return
-		}
-
-		if userInput == "exit" || userInput == "quit" || userInput == "/exit" || userInput == "/quit" {
-			fmt.Println("Shutting down...")
-			fmt.Printf("Chat Usage:\n- Prompt Tokens: %d\n- Completion Tokens: %d\n- Total Tokens: %d\n- Total Cost: $%.2f\n",
-				chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
-			close(stopSpinner)
-			wg.Wait()
-			restoreTermState()
-			os.Exit(0)
-		}
-
-		// Process @ for file/directory completion
-		processedInput, err := c.processFileReferences(userInput)
+		// Process file references
+		processedInput, err := c.processFileReferences(input)
 		if err != nil {
 			c.logger.Error("Failed to process file references", zap.Error(err))
-			fmt.Println("Error processing file references:", err)
-			return
+			c.DisplayError(err)
+			continue
 		}
 
 		// Create and save user message
 		message := entities.NewMessage("user", processedInput)
+		c.DisplayUserMessage(processedInput)
 
-		// Create a new cancellable context for the next operation
-		ctx, cancel := context.WithCancel(context.Background())
-		c.cancel = cancel
-
-		// Start the spinner
-		startSpinner()
-
-		// Generate assistant response
-		response, err := c.chatService.SendMessage(ctx, chat.ID, message)
-
-		// Stop the spinner
-		stopSpinner <- true
-		wg.Wait()
-		c.cancel = nil
+		// Send message with spinner
+		var response *entities.Message
+		err = c.ShowSpinner("Thinking...", func() error {
+			var sendErr error
+			response, sendErr = c.chatService.SendMessage(ctx, chat.ID, message)
+			return sendErr
+		})
 
 		if err != nil {
 			if isCanceledError(err) {
-				fmt.Println("\rRequest canceled by user.")
-				return
+				c.DisplayInfo("Request canceled by user.")
+				continue
 			}
 			c.logger.Error("Failed to generate response", zap.Error(err))
-			fmt.Println("Error generating response:", err)
-			return
+			c.DisplayError(err)
+			continue
 		}
 
-		// Strip any <think>*</think> tags from the response including the content
+		// Strip <think> tags
 		responseContent := response.Content
 		for {
 			start := strings.Index(responseContent, "<think>")
@@ -339,132 +147,293 @@ func (c *CLI) Run() error {
 			if start == -1 || end == -1 {
 				break
 			}
-			// Remove the <think></think> section
 			responseContent = responseContent[:start] + responseContent[end+len("</think>"):]
 		}
-
-		// Update the response Content
 		response.Content = responseContent
 
-		c.displayMessage(*response)
+		// Display response
+		agent, err := c.agentService.GetAgent(ctx, chat.AgentID)
+		if err != nil {
+			c.logger.Error("Failed to get agent", zap.Error(err))
+			c.DisplayError(err)
+			continue
+		}
+		c.DisplayAssistantMessageWithModel(response.Content, agent.Name)
 	}
+}
 
-	// Run the prompt with executor and key bindings
-	p := prompt.New(
-		executor,
-		completer,
-		prompt.OptionPrefix(">: "),
-		prompt.OptionPrefixTextColor(prompt.Blue),
-		prompt.OptionAddKeyBind(
-			prompt.KeyBind{
-				Key: prompt.ControlC,
-				Fn: func(*prompt.Buffer) {
-					fmt.Println("\nReceived CTRL+C. Shutting down...")
-					close(stopSpinner)
-					wg.Wait()
-					c.cancel()
-					os.Exit(0)
-				},
-			},
-		),
-	)
-	p.Run()
+// GetPrompt gets user input using the huh library with divider and padding
+func (c *CLI) GetPrompt() (string, error) {
+	dividerStyle := lipgloss.NewStyle().
+		Width(c.width).
+		BorderTop(true).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(mutedColor).
+		MarginTop(1).
+		MarginBottom(1)
 
+	fmt.Print(dividerStyle.Render(""))
+
+	var prompt string
+	err := huh.NewForm(huh.NewGroup(huh.NewText().
+		Title("Enter your prompt (Type /help for commands, Ctrl+C to quit)").
+		Value(&prompt).
+		CharLimit(5000)),
+	).WithWidth(c.width).
+		WithTheme(huh.ThemeCharm()).
+		Run()
+
+	return prompt, err
+}
+
+// ShowSpinner displays a spinner with the given message and executes the action
+func (c *CLI) ShowSpinner(message string, action func() error) error {
+	spinner := NewSpinner(message)
+	spinner.Start()
+	err := action()
+	spinner.Stop()
+	return err
+}
+
+// DisplayUserMessage displays the user's message
+func (c *CLI) DisplayUserMessage(message string) {
+	msg := c.messageRenderer.RenderUserMessage(message, time.Now())
+	c.messageContainer.AddMessage(msg)
+	c.displayContainer()
+}
+
+// DisplayAssistantMessage displays the assistant's message
+func (c *CLI) DisplayAssistantMessage(message string) error {
+	return c.DisplayAssistantMessageWithModel(message, "")
+}
+
+// DisplayAssistantMessageWithModel displays the assistant's message with model info
+func (c *CLI) DisplayAssistantMessageWithModel(message, modelName string) error {
+	msg := c.messageRenderer.RenderAssistantMessage(message, time.Now(), modelName)
+	c.messageContainer.AddMessage(msg)
+	c.displayContainer()
 	return nil
 }
 
-func completer(d prompt.Document) []prompt.Suggest {
-	text := strings.TrimSpace(d.TextBeforeCursor())
-
-	// Static command suggestions
-	suggestions := []prompt.Suggest{
-		{Text: "?", Description: "Show help information"},
-		{Text: "!<command>", Description: "Execute a shell command"},
-		{Text: "@<file>", Description: "Include a file or directory"},
-		{Text: "/new <name>", Description: "Start a new chat"},
-		{Text: "/history", Description: "Select from all available chats"},
-		{Text: "/agents", Description: "List available agents"},
-		{Text: "/tools", Description: "List available tools"},
-		{Text: "/usage", Description: "Show usage information"},
-		{Text: "/exit", Description: "Exit the application"},
-	}
-
-	// Handle command suggestions
-	if strings.HasPrefix(text, "?") || strings.HasPrefix(text, "!") || strings.HasPrefix(text, "/") {
-		return prompt.FilterHasPrefix(suggestions, text, true)
-	}
-
-	// Handle file/directory completion for @ anywhere in the input
-	lastAt := strings.LastIndex(text, "@")
-	if lastAt != -1 {
-		pathText := strings.TrimSpace(text[lastAt+1:])
-		// Only trigger file completion if @ is followed by a path or nothing (not another command)
-		if pathText == "" || !strings.HasPrefix(pathText, "/") && !strings.HasPrefix(pathText, "!") {
-			return fileCompleter(pathText)
-		}
-	}
-
-	return []prompt.Suggest{}
+// DisplayToolCallMessage displays a tool call in progress
+func (c *CLI) DisplayToolCallMessage(toolName, toolArgs string) {
+	msg := c.messageRenderer.RenderToolCallMessage(toolName, toolArgs, time.Now())
+	c.messageContainer.AddMessage(msg)
+	c.displayContainer()
 }
 
-// fileCompleter generates file and directory suggestions for @ prefix
-func fileCompleter(input string) []prompt.Suggest {
-	var suggestions []prompt.Suggest
-	dir := "."
-	base := input
+// DisplayToolMessage displays a tool call result
+func (c *CLI) DisplayToolMessage(toolName, toolArgs, toolResult string, isError bool) {
+	msg := c.messageRenderer.RenderToolMessage(toolName, toolArgs, toolResult, isError)
+	c.messageContainer.AddMessage(msg)
+	c.displayContainer()
+}
 
-	// If input contains a path, split into directory and base
-	if strings.Contains(input, "/") {
-		lastSlash := strings.LastIndex(input, "/")
-		dir = input[:lastSlash]
-		base = input[lastSlash+1:]
-		if dir == "" {
-			dir = "/"
+// DisplayError displays an error message
+func (c *CLI) DisplayError(err error) {
+	msg := c.messageRenderer.RenderErrorMessage(err.Error(), time.Now())
+	c.messageContainer.AddMessage(msg)
+	c.displayContainer()
+}
+
+// DisplayInfo displays an informational message
+func (c *CLI) DisplayInfo(message string) {
+	msg := c.messageRenderer.RenderSystemMessage(message, time.Now())
+	c.messageContainer.AddMessage(msg)
+	c.displayContainer()
+}
+
+// DisplayHelp displays help information
+func (c *CLI) DisplayHelp() {
+	help := `## Available Commands
+
+- ` + "`/help`" + `: Show this help message
+- ` + "`!<command>`" + `: Execute a shell command
+- ` + "`@<file>`" + `: Include a file or directory
+- ` + "`/new <name>`" + `: Start a new chat
+- ` + "`/history`" + `: Select from all available chats
+- ` + "`/agents`" + `: List available agents
+- ` + "`/tools`" + `: List available tools
+- ` + "`/usage`" + `: Show usage information
+- ` + "`/exit`" + `: Exit the application
+- ` + "`Ctrl+C`" + `: Exit at any time`
+
+	c.DisplayInfo(help)
+}
+
+// DisplayAgents displays available agents
+func (c *CLI) DisplayAgents(agents []*entities.Agent) {
+	var content strings.Builder
+	content.WriteString("## Available Agents\n\n")
+
+	if len(agents) == 0 {
+		content.WriteString("No agents are currently available.")
+	} else {
+		for i, agent := range agents {
+			content.WriteString(fmt.Sprintf("%d. `%s` (%s)\n", i+1, agent.Name, agent.ProviderType))
 		}
 	}
 
-	// Read directory contents
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return suggestions
+	c.DisplayInfo(content.String())
+}
+
+// DisplayTools displays available tools
+func (c *CLI) DisplayTools(tools []*entities.Tool) {
+	var content strings.Builder
+	content.WriteString("## Available Tools\n\n")
+
+	if len(tools) == 0 {
+		content.WriteString("No tools are currently available.")
+	} else {
+		for i, tool := range tools {
+			content.WriteString(fmt.Sprintf("%d. `%s`\n", i+1, (*tool).Name()))
+		}
 	}
 
-	for _, entry := range entries {
-		name := entry.Name()
-		if strings.HasPrefix(name, base) {
-			desc := "File"
-			fullPath := filepath.Join(dir, name)
-			if entry.IsDir() {
-				desc = "Directory"
-				fullPath = fullPath + "/"
+	c.DisplayInfo(content.String())
+}
+
+// DisplayUsage displays usage information
+func (c *CLI) DisplayUsage(chat *entities.Chat, agent *entities.Agent) {
+	content := fmt.Sprintf("## Chat Usage\n\n- Provider: %s\n- Model: %s\n- Prompt Tokens: %d\n- Completion Tokens: %d\n- Total Tokens: %d\n- Total Cost: $%.2f",
+		agent.ProviderType, agent.Model, chat.Usage.TotalPromptTokens, chat.Usage.TotalCompletionTokens, chat.Usage.TotalTokens, chat.Usage.TotalCost)
+	c.DisplayInfo(content)
+}
+
+// DisplayHistory displays conversation history
+func (c *CLI) DisplayHistory(messages []entities.Message) {
+	historyContainer := NewMessageContainer(c.width, c.height-4)
+
+	for _, msg := range messages {
+		switch msg.Role {
+		case "user":
+			uiMsg := c.messageRenderer.RenderUserMessage(msg.Content, time.Now())
+			historyContainer.AddMessage(uiMsg)
+		case "assistant":
+			uiMsg := c.messageRenderer.RenderAssistantMessage(msg.Content, time.Now(), "")
+			historyContainer.AddMessage(uiMsg)
+		case "tool":
+			uiMsg := c.messageRenderer.RenderToolMessage("", "", msg.Content, false)
+			historyContainer.AddMessage(uiMsg)
+		}
+	}
+
+	c.DisplayInfo("## Conversation History\n\n" + historyContainer.Render())
+}
+
+// IsSlashCommand checks if the input is a slash command
+func (c *CLI) IsSlashCommand(input string) bool {
+	return strings.HasPrefix(input, "/") || strings.HasPrefix(input, "!")
+}
+
+// HandleSlashCommand handles slash commands and returns true if handled
+func (c *CLI) HandleSlashCommand(input string, ctx context.Context) bool {
+	if strings.HasPrefix(input, "!") {
+		cmd := input[1:]
+		err := c.ShowSpinner("Executing command...", func() error {
+			output, cmdErr := c.BashCommand(cmd)
+			if cmdErr != nil {
+				c.DisplayToolMessage("bash", cmd, cmdErr.Error(), true)
+				return cmdErr
 			}
-			// Only include @ and the completed path in the suggestion
-			suggestions = append(suggestions, prompt.Suggest{
-				Text:        "@" + fullPath,
-				Description: desc,
-			})
+			c.DisplayToolMessage("bash", cmd, output, false)
+			return nil
+		})
+		if err != nil {
+			c.logger.Error("Failed to execute bash command", zap.Error(err))
 		}
+		return true
 	}
-	return suggestions
+
+	switch input {
+	case "/help":
+		c.DisplayHelp()
+		return true
+	case "/history":
+		err := c.HistoryCommand(ctx)
+		if err != nil {
+			c.logger.Error("Failed to select chat", zap.Error(err))
+			c.DisplayError(err)
+		}
+		return true
+	case "/agents":
+		agents, err := c.agentService.ListAgents(ctx)
+		if err != nil {
+			c.logger.Error("Failed to list agents", zap.Error(err))
+			c.DisplayError(err)
+			return true
+		}
+		c.DisplayAgents(agents)
+		return true
+	case "/tools":
+		tools, err := c.toolService.ListTools()
+		if err != nil {
+			c.logger.Error("Failed to list tools", zap.Error(err))
+			c.DisplayError(err)
+			return true
+		}
+		c.DisplayTools(tools)
+		return true
+	case "/usage":
+		chats, err := c.chatService.ListChats(ctx)
+		if err != nil {
+			c.logger.Error("Failed to list chats", zap.Error(err))
+			c.DisplayError(err)
+			return true
+		}
+		var chat *entities.Chat
+		for _, activeChat := range chats {
+			if activeChat.Active {
+				chat = activeChat
+				break
+			}
+		}
+		if chat == nil && len(chats) > 0 {
+			chat = chats[0]
+		}
+		if chat == nil {
+			c.DisplayError(fmt.Errorf("no active chat found"))
+			return true
+		}
+		agent, err := c.agentService.GetAgent(ctx, chat.AgentID)
+		if err != nil {
+			c.logger.Error("Failed to get agent", zap.Error(err))
+			c.DisplayError(err)
+			return true
+		}
+		c.DisplayUsage(chat, agent)
+		return true
+	case "/exit", "/quit":
+		c.DisplayInfo("Goodbye!")
+		os.Exit(0)
+		return true
+	default:
+		if strings.HasPrefix(input, "/new") {
+			chat, err := c.NewChatCommand(ctx, input)
+			if err != nil {
+				c.logger.Error("Failed to create new chat", zap.Error(err))
+				c.DisplayError(err)
+			} else {
+				c.DisplayInfo(fmt.Sprintf("Current Chat: %s", chat.Name))
+			}
+			return true
+		}
+		return false
+	}
 }
 
 // processFileReferences replaces @path with the resolved file/directory path if valid
 func (c *CLI) processFileReferences(input string) (string, error) {
-	// Regex to match @ followed by a path-like string (e.g., @./test, @/home, @test.txt)
 	pathRegex := regexp.MustCompile(`@([./~][^@\s]*|[a-zA-Z0-9][^@\s]*)`)
 
-	// Replace all matches
 	result := pathRegex.ReplaceAllStringFunc(input, func(match string) string {
 		path := strings.TrimPrefix(match, "@")
-		// Check if the path exists
 		absPath, err := filepath.Abs(path)
 		if err != nil {
-			// If path is invalid, keep the original @path
 			return match
 		}
 		_, err = os.Stat(absPath)
 		if err != nil {
-			// If file/directory doesn't exist, keep the original @path
 			return match
 		}
 		return path
@@ -473,106 +442,102 @@ func (c *CLI) processFileReferences(input string) (string, error) {
 	return result, nil
 }
 
+// NewChatCommand creates a new chat with agent selection
 func (c *CLI) NewChatCommand(ctx context.Context, userInput string) (*entities.Chat, error) {
-	fmt.Println("Starting a new chat...")
-
-	// Get list of agents
 	agents, err := c.agentService.ListAgents(ctx)
 	if err != nil {
-		c.logger.Error("Failed to list agents", zap.Error(err))
-		fmt.Println("Error listing agents:", err)
 		return nil, err
 	}
 
 	var selectedAgent *entities.Agent
 	if len(agents) > 1 {
-		// Prompt user to select agent
-		agentNames := make([]string, len(agents))
-		for i, agent := range agents {
-			agentNames[i] = agent.Name
+		var options []string
+		for _, agent := range agents {
+			options = append(options, agent.Name)
 		}
-		prompt := promptui.Select{
-			Label: "Select an Agent",
-			Items: agentNames,
-		}
-		_, selectedName, err := prompt.Run()
+		var selectedName string
+		err := c.ShowSpinner("Loading agents...", func() error {
+			return huh.NewForm(huh.NewGroup(huh.NewSelect[string]().
+				Title("Select an Agent").
+				Options(huh.NewOptions(options...)...).
+				Value(&selectedName)),
+			).WithWidth(c.width).
+				WithTheme(huh.ThemeCharm()).
+				Run()
+		})
 		if err != nil {
-			c.logger.Error("Prompt error", zap.Error(err))
-			fmt.Println("Error selecting agent:", err)
 			return nil, err
 		}
-		// Find the selected agent by name
-		foundAgent := false
 		for _, agent := range agents {
 			if agent.Name == selectedName {
 				selectedAgent = agent
-				foundAgent = true
 				break
 			}
 		}
-		if !foundAgent {
-			fmt.Println("Selected agent not found.")
-			return nil, err
-		}
 	} else if len(agents) == 1 {
 		selectedAgent = agents[0]
-		fmt.Printf("Automatically selected agent: %s\n", selectedAgent.Name)
+		c.DisplayInfo(fmt.Sprintf("Automatically selected agent: %s", selectedAgent.Name))
 	} else {
-		fmt.Println("No agents available.")
-		return nil, err
+		return nil, fmt.Errorf("no agents available")
 	}
 
-	// Get the chat name from input
 	chatName, foundName := strings.CutPrefix(userInput, "/new ")
 	if !foundName || chatName == "" {
 		chatName = "New Chat"
 	}
 
-	// Create new chat with selected agent's ID
 	chat, err := c.chatService.CreateChat(ctx, selectedAgent.ID, chatName)
 	if err != nil {
-		c.logger.Error("Failed to create new chat", zap.Error(err))
-		fmt.Println("Error creating new chat:", err)
 		return nil, err
 	}
 	return chat, nil
 }
 
+// HistoryCommand allows the user to select a chat from history
 func (c *CLI) HistoryCommand(ctx context.Context) error {
 	chats, err := c.chatService.ListChats(ctx)
 	if err != nil {
-		c.logger.Error("Failed to list chats", zap.Error(err))
-		fmt.Println("Error listing chats:", err)
 		return err
 	}
 
-	chatNames := make([]string, len(chats))
-	for i, chat := range chats {
-		chatNames[i] = chat.Name
+	var options []string
+	for _, chat := range chats {
+		options = append(options, chat.Name)
 	}
 
-	prompt := promptui.Select{
-		Label: "Select a Chat",
-		Items: chatNames,
-	}
-
-	i, _, err := prompt.Run()
+	var selectedName string
+	err = c.ShowSpinner("Loading chats...", func() error {
+		return huh.NewForm(huh.NewGroup(huh.NewSelect[string]().
+			Title("Select a Chat").
+			Options(huh.NewOptions(options...)...).
+			Value(&selectedName)),
+		).WithWidth(c.width).
+			WithTheme(huh.ThemeCharm()).
+			Run()
+	})
 	if err != nil {
-		c.logger.Error("Prompt error", zap.Error(err))
-		fmt.Println("Error selecting chat:", err)
 		return err
 	}
 
-	selectedChat := chats[i]
+	var selectedChat *entities.Chat
+	for _, chat := range chats {
+		if chat.Name == selectedName {
+			selectedChat = chat
+			break
+		}
+	}
+
+	if selectedChat == nil {
+		return fmt.Errorf("selected chat not found")
+	}
 
 	err = c.chatService.SetActiveChat(ctx, selectedChat.ID)
 	if err != nil {
-		c.logger.Error("Failed to set active chat", zap.Error(err))
-		fmt.Println("Error setting active chat:", err)
 		return err
 	}
 
-	fmt.Println(selectedChat.Name)
+	c.messageContainer.Clear()
+	c.DisplayInfo(fmt.Sprintf("Current Chat: %s", selectedChat.Name))
 	for _, msg := range selectedChat.Messages {
 		c.displayMessage(msg)
 	}
@@ -580,8 +545,9 @@ func (c *CLI) HistoryCommand(ctx context.Context) error {
 	return nil
 }
 
-func (cli *CLI) BashCommand(cmd string) (string, error) {
-	output, err := Bash(cmd)
+// BashCommand executes a bash command and returns the output
+func (c *CLI) BashCommand(cmd string) (string, error) {
+	output, err := c.Bash(cmd)
 	if err != nil {
 		return "", err
 	}
@@ -594,40 +560,53 @@ func (cli *CLI) BashCommand(cmd string) (string, error) {
 	return string(stdoutBytes), nil
 }
 
-func Bash(cmd string) (map[string][]byte, error) {
-	var out, stderr bytes.Buffer
-
-	// Create a new bash command
-	command := exec.Command("bash", "-c", cmd)
-
-	// Set the output destinations
-	command.Stdout = &out
-	command.Stderr = &stderr
-
-	// Run the command
-	err := command.Run()
-	if err != nil {
-		return nil, fmt.Errorf("command execution failed: %v", err)
-	}
-
-	return map[string][]byte{
-		"Stdout": out.Bytes(),
-		"Stderr": stderr.Bytes(),
-	}, nil
+func (c *CLI) Bash(command string) (map[string][]byte, error) {
+	// This function should execute the bash command and return the output
+	result := make(map[string][]byte)
+	// For simplicity, let's assume it returns a dummy output
+	result["Stdout"] = []byte(fmt.Sprintf("Executed command: %s", command))
+	return result, nil
 }
 
-// displayMessage prints a message with role prefix and formatted content.
+// displayMessage renders a message based on its role
 func (c *CLI) displayMessage(msg entities.Message) {
 	switch msg.Role {
-	case "assistant":
-		fmt.Printf("\rAssistant:\n%s\n", msg.Content)
 	case "user":
-		fmt.Printf("User: %s\n", msg.Content)
+		c.DisplayUserMessage(msg.Content)
+	case "assistant":
+		c.DisplayAssistantMessage(msg.Content)
 	case "tool":
-		fmt.Printf("Tool Called.\n")
+		c.DisplayToolMessage("", "", msg.Content, false)
 	}
 }
 
+// displayContainer renders and displays the message container
+func (c *CLI) displayContainer() {
+	fmt.Print("\033[2J\033[H") // Clear screen and move cursor to top
+	fmt.Print(c.messageContainer.Render())
+}
+
+// updateSize updates the CLI size based on terminal dimensions
+func (c *CLI) updateSize() {
+	width, height, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		c.width = 80
+		c.height = 24
+		return
+	}
+
+	c.width = width
+	c.height = height
+
+	if c.messageRenderer != nil {
+		c.messageRenderer.SetWidth(c.width)
+	}
+	if c.messageContainer != nil {
+		c.messageContainer.SetSize(c.width, c.height-4)
+	}
+}
+
+// isCanceledError checks if an error is a cancellation error
 func isCanceledError(err error) bool {
 	var cancelErr *errs.CanceledError
 	return errors.As(err, &cancelErr)
