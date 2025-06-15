@@ -35,7 +35,7 @@ To run the HTTP server, execute:
 aiagent --storage=[file|mongo] serve
 ```
 
-Access the server at `http://localhost:8080/hello`.
+Access the server at `http://localhost:8080`.
 
 ## Docker and Docker Compose
 ### Using Docker Compose

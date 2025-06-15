@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	version = "unknown"
+	version = "unknown" // This should be set during build with -ldflags="-X main.version=1.0.0"
 )
 
 func main() {
