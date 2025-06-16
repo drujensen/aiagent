@@ -381,7 +381,7 @@ Help users with coding, debugging, and enhancing projects using tools like FileR
 func DefaultTools() []*entities.ToolData {
 	return []*entities.ToolData{
 		{
-			ID:            "436F6B15-D874-4498-A243-A4711D09FB66",
+			ID:            "0087206E-C4C2-4954-AE55-6D820C696306",
 			ToolType:      "FileSearch",
 			Name:          "FileSearch",
 			Description:   "This tool provides the ability to search for text in files. The workspace directory is prepended to any file paths specified.",
