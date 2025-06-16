@@ -176,7 +176,7 @@ func (c *CLI) GetPrompt() (string, error) {
 
 	var prompt string
 	err := huh.NewForm(huh.NewGroup(huh.NewText().
-		Title("Enter your prompt (Type /help for commands, Ctrl+C to quit)").
+		Lines(1).
 		Value(&prompt).
 		CharLimit(5000)),
 	).WithWidth(c.width).
