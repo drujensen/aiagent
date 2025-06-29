@@ -50,10 +50,10 @@
                    {{template "agent_form_content" .}}
                {{else if eq .ContentTemplate "tool_form_content"}}
                    {{template "tool_form_content" .}}
-               {{else if eq .ContentTemplate "chat_content"}}
-                   {{template "chat_content" .}}
                {{else if eq .ContentTemplate "chat_form_content"}}
                    {{template "chat_form_content" .}}
+               {{else if eq .ContentTemplate "chat_content"}}
+                   {{template "chat_content" .}}
                {{end}}
            </main>
            <aside class="sidebar col col-3">
