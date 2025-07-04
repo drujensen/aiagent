@@ -2,7 +2,7 @@
 <main class="content">
   <div class="home-content">
       <div class="agent-form">
-          <h2>{{if .IsEdit}}Edit a Conversation{{else}}Start a New Conversation{{end}}</h2>
+          <h2>{{if .IsEdit}}Edit a Conversation{{else}}Start a Conversation{{end}}</h2>
           <form
               {{if .IsEdit}}hx-put="/chats/{{.Chat.ID}}"{{else}}hx-post="/chats"{{end}}
               hx-target="#response-message"
@@ -20,7 +20,7 @@
                       {{end}}
                   </select>
               </div>
-              <button type="submit" class="btn-primary">{{if .Chat.ID}}Save Chat{{else}}Start Chat{{end}}</button>
+              <button type="submit" class="btn-primary">{{if .IsEdit}}Save Chat{{else}}Start Chat{{end}}</button>
           </form>
           <div id="response-message"></div>
       </div>

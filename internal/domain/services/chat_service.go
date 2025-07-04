@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
-	"github.com/drujensen/aiagent/internal/domain/errs"
+	errors "github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
 	"github.com/drujensen/aiagent/internal/impl/config"
 	"github.com/drujensen/aiagent/internal/impl/integrations"
@@ -21,7 +21,7 @@ type ChatService interface {
 	GetChat(ctx context.Context, id string) (*entities.Chat, error)
 	SetActiveChat(ctx context.Context, chatID string) error
 	CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error)
-	UpdateChat(ctx context.Context, id, name string) (*entities.Chat, error)
+	UpdateChat(ctx context.Context, id, agentID, name string) (*entities.Chat, error)
 	DeleteChat(ctx context.Context, id string) error
 	SendMessage(ctx context.Context, id string, message *entities.Message) (*entities.Message, error)
 }
@@ -129,9 +129,13 @@ func (s *chatService) SetActiveChat(ctx context.Context, chatID string) error {
 	return nil
 }
 
-func (s *chatService) UpdateChat(ctx context.Context, id, name string) (*entities.Chat, error) {
+func (s *chatService) UpdateChat(ctx context.Context, id, agentID, name string) (*entities.Chat, error) {
 	if id == "" {
 		return nil, errors.ValidationErrorf("chat ID is required")
+	}
+
+	if agentID == "" {
+		return nil, errors.ValidationErrorf("agent ID is required")
 	}
 
 	if name == "" {
@@ -144,6 +148,7 @@ func (s *chatService) UpdateChat(ctx context.Context, id, name string) (*entitie
 	}
 
 	existingChat.Name = name
+	existingChat.AgentID = agentID
 	existingChat.UpdatedAt = time.Now()
 
 	if err := s.chatRepo.UpdateChat(ctx, existingChat); err != nil {

@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
-	"github.com/drujensen/aiagent/internal/domain/errs"
+	errors "github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/services"
 
 	"github.com/google/uuid"
@@ -159,12 +159,13 @@ func (c *ChatController) CreateChatHandler(eCtx echo.Context) error {
 
 func (c *ChatController) UpdateChatHandler(eCtx echo.Context) error {
 	chatID := eCtx.Param("id")
+	agentID := eCtx.FormValue("agent-select")
 	name := eCtx.FormValue("chat-name")
 	if chatID == "" || name == "" {
 		return eCtx.String(http.StatusBadRequest, "Chat ID and name are required")
 	}
 
-	_, err := c.chatService.UpdateChat(eCtx.Request().Context(), chatID, name)
+	_, err := c.chatService.UpdateChat(eCtx.Request().Context(), chatID, agentID, name)
 	if err != nil {
 		switch err.(type) {
 		case *errors.NotFoundError:
