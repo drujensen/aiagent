@@ -37,11 +37,12 @@
                 {{range .SelectedProviderModels}}
                 <option value="{{.Name}}" {{if eq .Name $.Agent.Model}}selected{{end}}>{{.Name}} (Input: ${{.InputPricePerMille}}/1M tokens, Output: ${{.OutputPricePerMille}}/1M tokens)</option>
                 {{end}}
+                <option value="custom">Custom Model (Enter name below)</option>
             </select>
         </div>
-        <div id="custom-model-container" class="form-group" style="display: {{if or (eq (len .SelectedProviderModels) 0) (eq .SelectedProvider.Type "generic")}}block{{else}}none{{end}};">
+        <div id="custom-model-container" class="form-group" style="display: {{if (and .Agent.Model (not (inArray .Agent.Model (collectModelNames .SelectedProviderModels))))}}block{{else}}none{{end}};">
             <label for="custom_model_name">Model Name:</label>
-            <input type="text" id="custom_model_name" name="custom_model_name" class="form-control" placeholder="Enter model name" value="{{if and .Agent.Model (or (eq (len .SelectedProviderModels) 0) (eq .SelectedProvider.Type "generic"))}}{{.Agent.Model}}{{end}}">
+            <input type="text" id="custom_model_name" name="custom_model_name" class="form-control" placeholder="Enter model name" value="{{if .Agent.Model}}{{.Agent.Model}}{{end}}">
             <small class="form-text">Will be populated when selecting a model, or enter a custom model name</small>
         </div>
         <div class="form-group">
@@ -70,7 +71,7 @@
         <div class="form-group">
             <label for="reasoning_effort">Reasoning Effort:</label>
             <select id="reasoning_effort" name="reasoning_effort" class="form-control">
-              <option value="none" {{if (eq .Agent.ReasoningEffort "none")}}selected{{end}}>None</option>
+                <option value="none" {{if (eq .Agent.ReasoningEffort "none")}}selected{{end}}>None</option>
                 <option value="low" {{if (eq .Agent.ReasoningEffort "low")}}selected{{end}}>Low</option>
                 <option value="medium" {{if (eq .Agent.ReasoningEffort "medium")}}selected{{end}}>Medium</option>
                 <option value="high" {{if (eq .Agent.ReasoningEffort "high")}}selected{{end}}>High</option>

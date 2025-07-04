@@ -11,7 +11,6 @@ document.addEventListener('htmx:afterRequest', function(event) {
         // Update endpoint and API key label from response headers
         const providerBaseUrl = event.detail.xhr.getResponseHeader('X-Provider-URL');
         const apiKeyName = event.detail.xhr.getResponseHeader('X-Provider-Key-Name');
-        const providerType = event.detail.xhr.getResponseHeader('X-Provider-Type');
 
         if (apiKeyName) {
             apiKeyLabel.textContent = apiKeyName;
@@ -22,8 +21,9 @@ document.addEventListener('htmx:afterRequest', function(event) {
             endpointInput.dataset.autoSet = 'true';
         }
 
-        // Show custom model input for generic providers or if no models
-        customModelContainer.style.display = (providerType === 'generic' || modelSelect.options.length <= 1) ? 'block' : 'none';
+        // Show custom model input when 'custom' is selected or model is not in provider's models
+        const isCustom = modelSelect.value === 'custom' || !Array.from(modelSelect.options).some(opt => opt.value === modelSelect.value && opt.value !== 'custom');
+        customModelContainer.style.display = isCustom ? 'block' : 'none';
 
         // Sync custom model input with selected model
         if (modelSelect.value && modelSelect.value !== 'custom') {
@@ -42,12 +42,24 @@ document.addEventListener('htmx:responseError', function(event) {
 
 document.addEventListener('DOMContentLoaded', function() {
     const modelSelect = document.getElementById('model');
+    const customModelContainer = document.getElementById('custom-model-container');
     const customModelInput = document.getElementById('custom_model_name');
     const form = document.querySelector('form');
 
+    // Initialize custom model visibility on page load
+    if (modelSelect && customModelContainer) {
+        const isCustom = modelSelect.value === 'custom' || !Array.from(modelSelect.options).some(opt => opt.value === modelSelect.value && opt.value !== 'custom');
+        customModelContainer.style.display = isCustom ? 'block' : 'none';
+        if (modelSelect.value && modelSelect.value !== 'custom') {
+            customModelInput.value = modelSelect.value;
+        }
+    }
+
     // Handle model selection
     modelSelect.addEventListener('change', function() {
-        if (this.value === 'custom') {
+        const isCustom = this.value === 'custom';
+        customModelContainer.style.display = isCustom ? 'block' : 'none';
+        if (isCustom) {
             customModelInput.focus();
         } else if (this.value) {
             customModelInput.value = this.value;

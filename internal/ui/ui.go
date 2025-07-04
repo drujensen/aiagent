@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"github.com/drujensen/aiagent/internal/domain/services"
-	"github.com/drujensen/aiagent/internal/impl/tools"
 	"bytes"
 	"embed"
 	"html/template"
@@ -11,6 +9,10 @@ import (
 	"net/http"
 	"path/filepath"
 	"slices"
+
+	"github.com/drujensen/aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/domain/services"
+	"github.com/drujensen/aiagent/internal/impl/tools"
 
 	apicontrollers "github.com/drujensen/aiagent/internal/api/controllers"
 	uiapicontrollers "github.com/drujensen/aiagent/internal/ui/controllers"
@@ -60,6 +62,13 @@ func (u *UI) Run() error {
 		},
 		"formatNumber": func(num int) string {
 			return humanize.Comma(int64(num))
+		},
+		"collectModelNames": func(models []entities.ModelPricing) []string {
+			names := make([]string, 0, len(models))
+			for _, model := range models {
+				names = append(names, model.Name)
+			}
+			return names
 		},
 	}
 
