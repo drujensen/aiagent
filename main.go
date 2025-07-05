@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"slices"
 
@@ -16,8 +17,10 @@ import (
 	repositoriesJson "github.com/drujensen/aiagent/internal/impl/repositories/json"
 	repositoriesMongo "github.com/drujensen/aiagent/internal/impl/repositories/mongo"
 	"github.com/drujensen/aiagent/internal/impl/tools"
+	"github.com/drujensen/aiagent/internal/tui"
 	"github.com/drujensen/aiagent/internal/ui"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"go.uber.org/zap"
 )
 
@@ -48,8 +51,11 @@ func main() {
 	// Check the first non-flag argument for the mode
 	if len(os.Args) > 1 && os.Args[1] == "serve" {
 		modeStr = "serve"
-		// Recreate the argument list stripping the "serve" part
-		// Exclude the program name argument (index 0) and "serve" (index 1)
+		os.Args = slices.Delete(os.Args, 0, 1)
+	}
+
+	if len(os.Args) > 1 && os.Args[1] == "tui" {
+		modeStr = "tui"
 		os.Args = slices.Delete(os.Args, 0, 1)
 	}
 
@@ -61,9 +67,6 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-
-	fmt.Printf("Running in mode: %s\n", modeStr)
-	fmt.Printf("Using storage: %s\n", *storage)
 
 	logConfig := zap.NewDevelopmentConfig()
 	logConfig.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
@@ -144,6 +147,12 @@ func main() {
 		uiApp := ui.NewUI(chatService, agentService, toolService, providerService, logger)
 		if err := uiApp.Run(); err != nil {
 			logger.Fatal("UI failed", zap.Error(err))
+		}
+	} else if modeStr == "tui" {
+		p := tea.NewProgram(tui.NewTUI(chatService))
+
+		if _, err := p.Run(); err != nil {
+			log.Fatal(err)
 		}
 	} else {
 		cliApp := cli.NewCLI(chatService, agentService, toolService, providerService, logger)
