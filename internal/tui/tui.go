@@ -27,7 +27,9 @@ type TUI struct {
 	activeChat  *entities.Chat
 	viewport    viewport.Model
 	textarea    textarea.Model
-	senderStyle lipgloss.Style
+	userStyle   lipgloss.Style
+	asstStyle   lipgloss.Style
+	systemStyle lipgloss.Style
 	err         error
 }
 
@@ -54,12 +56,18 @@ func NewTUI(chatService services.ChatService) TUI {
 		activeChat = nil
 	}
 
+	us := lipgloss.NewStyle().Foreground(lipgloss.Color("5"))
+	as := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+	ss := lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
+
 	return TUI{
 		chatService: chatService,
 		activeChat:  activeChat,
 		textarea:    ta,
 		viewport:    vp,
-		senderStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
+		userStyle:   us,
+		asstStyle:   as,
+		systemStyle: ss,
 		err:         nil,
 	}
 }
@@ -88,16 +96,17 @@ func (m TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var sb strings.Builder
 			for _, message := range messages {
 				if message.Role == "user" {
-					sb.WriteString(m.senderStyle.Render("User: ") + message.Content + "\n")
+					sb.WriteString(m.userStyle.Render("User: ") + message.Content + "\n")
 				} else if message.Role == "assistant" {
-					sb.WriteString(m.senderStyle.Render("Assistant: ") + message.Content + "\n")
+					sb.WriteString(m.asstStyle.Render("Assistant: ") + message.Content + "\n")
 				} else {
-					sb.WriteString(m.senderStyle.Render("System: ") + message.Content + "\n")
+					sb.WriteString(m.systemStyle.Render("System: ") + message.Content + "\n")
 				}
 			}
 			m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(sb.String()))
 		}
 		m.viewport.GotoBottom()
+
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
@@ -108,7 +117,6 @@ func (m TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.GotoBottom()
 		}
 
-	// We handle errors just like any other message
 	case errMsg:
 		m.err = msg
 		return m, nil
