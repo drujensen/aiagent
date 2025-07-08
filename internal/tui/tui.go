@@ -1,54 +1,31 @@
 package tui
 
-// A simple program demonstrating the text area component from the Bubbles
-// component library.
-
 import (
 	"context"
 	"fmt"
-	"strings"
 
-	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/services"
 )
 
-const gap = "\n\n"
-
 type (
-	errMsg error
+	errMsg         error
+	updatedChatMsg *entities.Chat
 )
 
 type TUI struct {
-	chatService services.ChatService
-	activeChat  *entities.Chat
-	viewport    viewport.Model
-	textarea    textarea.Model
-	userStyle   lipgloss.Style
-	asstStyle   lipgloss.Style
-	systemStyle lipgloss.Style
-	err         error
+	chatService  services.ChatService
+	agentService services.AgentService
+	activeChat   *entities.Chat
+	chatView     ChatView
+	chatForm     ChatForm
+	state        string
+	err          error
 }
 
-func NewTUI(chatService services.ChatService) TUI {
+func NewTUI(chatService services.ChatService, agentService services.AgentService) TUI {
 	ctx := context.Background()
-
-	ta := textarea.New()
-	ta.Placeholder = "Type your message..."
-	ta.Focus()
-	ta.Prompt = "┃ "
-	ta.CharLimit = 280
-	ta.SetWidth(30)
-	ta.SetHeight(3)
-	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
-	ta.ShowLineNumbers = false
-	ta.KeyMap.InsertNewline.SetEnabled(false)
-
-	vp := viewport.New(30, 5)
-	vp.SetContent(`How can I help you today?`)
 
 	activeChat, err := chatService.GetActiveChat(ctx)
 	if err != nil {
@@ -56,80 +33,54 @@ func NewTUI(chatService services.ChatService) TUI {
 		activeChat = nil
 	}
 
-	us := lipgloss.NewStyle().Foreground(lipgloss.Color("5"))
-	as := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
-	ss := lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
-
 	return TUI{
-		chatService: chatService,
-		activeChat:  activeChat,
-		textarea:    ta,
-		viewport:    vp,
-		userStyle:   us,
-		asstStyle:   as,
-		systemStyle: ss,
-		err:         nil,
+		chatService:  chatService,
+		agentService: agentService,
+		activeChat:   activeChat,
+		chatView:     NewChatView(chatService),
+		state:        "chat/view",
+		err:          nil,
 	}
 }
 
-func (m TUI) Init() tea.Cmd {
-	return textarea.Blink
+func (t TUI) Init() tea.Cmd {
+	return nil
 }
 
-func (m TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var (
-		tiCmd tea.Cmd
-		vpCmd tea.Cmd
-	)
-
-	m.textarea, tiCmd = m.textarea.Update(msg)
-	m.viewport, vpCmd = m.viewport.Update(msg)
-
+func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.viewport.Width = msg.Width
-		m.textarea.SetWidth(msg.Width)
-		m.viewport.Height = msg.Height - m.textarea.Height() - lipgloss.Height(gap)
-
-		messages := m.activeChat.Messages
-		if len(messages) > 0 {
-			var sb strings.Builder
-			for _, message := range messages {
-				if message.Role == "user" {
-					sb.WriteString(m.userStyle.Render("User: ") + message.Content + "\n")
-				} else if message.Role == "assistant" {
-					sb.WriteString(m.asstStyle.Render("Assistant: ") + message.Content + "\n")
-				} else {
-					sb.WriteString(m.systemStyle.Render("System: ") + message.Content + "\n")
-				}
-			}
-			m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(sb.String()))
-		}
-		m.viewport.GotoBottom()
-
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC, tea.KeyEsc:
-			fmt.Println(m.textarea.Value())
-			return m, tea.Quit
-		case tea.KeyEnter:
-			m.textarea.Reset()
-			m.viewport.GotoBottom()
-		}
-
+	case updatedChatMsg:
+		t.activeChat = msg
+		t.state = "chat/view"
+		t.chatView.SetActiveChat(t.activeChat)
 	case errMsg:
-		m.err = msg
-		return m, nil
+		t.err = msg
+		return t, nil
+	default:
+		if t.state == "chat/view" {
+			var cmd tea.Cmd
+			t.chatView, cmd = t.chatView.Update(msg)
+			if cmd != nil {
+				return t, cmd
+			}
+		} else if t.state == "chat/create" {
+			var cmd tea.Cmd
+			t.chatForm, cmd = t.chatForm.Update(msg)
+			if cmd != nil {
+				return t, cmd
+			}
+		}
 	}
 
-	return m, tea.Batch(tiCmd, vpCmd)
+	return t, nil
 }
 
-func (m TUI) View() string {
-	return fmt.Sprintf(
-		"%s%s%s",
-		m.viewport.View(),
-		gap,
-		m.textarea.View(),
-	)
+func (t TUI) View() string {
+	switch t.state {
+	case "chat/view":
+		return t.chatView.View()
+	case "chat/create":
+		return t.chatForm.View()
+	}
+	return "Error: Invalid state"
 }

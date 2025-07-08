@@ -40,6 +40,11 @@ func NewAgent(name, role string, providerID string, providerType ProviderType, e
 	}
 }
 
+// Implement the list.Item interface
+func (a *Agent) FilterValue() string {
+	return a.Name + " - " + a.Model
+}
+
 func (a *Agent) FullSystemPrompt() string {
 	currentTime := time.Now()
 	formattedTime := currentTime.Format("2006-01-02 15:04:05")
