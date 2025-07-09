@@ -81,8 +81,8 @@ func (c ChatView) Init() tea.Cmd {
 func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 	switch m := msg.(type) {
 	case tea.KeyMsg:
-		switch m.String() {
-		case "enter":
+		switch m.Type {
+		case tea.KeyEnter:
 			if c.textarea.Value() == "" {
 				c.err = fmt.Errorf("message cannot be empty")
 				return c, nil
@@ -96,12 +96,22 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				Content: c.textarea.Value(),
 				Role:    "user",
 			}
-			// Send the message to the chat services
 			return c, sendMessageCmd(c.chatService, c.activeChat.ID, msg)
-		case "up", "down":
+		case tea.KeyUp, tea.KeyDown:
 			c.textarea, _ = c.textarea.Update(msg)
-		case "left", "right":
+		case tea.KeyLeft, tea.KeyRight:
 			c.viewport, _ = c.viewport.Update(msg)
+		default:
+			var taCmd tea.Cmd
+			var vpCmd tea.Cmd
+			c.textarea, taCmd = c.textarea.Update(msg)
+			if taCmd != nil {
+				return c, taCmd
+			}
+			c.viewport, vpCmd = c.viewport.Update(msg)
+			if vpCmd != nil {
+				return c, vpCmd
+			}
 		}
 
 	case updatedChatMsg:
@@ -129,18 +139,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 	case tea.MouseMsg:
 		// Handle mouse events if needed
 		if m.Type == tea.MouseWheelUp || m.Type == tea.MouseWheelDown {
-			c.viewport, _ = c.viewport.Update(msg) // Update viewport for mouse wheel events
-		}
-	default:
-		var taCmd tea.Cmd
-		var vpCmd tea.Cmd
-		c.textarea, taCmd = c.textarea.Update(msg)
-		c.viewport, vpCmd = c.viewport.Update(msg)
-		if taCmd != nil {
-			return c, taCmd
-		}
-		if vpCmd != nil {
-			return c, vpCmd
+			c.viewport, _ = c.viewport.Update(msg)
 		}
 	}
 

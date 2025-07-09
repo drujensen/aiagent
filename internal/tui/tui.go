@@ -49,10 +49,29 @@ func (t TUI) Init() tea.Cmd {
 
 func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case updatedChatMsg:
-		t.activeChat = msg
-		t.state = "chat/view"
-		t.chatView.SetActiveChat(t.activeChat)
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC, tea.KeyEsc:
+			return t, tea.Quit
+		case tea.KeyCtrlN:
+			t.state = "chat/create"
+			return t, nil
+		default:
+			if t.state == "chat/view" {
+				var cmd tea.Cmd
+				t.chatView, cmd = t.chatView.Update(msg)
+				if cmd != nil {
+					return t, cmd
+				}
+			}
+			if t.state == "chat/create" {
+				var cmd tea.Cmd
+				t.chatForm, cmd = t.chatForm.Update(msg)
+				if cmd != nil {
+					return t, cmd
+				}
+			}
+		}
 	case errMsg:
 		t.err = msg
 		return t, nil
