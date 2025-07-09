@@ -26,7 +26,7 @@ type ChatView struct {
 	err         error
 }
 
-func NewChatView(chatService services.ChatService) ChatView {
+func NewChatView(chatService services.ChatService, activeChat *entities.Chat) ChatView {
 	ta := textarea.New()
 	ta.Placeholder = "Type your message..."
 	ta.Focus()
@@ -45,9 +45,9 @@ func NewChatView(chatService services.ChatService) ChatView {
 	as := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
 	ss := lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
 
-	return ChatView{
+	cv := ChatView{
 		chatService: chatService,
-		activeChat:  nil,
+		activeChat:  activeChat,
 		textarea:    ta,
 		viewport:    vp,
 		userStyle:   us,
@@ -55,6 +55,9 @@ func NewChatView(chatService services.ChatService) ChatView {
 		systemStyle: ss,
 		err:         nil,
 	}
+	cv.SetActiveChat(cv.activeChat)
+
+	return cv
 }
 
 func (c *ChatView) SetActiveChat(chat *entities.Chat) {
@@ -98,8 +101,6 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			}
 			return c, sendMessageCmd(c.chatService, c.activeChat.ID, msg)
 		case tea.KeyUp, tea.KeyDown:
-			c.textarea, _ = c.textarea.Update(msg)
-		case tea.KeyLeft, tea.KeyRight:
 			c.viewport, _ = c.viewport.Update(msg)
 		default:
 			var taCmd tea.Cmd
@@ -115,6 +116,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		}
 
 	case updatedChatMsg:
+		c.textarea.Reset()
 		c.SetActiveChat(m)
 
 	case tea.WindowSizeMsg:

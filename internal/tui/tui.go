@@ -37,7 +37,7 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 		chatService:  chatService,
 		agentService: agentService,
 		activeChat:   activeChat,
-		chatView:     NewChatView(chatService),
+		chatView:     NewChatView(chatService, activeChat),
 		state:        "chat/view",
 		err:          nil,
 	}
