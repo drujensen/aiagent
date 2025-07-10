@@ -16,6 +16,7 @@ func DefaultProviders() []*entities.Provider {
 			BaseURL:    "https://api.x.ai",
 			APIKeyName: "XAI_API_KEY",
 			Models: []entities.ModelPricing{
+				{Name: "grok-4", InputPricePerMille: 3.00, OutputPricePerMille: 15.00, ContextWindow: 256000},
 				{Name: "grok-3-fast", InputPricePerMille: 5.00, OutputPricePerMille: 25.00, ContextWindow: 131072},
 				{Name: "grok-3", InputPricePerMille: 3.00, OutputPricePerMille: 15.00, ContextWindow: 131072},
 				{Name: "grok-3-mini-fast", InputPricePerMille: 0.60, OutputPricePerMille: 4.00, ContextWindow: 131072},
