@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -17,6 +18,7 @@ type (
 		name    string
 		agentID string
 	}
+	chatFormCancelledMsg struct{}
 )
 
 type TUI struct {
@@ -65,8 +67,14 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.state = "chat/view"
 		return t, nil
 	case chatFormSubmittedMsg:
-		// Create the chat with the submitted name and agent ID
 		return t, createChatCmd(t.chatService, msg.name, msg.agentID)
+	case chatFormCancelledMsg:
+		t.state = "chat/view"
+		t.chatView.err = errors.New("chat creation cancelled")
+		if t.activeChat != nil {
+			t.chatView.SetActiveChat(t.activeChat)
+		}
+		return t, t.chatView.Init()
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
@@ -83,6 +91,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case errMsg:
+		fmt.Println("TUI: Received errMsg:", msg)
 		t.err = msg
 		return t, nil
 	default:

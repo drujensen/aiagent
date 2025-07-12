@@ -97,14 +97,9 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 	case tea.KeyMsg:
 		switch m.String() {
 		case "esc":
-			c.err = errors.New("chat creation cancelled")
-			return c, func() tea.Msg { return startCreateChatMsg("") }
+			return c, func() tea.Msg { return chatFormCancelledMsg{} }
 		case "ctrl+c", "q":
-			c.err = errors.New("chat creation cancelled")
-			return c, tea.Batch(
-				tea.Quit,
-				func() tea.Msg { return startCreateChatMsg("") },
-			)
+			return c, tea.Quit
 		case "tab":
 			if c.focused == "name" {
 				c.focused = "list"
@@ -126,6 +121,7 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 				return c, nil
 			}
 			selectedAgent := c.agentsList.SelectedItem().(*entities.Agent)
+			fmt.Println("ChatForm: Enter pressed, submitting chat creation")
 			return c, func() tea.Msg {
 				return chatFormSubmittedMsg{
 					name:    c.nameField.Value(),
