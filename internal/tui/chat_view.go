@@ -16,17 +16,18 @@ import (
 const gap = "\n\n"
 
 type ChatView struct {
-	chatService services.ChatService
-	activeChat  *entities.Chat
-	viewport    viewport.Model
-	textarea    textarea.Model
-	userStyle   lipgloss.Style
-	asstStyle   lipgloss.Style
-	systemStyle lipgloss.Style
-	err         error
+	chatService  services.ChatService
+	agentService services.AgentService
+	activeChat   *entities.Chat
+	viewport     viewport.Model
+	textarea     textarea.Model
+	userStyle    lipgloss.Style
+	asstStyle    lipgloss.Style
+	systemStyle  lipgloss.Style
+	err          error
 }
 
-func NewChatView(chatService services.ChatService, activeChat *entities.Chat) ChatView {
+func NewChatView(chatService services.ChatService, agentService services.AgentService, activeChat *entities.Chat) ChatView {
 	ta := textarea.New()
 	ta.Placeholder = "Type your message..."
 	ta.Focus()
@@ -46,14 +47,15 @@ func NewChatView(chatService services.ChatService, activeChat *entities.Chat) Ch
 	ss := lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
 
 	cv := ChatView{
-		chatService: chatService,
-		activeChat:  activeChat,
-		textarea:    ta,
-		viewport:    vp,
-		userStyle:   us,
-		asstStyle:   as,
-		systemStyle: ss,
-		err:         nil,
+		chatService:  chatService,
+		agentService: agentService,
+		activeChat:   activeChat,
+		textarea:     ta,
+		viewport:     vp,
+		userStyle:    us,
+		asstStyle:    as,
+		systemStyle:  ss,
+		err:          nil,
 	}
 	cv.SetActiveChat(cv.activeChat)
 
@@ -86,7 +88,18 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 	case tea.KeyMsg:
 		switch m.Type {
 		case tea.KeyEnter:
-			if c.textarea.Value() == "" {
+			input := c.textarea.Value()
+			if strings.HasPrefix(input, "/new ") {
+				name := strings.TrimSpace(strings.TrimPrefix(input, "/new "))
+				if name == "" {
+					c.err = fmt.Errorf("chat name cannot be empty")
+					return c, nil
+				}
+				c.textarea.Reset()
+				return c, tea.Cmd(func() tea.Msg { return startCreateChatMsg(name) })
+			}
+			// Normal message handling
+			if input == "" {
 				c.err = fmt.Errorf("message cannot be empty")
 				return c, nil
 			}
@@ -94,9 +107,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				c.err = fmt.Errorf("no active chat")
 				return c, nil
 			}
-			// Create a new Message
 			msg := &entities.Message{
-				Content: c.textarea.Value(),
+				Content: input,
 				Role:    "user",
 			}
 			return c, sendMessageCmd(c.chatService, c.activeChat.ID, msg)
@@ -139,7 +151,6 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		c.viewport.GotoBottom()
 
 	case tea.MouseMsg:
-		// Handle mouse events if needed
 		if m.Type == tea.MouseWheelUp || m.Type == tea.MouseWheelDown {
 			c.viewport, _ = c.viewport.Update(msg)
 		}

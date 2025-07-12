@@ -10,18 +10,19 @@ import (
 )
 
 type (
-	errMsg         error
-	updatedChatMsg *entities.Chat
+	errMsg            error
+	updatedChatMsg    *entities.Chat
+	startCreateChatMsg string
 )
 
 type TUI struct {
-	chatService  services.ChatService
-	agentService services.AgentService
-	activeChat   *entities.Chat
-	chatView     ChatView
-	chatForm     ChatForm
-	state        string
-	err          error
+	chatService   services.ChatService
+	agentService  services.AgentService
+	activeChat    *entities.Chat
+	chatView      ChatView
+	agentSelector AgentSelector
+	state         string
+	err           error
 }
 
 func NewTUI(chatService services.ChatService, agentService services.AgentService) TUI {
@@ -34,12 +35,13 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 	}
 
 	return TUI{
-		chatService:  chatService,
-		agentService: agentService,
-		activeChat:   activeChat,
-		chatView:     NewChatView(chatService, activeChat),
-		state:        "chat/view",
-		err:          nil,
+		chatService:   chatService,
+		agentService:  agentService,
+		activeChat:    activeChat,
+		chatView:      NewChatView(chatService, agentService, activeChat),
+		agentSelector: NewAgentSelector(chatService, agentService),
+		state:         "chat/view",
+		err:           nil,
 	}
 }
 
@@ -49,27 +51,28 @@ func (t TUI) Init() tea.Cmd {
 
 func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case startCreateChatMsg:
+		t.state = "chat/create"
+		t.agentSelector.SetChatName(string(msg))
+		return t, t.agentSelector.Init()
+	case updatedChatMsg:
+		t.activeChat = msg
+		t.chatView.SetActiveChat(msg)
+		t.state = "chat/view"
+		return t, nil
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
 			return t, tea.Quit
-		case tea.KeyCtrlN:
-			t.state = "chat/create"
-			return t, nil
 		default:
 			if t.state == "chat/view" {
 				var cmd tea.Cmd
 				t.chatView, cmd = t.chatView.Update(msg)
-				if cmd != nil {
-					return t, cmd
-				}
-			}
-			if t.state == "chat/create" {
+				return t, cmd
+			} else if t.state == "chat/create" {
 				var cmd tea.Cmd
-				t.chatForm, cmd = t.chatForm.Update(msg)
-				if cmd != nil {
-					return t, cmd
-				}
+				t.agentSelector, cmd = t.agentSelector.Update(msg)
+				return t, cmd
 			}
 		}
 	case errMsg:
@@ -78,17 +81,13 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	default:
 		if t.state == "chat/view" {
 			var cmd tea.Cmd
-			t.chatView, cmd = t.chatView.Update(msg)
-			if cmd != nil {
+				t.chatView, cmd = t.chatView.Update(msg)
+				return t, cmd
+			} else if t.state == "chat/create" {
+				var cmd tea.Cmd
+				t.agentSelector, cmd = t.agentSelector.Update(msg)
 				return t, cmd
 			}
-		} else if t.state == "chat/create" {
-			var cmd tea.Cmd
-			t.chatForm, cmd = t.chatForm.Update(msg)
-			if cmd != nil {
-				return t, cmd
-			}
-		}
 	}
 
 	return t, nil
@@ -99,7 +98,7 @@ func (t TUI) View() string {
 	case "chat/view":
 		return t.chatView.View()
 	case "chat/create":
-		return t.chatForm.View()
+		return t.agentSelector.View()
 	}
 	return "Error: Invalid state"
 }
