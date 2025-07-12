@@ -89,12 +89,17 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 	switch m := msg.(type) {
 	case tea.KeyMsg:
 		switch m.Type {
+		case tea.KeyCtrlC:
+			return c, tea.Quit
 		case tea.KeyEnter:
 			input := c.textarea.Value()
 			if strings.HasPrefix(input, "/new") {
 				name := strings.TrimSpace(strings.TrimPrefix(input, "/new"))
 				c.textarea.Reset()
 				return c, tea.Cmd(func() tea.Msg { return startCreateChatMsg(name) })
+			}
+			if input == "/exit" {
+				return c, tea.Quit
 			}
 			// Normal message handling
 			if input == "" {

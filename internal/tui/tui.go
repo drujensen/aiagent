@@ -69,7 +69,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t, createChatCmd(t.chatService, msg.name, msg.agentID)
 	case tea.KeyMsg:
 		switch msg.Type {
-		case tea.KeyCtrlC, tea.KeyEsc:
+		case tea.KeyCtrlC:
 			return t, tea.Quit
 		default:
 			if t.state == "chat/view" {

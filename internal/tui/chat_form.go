@@ -25,35 +25,49 @@ type ChatForm struct {
 	agentsList  list.Model
 	agents      []*entities.Agent
 	chatName    string
+	focused     string // "name" or "list"
 	err         error
+	width       int
+	height      int
 }
 
 func NewChatForm(chatService services.ChatService, agentService services.AgentService) ChatForm {
 	ctx := context.Background()
 	agents, err := agentService.ListAgents(ctx)
 	if err != nil {
+		fmt.Printf("Error listing agents: %v\n", err)
 		agents = []*entities.Agent{}
 	}
 
+	// Initialize name field with wider width and explicit placeholder styling
 	nameField := textinput.New()
 	nameField.Placeholder = "Enter chat name"
+	nameField.PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
 	nameField.Focus()
 	nameField.CharLimit = 50
-	nameField.Width = 30
+	nameField.Width = 50 // Wide enough for placeholder and input
 
+	// Initialize agent list with custom delegate and reasonable default size
 	agentItems := make([]list.Item, len(agents))
 	for i, agent := range agents {
 		agentItems[i] = agent
 	}
-	agentsList := list.New(agentItems, list.NewDefaultDelegate(), 30, 10)
+	delegate := list.NewDefaultDelegate()
+	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("6")).Bold(true)
+	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("7"))
+	delegate.SetHeight(2)
+	agentsList := list.New(agentItems, delegate, 100, 10)
 	agentsList.Title = "Select an Agent"
 	agentsList.SetShowStatusBar(false)
+	agentsList.SetShowFilter(false)
+	agentsList.SetShowPagination(len(agents) > 10)
 
 	return ChatForm{
 		chatService: chatService,
 		nameField:   nameField,
 		agentsList:  agentsList,
 		agents:      agents,
+		focused:     "name",
 	}
 }
 
@@ -68,15 +82,40 @@ func (c ChatForm) Init() tea.Cmd {
 }
 
 func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
+	var cmds []tea.Cmd
+
 	switch m := msg.(type) {
+	case tea.WindowSizeMsg:
+		c.width = m.Width
+		c.height = m.Height
+		nameFieldWidth := m.Width - 4
+		c.nameField.Width = nameFieldWidth
+		listHeight := m.Height - 3
+		c.agentsList.SetSize(m.Width-4, listHeight)
+		return c, nil
+
 	case tea.KeyMsg:
 		switch m.String() {
+		case "esc":
+			c.err = errors.New("chat creation cancelled")
+			return c, func() tea.Msg { return startCreateChatMsg("") }
 		case "ctrl+c", "q":
 			c.err = errors.New("chat creation cancelled")
 			return c, tea.Batch(
 				tea.Quit,
-				func() tea.Msg { return startCreateChatMsg("") }, // Signal to return to chat view
+				func() tea.Msg { return startCreateChatMsg("") },
 			)
+		case "tab":
+			if c.focused == "name" {
+				c.focused = "list"
+				c.nameField.Blur()
+				c.agentsList.SetShowStatusBar(true)
+			} else {
+				c.focused = "name"
+				c.nameField.Focus()
+				c.agentsList.SetShowStatusBar(false)
+			}
+			return c, nil
 		case "enter":
 			if c.nameField.Value() == "" {
 				c.err = ErrEmptyChatName
@@ -93,45 +132,62 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 					agentID: selectedAgent.ID,
 				}
 			}
+		case "j", "k":
+			if c.focused == "list" {
+				var cmd tea.Cmd
+				c.agentsList, cmd = c.agentsList.Update(msg)
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+				return c, tea.Batch(cmds...)
+			}
+			// If name field is focused, pass to textinput
 		}
-	case tea.WindowSizeMsg:
-		c.nameField.Width = m.Width - 2
-		c.agentsList.SetSize(m.Width-2, m.Height-5)
 	}
 
-	var cmd tea.Cmd
-	c.nameField, cmd = c.nameField.Update(msg)
-	if cmd != nil {
-		return c, cmd
+	if c.focused == "name" {
+		var cmd tea.Cmd
+		c.nameField, cmd = c.nameField.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	} else {
+		var cmd tea.Cmd
+		c.agentsList, cmd = c.agentsList.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	}
 
-	c.agentsList, cmd = c.agentsList.Update(msg)
-	if cmd != nil {
-		return c, cmd
-	}
-
-	return c, nil
+	return c, tea.Batch(cmds...)
 }
 
 func (c ChatForm) View() string {
 	var sb strings.Builder
 
 	// Render the name input field
+	nameFieldStyle := lipgloss.NewStyle().Width(c.width - 4)
 	sb.WriteString("Chat Name: ")
-	sb.WriteString(c.nameField.View())
+	if c.focused == "name" {
+		sb.WriteString(nameFieldStyle.Render(c.nameField.View()))
+	} else {
+		sb.WriteString(nameFieldStyle.Render(lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(c.nameField.Value())))
+	}
 	sb.WriteString("\n\n")
 
 	// Render the agents list
-	sb.WriteString(c.agentsList.View())
+	listStyle := lipgloss.NewStyle().Width(c.width - 4)
+	sb.WriteString(listStyle.Render(c.agentsList.View()))
 	sb.WriteString("\n")
 
 	// Render instructions
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render("Press Enter to create chat, Ctrl+C or q to cancel\n"))
+	instructions := "Press Enter to create chat, Tab to switch focus, Esc to cancel, Ctrl+C or q to quit"
+	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions + "\n"))
 
 	// Render error if any
 	if c.err != nil {
 		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Render(fmt.Sprintf("Error: %s\n", c.err.Error())))
 	}
 
-	return sb.String()
+	return lipgloss.NewStyle().Padding(1, 2).Render(sb.String())
 }

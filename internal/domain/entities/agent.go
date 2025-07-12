@@ -51,7 +51,7 @@ func (a *Agent) Title() string {
 }
 
 func (a *Agent) Description() string {
-	return fmt.Sprintf("Model: %s | Provider: %s | Prompt: %s", a.Model, a.ProviderType, a.SystemPrompt)
+	return fmt.Sprintf("Model: %s | Provider: %s", a.Model, a.ProviderType)
 }
 
 func (a *Agent) FullSystemPrompt() string {
