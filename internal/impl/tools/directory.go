@@ -113,7 +113,6 @@ func (t *DirectoryTool) validatePath(path string) (string, error) {
 
 func (t *DirectoryTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing directory command", zap.String("arguments", arguments))
-	fmt.Println("\rExecuting directory command", arguments)
 	var args struct {
 		Operation   string `json:"operation"`
 		Path        string `json:"path"`

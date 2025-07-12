@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"github.com/drujensen/aiagent/internal/domain/entities"
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
@@ -9,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/drujensen/aiagent/internal/domain/entities"
 )
 
 type VisionTool struct {
@@ -58,7 +59,6 @@ func (v *VisionTool) Parameters() []entities.Parameter {
 }
 
 func (v *VisionTool) Execute(arguments string) (string, error) {
-	fmt.Println("\rExecuting VisionTool:", arguments)
 	var args map[string]string
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return "", fmt.Errorf("invalid arguments: %v", err)

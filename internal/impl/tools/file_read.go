@@ -117,7 +117,6 @@ func (t *FileReadTool) checkFileSize(path string) (bool, error) {
 
 func (t *FileReadTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing file read command", zap.String("arguments", arguments))
-	fmt.Println("\rExecuting file read command", arguments)
 	var args struct {
 		Path      string `json:"path"`
 		StartLine int    `json:"start_line"`

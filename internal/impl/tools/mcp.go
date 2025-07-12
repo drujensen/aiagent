@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"github.com/drujensen/aiagent/internal/domain/entities"
 	"bufio"
 	"context"
 	"encoding/json"
@@ -12,6 +11,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/drujensen/aiagent/internal/domain/entities"
 
 	"go.uber.org/zap"
 )
@@ -116,8 +117,6 @@ func (c *MCPClient) InvokeMethod(method string, params any) (any, error) {
 	case <-ctx.Done():
 		return nil, fmt.Errorf("timeout reading response: %w", ctx.Err())
 	}
-
-	fmt.Printf("Received response: %s\n", responseStr)
 
 	// Parse JSON-RPC response
 	var resp map[string]any

@@ -118,7 +118,6 @@ func (t *FileSearchTool) checkFileSize(path string) (bool, error) {
 
 func (t *FileSearchTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing file search command", zap.String("arguments", arguments))
-	fmt.Println("\rExecuting file search command", arguments)
 	var args struct {
 		Path     string `json:"path"`
 		Pattern  string `json:"pattern"`

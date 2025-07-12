@@ -134,7 +134,6 @@ func (t *FileWriteTool) validatePath(path string) (string, error) {
 
 func (t *FileWriteTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing file write command", zap.String("arguments", arguments))
-	fmt.Println("\rExecuting file write command", arguments)
 	var args struct {
 		Operation string `json:"operation"`
 		Path      string `json:"path"`

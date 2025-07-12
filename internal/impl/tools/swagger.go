@@ -1,12 +1,13 @@
 package tools
 
 import (
-	"github.com/drujensen/aiagent/internal/domain/entities"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/drujensen/aiagent/internal/domain/entities"
 
 	"github.com/go-openapi/spec"
 	"go.uber.org/zap"
@@ -90,7 +91,6 @@ type SwaggerResponse struct {
 
 func (t *SwaggerTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing Swagger tool", zap.String("arguments", arguments))
-	fmt.Println("\rExecuting Swagger tool", arguments)
 
 	var args struct {
 		Fetch bool `json:"fetch"`
