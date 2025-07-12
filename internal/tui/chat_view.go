@@ -57,7 +57,9 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		systemStyle:  ss,
 		err:          nil,
 	}
-	cv.SetActiveChat(cv.activeChat)
+	if activeChat != nil {
+		cv.SetActiveChat(activeChat)
+	}
 
 	return cv
 }
@@ -89,12 +91,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		switch m.Type {
 		case tea.KeyEnter:
 			input := c.textarea.Value()
-			if strings.HasPrefix(input, "/new ") {
-				name := strings.TrimSpace(strings.TrimPrefix(input, "/new "))
-				if name == "" {
-					c.err = fmt.Errorf("chat name cannot be empty")
-					return c, nil
-				}
+			if strings.HasPrefix(input, "/new") {
+				name := strings.TrimSpace(strings.TrimPrefix(input, "/new"))
 				c.textarea.Reset()
 				return c, tea.Cmd(func() tea.Msg { return startCreateChatMsg(name) })
 			}
@@ -111,6 +109,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				Content: input,
 				Role:    "user",
 			}
+			c.textarea.Reset()
 			return c, sendMessageCmd(c.chatService, c.activeChat.ID, msg)
 		case tea.KeyUp, tea.KeyDown:
 			c.viewport, _ = c.viewport.Update(msg)
@@ -130,6 +129,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 	case updatedChatMsg:
 		c.textarea.Reset()
 		c.SetActiveChat(m)
+		return c, nil
 
 	case tea.WindowSizeMsg:
 		c.viewport.Width = m.Width
@@ -167,7 +167,7 @@ func (c ChatView) View() string {
 
 	// Render error if any
 	if c.err != nil {
-		sb.WriteString(fmt.Sprintf("Error: %s\n", c.err.Error()))
+		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Render(fmt.Sprintf("Error: %s\n", c.err.Error())))
 	}
 
 	return sb.String()
