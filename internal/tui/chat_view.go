@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -21,6 +22,7 @@ type ChatView struct {
 	activeChat   *entities.Chat
 	viewport     viewport.Model
 	textarea     textarea.Model
+	spinner      spinner.Model
 	userStyle    lipgloss.Style
 	asstStyle    lipgloss.Style
 	systemStyle  lipgloss.Style
@@ -48,12 +50,17 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	as := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
 	ss := lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
 
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+
 	cv := ChatView{
 		chatService:  chatService,
 		agentService: agentService,
 		activeChat:   activeChat,
 		textarea:     ta,
 		viewport:     vp,
+		spinner:      s,
 		userStyle:    us,
 		asstStyle:    as,
 		systemStyle:  ss,
@@ -99,7 +106,6 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				c.cancel()
 				c.isProcessing = false
 				c.err = fmt.Errorf("request cancelled")
-				c.viewport.SetContent(c.viewport.View() + "\n" + c.systemStyle.Render("System: Request cancelled"))
 				c.viewport.GotoBottom()
 			}
 			return c, nil
@@ -139,11 +145,11 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				Role:    "user",
 			}
 			c.textarea.Reset()
-			c.err = nil // Clear any previous error
+			c.err = nil
 			ctx, cancel := context.WithCancel(context.Background())
 			c.cancel = cancel
 			c.isProcessing = true
-			return c, sendMessageCmd(c.chatService, c.activeChat.ID, message, ctx)
+			return c, tea.Batch(sendMessageCmd(c.chatService, c.activeChat.ID, message, ctx), c.spinner.Tick)
 		case tea.KeyUp, tea.KeyDown:
 			c.viewport, _ = c.viewport.Update(msg)
 		default:
@@ -159,11 +165,24 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			}
 		}
 
+	case spinner.TickMsg:
+		if c.isProcessing {
+			var cmd tea.Cmd
+			c.spinner, cmd = c.spinner.Update(m)
+			return c, cmd
+		}
+
 	case updatedChatMsg:
 		c.textarea.Reset()
 		c.SetActiveChat(m)
 		c.isProcessing = false
 		c.cancel = nil
+		return c, nil
+
+	case errMsg:
+		c.isProcessing = false
+		c.cancel = nil
+		c.err = m
 		return c, nil
 
 	case tea.WindowSizeMsg:
@@ -200,11 +219,14 @@ func (c ChatView) View() string {
 	sb.WriteString(gap)
 	sb.WriteString(c.textarea.View())
 
-	// Instructions below textarea
-	instructions := "Type /help for commands"
-	sb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions))
+	if c.isProcessing {
+		sb.WriteString("\n" + c.spinner.View() + " Thinking... (Esc to cancel)")
+	} else {
+		instructions := "Type /help for commands"
+		sb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions))
+	}
 
-	// Render error or status if any
+	// Render error if any
 	if c.err != nil {
 		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Render(fmt.Sprintf("\n%s", c.err.Error())))
 	}

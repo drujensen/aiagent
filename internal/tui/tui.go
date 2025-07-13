@@ -62,9 +62,10 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t, t.chatForm.Init()
 	case updatedChatMsg:
 		t.activeChat = msg
-		t.chatView.SetActiveChat(msg)
 		t.state = "chat/view"
-		return t, nil
+		var cmd tea.Cmd
+		t.chatView, cmd = t.chatView.Update(msg)
+		return t, cmd
 	case canceledCreateChatMsg:
 		t.state = "chat/view"
 		t.chatView.err = errors.New("chat creation cancelled")

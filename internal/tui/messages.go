@@ -7,6 +7,7 @@ type (
 	updatedChatMsg        *entities.Chat
 	startCreateChatMsg    string
 	canceledCreateChatMsg struct{}
+	cancelSpinnerMsg      struct{}
 )
 
 // messages for history view
