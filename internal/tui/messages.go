@@ -2,7 +2,6 @@ package tui
 
 import "github.com/drujensen/aiagent/internal/domain/entities"
 
-// messages for chat view
 type (
 	updatedChatMsg        *entities.Chat
 	startCreateChatMsg    string
@@ -10,7 +9,6 @@ type (
 	cancelSpinnerMsg      struct{}
 )
 
-// messages for history view
 type (
 	startHistoryMsg    struct{}
 	historySelectedMsg struct {
@@ -19,7 +17,6 @@ type (
 	historyCancelledMsg struct{}
 )
 
-// messages for usage view
 type (
 	startUsageMsg   struct{}
 	updatedUsageMsg struct {
@@ -28,10 +25,25 @@ type (
 	usageCancelledMsg struct{}
 )
 
-// messages for help view
 type (
 	startHelpMsg     struct{}
 	helpCancelledMsg struct{}
+)
+
+type (
+	startAgentsMsg   struct{}
+	agentsFetchedMsg struct {
+		agents []*entities.Agent
+	}
+	agentsCancelledMsg struct{}
+)
+
+type (
+	startToolsMsg   struct{}
+	toolsFetchedMsg struct {
+		tools []*entities.ToolData
+	}
+	toolsCancelledMsg struct{}
 )
 
 // messages for error handling

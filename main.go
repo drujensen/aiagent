@@ -149,7 +149,7 @@ func main() {
 			logger.Fatal("UI failed", zap.Error(err))
 		}
 	} else if modeStr == "tui" {
-		p := tea.NewProgram(tui.NewTUI(chatService, agentService), tea.WithAltScreen())
+		p := tea.NewProgram(tui.NewTUI(chatService, agentService, toolService), tea.WithAltScreen())
 
 		if _, err := p.Run(); err != nil {
 			log.Fatal(err)

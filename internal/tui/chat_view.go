@@ -83,7 +83,7 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 		} else if message.Role == "assistant" {
 			sb.WriteString(c.asstStyle.Render("Assistant: ") + message.Content + "\n")
 		} else {
-			sb.WriteString(c.systemStyle.Render("System: ") + message.Content + "\n")
+			sb.WriteString(c.systemStyle.Render("Tool Called") + "\n")
 		}
 	}
 	c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render(sb.String()))
@@ -119,6 +119,14 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			if input == "/history" {
 				c.textarea.Reset()
 				return c, func() tea.Msg { return startHistoryMsg{} }
+			}
+			if input == "/agents" {
+				c.textarea.Reset()
+				return c, func() tea.Msg { return startAgentsMsg{} }
+			}
+			if input == "/tools" {
+				c.textarea.Reset()
+				return c, func() tea.Msg { return startToolsMsg{} }
 			}
 			if input == "/usage" {
 				c.textarea.Reset()
@@ -197,7 +205,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				} else if message.Role == "assistant" {
 					sb.WriteString(c.asstStyle.Render("Assistant: ") + message.Content + "\n")
 				} else {
-					sb.WriteString(c.systemStyle.Render("System: ") + message.Content + "\n")
+					sb.WriteString(c.systemStyle.Render("Tool Called") + "\n")
 				}
 			}
 			c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render(sb.String()))

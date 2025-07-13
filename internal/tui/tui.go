@@ -13,6 +13,7 @@ import (
 type TUI struct {
 	chatService  services.ChatService
 	agentService services.AgentService
+	toolService  services.ToolService
 	activeChat   *entities.Chat
 
 	chatView    ChatView
@@ -20,12 +21,14 @@ type TUI struct {
 	historyView HistoryView
 	usageView   UsageView
 	helpView    HelpView
+	agentView   AgentView
+	toolView    ToolView
 
 	state string
 	err   error
 }
 
-func NewTUI(chatService services.ChatService, agentService services.AgentService) TUI {
+func NewTUI(chatService services.ChatService, agentService services.AgentService, toolService services.ToolService) TUI {
 	ctx := context.Background()
 
 	activeChat, err := chatService.GetActiveChat(ctx)
@@ -37,12 +40,15 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 	return TUI{
 		chatService:  chatService,
 		agentService: agentService,
+		toolService:  toolService,
 		activeChat:   activeChat,
 		chatView:     NewChatView(chatService, agentService, activeChat),
 		chatForm:     NewChatForm(chatService, agentService),
 		historyView:  NewHistoryView(chatService),
 		usageView:    NewUsageView(chatService, agentService),
 		helpView:     NewHelpView(),
+		agentView:    NewAgentView(agentService),
+		toolView:     NewToolView(toolService),
 		state:        "chat/view",
 		err:          nil,
 	}
@@ -121,6 +127,28 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return t, nil
 
+	// Handle agents view messages
+	case startAgentsMsg:
+		t.state = "agents/list"
+		return t, t.agentView.Init()
+	case agentsCancelledMsg:
+		t.state = "chat/view"
+		if t.activeChat != nil {
+			t.chatView.SetActiveChat(t.activeChat)
+		}
+		return t, nil
+
+	// Handle tools view messages
+	case startToolsMsg:
+		t.state = "tools/list"
+		return t, t.toolView.Init()
+	case toolsCancelledMsg:
+		t.state = "chat/view"
+		if t.activeChat != nil {
+			t.chatView.SetActiveChat(t.activeChat)
+		}
+		return t, nil
+
 	// Handle global key messages and errors
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -146,6 +174,10 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.usageView, cmd = t.usageView.Update(msg)
 	case "chat/help":
 		t.helpView, cmd = t.helpView.Update(msg)
+	case "agents/list":
+		t.agentView, cmd = t.agentView.Update(msg)
+	case "tools/list":
+		t.toolView, cmd = t.toolView.Update(msg)
 	}
 	return t, cmd
 }
@@ -162,6 +194,10 @@ func (t TUI) View() string {
 		return t.usageView.View()
 	case "chat/help":
 		return t.helpView.View()
+	case "agents/list":
+		return t.agentView.View()
+	case "tools/list":
+		return t.toolView.View()
 	}
 
 	return "Error: Invalid state"
