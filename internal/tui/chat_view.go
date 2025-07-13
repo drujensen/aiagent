@@ -102,6 +102,14 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				c.textarea.Reset()
 				return c, func() tea.Msg { return startHistoryMsg{} }
 			}
+			if input == "/usage" { // New: Trigger usage view
+				c.textarea.Reset()
+				return c, func() tea.Msg { return startUsageMsg{} }
+			}
+			if input == "/help" { // New: Trigger help view
+				c.textarea.Reset()
+				return c, func() tea.Msg { return startHelpMsg{} }
+			}
 			if input == "/exit" {
 				return c, tea.Quit
 			}
@@ -173,6 +181,10 @@ func (c ChatView) View() string {
 	sb.WriteString(c.viewport.View())
 	sb.WriteString(gap)
 	sb.WriteString(c.textarea.View())
+
+	// New: Instructions below textarea
+	instructions := "Type /help for commands"
+	sb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions))
 
 	// Render error if any
 	if c.err != nil {

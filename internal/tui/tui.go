@@ -10,25 +10,6 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/services"
 )
 
-// messages for chat view
-type (
-	updatedChatMsg        *entities.Chat
-	startCreateChatMsg    string
-	canceledCreateChatMsg struct{}
-)
-
-// messages for history view
-type (
-	startHistoryMsg    struct{}
-	historySelectedMsg struct {
-		chatID string
-	}
-	historyCancelledMsg struct{}
-)
-
-// messages for error handling
-type errMsg error
-
 type TUI struct {
 	chatService  services.ChatService
 	agentService services.AgentService
@@ -37,6 +18,8 @@ type TUI struct {
 	chatView    ChatView
 	chatForm    ChatForm
 	historyView HistoryView
+	usageView   UsageView
+	helpView    HelpView
 
 	state string
 	err   error
@@ -58,6 +41,8 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 		chatView:     NewChatView(chatService, agentService, activeChat),
 		chatForm:     NewChatForm(chatService, agentService),
 		historyView:  NewHistoryView(chatService),
+		usageView:    NewUsageView(chatService, agentService),
+		helpView:     NewHelpView(),
 		state:        "chat/view",
 		err:          nil,
 	}
@@ -113,6 +98,28 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return t, nil
 
+	// Handle usage view messages
+	case startUsageMsg:
+		t.state = "chat/usage"
+		return t, t.usageView.Init()
+	case usageCancelledMsg:
+		t.state = "chat/view"
+		if t.activeChat != nil {
+			t.chatView.SetActiveChat(t.activeChat)
+		}
+		return t, nil
+
+	// Handle help view messages
+	case startHelpMsg:
+		t.state = "chat/help"
+		return t, t.helpView.Init()
+	case helpCancelledMsg:
+		t.state = "chat/view"
+		if t.activeChat != nil {
+			t.chatView.SetActiveChat(t.activeChat)
+		}
+		return t, nil
+
 	// Handle global key messages and errors
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -134,6 +141,10 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.chatForm, cmd = t.chatForm.Update(msg)
 	case "chat/history":
 		t.historyView, cmd = t.historyView.Update(msg)
+	case "chat/usage":
+		t.usageView, cmd = t.usageView.Update(msg)
+	case "chat/help":
+		t.helpView, cmd = t.helpView.Update(msg)
 	}
 	return t, cmd
 }
@@ -146,6 +157,10 @@ func (t TUI) View() string {
 		return t.chatForm.View()
 	case "chat/history":
 		return t.historyView.View()
+	case "chat/usage":
+		return t.usageView.View()
+	case "chat/help":
+		return t.helpView.View()
 	}
 
 	return "Error: Invalid state"
