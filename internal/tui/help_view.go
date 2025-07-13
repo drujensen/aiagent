@@ -44,6 +44,8 @@ func (h HelpView) View() string {
 Commands:
 /new <name>   - Start a new chat            
 /history      - View and select from history
+/agents       - View available agents       
+/tools        - View available tools        
 /usage        - Show usage statistics       
 /help         - Show this help screen       
 /exit         - Exit the application        
