@@ -91,7 +91,7 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 		c.height = m.Height
 		nameFieldWidth := m.Width - 4
 		c.nameField.Width = nameFieldWidth
-		listHeight := m.Height - 3
+		listHeight := m.Height - 6 // Adjust for borders and extra elements
 		c.agentsList.SetSize(m.Width-4, listHeight)
 		return c, nil
 
@@ -142,11 +142,31 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 }
 
 func (c ChatForm) View() string {
+	// Define border styles
+	focusedBorder := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("6")) // Bright cyan for focused
+
+	unfocusedBorder := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("8")) // Dim gray for unfocused
+
+	// Outer container style (Vim-like overall border)
+	outerStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.ThickBorder()).
+		BorderForeground(lipgloss.Color("4")). // Blue for outer border
+		Width(c.width - 2).
+		Height(c.height - 2).
+		Padding(1)
+
 	var sb strings.Builder
 
-	// Render the name input field
-	nameFieldStyle := lipgloss.NewStyle().Width(c.width - 4)
-	sb.WriteString("Chat Name: ")
+	// Render the name input field with border
+	nameFieldStyle := unfocusedBorder.Copy().Width(c.width - 4)
+	if c.focused == "name" {
+		nameFieldStyle = focusedBorder.Copy().Width(c.width - 4)
+	}
+	sb.WriteString("Chat Name:\n")
 	if c.focused == "name" {
 		sb.WriteString(nameFieldStyle.Render(c.nameField.View()))
 	} else {
@@ -154,8 +174,11 @@ func (c ChatForm) View() string {
 	}
 	sb.WriteString("\n\n")
 
-	// Render the agents list
-	listStyle := lipgloss.NewStyle().Width(c.width - 4)
+	// Render the agents list with border
+	listStyle := unfocusedBorder.Copy().Width(c.width - 4).Height(c.agentsList.Height())
+	if c.focused == "list" {
+		listStyle = focusedBorder.Copy().Width(c.width - 4).Height(c.agentsList.Height())
+	}
 	sb.WriteString(listStyle.Render(c.agentsList.View()))
 	sb.WriteString("\n")
 
@@ -168,7 +191,8 @@ func (c ChatForm) View() string {
 		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Render(fmt.Sprintf("\nError: %s\n", c.err.Error())))
 	}
 
-	return lipgloss.NewStyle().Padding(1, 2).Render(sb.String())
+	// Wrap in outer border
+	return outerStyle.Render(sb.String())
 }
 
 func createChatCmd(cs services.ChatService, name, agentID string) tea.Cmd {

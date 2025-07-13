@@ -22,7 +22,6 @@ func NewHistoryView(chatService services.ChatService) HistoryView {
 	ctx := context.Background()
 	chats, err := chatService.ListChats(ctx)
 	if err != nil {
-		// Handle error gracefully (print to console for now; could log in production)
 		fmt.Printf("Error listing chats: %v\n", err)
 		chats = []*entities.Chat{}
 	}
@@ -58,7 +57,8 @@ func (h HistoryView) Update(msg tea.Msg) (HistoryView, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		h.width = m.Width
 		h.height = m.Height
-		listHeight := m.Height - 3
+		// Adjust for borders/padding
+		listHeight := m.Height - 4
 		h.list.SetSize(m.Width-4, listHeight)
 		return h, nil
 
@@ -80,7 +80,24 @@ func (h HistoryView) Update(msg tea.Msg) (HistoryView, tea.Cmd) {
 }
 
 func (h HistoryView) View() string {
+	// Outer container style (Vim-like overall border)
+	outerStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.ThickBorder()).
+		BorderForeground(lipgloss.Color("4")). // Blue for outer border
+		Width(h.width - 2).
+		Height(h.height - 2).
+		Padding(1)
+
+	// Inner border for list (always "focused" since single component)
+	innerBorder := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("6")). // Bright cyan
+		Width(h.list.Width()).
+		Height(h.list.Height())
+
 	instructions := "Use arrows or j/k to navigate, Enter to select, Esc to cancel"
-	view := h.list.View() + "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions)
-	return lipgloss.NewStyle().Padding(1, 2).Render(view)
+	view := innerBorder.Render(h.list.View()) + "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions)
+
+	// Wrap in outer border
+	return outerStyle.Render(view)
 }

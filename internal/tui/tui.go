@@ -74,7 +74,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t, cmd
 	case canceledCreateChatMsg:
 		t.state = "chat/view"
-		t.chatView.err = errors.New("new chat canceled")
+		t.chatView.err = errors.New("New chat canceled")
 		if t.activeChat != nil {
 			t.chatView.SetActiveChat(t.activeChat)
 		}
@@ -157,7 +157,6 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case errMsg:
-		fmt.Println("TUI: Received errMsg:", msg)
 		t.err = msg
 		return t, nil
 	}

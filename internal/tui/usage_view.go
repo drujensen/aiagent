@@ -57,27 +57,37 @@ func (u UsageView) Update(msg tea.Msg) (UsageView, tea.Cmd) {
 }
 
 func (u UsageView) View() string {
+	// Outer container style (Vim-like overall border)
+	outerStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.ThickBorder()).
+		BorderForeground(lipgloss.Color("4")). // Blue for outer border
+		Width(u.width - 2).
+		Height(u.height - 2).
+		Padding(1)
+
+	// Inner style for content (focused since single component)
+	innerStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("6")). // Bright cyan
+		Width(u.width-4).
+		Padding(1, 2)
+
 	var sb strings.Builder
 
 	if u.err != nil {
 		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Render(fmt.Sprintf("Error: %s\n", u.err.Error())))
 	} else if u.usageInfo != "" {
-		// Style the usage info in a box
-		style := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("63")).
-			Padding(1, 2).
-			Width(u.width - 4)
-		sb.WriteString(style.Render(u.usageInfo))
+		sb.WriteString(innerStyle.Render(u.usageInfo))
 	} else {
-		sb.WriteString("Loading usage information...")
+		sb.WriteString(innerStyle.Render("Loading usage information..."))
 	}
 
 	// Instructions
 	instructions := "\nPress Esc to close"
 	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions))
 
-	return lipgloss.NewStyle().Padding(1, 2).Render(sb.String())
+	// Wrap in outer border
+	return outerStyle.Render(sb.String())
 }
 
 // fetchUsageCmd fetches and formats usage info asynchronously

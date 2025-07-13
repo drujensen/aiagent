@@ -46,7 +46,8 @@ func (v ToolView) Update(msg tea.Msg) (ToolView, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		v.width = m.Width
 		v.height = m.Height
-		listHeight := m.Height - 3
+		// Adjust for borders/padding
+		listHeight := m.Height - 4
 		v.list.SetSize(m.Width-4, listHeight)
 		return v, nil
 
@@ -79,17 +80,32 @@ func (v ToolView) Update(msg tea.Msg) (ToolView, tea.Cmd) {
 }
 
 func (v ToolView) View() string {
-	var sb strings.Builder
+	// Outer container style (Vim-like overall border)
+	outerStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.ThickBorder()).
+		BorderForeground(lipgloss.Color("4")). // Blue for outer border
+		Width(v.width - 2).
+		Height(v.height - 2).
+		Padding(1)
 
+	// Inner border for list (always "focused" since single component)
+	innerBorder := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("6")). // Bright cyan
+		Width(v.list.Width()).
+		Height(v.list.Height())
+
+	var sb strings.Builder
 	instructions := "Use arrows or j/k to navigate, Esc to return to chat"
-	view := v.list.View() + "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions)
+	view := innerBorder.Render(v.list.View()) + "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions)
 	sb.WriteString(view)
 
 	if v.err != nil {
 		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Render("\nError: "+v.err.Error()) + "\n")
 	}
 
-	return lipgloss.NewStyle().Padding(1, 2).Render(sb.String())
+	// Wrap in outer border
+	return outerStyle.Render(sb.String())
 }
 
 func (v ToolView) fetchToolsCmd() tea.Cmd {

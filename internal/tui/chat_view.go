@@ -237,9 +237,16 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		return c, nil
 
 	case tea.WindowSizeMsg:
-		c.viewport.Width = m.Width
-		c.textarea.SetWidth(m.Width)
-		c.viewport.Height = m.Height - c.textarea.Height() - 2
+		// Account for outer border (2) and padding (2 left/right, 2 top/bottom)
+		innerWidth := m.Width - 4
+		innerHeight := m.Height - 4
+
+		c.viewport.Width = innerWidth
+		c.textarea.SetWidth(innerWidth)
+
+		// Subtract textarea height (3), gap (2), instructions (1), possible error (1), and adjust for borders
+		c.viewport.Height = innerHeight - 3 - 2 - 1 - 1 - 2 // Extra adjustment to fit
+
 		if c.activeChat != nil {
 			var sb strings.Builder
 			for _, message := range c.activeChat.Messages {
@@ -261,14 +268,38 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 }
 
 func (c ChatView) View() string {
+	// Define border styles
+	focusedBorder := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("6")) // Bright cyan for focused
+
+	unfocusedBorder := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("8")) // Dim gray for unfocused
+
+	// Outer container style (Vim-like overall border)
+	outerStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.ThickBorder()).
+		BorderForeground(lipgloss.Color("4")). // Blue for outer border
+		Width(c.viewport.Width + 4).           // Adjust for inner content
+		Height(c.viewport.Height + c.textarea.Height() + 6).
+		Padding(1)
+
 	var sb strings.Builder
-	sb.WriteString(c.viewport.View())
+
+	// Style viewport
+	vpStyle := unfocusedBorder.Copy().Width(c.viewport.Width).Height(c.viewport.Height)
+	if c.focused == "viewport" {
+		vpStyle = focusedBorder.Copy().Width(c.viewport.Width).Height(c.viewport.Height)
+	}
+	sb.WriteString(vpStyle.Render(c.viewport.View()))
+
 	sb.WriteString(gap)
 
-	// Style textarea based on focus
-	taStyle := lipgloss.NewStyle().Width(c.viewport.Width)
-	if c.focused != "textarea" {
-		taStyle = taStyle.Faint(true)
+	// Style textarea
+	taStyle := unfocusedBorder.Copy().Width(c.viewport.Width).Height(c.textarea.Height())
+	if c.focused == "textarea" {
+		taStyle = focusedBorder.Copy().Width(c.viewport.Width).Height(c.textarea.Height())
 	}
 	sb.WriteString(taStyle.Render(c.textarea.View()))
 
@@ -285,7 +316,8 @@ func (c ChatView) View() string {
 		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Render(fmt.Sprintf("\n%s", c.err.Error())))
 	}
 
-	return sb.String()
+	// Wrap everything in the outer border
+	return outerStyle.Render(sb.String())
 }
 
 func sendMessageCmd(cs services.ChatService, chatID string, msg *entities.Message, ctx context.Context) tea.Cmd {
