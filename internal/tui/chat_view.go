@@ -85,7 +85,7 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 		} else if message.Role == "assistant" {
 			sb.WriteString(c.asstStyle.Render("Assistant: ") + message.Content + "\n")
 		} else {
-			sb.WriteString(c.systemStyle.Render("Tool Called") + "\n")
+			sb.WriteString(c.systemStyle.Render("System: Tool Called") + "\n")
 		}
 	}
 	c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render(sb.String()))
@@ -208,7 +208,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				} else if message.Role == "assistant" {
 					sb.WriteString(c.asstStyle.Render("Assistant: ") + message.Content + "\n")
 				} else {
-					sb.WriteString(c.systemStyle.Render("Tool Called") + "\n")
+					sb.WriteString(c.systemStyle.Render("System: Tool Called") + "\n")
 				}
 			}
 			c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render(sb.String()))
