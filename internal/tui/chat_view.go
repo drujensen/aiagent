@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
@@ -29,6 +30,7 @@ type ChatView struct {
 	err          error
 	cancel       context.CancelFunc
 	isProcessing bool
+	startTime    time.Time
 }
 
 func NewChatView(chatService services.ChatService, agentService services.AgentService, activeChat *entities.Chat) ChatView {
@@ -157,6 +159,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			ctx, cancel := context.WithCancel(context.Background())
 			c.cancel = cancel
 			c.isProcessing = true
+			c.startTime = time.Now()
 			return c, tea.Batch(sendMessageCmd(c.chatService, c.activeChat.ID, message, ctx), c.spinner.Tick)
 		case tea.KeyUp, tea.KeyDown:
 			c.viewport, _ = c.viewport.Update(msg)
@@ -228,7 +231,8 @@ func (c ChatView) View() string {
 	sb.WriteString(c.textarea.View())
 
 	if c.isProcessing {
-		sb.WriteString("\n" + c.spinner.View() + " Thinking... (Esc to cancel)")
+		elapsed := time.Since(c.startTime).Round(time.Second)
+		sb.WriteString("\n" + c.spinner.View() + fmt.Sprintf(" Thinking... (%ds)", int(elapsed.Seconds())))
 	} else {
 		instructions := "Type /help for commands, Arrows to navigate, Ctrl+C to exit."
 		sb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions))
