@@ -99,18 +99,7 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 		switch m.String() {
 		case "esc":
 			return c, func() tea.Msg { return canceledCreateChatMsg{} }
-		case "tab":
-			if c.focused == "name" {
-				c.focused = "list"
-				c.nameField.Blur()
-				c.agentsList.SetShowStatusBar(true)
-			} else {
-				c.focused = "name"
-				c.nameField.Focus()
-				c.agentsList.SetShowStatusBar(false)
-			}
-			return c, nil
-		case "shift+tab":
+		case "tab", "shift+tab":
 			if c.focused == "name" {
 				c.focused = "list"
 				c.nameField.Blur()

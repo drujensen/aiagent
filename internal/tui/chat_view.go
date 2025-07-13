@@ -31,6 +31,7 @@ type ChatView struct {
 	cancel       context.CancelFunc
 	isProcessing bool
 	startTime    time.Time
+	focused      string // "textarea" or "viewport"
 }
 
 func NewChatView(chatService services.ChatService, agentService services.AgentService, activeChat *entities.Chat) ChatView {
@@ -67,6 +68,7 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		asstStyle:    as,
 		systemStyle:  ss,
 		err:          nil,
+		focused:      "textarea",
 	}
 
 	if activeChat != nil {
@@ -94,85 +96,123 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 
 func (c ChatView) Init() tea.Cmd {
 	c.textarea.Focus()
+	c.focused = "textarea"
 	return textarea.Blink
 }
 
 func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
+	var cmds []tea.Cmd
+
 	switch m := msg.(type) {
 	case tea.KeyMsg:
-		switch m.Type {
-		case tea.KeyCtrlC:
-			return c, tea.Quit
-		case tea.KeyEsc:
-			if c.isProcessing && c.cancel != nil {
-				c.cancel()
-				c.isProcessing = false
-				c.err = fmt.Errorf("request cancelled")
-				c.viewport.GotoBottom()
+		if c.isProcessing {
+			if m.Type == tea.KeyEsc {
+				if c.cancel != nil {
+					c.cancel()
+					c.isProcessing = false
+					c.err = fmt.Errorf("request cancelled")
+					c.viewport.GotoBottom()
+				}
+				return c, nil
 			}
 			return c, nil
-		case tea.KeyEnter:
-			input := c.textarea.Value()
-			if strings.HasPrefix(input, "/new") {
-				name := strings.TrimSpace(strings.TrimPrefix(input, "/new"))
+		}
+
+		switch m.String() {
+		case "ctrl+c":
+			return c, tea.Quit
+		case "esc":
+			return c, nil
+		case "enter":
+			if c.focused == "textarea" {
+				input := c.textarea.Value()
+				if strings.HasPrefix(input, "/new") {
+					name := strings.TrimSpace(strings.TrimPrefix(input, "/new"))
+					c.textarea.Reset()
+					return c, func() tea.Msg { return startCreateChatMsg(name) }
+				}
+				if input == "/history" {
+					c.textarea.Reset()
+					return c, func() tea.Msg { return startHistoryMsg{} }
+				}
+				if input == "/agents" {
+					c.textarea.Reset()
+					return c, func() tea.Msg { return startAgentsMsg{} }
+				}
+				if input == "/tools" {
+					c.textarea.Reset()
+					return c, func() tea.Msg { return startToolsMsg{} }
+				}
+				if input == "/usage" {
+					c.textarea.Reset()
+					return c, func() tea.Msg { return startUsageMsg{} }
+				}
+				if input == "/help" {
+					c.textarea.Reset()
+					return c, func() tea.Msg { return startHelpMsg{} }
+				}
+				if input == "/exit" {
+					return c, tea.Quit
+				}
+				// Normal message handling
+				if input == "" {
+					c.err = fmt.Errorf("message cannot be empty")
+					return c, nil
+				}
+				if c.activeChat == nil {
+					c.err = fmt.Errorf("no active chat")
+					return c, nil
+				}
+				message := &entities.Message{
+					Content: input,
+					Role:    "user",
+				}
 				c.textarea.Reset()
-				return c, func() tea.Msg { return startCreateChatMsg(name) }
+				c.err = nil
+				ctx, cancel := context.WithCancel(context.Background())
+				c.cancel = cancel
+				c.isProcessing = true
+				c.startTime = time.Now()
+				return c, tea.Batch(sendMessageCmd(c.chatService, c.activeChat.ID, message, ctx), c.spinner.Tick)
 			}
-			if input == "/history" {
-				c.textarea.Reset()
-				return c, func() tea.Msg { return startHistoryMsg{} }
+		case "tab", "shift+tab":
+			if c.focused == "textarea" {
+				c.focused = "viewport"
+				c.textarea.Blur()
+			} else {
+				c.focused = "textarea"
+				c.textarea.Focus()
+				cmd := textarea.Blink
+				cmds = append(cmds, cmd)
 			}
-			if input == "/agents" {
-				c.textarea.Reset()
-				return c, func() tea.Msg { return startAgentsMsg{} }
+			return c, tea.Batch(cmds...)
+		case "j", "down":
+			if c.focused == "viewport" {
+				c.viewport.ScrollDown(1)
+			} else {
+				var cmd tea.Cmd
+				c.textarea, cmd = c.textarea.Update(m)
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
 			}
-			if input == "/tools" {
-				c.textarea.Reset()
-				return c, func() tea.Msg { return startToolsMsg{} }
+		case "k", "up":
+			if c.focused == "viewport" {
+				c.viewport.ScrollUp(1)
+			} else {
+				var cmd tea.Cmd
+				c.textarea, cmd = c.textarea.Update(m)
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
 			}
-			if input == "/usage" {
-				c.textarea.Reset()
-				return c, func() tea.Msg { return startUsageMsg{} }
-			}
-			if input == "/help" {
-				c.textarea.Reset()
-				return c, func() tea.Msg { return startHelpMsg{} }
-			}
-			if input == "/exit" {
-				return c, tea.Quit
-			}
-			// Normal message handling
-			if input == "" {
-				c.err = fmt.Errorf("message cannot be empty")
-				return c, nil
-			}
-			if c.activeChat == nil {
-				c.err = fmt.Errorf("no active chat")
-				return c, nil
-			}
-			message := &entities.Message{
-				Content: input,
-				Role:    "user",
-			}
-			c.textarea.Reset()
-			c.err = nil
-			ctx, cancel := context.WithCancel(context.Background())
-			c.cancel = cancel
-			c.isProcessing = true
-			c.startTime = time.Now()
-			return c, tea.Batch(sendMessageCmd(c.chatService, c.activeChat.ID, message, ctx), c.spinner.Tick)
-		case tea.KeyUp, tea.KeyDown:
-			c.viewport, _ = c.viewport.Update(msg)
 		default:
-			var taCmd tea.Cmd
-			var vpCmd tea.Cmd
-			c.textarea, taCmd = c.textarea.Update(msg)
-			if taCmd != nil {
-				return c, taCmd
-			}
-			c.viewport, vpCmd = c.viewport.Update(msg)
-			if vpCmd != nil {
-				return c, vpCmd
+			if c.focused == "textarea" {
+				var cmd tea.Cmd
+				c.textarea, cmd = c.textarea.Update(m)
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
 			}
 		}
 
@@ -214,27 +254,29 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render(sb.String()))
 		}
 		c.viewport.GotoBottom()
-
-	case tea.MouseMsg:
-		if m.Type == tea.MouseWheelUp || m.Type == tea.MouseWheelDown {
-			c.viewport, _ = c.viewport.Update(msg)
-		}
+		return c, nil
 	}
 
-	return c, nil
+	return c, tea.Batch(cmds...)
 }
 
 func (c ChatView) View() string {
 	var sb strings.Builder
 	sb.WriteString(c.viewport.View())
 	sb.WriteString(gap)
-	sb.WriteString(c.textarea.View())
+
+	// Style textarea based on focus
+	taStyle := lipgloss.NewStyle().Width(c.viewport.Width)
+	if c.focused != "textarea" {
+		taStyle = taStyle.Faint(true)
+	}
+	sb.WriteString(taStyle.Render(c.textarea.View()))
 
 	if c.isProcessing {
 		elapsed := time.Since(c.startTime).Round(time.Second)
 		sb.WriteString("\n" + c.spinner.View() + fmt.Sprintf(" Thinking... (%ds)", int(elapsed.Seconds())))
 	} else {
-		instructions := "Type /help for commands, Arrows to navigate, Ctrl+C to exit."
+		instructions := "Type /help for commands, Tab to switch focus, j/k to navigate, Ctrl+C to exit."
 		sb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions))
 	}
 
