@@ -25,6 +25,8 @@ type ChatView struct {
 	asstStyle    lipgloss.Style
 	systemStyle  lipgloss.Style
 	err          error
+	cancel       context.CancelFunc
+	isProcessing bool
 }
 
 func NewChatView(chatService services.ChatService, agentService services.AgentService, activeChat *entities.Chat) ChatView {
@@ -57,6 +59,7 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		systemStyle:  ss,
 		err:          nil,
 	}
+
 	if activeChat != nil {
 		cv.SetActiveChat(activeChat)
 	}
@@ -91,6 +94,15 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		switch m.Type {
 		case tea.KeyCtrlC:
 			return c, tea.Quit
+		case tea.KeyEsc:
+			if c.isProcessing && c.cancel != nil {
+				c.cancel()
+				c.isProcessing = false
+				c.err = fmt.Errorf("request cancelled")
+				c.viewport.SetContent(c.viewport.View() + "\n" + c.systemStyle.Render("System: Request cancelled"))
+				c.viewport.GotoBottom()
+			}
+			return c, nil
 		case tea.KeyEnter:
 			input := c.textarea.Value()
 			if strings.HasPrefix(input, "/new") {
@@ -102,11 +114,11 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				c.textarea.Reset()
 				return c, func() tea.Msg { return startHistoryMsg{} }
 			}
-			if input == "/usage" { // New: Trigger usage view
+			if input == "/usage" {
 				c.textarea.Reset()
 				return c, func() tea.Msg { return startUsageMsg{} }
 			}
-			if input == "/help" { // New: Trigger help view
+			if input == "/help" {
 				c.textarea.Reset()
 				return c, func() tea.Msg { return startHelpMsg{} }
 			}
@@ -122,12 +134,16 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				c.err = fmt.Errorf("no active chat")
 				return c, nil
 			}
-			msg := &entities.Message{
+			message := &entities.Message{
 				Content: input,
 				Role:    "user",
 			}
 			c.textarea.Reset()
-			return c, sendMessageCmd(c.chatService, c.activeChat.ID, msg)
+			c.err = nil // Clear any previous error
+			ctx, cancel := context.WithCancel(context.Background())
+			c.cancel = cancel
+			c.isProcessing = true
+			return c, sendMessageCmd(c.chatService, c.activeChat.ID, message, ctx)
 		case tea.KeyUp, tea.KeyDown:
 			c.viewport, _ = c.viewport.Update(msg)
 		default:
@@ -146,6 +162,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 	case updatedChatMsg:
 		c.textarea.Reset()
 		c.SetActiveChat(m)
+		c.isProcessing = false
+		c.cancel = nil
 		return c, nil
 
 	case tea.WindowSizeMsg:
@@ -182,21 +200,20 @@ func (c ChatView) View() string {
 	sb.WriteString(gap)
 	sb.WriteString(c.textarea.View())
 
-	// New: Instructions below textarea
+	// Instructions below textarea
 	instructions := "Type /help for commands"
 	sb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions))
 
-	// Render error if any
+	// Render error or status if any
 	if c.err != nil {
-		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Render(fmt.Sprintf("Error: %s\n", c.err.Error())))
+		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Render(fmt.Sprintf("\n%s", c.err.Error())))
 	}
 
 	return sb.String()
 }
 
-func sendMessageCmd(cs services.ChatService, chatID string, msg *entities.Message) tea.Cmd {
+func sendMessageCmd(cs services.ChatService, chatID string, msg *entities.Message, ctx context.Context) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
 		_, err := cs.SendMessage(ctx, chatID, msg)
 		if err != nil {
 			return errMsg(err)
