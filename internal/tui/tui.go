@@ -10,25 +10,36 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/services"
 )
 
+// messages for chat view
 type (
-	errMsg               error
-	updatedChatMsg       *entities.Chat
-	startCreateChatMsg   string
-	chatFormSubmittedMsg struct {
-		name    string
-		agentID string
-	}
-	chatFormCancelledMsg struct{}
+	updatedChatMsg        *entities.Chat
+	startCreateChatMsg    string
+	canceledCreateChatMsg struct{}
 )
+
+// messages for history view
+type (
+	startHistoryMsg    struct{}
+	historySelectedMsg struct {
+		chatID string
+	}
+	historyCancelledMsg struct{}
+)
+
+// messages for error handling
+type errMsg error
 
 type TUI struct {
 	chatService  services.ChatService
 	agentService services.AgentService
 	activeChat   *entities.Chat
-	chatView     ChatView
-	chatForm     ChatForm
-	state        string
-	err          error
+
+	chatView    ChatView
+	chatForm    ChatForm
+	historyView HistoryView
+
+	state string
+	err   error
 }
 
 func NewTUI(chatService services.ChatService, agentService services.AgentService) TUI {
@@ -46,6 +57,7 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 		activeChat:   activeChat,
 		chatView:     NewChatView(chatService, agentService, activeChat),
 		chatForm:     NewChatForm(chatService, agentService),
+		historyView:  NewHistoryView(chatService),
 		state:        "chat/view",
 		err:          nil,
 	}
@@ -57,6 +69,8 @@ func (t TUI) Init() tea.Cmd {
 
 func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+
+	// Handle chat view messages
 	case startCreateChatMsg:
 		t.state = "chat/create"
 		t.chatForm.SetChatName(string(msg))
@@ -66,15 +80,40 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.chatView.SetActiveChat(msg)
 		t.state = "chat/view"
 		return t, nil
-	case chatFormSubmittedMsg:
-		return t, createChatCmd(t.chatService, msg.name, msg.agentID)
-	case chatFormCancelledMsg:
+	case canceledCreateChatMsg:
 		t.state = "chat/view"
 		t.chatView.err = errors.New("chat creation cancelled")
 		if t.activeChat != nil {
 			t.chatView.SetActiveChat(t.activeChat)
 		}
 		return t, t.chatView.Init()
+
+	// Handle history view messages
+	case startHistoryMsg:
+		t.state = "chat/history"
+		return t, t.historyView.Init()
+	case historySelectedMsg:
+		ctx := context.Background()
+		err := t.chatService.SetActiveChat(ctx, msg.chatID)
+		if err != nil {
+			return t, func() tea.Msg { return errMsg(err) }
+		}
+		chat, err := t.chatService.GetChat(ctx, msg.chatID)
+		if err != nil {
+			return t, func() tea.Msg { return errMsg(err) }
+		}
+		t.activeChat = chat
+		t.chatView.SetActiveChat(chat)
+		t.state = "chat/view"
+		return t, nil
+	case historyCancelledMsg:
+		t.state = "chat/view"
+		if t.activeChat != nil {
+			t.chatView.SetActiveChat(t.activeChat)
+		}
+		return t, nil
+
+	// Handle global key messages and errors
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
@@ -94,6 +133,8 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		fmt.Println("TUI: Received errMsg:", msg)
 		t.err = msg
 		return t, nil
+
+	// forward all other messages to the current view
 	default:
 		if t.state == "chat/view" {
 			var cmd tea.Cmd
@@ -102,6 +143,10 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else if t.state == "chat/create" {
 			var cmd tea.Cmd
 			t.chatForm, cmd = t.chatForm.Update(msg)
+			return t, cmd
+		} else if t.state == "chat/history" {
+			var cmd tea.Cmd
+			t.historyView, cmd = t.historyView.Update(msg)
 			return t, cmd
 		}
 	}
@@ -115,21 +160,9 @@ func (t TUI) View() string {
 		return t.chatView.View()
 	case "chat/create":
 		return t.chatForm.View()
+	case "chat/history":
+		return t.historyView.View()
 	}
-	return "Error: Invalid state"
-}
 
-func createChatCmd(cs services.ChatService, name, agentID string) tea.Cmd {
-	return func() tea.Msg {
-		ctx := context.Background()
-		newChat, err := cs.CreateChat(ctx, agentID, name)
-		if err != nil {
-			return errMsg(err)
-		}
-		err = cs.SetActiveChat(ctx, newChat.ID)
-		if err != nil {
-			return errMsg(err)
-		}
-		return updatedChatMsg(newChat)
-	}
+	return "Error: Invalid state"
 }

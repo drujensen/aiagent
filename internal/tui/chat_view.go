@@ -96,7 +96,11 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			if strings.HasPrefix(input, "/new") {
 				name := strings.TrimSpace(strings.TrimPrefix(input, "/new"))
 				c.textarea.Reset()
-				return c, tea.Cmd(func() tea.Msg { return startCreateChatMsg(name) })
+				return c, func() tea.Msg { return startCreateChatMsg(name) }
+			}
+			if input == "/history" {
+				c.textarea.Reset()
+				return c, func() tea.Msg { return startHistoryMsg{} }
 			}
 			if input == "/exit" {
 				return c, tea.Quit

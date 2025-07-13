@@ -97,9 +97,7 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 	case tea.KeyMsg:
 		switch m.String() {
 		case "esc":
-			return c, func() tea.Msg { return chatFormCancelledMsg{} }
-		case "ctrl+c", "q":
-			return c, tea.Quit
+			return c, func() tea.Msg { return canceledCreateChatMsg{} }
 		case "tab":
 			if c.focused == "name" {
 				c.focused = "list"
@@ -121,13 +119,7 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 				return c, nil
 			}
 			selectedAgent := c.agentsList.SelectedItem().(*entities.Agent)
-			fmt.Println("ChatForm: Enter pressed, submitting chat creation")
-			return c, func() tea.Msg {
-				return chatFormSubmittedMsg{
-					name:    c.nameField.Value(),
-					agentID: selectedAgent.ID,
-				}
-			}
+			return c, createChatCmd(c.chatService, c.nameField.Value(), selectedAgent.ID)
 		case "j", "k":
 			if c.focused == "list" {
 				var cmd tea.Cmd
@@ -186,4 +178,19 @@ func (c ChatForm) View() string {
 	}
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(sb.String())
+}
+
+func createChatCmd(cs services.ChatService, name, agentID string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		newChat, err := cs.CreateChat(ctx, agentID, name)
+		if err != nil {
+			return errMsg(err)
+		}
+		err = cs.SetActiveChat(ctx, newChat.ID)
+		if err != nil {
+			return errMsg(err)
+		}
+		return updatedChatMsg(newChat)
+	}
 }
