@@ -196,7 +196,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		c.viewport.Width = m.Width
 		c.textarea.SetWidth(m.Width)
-		c.viewport.Height = m.Height - c.textarea.Height() - lipgloss.Height("┃ ")
+		c.viewport.Height = m.Height - c.textarea.Height() - 2
 		if c.activeChat != nil {
 			var sb strings.Builder
 			for _, message := range c.activeChat.Messages {
@@ -230,7 +230,7 @@ func (c ChatView) View() string {
 	if c.isProcessing {
 		sb.WriteString("\n" + c.spinner.View() + " Thinking... (Esc to cancel)")
 	} else {
-		instructions := "Type /help for commands"
+		instructions := "Type /help for commands, Arrows to navigate, Ctrl+C to exit."
 		sb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions))
 	}
 

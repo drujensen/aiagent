@@ -29,7 +29,7 @@ func NewAgentView(agentService services.AgentService) AgentView {
 	l.Title = "Available Agents"
 	l.SetShowStatusBar(false)
 	l.SetShowFilter(false)
-	l.SetShowPagination(false)
+	l.SetShowPagination(true)
 
 	return AgentView{
 		agentService: agentService,
@@ -81,13 +81,13 @@ func (v AgentView) Update(msg tea.Msg) (AgentView, tea.Cmd) {
 func (v AgentView) View() string {
 	var sb strings.Builder
 
-	if v.err != nil {
-		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Render("Error: "+v.err.Error()) + "\n")
-	}
-
 	instructions := "Use arrows or j/k to navigate, Esc to return to chat"
 	view := v.list.View() + "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions)
 	sb.WriteString(view)
+
+	if v.err != nil {
+		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Render("\nError: "+v.err.Error()) + "\n")
+	}
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(sb.String())
 }

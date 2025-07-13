@@ -56,11 +56,12 @@ func NewChatForm(chatService services.ChatService, agentService services.AgentSe
 	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("6")).Bold(true)
 	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("7"))
 	delegate.SetHeight(2)
+
 	agentsList := list.New(agentItems, delegate, 100, 10)
 	agentsList.Title = "Select an Agent"
 	agentsList.SetShowStatusBar(false)
 	agentsList.SetShowFilter(false)
-	agentsList.SetShowPagination(len(agents) > 10)
+	agentsList.SetShowPagination(true)
 
 	return ChatForm{
 		chatService: chatService,
@@ -109,6 +110,17 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 				c.agentsList.SetShowStatusBar(false)
 			}
 			return c, nil
+		case "shift+tab":
+			if c.focused == "name" {
+				c.focused = "list"
+				c.nameField.Blur()
+				c.agentsList.SetShowStatusBar(true)
+			} else {
+				c.focused = "name"
+				c.nameField.Focus()
+				c.agentsList.SetShowStatusBar(false)
+			}
+			return c, nil
 		case "enter":
 			if c.nameField.Value() == "" {
 				c.err = ErrEmptyChatName
@@ -120,16 +132,6 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 			}
 			selectedAgent := c.agentsList.SelectedItem().(*entities.Agent)
 			return c, createChatCmd(c.chatService, c.nameField.Value(), selectedAgent.ID)
-		case "j", "k":
-			if c.focused == "list" {
-				var cmd tea.Cmd
-				c.agentsList, cmd = c.agentsList.Update(msg)
-				if cmd != nil {
-					cmds = append(cmds, cmd)
-				}
-				return c, tea.Batch(cmds...)
-			}
-			// If name field is focused, pass to textinput
 		}
 	}
 
@@ -169,12 +171,12 @@ func (c ChatForm) View() string {
 	sb.WriteString("\n")
 
 	// Render instructions
-	instructions := "Press Enter to create chat, Tab to switch focus, Esc to cancel, Ctrl+C or q to quit"
+	instructions := "Press Enter to create chat, Tab to switch focus, Esc to cancel"
 	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions + "\n"))
 
 	// Render error if any
 	if c.err != nil {
-		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Render(fmt.Sprintf("Error: %s\n", c.err.Error())))
+		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Render(fmt.Sprintf("\nError: %s\n", c.err.Error())))
 	}
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(sb.String())
