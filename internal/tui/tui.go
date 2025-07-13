@@ -118,40 +118,24 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.Type {
 		case tea.KeyCtrlC:
 			return t, tea.Quit
-		default:
-			if t.state == "chat/view" {
-				var cmd tea.Cmd
-				t.chatView, cmd = t.chatView.Update(msg)
-				return t, cmd
-			} else if t.state == "chat/create" {
-				var cmd tea.Cmd
-				t.chatForm, cmd = t.chatForm.Update(msg)
-				return t, cmd
-			}
 		}
+
 	case errMsg:
 		fmt.Println("TUI: Received errMsg:", msg)
 		t.err = msg
 		return t, nil
-
-	// forward all other messages to the current view
-	default:
-		if t.state == "chat/view" {
-			var cmd tea.Cmd
-			t.chatView, cmd = t.chatView.Update(msg)
-			return t, cmd
-		} else if t.state == "chat/create" {
-			var cmd tea.Cmd
-			t.chatForm, cmd = t.chatForm.Update(msg)
-			return t, cmd
-		} else if t.state == "chat/history" {
-			var cmd tea.Cmd
-			t.historyView, cmd = t.historyView.Update(msg)
-			return t, cmd
-		}
 	}
 
-	return t, nil
+	var cmd tea.Cmd
+	switch t.state {
+	case "chat/view":
+		t.chatView, cmd = t.chatView.Update(msg)
+	case "chat/create":
+		t.chatForm, cmd = t.chatForm.Update(msg)
+	case "chat/history":
+		t.historyView, cmd = t.historyView.Update(msg)
+	}
+	return t, cmd
 }
 
 func (t TUI) View() string {
