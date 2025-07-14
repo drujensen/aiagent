@@ -1,12 +1,13 @@
 package tools
 
 import (
-	"github.com/drujensen/aiagent/internal/domain/entities"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/drujensen/aiagent/internal/domain/entities"
 
 	"go.uber.org/zap"
 )
@@ -76,7 +77,6 @@ func (t *ImageTool) Parameters() []entities.Parameter {
 
 func (t *ImageTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing image generation", zap.String("arguments", arguments))
-	fmt.Println("\rExecuting image generation", arguments)
 	var args struct {
 		Prompt string `json:"prompt"`
 		N      int    `json:"n"`

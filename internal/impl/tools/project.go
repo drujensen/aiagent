@@ -1,12 +1,13 @@
 package tools
 
 import (
-	"github.com/drujensen/aiagent/internal/domain/entities"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/drujensen/aiagent/internal/domain/entities"
 
 	"go.uber.org/zap"
 )
@@ -70,7 +71,6 @@ func (t *ProjectTool) Parameters() []entities.Parameter {
 
 func (t *ProjectTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing project tool", zap.String("arguments", arguments))
-	fmt.Println("\rExecuting project tool", arguments)
 
 	var args struct {
 		Operation string `json:"operation"`

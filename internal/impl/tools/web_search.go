@@ -82,7 +82,6 @@ func (t *WebSearchTool) Parameters() []entities.Parameter {
 func (t *WebSearchTool) Execute(arguments string) (string, error) {
 	// Log the search query
 	t.logger.Debug("Executing search", zap.String("arguments", arguments))
-	fmt.Println("\rExecuting search", arguments)
 
 	// Parse the arguments to extract the query
 	type args struct {

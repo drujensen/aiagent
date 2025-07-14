@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -38,6 +39,19 @@ func NewAgent(name, role string, providerID string, providerType ProviderType, e
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
+}
+
+// Implement the list.Item interface
+func (a *Agent) FilterValue() string {
+	return a.Name + " - " + a.Model
+}
+
+func (a *Agent) Title() string {
+	return a.Name
+}
+
+func (a *Agent) Description() string {
+	return fmt.Sprintf("Model: %s | Provider: %s", a.Model, a.ProviderType)
 }
 
 func (a *Agent) FullSystemPrompt() string {

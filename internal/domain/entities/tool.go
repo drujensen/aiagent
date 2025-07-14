@@ -50,3 +50,20 @@ type Tool interface {
 	Parameters() []Parameter
 	Execute(arguments string) (string, error)
 }
+
+// ToolItem wraps a Tool to implement bubbles/list.Item
+type ToolItem struct {
+	Tool ToolData
+}
+
+func (ti ToolItem) FilterValue() string {
+	return ti.Tool.Name
+}
+
+func (ti ToolItem) Title() string {
+	return ti.Tool.Name
+}
+
+func (ti ToolItem) Description() string {
+	return ti.Tool.Description
+}

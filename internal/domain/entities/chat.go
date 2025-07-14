@@ -60,3 +60,16 @@ func (c *Chat) UpdateUsage() {
 	c.Usage.TotalTokens = totalTokens
 	c.Usage.TotalCost = totalCost
 }
+
+// Implement list.Item interface for Bubble Tea
+func (c *Chat) FilterValue() string {
+	return c.Name
+}
+
+func (c *Chat) Title() string {
+	return c.Name
+}
+
+func (c *Chat) Description() string {
+	return c.CreatedAt.Format("2006-01-02 15:04")
+}

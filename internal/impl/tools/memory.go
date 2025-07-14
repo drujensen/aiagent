@@ -160,7 +160,6 @@ func (t *MemoryTool) Parameters() []entities.Parameter {
 
 func (t *MemoryTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing memory operation", zap.String("arguments", arguments))
-	fmt.Println("\rExecuting memory operation", arguments)
 
 	var args struct {
 		Operation    string           `json:"operation"`

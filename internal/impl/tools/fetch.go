@@ -1,13 +1,14 @@
 package tools
 
 import (
-	"github.com/drujensen/aiagent/internal/domain/entities"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/drujensen/aiagent/internal/domain/entities"
 
 	"go.uber.org/zap"
 )
@@ -103,7 +104,6 @@ func (t *FetchTool) Parameters() []entities.Parameter {
 
 func (t *FetchTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing fetch operation", zap.String("arguments", arguments))
-	fmt.Println("\rExecuting fetch operation", arguments)
 
 	var args struct {
 		Operation string   `json:"operation"`

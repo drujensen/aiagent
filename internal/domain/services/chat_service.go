@@ -19,6 +19,7 @@ import (
 type ChatService interface {
 	ListChats(ctx context.Context) ([]*entities.Chat, error)
 	GetChat(ctx context.Context, id string) (*entities.Chat, error)
+	GetActiveChat(ctx context.Context) (*entities.Chat, error)
 	SetActiveChat(ctx context.Context, chatID string) error
 	CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error)
 	UpdateChat(ctx context.Context, id, agentID, name string) (*entities.Chat, error)
@@ -100,6 +101,21 @@ func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*en
 	}
 
 	return chat, nil
+}
+
+func (s *chatService) GetActiveChat(ctx context.Context) (*entities.Chat, error) {
+	chats, err := s.chatRepo.ListChats(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, chat := range chats {
+		if chat.Active {
+			return chat, nil
+		}
+	}
+
+	return nil, errors.NotFoundErrorf("no active chat found")
 }
 
 func (s *chatService) SetActiveChat(ctx context.Context, chatID string) error {
