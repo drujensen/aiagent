@@ -34,8 +34,8 @@ jobs:
           GOOS=linux GOARCH=riscv64 go build -ldflags="$LDFLAGS" -o aiagent-linux-riscv64 main.go
           GOOS=darwin GOARCH=amd64 go build -ldflags="$LDFLAGS" -o aiagent-macos-x86_64 main.go
           GOOS=darwin GOARCH=arm64 go build -ldflags="$LDFLAGS" -o aiagent-macos-arm64 main.go
-          # GOOS=windows GOARCH=amd64 go build -ldflags="$LDFLAGS" -o aiagent-windows-x86_64.exe main.go
-          # GOOS=windows GOARCH=arm64 go build -ldflags="$LDFLAGS" -o aiagent-windows-arm64.exe main.go
+          GOOS=windows GOARCH=amd64 go build -ldflags="$LDFLAGS" -o aiagent-windows-x86_64.exe main.go
+          GOOS=windows GOARCH=arm64 go build -ldflags="$LDFLAGS" -o aiagent-windows-arm64.exe main.go
 
       - name: Upload binaries to release
         uses: softprops/action-gh-release@v1
@@ -46,5 +46,5 @@ jobs:
             aiagent-linux-riscv64
             aiagent-macos-x86_64
             aiagent-macos-arm64
-            # aiagent-windows-x86_64.exe
-            # aiagent-windows-arm64.exe
+            aiagent-windows-x86_64.exe
+            aiagent-windows-arm64.exe
