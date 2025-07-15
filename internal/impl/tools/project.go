@@ -85,7 +85,7 @@ func (t *ProjectTool) Parameters() []entities.Parameter {
 			Type:        "string",
 			Description: "Programming language to determine default file patterns (e.g., 'go', 'csharp')",
 			Required:    false,
-			Enum:        []string{"go", "csharp", "python", "javascript"},
+			Enum:        []string{"all", "shell", "assembly", "c", "cpp", "rust", "zig", "go", "csharp", "objective-c", "swift", "java", "kotlin", "clojure", "groovy", "lua", "elixir", "scala", "dart", "haskell", "javascript", "python", "ruby", "php", "perl", "r", "html", "stylesheet"},
 		},
 		{
 			Name:        "filters",
