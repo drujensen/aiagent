@@ -8,7 +8,6 @@ import (
 	"os"
 	"slices"
 
-	"github.com/drujensen/aiagent/internal/cli"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
 	"github.com/drujensen/aiagent/internal/domain/services"
 	"github.com/drujensen/aiagent/internal/impl/config"
@@ -148,16 +147,11 @@ func main() {
 		if err := uiApp.Run(); err != nil {
 			logger.Fatal("UI failed", zap.Error(err))
 		}
-	} else if modeStr == "tui" {
+	} else {
 		p := tea.NewProgram(tui.NewTUI(chatService, agentService, toolService), tea.WithAltScreen())
 
 		if _, err := p.Run(); err != nil {
 			log.Fatal(err)
-		}
-	} else {
-		cliApp := cli.NewCLI(chatService, agentService, toolService, providerService, logger)
-		if err := cliApp.Run(); err != nil {
-			logger.Fatal("CLI failed", zap.Error(err))
 		}
 	}
 }
