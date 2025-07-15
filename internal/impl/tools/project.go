@@ -208,10 +208,34 @@ Please update this file with relevant project information.
 
 func (t *ProjectTool) executeGetSource(workspace, language string, customFilters []string, maxFileSize int) (string, error) {
 	defaultFilters := map[string][]string{
-		"go":         {"**/*.go", "go.mod"},
-		"csharp":     {"**/*.cs", "**/*.csproj", "*.sln"},
-		"python":     {"**/*.py"},
-		"javascript": {"**/*.js", "**/*.ts", "package.json"},
+		"all":         {"**/*"},
+		"shell":       {"**/*.sh", "**/*.bash", "**.zsh", "**/*.pwsh"},
+		"assembly":    {"**/*.asm", "**/*.s"},
+		"c":           {"**/*.c", "**/*.h", "Makefile"},
+		"cpp":         {"**/*.cpp", "**/*.hpp", "**/*.h", "CMakeLists.txt"},
+		"rust":        {"**/*.rs", "Cargo.toml"},
+		"zig":         {"**/*.zig", "build.zig"},
+		"go":          {"**/*.go", "go.mod"},
+		"csharp":      {"**/*.cs", "**/*.csproj", "*.sln"},
+		"objective-c": {"**/*.m", "**/*.h"},
+		"swift":       {"**/*.swift", "Package.swift"},
+		"java":        {"**/*.java", "**/*.xml"},
+		"kotlin":      {"**/*.kt", "**/*.kts", "build.gradle.kts"},
+		"clojure":     {"**/*.clj", "**/*.cljs", "project.clj", "deps.edn"},
+		"groovy":      {"**/*.groovy", "build.gradle"},
+		"lua":         {"**/*.lua"},
+		"elixir":      {"**/*.ex", "**/*.exs", "mix.exs"},
+		"scala":       {"**/*.scala", "build.sbt"},
+		"dart":        {"**/*.dart", "pubspec.yaml"},
+		"haskell":     {"**/*.hs", "stack.yaml", "cabal.project"},
+		"javascript":  {"**/*.js", "**/*.ts", "package.json"},
+		"python":      {"**/*.py", "requirements.txt", "setup.py"},
+		"ruby":        {"**/*.rb", "Gemfile"},
+		"php":         {"**/*.php", "composer.json"},
+		"perl":        {"**/*.pl", "**/*.pm", "Makefile.PL"},
+		"r":           {"**/*.R", "**/*.r", "DESCRIPTION"},
+		"html":        {"**/*.html", "**/*.htm"},
+		"stylesheet":  {"**/*.css", "**/*.scss", "**/*.less"},
 	}
 
 	filters := customFilters
@@ -224,8 +248,7 @@ func (t *ProjectTool) executeGetSource(workspace, language string, customFilters
 				return "", fmt.Errorf("unsupported language: %s", language)
 			}
 		} else {
-			// Default to Go if no language specified
-			filters = defaultFilters["go"]
+			filters = defaultFilters["all"]
 		}
 	}
 
@@ -328,6 +351,11 @@ func buildDirectoryTree(root string) (string, error) {
 		if relPath == "." {
 			buf.WriteString(".\n")
 			return nil
+		}
+
+		// Skip .git directories
+		if strings.Contains(relPath, string(os.PathSeparator)+".git"+string(os.PathSeparator)) {
+			return filepath.SkipDir
 		}
 
 		depth := strings.Count(relPath, string(os.PathSeparator))
