@@ -38,6 +38,11 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 		activeChat = nil
 	}
 
+	initialState := "chat/view"
+	if activeChat == nil {
+		initialState = "chat/create"
+	}
+
 	return TUI{
 		chatService:  chatService,
 		agentService: agentService,
@@ -53,7 +58,7 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 		toolView:    NewToolView(toolService),
 		commandMenu: NewCommandMenu(),
 
-		state: "chat/view",
+		state: initialState,
 		err:   nil,
 	}
 }
@@ -81,9 +86,10 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.chatView.err = errors.New("New chat canceled")
 		if t.activeChat != nil {
 			t.chatView.SetActiveChat(t.activeChat)
+		} else {
+			return t, tea.Quit
 		}
-		return t, t.chatView.Init()
-
+		return t, nil
 	// Handle history view messages
 	case startHistoryMsg:
 		t.state = "chat/history"
@@ -156,6 +162,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Handle command menu messages
 	case startCommandsMsg:
 		t.state = "chat/commands"
+		t.commandMenu.list.ResetFilter()
 		return t, t.commandMenu.Init()
 
 	case executeCommandMsg:

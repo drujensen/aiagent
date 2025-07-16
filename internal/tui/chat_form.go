@@ -91,7 +91,7 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 		c.height = m.Height
 		nameFieldWidth := m.Width - 4
 		c.nameField.Width = nameFieldWidth
-		listHeight := m.Height - 6 // Adjust for borders and extra elements
+		listHeight := m.Height - 6
 		c.agentsList.SetSize(m.Width-4, listHeight)
 		return c, nil
 
