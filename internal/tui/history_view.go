@@ -57,9 +57,7 @@ func (h HistoryView) Update(msg tea.Msg) (HistoryView, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		h.width = m.Width
 		h.height = m.Height
-		// Adjust for borders/padding
-		listHeight := m.Height - 4
-		h.list.SetSize(m.Width-4, listHeight)
+		h.list.SetSize(m.Width-4, m.Height-4)
 		return h, nil
 
 	case tea.KeyMsg:
@@ -80,6 +78,11 @@ func (h HistoryView) Update(msg tea.Msg) (HistoryView, tea.Cmd) {
 }
 
 func (h HistoryView) View() string {
+
+	if h.width == 0 || h.height == 0 {
+		return ""
+	}
+
 	// Outer container style (Vim-like overall border)
 	outerStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.ThickBorder()).

@@ -57,6 +57,11 @@ func (u UsageView) Update(msg tea.Msg) (UsageView, tea.Cmd) {
 }
 
 func (u UsageView) View() string {
+
+	if u.width == 0 || u.height == 0 {
+		return ""
+	}
+
 	// Outer container style (Vim-like overall border)
 	outerStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.ThickBorder()).

@@ -64,7 +64,14 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 }
 
 func (t TUI) Init() tea.Cmd {
-	return nil
+	switch t.state {
+	case "chat/create":
+		return t.chatForm.Init()
+	case "chat/view":
+		return t.chatView.Init()
+	default:
+		return nil
+	}
 }
 
 func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -214,6 +221,24 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case errMsg:
 		t.err = msg
 		return t, nil
+
+	case tea.WindowSizeMsg:
+		t.chatView.width = msg.Width // Assuming you add width/height to ChatView struct (see note below)
+		t.chatView.height = msg.Height
+		t.chatForm.width = msg.Width
+		t.chatForm.height = msg.Height
+		t.historyView.width = msg.Width
+		t.historyView.height = msg.Height
+		t.usageView.width = msg.Width
+		t.usageView.height = msg.Height
+		t.helpView.width = msg.Width
+		t.helpView.height = msg.Height
+		t.agentView.width = msg.Width
+		t.agentView.height = msg.Height
+		t.toolView.width = msg.Width
+		t.toolView.height = msg.Height
+		t.commandMenu.width = msg.Width
+		t.commandMenu.height = msg.Height
 	}
 
 	var cmd tea.Cmd

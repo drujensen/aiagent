@@ -32,6 +32,8 @@ type ChatView struct {
 	isProcessing bool
 	startTime    time.Time
 	focused      string // "textarea" or "viewport"
+	width        int
+	height       int
 }
 
 func NewChatView(chatService services.ChatService, agentService services.AgentService, activeChat *entities.Chat) ChatView {
@@ -68,6 +70,8 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		systemStyle:  ss,
 		err:          nil,
 		focused:      "textarea",
+		width:        30,
+		height:       5,
 	}
 
 	if activeChat != nil {
@@ -211,9 +215,10 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		return c, nil
 
 	case tea.WindowSizeMsg:
-		// Account for outer border (2) and padding (2 left/right, 2 top/bottom)
-		innerWidth := m.Width - 4
-		innerHeight := m.Height - 4
+		c.width = m.Width
+		c.height = m.Height
+		innerWidth := c.width - 4
+		innerHeight := c.height - 4
 
 		c.viewport.Width = innerWidth
 		c.textarea.SetWidth(innerWidth)

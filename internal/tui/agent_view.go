@@ -46,9 +46,7 @@ func (v AgentView) Update(msg tea.Msg) (AgentView, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		v.width = m.Width
 		v.height = m.Height
-		// Adjust for borders/padding
-		listHeight := m.Height - 4
-		v.list.SetSize(m.Width-4, listHeight)
+		v.list.SetSize(m.Width-4, m.Height-4)
 		return v, nil
 
 	case tea.KeyMsg:
@@ -80,6 +78,11 @@ func (v AgentView) Update(msg tea.Msg) (AgentView, tea.Cmd) {
 }
 
 func (v AgentView) View() string {
+
+	if v.width == 0 || v.height == 0 {
+		return ""
+	}
+
 	// Outer container style (Vim-like overall border)
 	outerStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.ThickBorder()).

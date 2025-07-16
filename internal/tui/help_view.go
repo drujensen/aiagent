@@ -38,6 +38,11 @@ func (h HelpView) Update(msg tea.Msg) (HelpView, tea.Cmd) {
 }
 
 func (h HelpView) View() string {
+
+	if h.width == 0 || h.height == 0 {
+		return ""
+	}
+
 	// Help content (can be expanded as needed)
 	helpText := `AI Agent TUI Help
 

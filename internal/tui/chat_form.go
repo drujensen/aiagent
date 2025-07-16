@@ -91,8 +91,7 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 		c.height = m.Height
 		nameFieldWidth := m.Width - 4
 		c.nameField.Width = nameFieldWidth
-		listHeight := m.Height - 6
-		c.agentsList.SetSize(m.Width-4, listHeight)
+		c.agentsList.SetSize(m.Width-4, m.Height-4)
 		return c, nil
 
 	case tea.KeyMsg:
@@ -142,6 +141,11 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 }
 
 func (c ChatForm) View() string {
+
+	if c.width == 0 || c.height == 0 {
+		return ""
+	}
+
 	// Define border styles
 	focusedBorder := lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
