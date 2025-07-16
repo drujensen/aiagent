@@ -23,6 +23,7 @@ type TUI struct {
 	helpView    HelpView
 	agentView   AgentView
 	toolView    ToolView
+	commandMenu CommandMenu
 
 	state string
 	err   error
@@ -42,15 +43,18 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 		agentService: agentService,
 		toolService:  toolService,
 		activeChat:   activeChat,
-		chatView:     NewChatView(chatService, agentService, activeChat),
-		chatForm:     NewChatForm(chatService, agentService),
-		historyView:  NewHistoryView(chatService),
-		usageView:    NewUsageView(chatService, agentService),
-		helpView:     NewHelpView(),
-		agentView:    NewAgentView(agentService),
-		toolView:     NewToolView(toolService),
-		state:        "chat/view",
-		err:          nil,
+
+		chatView:    NewChatView(chatService, agentService, activeChat),
+		chatForm:    NewChatForm(chatService, agentService),
+		historyView: NewHistoryView(chatService),
+		usageView:   NewUsageView(chatService, agentService),
+		helpView:    NewHelpView(),
+		agentView:   NewAgentView(agentService),
+		toolView:    NewToolView(toolService),
+		commandMenu: NewCommandMenu(),
+
+		state: "chat/view",
+		err:   nil,
 	}
 }
 
@@ -149,6 +153,50 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return t, nil
 
+	// Handle command menu messages
+	case startCommandsMsg:
+		t.state = "chat/commands"
+		return t, t.commandMenu.Init()
+
+	case executeCommandMsg:
+		// Default back to chat view
+		t.state = "chat/view"
+		if t.activeChat != nil {
+			t.chatView.SetActiveChat(t.activeChat)
+		}
+
+		switch msg.command {
+		case "new":
+			t.state = "chat/create"
+			t.chatForm.SetChatName("") // No name provided
+			return t, t.chatForm.Init()
+		case "history":
+			t.state = "chat/history"
+			return t, t.historyView.Init()
+		case "agents":
+			t.state = "agents/list"
+			return t, t.agentView.Init()
+		case "tools":
+			t.state = "tools/list"
+			return t, t.toolView.Init()
+		case "usage":
+			t.state = "chat/usage"
+			return t, t.usageView.Init()
+		case "help":
+			t.state = "chat/help"
+			return t, t.helpView.Init()
+		case "exit":
+			return t, tea.Quit
+		}
+		return t, nil
+
+	case commandsCancelledMsg:
+		t.state = "chat/view"
+		if t.activeChat != nil {
+			t.chatView.SetActiveChat(t.activeChat)
+		}
+		return t, nil
+
 	// Handle global key messages and errors
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -177,6 +225,8 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.agentView, cmd = t.agentView.Update(msg)
 	case "tools/list":
 		t.toolView, cmd = t.toolView.Update(msg)
+	case "chat/commands":
+		t.commandMenu, cmd = t.commandMenu.Update(msg)
 	}
 	return t, cmd
 }
@@ -197,6 +247,8 @@ func (t TUI) View() string {
 		return t.agentView.View()
 	case "tools/list":
 		return t.toolView.View()
+	case "chat/commands":
+		return t.commandMenu.View()
 	}
 
 	return "Error: Invalid state"

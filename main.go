@@ -44,8 +44,8 @@ func main() {
 	// Preserve the flags by not calling flag.Parse() yet
 	flag.CommandLine.Parse([]string{})
 
-	// Default mode is "console"
-	modeStr := "console"
+	// Default mode is "tui"
+	modeStr := "tui"
 
 	// Check the first non-flag argument for the mode
 	if len(os.Args) > 1 && os.Args[1] == "serve" {

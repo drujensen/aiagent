@@ -39,7 +39,6 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	ta.Placeholder = "Type your message..."
 	ta.Focus()
 	ta.Prompt = "┃ "
-	ta.CharLimit = 280
 	ta.SetWidth(30)
 	ta.SetHeight(3)
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
@@ -123,38 +122,13 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			return c, tea.Quit
 		case "esc":
 			return c, nil
+		case "/":
+			if c.focused == "textarea" {
+				return c, func() tea.Msg { return startCommandsMsg{} }
+			}
 		case "enter":
 			if c.focused == "textarea" {
 				input := c.textarea.Value()
-				if strings.HasPrefix(input, "/new") {
-					name := strings.TrimSpace(strings.TrimPrefix(input, "/new"))
-					c.textarea.Reset()
-					return c, func() tea.Msg { return startCreateChatMsg(name) }
-				}
-				if input == "/history" {
-					c.textarea.Reset()
-					return c, func() tea.Msg { return startHistoryMsg{} }
-				}
-				if input == "/agents" {
-					c.textarea.Reset()
-					return c, func() tea.Msg { return startAgentsMsg{} }
-				}
-				if input == "/tools" {
-					c.textarea.Reset()
-					return c, func() tea.Msg { return startToolsMsg{} }
-				}
-				if input == "/usage" {
-					c.textarea.Reset()
-					return c, func() tea.Msg { return startUsageMsg{} }
-				}
-				if input == "/help" {
-					c.textarea.Reset()
-					return c, func() tea.Msg { return startHelpMsg{} }
-				}
-				if input == "/exit" {
-					return c, tea.Quit
-				}
-				// Normal message handling
 				if input == "" {
 					c.err = fmt.Errorf("message cannot be empty")
 					return c, nil
@@ -307,7 +281,7 @@ func (c ChatView) View() string {
 		elapsed := time.Since(c.startTime).Round(time.Second)
 		sb.WriteString("\n" + c.spinner.View() + fmt.Sprintf(" Thinking... (%ds)", int(elapsed.Seconds())))
 	} else {
-		instructions := "Type /help for commands, Tab to switch focus, j/k to navigate, Ctrl+C to exit."
+		instructions := "Press / for menu, Tab to switch focus, j/k to navigate, Ctrl+C to exit."
 		sb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions))
 	}
 

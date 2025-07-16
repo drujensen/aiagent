@@ -46,5 +46,10 @@ type (
 	toolsCancelledMsg struct{}
 )
 
-// messages for error handling
+type (
+	startCommandsMsg     struct{}
+	executeCommandMsg    struct{ command string }
+	commandsCancelledMsg struct{}
+)
+
 type errMsg error
