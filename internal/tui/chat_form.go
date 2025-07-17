@@ -89,9 +89,8 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		c.width = m.Width
 		c.height = m.Height
-		nameFieldWidth := m.Width - 4
-		c.nameField.Width = nameFieldWidth
-		c.agentsList.SetSize(m.Width-4, m.Height-4)
+		c.nameField.Width = c.width - 6
+		c.agentsList.SetSize(c.width-6, c.height-10)
 		return c, nil
 
 	case tea.KeyMsg:
@@ -160,15 +159,14 @@ func (c ChatForm) View() string {
 		BorderStyle(lipgloss.ThickBorder()).
 		BorderForeground(lipgloss.Color("4")). // Blue for outer border
 		Width(c.width - 2).
-		Height(c.height - 2).
-		Padding(1)
+		Height(c.height - 2)
 
 	var sb strings.Builder
 
 	// Render the name input field with border
-	nameFieldStyle := unfocusedBorder.Copy().Width(c.width - 4)
+	nameFieldStyle := unfocusedBorder.Width(c.width - 4).Height(1)
 	if c.focused == "name" {
-		nameFieldStyle = focusedBorder.Copy().Width(c.width - 4)
+		nameFieldStyle = focusedBorder.Width(c.width - 4).Height(1)
 	}
 	sb.WriteString("Chat Name:\n")
 	if c.focused == "name" {
@@ -176,12 +174,11 @@ func (c ChatForm) View() string {
 	} else {
 		sb.WriteString(nameFieldStyle.Render(lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(c.nameField.Value())))
 	}
-	sb.WriteString("\n\n")
 
 	// Render the agents list with border
-	listStyle := unfocusedBorder.Copy().Width(c.width - 4).Height(c.agentsList.Height())
+	listStyle := unfocusedBorder.Width(c.width - 4).Height(c.agentsList.Height())
 	if c.focused == "list" {
-		listStyle = focusedBorder.Copy().Width(c.width - 4).Height(c.agentsList.Height())
+		listStyle = focusedBorder.Width(c.width - 4).Height(c.agentsList.Height())
 	}
 	sb.WriteString(listStyle.Render(c.agentsList.View()))
 	sb.WriteString("\n")

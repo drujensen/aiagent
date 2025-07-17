@@ -15,8 +15,6 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/services"
 )
 
-const gap = "\n\n"
-
 type ChatView struct {
 	chatService  services.ChatService
 	agentService services.AgentService
@@ -223,8 +221,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		c.viewport.Width = innerWidth
 		c.textarea.SetWidth(innerWidth)
 
-		// Subtract textarea height (3), gap (2), instructions (1), possible error (1), and adjust for borders
-		c.viewport.Height = innerHeight - 3 - 2 - 1 - 1 - 2 // Extra adjustment to fit
+		// Subtract textarea height (3), instructions (1), possible error (1), and adjust for borders
+		c.viewport.Height = innerHeight - 3 - 1 - 1 - 2
 
 		if c.activeChat != nil {
 			var sb strings.Builder
@@ -260,25 +258,22 @@ func (c ChatView) View() string {
 	outerStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.ThickBorder()).
 		BorderForeground(lipgloss.Color("4")). // Blue for outer border
-		Width(c.viewport.Width + 4).           // Adjust for inner content
-		Height(c.viewport.Height + c.textarea.Height() + 6).
-		Padding(1)
+		Width(c.width - 2).
+		Height(c.height - 2)
 
 	var sb strings.Builder
 
 	// Style viewport
-	vpStyle := unfocusedBorder.Copy().Width(c.viewport.Width).Height(c.viewport.Height)
+	vpStyle := unfocusedBorder.Width(c.width - 4).Height(c.viewport.Height)
 	if c.focused == "viewport" {
-		vpStyle = focusedBorder.Copy().Width(c.viewport.Width).Height(c.viewport.Height)
+		vpStyle = focusedBorder.Width(c.width - 4).Height(c.viewport.Height)
 	}
 	sb.WriteString(vpStyle.Render(c.viewport.View()))
 
-	sb.WriteString(gap)
-
 	// Style textarea
-	taStyle := unfocusedBorder.Copy().Width(c.viewport.Width).Height(c.textarea.Height())
+	taStyle := unfocusedBorder.Width(c.width - 4).Height(c.textarea.Height())
 	if c.focused == "textarea" {
-		taStyle = focusedBorder.Copy().Width(c.viewport.Width).Height(c.textarea.Height())
+		taStyle = focusedBorder.Width(c.width - 4).Height(c.textarea.Height())
 	}
 	sb.WriteString(taStyle.Render(c.textarea.View()))
 

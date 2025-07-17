@@ -96,7 +96,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			return t, tea.Quit
 		}
-		return t, nil
+		return t, t.chatView.Init()
 	// Handle history view messages
 	case startHistoryMsg:
 		t.state = "chat/history"
@@ -223,7 +223,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t, nil
 
 	case tea.WindowSizeMsg:
-		t.chatView.width = msg.Width // Assuming you add width/height to ChatView struct (see note below)
+		t.chatView.width = msg.Width
 		t.chatView.height = msg.Height
 		t.chatForm.width = msg.Width
 		t.chatForm.height = msg.Height
