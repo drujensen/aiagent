@@ -219,10 +219,10 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		innerHeight := c.height - 4
 
 		c.viewport.Width = innerWidth
-		c.textarea.SetWidth(innerWidth)
-
 		// Subtract textarea height (3), instructions (1), possible error (1), and adjust for borders
 		c.viewport.Height = innerHeight - 3 - 1 - 1 - 2
+
+		c.textarea.SetWidth(innerWidth)
 
 		if c.activeChat != nil {
 			var sb strings.Builder
