@@ -28,7 +28,7 @@ func NewToolView(toolService services.ToolService) ToolView {
 	l := list.New([]list.Item{}, delegate, 100, 10)
 	l.Title = "Available Tools"
 	l.SetShowStatusBar(false)
-	l.SetShowFilter(false)
+	l.SetFilteringEnabled(true)
 	l.SetShowPagination(true)
 
 	return ToolView{

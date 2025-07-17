@@ -28,7 +28,7 @@ func NewAgentView(agentService services.AgentService) AgentView {
 	l := list.New([]list.Item{}, delegate, 100, 10)
 	l.Title = "Available Agents"
 	l.SetShowStatusBar(false)
-	l.SetShowFilter(false)
+	l.SetFilteringEnabled(true)
 	l.SetShowPagination(true)
 
 	return AgentView{

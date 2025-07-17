@@ -39,8 +39,8 @@ func NewHistoryView(chatService services.ChatService) HistoryView {
 	l := list.New(items, delegate, 100, 10)
 	l.Title = "Chat History"
 	l.SetShowStatusBar(false)
-	l.SetShowFilter(false)
-	l.SetShowPagination(len(chats) > 10)
+	l.SetFilteringEnabled(true)
+	l.SetShowPagination(true)
 
 	return HistoryView{
 		chatService: chatService,

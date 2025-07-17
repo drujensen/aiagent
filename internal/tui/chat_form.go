@@ -60,8 +60,8 @@ func NewChatForm(chatService services.ChatService, agentService services.AgentSe
 	agentsList := list.New(agentItems, delegate, 100, 10)
 	agentsList.Title = "Select an Agent"
 	agentsList.SetShowStatusBar(false)
-	agentsList.SetShowFilter(false)
-	agentsList.SetShowPagination(true)
+	agentsList.SetFilteringEnabled(true)
+	agentsList.SetShowPagination(false)
 
 	return ChatForm{
 		chatService: chatService,
