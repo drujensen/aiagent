@@ -59,7 +59,7 @@ func (m CommandMenu) Update(msg tea.Msg) (CommandMenu, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.list.SetSize(m.width-4, m.height-4)
+		m.list.SetSize(m.width-6, m.height-6)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -88,8 +88,7 @@ func (m CommandMenu) View() string {
 		BorderStyle(lipgloss.ThickBorder()).
 		BorderForeground(lipgloss.Color("4")).
 		Width(m.width - 2).
-		Height(m.height - 2).
-		Padding(1)
+		Height(m.height - 2)
 
 	innerBorder := lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).

@@ -67,15 +67,13 @@ func (u UsageView) View() string {
 		BorderStyle(lipgloss.ThickBorder()).
 		BorderForeground(lipgloss.Color("4")). // Blue for outer border
 		Width(u.width - 2).
-		Height(u.height - 2).
-		Padding(1)
+		Height(u.height - 2)
 
 	// Inner style for content (focused since single component)
 	innerStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("6")). // Bright cyan
-		Width(u.width-4).
-		Padding(1, 2)
+		Width(u.width - 4)
 
 	var sb strings.Builder
 

@@ -64,14 +64,16 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 }
 
 func (t TUI) Init() tea.Cmd {
-	switch t.state {
-	case "chat/create":
-		return t.chatForm.Init()
-	case "chat/view":
-		return t.chatView.Init()
-	default:
-		return nil
-	}
+	return tea.Batch(
+		t.chatForm.Init(),
+		t.chatView.Init(),
+		t.historyView.Init(),
+		t.usageView.Init(),
+		t.helpView.Init(),
+		t.agentView.Init(),
+		t.toolView.Init(),
+		t.commandMenu.Init(),
+	)
 }
 
 func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -223,22 +225,52 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t, nil
 
 	case tea.WindowSizeMsg:
-		t.chatView.width = msg.Width
-		t.chatView.height = msg.Height
-		t.chatForm.width = msg.Width
-		t.chatForm.height = msg.Height
-		t.historyView.width = msg.Width
-		t.historyView.height = msg.Height
-		t.usageView.width = msg.Width
-		t.usageView.height = msg.Height
-		t.helpView.width = msg.Width
-		t.helpView.height = msg.Height
-		t.agentView.width = msg.Width
-		t.agentView.height = msg.Height
-		t.toolView.width = msg.Width
-		t.toolView.height = msg.Height
-		t.commandMenu.width = msg.Width
-		t.commandMenu.height = msg.Height
+		var (
+			cmd  tea.Cmd
+			cmds []tea.Cmd
+		)
+
+		t.chatView, cmd = t.chatView.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+		t.chatForm, cmd = t.chatForm.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+		t.historyView, cmd = t.historyView.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+		t.usageView, cmd = t.usageView.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+		t.helpView, cmd = t.helpView.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+		t.agentView, cmd = t.agentView.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+		t.toolView, cmd = t.toolView.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+		t.commandMenu, cmd = t.commandMenu.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+		return t, tea.Batch(cmds...)
 	}
 
 	var cmd tea.Cmd

@@ -46,7 +46,7 @@ func (v ToolView) Update(msg tea.Msg) (ToolView, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		v.width = m.Width
 		v.height = m.Height
-		v.list.SetSize(m.Width-4, m.Height-4)
+		v.list.SetSize(m.Width-6, m.Height-6)
 		return v, nil
 
 	case tea.KeyMsg:
@@ -88,8 +88,7 @@ func (v ToolView) View() string {
 		BorderStyle(lipgloss.ThickBorder()).
 		BorderForeground(lipgloss.Color("4")). // Blue for outer border
 		Width(v.width - 2).
-		Height(v.height - 2).
-		Padding(1)
+		Height(v.height - 2)
 
 	// Inner border for list (always "focused" since single component)
 	innerBorder := lipgloss.NewStyle().
