@@ -399,9 +399,9 @@ func estimateTokens(msg *entities.Message) int {
 	return contentTokens + 4
 }
 
-// isSafeSplit checks if splitting at 'split' would leave no orphaned tool responses.
-// Returns true if no tool message after 'split' references a tool call before 'split'.
+// isSafeSplit checks if splitting at 'split' avoids both orphaned responses and unfinished calls.
 func isSafeSplit(messages []entities.Message, split int) bool {
+	// Collect all tool call IDs before split
 	toolCallIDsBefore := make(map[string]struct{})
 	for i := 0; i < split; i++ {
 		msg := messages[i]
@@ -411,14 +411,33 @@ func isSafeSplit(messages []entities.Message, split int) bool {
 			}
 		}
 	}
+
+	// Check for orphaned responses: tool after split referencing call before split
 	for i := split; i < len(messages); i++ {
 		msg := messages[i]
 		if msg.Role == "tool" {
 			if _, ok := toolCallIDsBefore[msg.ToolCallID]; ok {
-				return false
+				return false // Orphan response
 			}
 		}
 	}
+
+	// Collect all tool call IDs before split and check if they have responses before split
+	responseIDsBefore := make(map[string]struct{})
+	for i := 0; i < split; i++ {
+		msg := messages[i]
+		if msg.Role == "tool" {
+			responseIDsBefore[msg.ToolCallID] = struct{}{}
+		}
+	}
+
+	// Check for unfinished calls: call before split without response before split
+	for callID := range toolCallIDsBefore {
+		if _, ok := responseIDsBefore[callID]; !ok {
+			return false // Unfinished call
+		}
+	}
+
 	return true
 }
 
@@ -438,7 +457,7 @@ func (s *chatService) compressMessages(
 		numMessagesToKeep = 1 // Always keep at least the most recent message
 	}
 
-	// Split messages: older ones to summarize and recent ones to keep
+	// Tentative split point
 	summarizeEndIdx := len(chat.Messages) - numMessagesToKeep
 	if summarizeEndIdx < 1 {
 		summarizeEndIdx = 1 // Ensure we have at least one message to summarize
@@ -454,7 +473,8 @@ func (s *chatService) compressMessages(
 		}
 	}
 	if !safeFound {
-		return nil, false, fmt.Errorf("cannot safely compress without splitting tool pairs")
+		s.logger.Warn("No safe split point found; skipping compression to avoid unbalanced messages")
+		return nil, false, nil // Return nil to indicate skipping, no error
 	}
 
 	messagesToSummarize := chat.Messages[:summarizeEndIdx]
