@@ -399,6 +399,29 @@ func estimateTokens(msg *entities.Message) int {
 	return contentTokens + 4
 }
 
+// isSafeSplit checks if splitting at 'split' would leave no orphaned tool responses.
+// Returns true if no tool message after 'split' references a tool call before 'split'.
+func isSafeSplit(messages []entities.Message, split int) bool {
+	toolCallIDsBefore := make(map[string]struct{})
+	for i := 0; i < split; i++ {
+		msg := messages[i]
+		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
+			for _, tc := range msg.ToolCalls {
+				toolCallIDsBefore[tc.ID] = struct{}{}
+			}
+		}
+	}
+	for i := split; i < len(messages); i++ {
+		msg := messages[i]
+		if msg.Role == "tool" {
+			if _, ok := toolCallIDsBefore[msg.ToolCallID]; ok {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // compressMessages summarizes older messages to reduce token count while preserving context
 // Returns the compressed messages, a flag indicating if the chat messages were replaced, and any error
 func (s *chatService) compressMessages(
@@ -419,6 +442,19 @@ func (s *chatService) compressMessages(
 	summarizeEndIdx := len(chat.Messages) - numMessagesToKeep
 	if summarizeEndIdx < 1 {
 		summarizeEndIdx = 1 // Ensure we have at least one message to summarize
+	}
+
+	// Find the largest safe split point <= summarizeEndIdx
+	safeFound := false
+	for j := summarizeEndIdx; j >= 1; j-- { // Require at least 1 message to summarize
+		if isSafeSplit(chat.Messages, j) {
+			summarizeEndIdx = j
+			safeFound = true
+			break
+		}
+	}
+	if !safeFound {
+		return nil, false, fmt.Errorf("cannot safely compress without splitting tool pairs")
 	}
 
 	messagesToSummarize := chat.Messages[:summarizeEndIdx]
