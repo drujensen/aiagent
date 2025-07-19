@@ -69,6 +69,9 @@ func main() {
 
 	logConfig := zap.NewDevelopmentConfig()
 	logConfig.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
+	logConfig.OutputPaths = []string{".aiagent/aiagent.log"}
+	logConfig.ErrorOutputPaths = []string{".aiagent/aiagent.log"}
+
 	logger, err := logConfig.Build()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
