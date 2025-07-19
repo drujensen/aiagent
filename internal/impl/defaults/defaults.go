@@ -156,67 +156,68 @@ func DefaultProviders() []*entities.Provider {
 func DefaultAgents() []entities.Agent {
 	temperature := 1.0
 	systemPrompt := `
-### Introduction and Role
+You are an AI assistant that helps software developers accomplish tasks on a Linux command line. You have access to a Bash shell and common command-line tools, including ls, rg (ripgrep), tree, sed, find, git, as well as compiler tools like gcc, go, rustc, javac, and dotnet. The user will provide instructions in natural language related to software development, and your goal is to translate those instructions into a sequence of Bash commands that achieve the desired outcome.
 
-You are an interactive CLI tool that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
+**Important Guidelines:**
 
-### Memory
+- **Focus on the developer's intent:** Understand what the developer _wants_ to achieve in their development workflow, not just what they _say_ to do literally. This could involve code generation, compilation, testing, debugging, deployment, or file editing.
+- **Use the available tools effectively:** Choose the right tools for the job and combine them creatively to solve complex development problems. Prioritize using standard Bash tools for file manipulation.
+- **File Editing Strategy:** For file editing tasks, prioritize sed in conjunction with rg to locate the correct lines. Use rg to provide context and identify line numbers before using sed to modify the content. Consider using sed's -n (or --dry-run) option to preview changes before applying them.
+- **Version Control:** You have access to git. Before making any significant changes to a file, use git to create a commit or a temporary branch. This allows you to easily rollback the changes if something goes wrong.
+- **Break down complex tasks:** Divide the user's request into smaller, manageable steps. Consider common development workflows (e.g., edit -> compile -> test -> debug).
+- **Prioritize correctness:** Ensure that the generated commands are syntactically correct and logically sound. Pay close attention to compiler flags and language-specific syntax.
+- **Handle errors gracefully:** Anticipate potential errors during compilation, execution, or deployment and include error handling in your commands (e.g., using || and && to handle errors and check exit codes).
+- **Be concise:** Use the most efficient commands possible to achieve the desired result. Avoid unnecessary steps.
+- **Assume the current directory is the developer's workspace:** They can create, modify, and delete files and directories within this workspace.
+- **Ask clarifying questions:** If the user's request is ambiguous or incomplete, ask questions to gather more information before generating commands. For example, ask about the programming language, target platform, or specific dependencies.
+- **Explain your reasoning:** Before providing the commands, briefly explain your plan and the logic behind your approach. This helps the developer understand why you're suggesting those specific commands.
+- **Output format:** Present your response in a clear and organized manner, including both the explanation and the generated commands. Use Markdown formatting for readability. Use code blocks for commands.
 
-If the current working directory contains a AIAGENT.md file, it is added to context for:
+Example:
 
-1. Storing bash commands (e.g., build, test).
-2. Recording code style preferences.
-3. Maintaining codebase information.
+User: "Compile the main.c file using gcc and create an executable named my_program."
 
-Proactively ask users to add commands or preferences to AIAGENT.md for future reference.
+Assistant: "Okay, I will use gcc to compile main.c and create an executable named my_program. I will also include the -Wall flag to enable all warnings.
 
-### Tone and Style
+gcc -Wall main.c -o my_program
 
-- Be concise, direct, and to the point.
-- Use GitHub-flavored Markdown for formatting.
-- Output text for user communication; use tools only for tasks.
-- If unable to help, offer alternatives in 1-2 sentences without explanations.
-- Minimize tokens: Respond in 1-3 sentences or a short paragraph, fewer than 4 lines unless detailed.
-- Avoid unnecessary preamble or postamble (e.g., no "The answer is..." unless asked).
-- Examples of concise responses:
-	- User: "2 + 2" -> Assistant: "4"
-	- User: "Is 11 a prime number?" -> Assistant: "true"
+User: "Run all the go tests in the current directory"
 
-### Proactiveness
+Assistant: "Okay, I will use go test to run all tests in the current directory
 
-Be proactive only when directly asked. Balance actions with user confirmation. Do not explain code changes unless requested.
+go test ./...
 
-### Synthetic Messages
+User: "Change the variable name 'old_name' to 'new_name' in file 'my_file.txt'"
 
-Ignore system-added messages like "[Request interrupted by user]"; do not generate them.
+Assistant: "Okay, first I will create a git commit to allow for easy rollback. Then I will use sed with rg to replace all occurrences of 'old_name' with 'new_name' in 'my_file.txt'.
 
-### Following Conventions
-- Mimic existing code styles, libraries, and patterns.
-- Verify library availability before use.
-- Follow security best practices (e.g., never commit secrets).
-- Do not add comments to code unless requested.
+git commit -am "Backup before renaming variable"
+rg 'old_name' my_file.txt # Find the line numbers (optional)
+sed 's/old_name/new_name/g' my_file.txt
 
-### Doing Tasks
-
-For software engineering tasks (e.g., bugs, features):
-
-1. Use search tools to understand the codebase.
-2. Implement using available tools.
-3. Verify with tests; check for testing commands.
-4. Run lint and typecheck commands if available; suggest adding to AIAGENT.md.
-
-- Never commit changes unless explicitly asked.
-
-### Tool Usage Policy
-
-- Prefer Agent for open-ended searches.
-- Make independent tool calls in the same block.
-- Be concise in responses.
+Now, respond to the user's requests by generating the appropriate Bash commands."
 `
 	maxTokens := 8192
 	contextWindow := 131072
 	localSystemPrompt := `
-Help users with coding, debugging, and enhancing projects using tools like FileRead, FileWrite, Directory, Bash, and others. Be concise, proactive, and persistent: analyze tasks quickly, use tools to edit files, run commands, and iterate until success. Keep responses short, directly addressing queries without preamble.
+You are a helpful AI assistant for software developers using a Linux command line. Use Bash tools like ls, rg, sed, and git to accomplish tasks.
+
+Instructions:
+
+Understand the developer's goal.
+Use Bash tools efficiently. Prefer sed with rg for file editing.
+Use git to create commits before significant changes.
+Provide concise, correct Bash commands.
+Ask questions if unclear.
+Example:
+
+User: "List files." 
+Assistant:
+
+ls -l
+
+Now, respond to the user's requests.
+
 `
 	localMaxTokens := 4096
 	localContextWindow := 8192
@@ -235,7 +236,7 @@ Help users with coding, debugging, and enhancing projects using tools like FileR
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &contextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"FileSearch", "FileRead", "FileWrite", "Directory", "WebSearch", "Bash", "Git", "Go", "Python", "Node", "Project"},
+			Tools:           []string{"WebSearch", "Project", "Bash", "Rg", "Ls", "Cat", "Sed", "Find", "Tree", "Git", "Go", "Python", "Node", "Dotnet"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -252,7 +253,7 @@ Help users with coding, debugging, and enhancing projects using tools like FileR
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &contextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"FileSearch", "FileRead", "FileWrite", "Directory", "WebSearch", "Bash", "Git", "Go", "Python", "Node", "Project"},
+			Tools:           []string{"WebSearch", "Project", "Bash", "Rg", "Ls", "Cat", "Sed", "Find", "Tree", "Git", "Go", "Python", "Node", "Dotnet"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -269,7 +270,7 @@ Help users with coding, debugging, and enhancing projects using tools like FileR
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &contextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"FileSearch", "FileRead", "FileWrite", "Directory", "WebSearch", "Bash", "Git", "Go", "Python", "Node", "Project"},
+			Tools:           []string{"WebSearch", "Project", "Bash", "Rg", "Ls", "Cat", "Sed", "Find", "Tree", "Git", "Go", "Python", "Node", "Dotnet"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -286,7 +287,7 @@ Help users with coding, debugging, and enhancing projects using tools like FileR
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &contextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"FileSearch", "FileRead", "FileWrite", "Directory", "WebSearch", "Bash", "Git", "Go", "Python", "Node", "Project"},
+			Tools:           []string{"WebSearch", "Project", "Bash", "Rg", "Ls", "Cat", "Sed", "Find", "Tree", "Git", "Go", "Python", "Node", "Dotnet"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -303,7 +304,7 @@ Help users with coding, debugging, and enhancing projects using tools like FileR
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &contextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"FileSearch", "FileRead", "FileWrite", "Directory", "WebSearch", "Bash", "Git", "Go", "Python", "Node", "Project"},
+			Tools:           []string{"WebSearch", "Project", "Bash", "Rg", "Ls", "Cat", "Sed", "Find", "Tree", "Git", "Go", "Python", "Node", "Dotnet"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -320,7 +321,7 @@ Help users with coding, debugging, and enhancing projects using tools like FileR
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &contextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"FileSearch", "FileRead", "FileWrite", "Directory", "WebSearch", "Bash", "Git", "Go", "Python", "Node", "Project"},
+			Tools:           []string{"WebSearch", "Project", "Bash", "Rg", "Ls", "Cat", "Sed", "Find", "Tree", "Git", "Go", "Python", "Node", "Dotnet"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -337,7 +338,7 @@ Help users with coding, debugging, and enhancing projects using tools like FileR
 			MaxTokens:       &localMaxTokens,
 			ContextWindow:   &localContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"FileSearch", "FileRead", "FileWrite", "Directory", "WebSearch", "Bash", "Git", "Go", "Python", "Node", "Project"},
+			Tools:           []string{"WebSearch", "Project", "Bash", "Rg", "Ls", "Cat", "Sed", "Find", "Tree", "Git", "Go", "Python", "Node", "Dotnet"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -354,7 +355,7 @@ Help users with coding, debugging, and enhancing projects using tools like FileR
 			MaxTokens:       &localMaxTokens,
 			ContextWindow:   &localContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"FileSearch", "FileRead", "FileWrite", "Directory", "WebSearch", "Bash", "Git", "Go", "Python", "Node", "Project"},
+			Tools:           []string{"WebSearch", "Project", "Bash", "Rg", "Ls", "Cat", "Sed", "Find", "Tree", "Git", "Go", "Python", "Node", "Dotnet"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -371,7 +372,7 @@ Help users with coding, debugging, and enhancing projects using tools like FileR
 			MaxTokens:       &localMaxTokens,
 			ContextWindow:   &localContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"FileSearch", "FileRead", "FileWrite", "Directory", "WebSearch", "Bash", "Git", "Go", "Python", "Node", "Project"},
+			Tools:           []string{"WebSearch", "Project", "Bash", "Rg", "Ls", "Cat", "Sed", "Find", "Tree", "Git", "Go", "Python", "Node", "Dotnet"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -380,51 +381,26 @@ Help users with coding, debugging, and enhancing projects using tools like FileR
 
 // DefaultTools returns the default list of tools.
 func DefaultTools() []*entities.ToolData {
+	now := time.Now()
+
 	return []*entities.ToolData{
-		{
-			ID:            "0087206E-C4C2-4954-AE55-6D820C696306",
-			ToolType:      "FileSearch",
-			Name:          "FileSearch",
-			Description:   "This tool provides the ability to search for text in files. The workspace directory is prepended to any file paths specified.",
-			Configuration: map[string]string{},
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
-		},
-		{
-			ID:            "436F6B15-D874-4498-A243-A4711D09FB66",
-			ToolType:      "FileRead",
-			Name:          "FileRead",
-			Description:   "This tool provides the ability to read files. The workspace directory is prepended to any file paths specified.",
-			Configuration: map[string]string{},
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
-		},
-		{
-			ID:            "9F7A3B2C-5E8D-4C9A-B1D2-3E4F5A6B7C8D",
-			ToolType:      "FileWrite",
-			Name:          "FileWrite",
-			Description:   "This tool provides file writing and modification operations, including overwriting, editing, inserting, and deleting content in files. The workspace directory is prepended to any file paths specified.",
-			Configuration: map[string]string{},
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
-		},
-		{
-			ID:            "2A8C9D3E-7F1B-4E2C-A3F4-5B6C7D8E9F0A",
-			ToolType:      "Directory",
-			Name:          "Directory",
-			Description:   "This tool provides directory operations, including listing directory contents, building directory trees, creating and moving directories. The workspace directory is prepended to any paths specified.",
-			Configuration: map[string]string{},
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
-		},
 		{
 			ID:            "501A9EC8-633A-4BD2-91BF-8744B7DC34EC",
 			ToolType:      "WebSearch",
 			Name:          "WebSearch",
 			Description:   "This tool searches the web using the Tavily API.",
 			Configuration: map[string]string{"tavily_api_key": "#{TAVILY_API_KEY}#"},
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+		{
+			ID:            "8C2DBDF3-790C-472D-A8EB-F679EB0F887B",
+			ToolType:      "Project",
+			Name:          "Project",
+			Description:   "This tool reads project details from a configurable markdown file to provide context for AI agents. The AIAGENT.md file should contain a project description.",
+			Configuration: map[string]string{"project_file": "AIAGENT.md"},
+			CreatedAt:     now,
+			UpdatedAt:     now,
 		},
 		{
 			ID:            "AE3E4944-253D-4188-BEB0-F370A6F9DC6F",
@@ -432,71 +408,125 @@ func DefaultTools() []*entities.ToolData {
 			Name:          "Bash",
 			Description:   "This tool executes a bash command with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory.",
 			Configuration: map[string]string{},
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+		{
+			ID:            "2D22D358-51A7-432D-851F-4E7198084BB5",
+			ToolType:      "Process",
+			Name:          "Rg",
+			Description:   "Searches files for a regex pattern. Very fast, respects .gitignore, ignores hidden files. The command is executed in the workspace directory. The 'arguments' argument should be provided.",
+			Configuration: map[string]string{"command": "rg"},
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+		{
+			ID:            "7A37A146-1B79-481F-B84A-154875A3407C",
+			ToolType:      "Process",
+			Name:          "Ls",
+			Description:   "Lists directory contents (files and directories). The path to list is provided as the 'arguments' argument. If no path is provided, the current directory is listed. The command is executed in the workspace directory.",
+			Configuration: map[string]string{"command": "ls"},
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+		{
+			ID:            "8B998247-D72A-4D57-B1C3-4E39277F6719",
+			ToolType:      "Process",
+			Name:          "Cat",
+			Description:   "Displays the contents of a file. Provide the full path to the file as the 'arguments' argument. The command is executed in the workspace directory.",
+			Configuration: map[string]string{"command": "cat"},
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+		{
+			ID:            "36589423-7144-4D9C-9A06-A4179DD94849",
+			ToolType:      "Process",
+			Name:          "Sed",
+			Description:   "Stream editor for text transformations. Use to substitute text, delete lines, and perform other editing operations on files. Provide the full command, including the filename, as the 'arguments' argument. The command is executed in the workspace directory.",
+			Configuration: map[string]string{"command": "sed"},
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+		{
+			ID:            "4E169241-1227-47A9-909F-34D40657A6A9",
+			ToolType:      "Process",
+			Name:          "Find",
+			Description:   "Searches for files based on criteria like name, type, size, and modification time within a directory hierarchy. Provide the full command, including the search path, as the 'arguments' argument. The command is executed in the workspace directory.",
+			Configuration: map[string]string{"command": "find"},
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+		{
+			ID:            "961B2F87-00B7-40B9-A70B-4327918D398A",
+			ToolType:      "Process",
+			Name:          "Tree",
+			Description:   "Displays the directory structure in a hierarchical tree format. Provide the path to display as the 'arguments' argument. If no path is provided, the current directory is displayed. The command is executed in the workspace directory.",
+			Configuration: map[string]string{"command": "tree"},
+			CreatedAt:     now,
+			UpdatedAt:     now,
 		},
 		{
 			ID:            "4EA3F4A2-EFCD-4E9A-A5F8-4DFFAFB018E7",
 			ToolType:      "Process",
 			Name:          "Git",
-			Description:   "This tool executes a configured CLI command with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory. The extraArgs are prepended with the arguments passed to the tool.",
+			Description:   "Executes git commands. Use this for version control operations. Provide the git command and arguments as a single string. The command is executed in the workspace directory.",
 			Configuration: map[string]string{"command": "git"},
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
+			CreatedAt:     now,
+			UpdatedAt:     now,
 		},
 		{
 			ID:            "8C4E1573-59D9-463B-AF5F-1EA7620F469D",
 			ToolType:      "Process",
 			Name:          "Go",
-			Description:   "This tool executes a configured CLI command with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory. The extraArgs are prepended with the arguments passed to the tool.",
+			Description:   "Executes Go commands. Use this to build, test, and run Go programs. Provide the go command and arguments as a single string. The command is executed in the workspace directory.",
 			Configuration: map[string]string{"command": "go"},
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
+			CreatedAt:     now,
+			UpdatedAt:     now,
 		},
 		{
 			ID:            "50A77E90-D6D3-410C-A7B4-6A3E5E58253E",
 			ToolType:      "Process",
 			Name:          "Python",
-			Description:   "This tool executes a configured CLI command with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory. The extraArgs are prepended with the arguments passed to the tool.",
+			Description:   "Executes Python commands. Use this to run Python scripts or execute Python code. Provide the python command and arguments as a single string. The command is executed in the workspace directory.",
 			Configuration: map[string]string{"command": "python"},
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
+			CreatedAt:     now,
+			UpdatedAt:     now,
 		},
 		{
 			ID:            "382EE72F-68A2-41C2-B2B6-1F729324BCEC",
 			ToolType:      "Process",
 			Name:          "Node",
-			Description:   "This tool executes a configured CLI command with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory. The extraArgs are prepended with the arguments passed to the tool.",
+			Description:   "Executes Node.js commands. Use this to run JavaScript files or execute Node.js code. Provide the node command and arguments as a single string. The command is executed in the workspace directory.",
 			Configuration: map[string]string{"command": "node"},
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+		{
+			ID:            "3D596BD2-BB1E-4D4A-8254-F08AC5D75BEA",
+			ToolType:      "Process",
+			Name:          "Dotnet",
+			Description:   "Executes Dotnet commands. Use this to work with Dotnet projects. Provide the dotnet command and arguments as a single string. The command is executed in the workspace directory.",
+			Configuration: map[string]string{"command": "node"},
+			CreatedAt:     now,
+			UpdatedAt:     now,
 		},
 		{
 			ID:            "A8370999-C6F2-4D4E-9C57-CBD5056F85E3",
 			ToolType:      "Image",
 			Name:          "Image",
-			Description:   "This tool generates images using AI providers like XAI or OpenAI.",
+			Description:   "Generates images using AI providers like XAI or OpenAI. Provide a detailed text prompt describing the desired image.",
 			Configuration: map[string]string{"provider": "xai", "api_key": "#{XAI_API_KEY}#"},
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
+			CreatedAt:     now,
+			UpdatedAt:     now,
 		},
 		{
 			ID:            "70523B6A-18CD-4EE2-8661-4782EBD34A0F",
 			ToolType:      "Vision",
 			Name:          "Vision",
-			Description:   "This tool provides image understanding capabilities using providers like XAI or OpenAI, allowing processing of images via base64 or URLs combined with text prompts.",
+			Description:   "Provides image understanding capabilities using providers like XAI or OpenAI, allowing processing of images via base64 or URLs combined with text prompts. Provide a detailed text prompt and either the image path or URL.",
 			Configuration: map[string]string{"provider": "xai", "api_key": "#{XAI_API_KEY}#"},
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
-		},
-		{
-			ID:            "8C2DBDF3-790C-472D-A8EB-F679EB0F887B",
-			ToolType:      "Project",
-			Name:          "Project",
-			Description:   "This tool reads project details from a configurable markdown file to provide context for AI agents.",
-			Configuration: map[string]string{"project_file": "AIAGENT.md"},
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
+			CreatedAt:     now,
+			UpdatedAt:     now,
 		},
 	}
 }

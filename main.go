@@ -69,8 +69,18 @@ func main() {
 
 	logConfig := zap.NewDevelopmentConfig()
 	logConfig.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
-	logConfig.OutputPaths = []string{".aiagent/aiagent.log"}
-	logConfig.ErrorOutputPaths = []string{".aiagent/aiagent.log"}
+	if modeStr == "tui" {
+		mkdirErr := os.MkdirAll(".aiagent", 0755)
+		if mkdirErr != nil {
+			fmt.Fprintf(os.Stderr, "Failed to create .aiagent directory: %v\n", mkdirErr)
+			os.Exit(1)
+		}
+		logConfig.OutputPaths = []string{".aiagent/aiagent.log"}
+		logConfig.ErrorOutputPaths = []string{".aiagent/aiagent.log"}
+	} else {
+		logConfig.OutputPaths = []string{"stdout"}
+		logConfig.ErrorOutputPaths = []string{"stderr"}
+	}
 
 	logger, err := logConfig.Build()
 	if err != nil {
