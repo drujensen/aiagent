@@ -46,7 +46,6 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	ta.KeyMap.InsertNewline.SetEnabled(false)
 
 	vp := viewport.New(30, 5)
-	vp.SetContent(`How can I help you today?`)
 
 	us := lipgloss.NewStyle().Foreground(lipgloss.Color("5"))
 	as := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
@@ -268,7 +267,31 @@ func (c ChatView) View() string {
 	if c.focused == "viewport" {
 		vpStyle = focusedBorder.Width(c.width - 4).Height(c.viewport.Height)
 	}
-	sb.WriteString(vpStyle.Render(c.viewport.View()))
+
+	// Check if activeChat is nil OR has no messages
+	if c.activeChat == nil || len(c.activeChat.Messages) == 0 {
+		c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render("How can I help you today?"))
+
+		sb.WriteString(vpStyle.Render(c.viewport.View()))
+
+	} else {
+		// Display chat messages
+		var chatContent strings.Builder
+		for _, message := range c.activeChat.Messages {
+			if message.Role == "user" {
+				chatContent.WriteString(c.userStyle.Render("User: ") + message.Content + "\n")
+			} else if message.Role == "assistant" {
+				chatContent.WriteString(c.asstStyle.Render("Assistant: ") + message.Content + "\n")
+			} else {
+				chatContent.WriteString(c.systemStyle.Render("System: Tool Called") + "\n")
+			}
+		}
+
+		//Set the viewport to contain the chat messages
+		c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render(chatContent.String()))
+
+		sb.WriteString(vpStyle.Render(c.viewport.View()))
+	}
 
 	// Style textarea
 	taStyle := unfocusedBorder.Width(c.width - 4).Height(c.textarea.Height())
