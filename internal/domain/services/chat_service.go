@@ -13,6 +13,7 @@ import (
 	"github.com/drujensen/aiagent/internal/impl/integrations"
 
 	"github.com/google/uuid"
+	"github.com/pkoukk/tiktoken-go"
 	"go.uber.org/zap"
 )
 
@@ -393,10 +394,15 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 	return nil, errors.InternalErrorf("no AI response generated")
 }
 
-// estimateTokens approximates the token count for a message.
 func estimateTokens(msg *entities.Message) int {
-	contentTokens := (len(msg.Content) + 3) / 4
-	return contentTokens + 4
+	enc, err := tiktoken.EncodingForModel("gpt-4")
+	if err != nil {
+		return 0
+	}
+
+	tokens := enc.Encode(msg.Content, nil, nil)
+
+	return len(tokens)
 }
 
 // isSafeSplit checks if splitting at 'split' avoids both orphaned responses and unfinished calls.
