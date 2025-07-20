@@ -220,9 +220,9 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return t, tea.Quit
 		}
 
-	case errMsg:
-		t.err = msg
-		return t, nil
+	// case errMsg:
+	//   t.err = msg
+	//   return t, nil
 
 	case tea.WindowSizeMsg:
 		var (
