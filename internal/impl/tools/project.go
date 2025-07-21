@@ -11,7 +11,12 @@ import (
 	"strings"
 
 	treesitter "github.com/smacker/go-tree-sitter"
-	"github.com/smacker/go-tree-sitter/golang" // Add more language imports as needed, e.g., import python "github.com/smacker/go-tree-sitter/python"
+	"github.com/smacker/go-tree-sitter/csharp"
+	"github.com/smacker/go-tree-sitter/golang"
+	"github.com/smacker/go-tree-sitter/javascript"
+	"github.com/smacker/go-tree-sitter/python"
+	"github.com/smacker/go-tree-sitter/ruby"
+	"github.com/smacker/go-tree-sitter/typescript/typescript"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
 
@@ -67,6 +72,8 @@ func (t *ProjectTool) FullDescription() string {
 	b.WriteString("- csharp: **/*.cs, **/*.csproj, *.sln\n")
 	b.WriteString("- python: **/*.py\n")
 	b.WriteString("- javascript: **/*.js, **/*.ts, package.json\n")
+	b.WriteString("- typescript: **/*.ts, **/*.tsx, package.json\n")
+	b.WriteString("- ruby: **/*.rb, Gemfile\n")
 	b.WriteString("\n## Configuration\n")
 	b.WriteString("| Key           | Value         |\n")
 	b.WriteString("|---------------|---------------|\n")
@@ -90,7 +97,7 @@ func (t *ProjectTool) Parameters() []entities.Parameter {
 			Type:        "string",
 			Description: "Programming language to determine default file patterns and parsing (e.g., 'go', 'csharp')",
 			Required:    false,
-			Enum:        []string{"all", "shell", "assembly", "c", "cpp", "rust", "zig", "go", "csharp", "objective-c", "swift", "java", "kotlin", "clojure", "groovy", "lua", "elixir", "scala", "dart", "haskell", "javascript", "python", "ruby", "php", "perl", "r", "html", "stylesheet"},
+			Enum:        []string{"all", "shell", "assembly", "c", "cpp", "rust", "zig", "go", "csharp", "objective-c", "swift", "java", "kotlin", "clojure", "groovy", "lua", "elixir", "scala", "dart", "haskell", "javascript", "typescript", "python", "ruby", "php", "perl", "r", "html", "stylesheet"},
 		},
 		{
 			Name:        "filters",
@@ -236,6 +243,7 @@ func (t *ProjectTool) executeGetSource(workspace, language string, customFilters
 		"dart":        {"**/*.dart", "pubspec.yaml"},
 		"haskell":     {"**/*.hs", "stack.yaml", "cabal.project"},
 		"javascript":  {"**/*.js", "**/*.ts", "package.json"},
+		"typescript":  {"**/*.ts", "**/*.tsx", "package.json"},
 		"python":      {"**/*.py", "requirements.txt", "setup.py"},
 		"ruby":        {"**/*.rb", "Gemfile"},
 		"php":         {"**/*.php", "composer.json"},
@@ -362,11 +370,12 @@ func (t *ProjectTool) executeGetStructure(workspace, language string, customFilt
 		"clojure":     {"**/*.clj", "**/*.cljs", "project.clj", "deps.edn"},
 		"groovy":      {"**/*.groovy", "build.gradle"},
 		"lua":         {"**/*.lua"},
-		"elixir":      {"**/*.ex", "**/*.exs", "mix.exs"},
+		"elixir":      {"**/*.ex", "** Tayyip.exs", "mix.exs"},
 		"scala":       {"**/*.scala", "build.sbt"},
 		"dart":        {"**/*.dart", "pubspec.yaml"},
 		"haskell":     {"**/*.hs", "stack.yaml", "cabal.project"},
 		"javascript":  {"**/*.js", "**/*.ts", "package.json"},
+		"typescript":  {"**/*.ts", "**/*.tsx", "package.json"},
 		"python":      {"**/*.py", "requirements.txt", "setup.py"},
 		"ruby":        {"**/*.rb", "Gemfile"},
 		"php":         {"**/*.php", "composer.json"},
@@ -536,10 +545,12 @@ type CodeEntity struct {
 
 // Map of language names to Tree-sitter language objects
 var languageMap = map[string]*treesitter.Language{
-	"go": golang.GetLanguage(),
-	// Add more: "python": python.GetLanguage(),
-	// "javascript": javascript.GetLanguage(),
-	// etc.
+	"go":         golang.GetLanguage(),
+	"csharp":     csharp.GetLanguage(),
+	"javascript": javascript.GetLanguage(),
+	"typescript": typescript.GetLanguage(),
+	"python":     python.GetLanguage(),
+	"ruby":       ruby.GetLanguage(),
 }
 
 // Map of language to tags query (copy from tree-sitter-<lang>/queries/tags.scm)
@@ -556,8 +567,65 @@ var tagsQueries = map[string]string{
   (var_spec name: (identifier) @definition.var))
 (const_declaration
   (const_spec name: (identifier) @definition.var))
-	`, // Full query: https://github.com/tree-sitter/tree-sitter-go/blob/master/queries/tags.scm
-	// Add for other languages, e.g., "python": `(class_definition name: (identifier) @definition.class) (function_definition name: (identifier) @definition.function) ...`
+	`,
+	"csharp": `
+(class_declaration
+  name: (identifier) @definition.class)
+(interface_declaration
+  name: (identifier) @definition.interface)
+(struct_declaration
+  name: (identifier) @definition.struct)
+(enum_declaration
+  name: (identifier) @definition.enum)
+(method_declaration
+  name: (identifier) @definition.method)
+(property_declaration
+  name: (identifier) @definition.property)
+(field_declaration
+  (variable_declaration
+    (variable_declarator
+      name: (identifier) @definition.field)))
+	`,
+	"javascript": `
+(function_declaration
+  name: (identifier) @definition.function)
+(method_definition
+  name: (property_identifier) @definition.method)
+(class_declaration
+  name: (identifier) @definition.class)
+(variable_declarator
+  name: (identifier) @definition.var)
+	`,
+	"typescript": `
+(function_declaration
+  name: (identifier) @definition.function)
+(method_definition
+  name: (property_identifier) @definition.method)
+(class_declaration
+  name: (type_identifier) @definition.class)
+(interface_declaration
+  name: (type_identifier) @definition.interface)
+(type_alias_declaration
+  name: (type_identifier) @definition.type)
+(variable_declarator
+  name: (identifier) @definition.var)
+	`,
+	"python": `
+(class_definition
+  name: (identifier) @definition.class)
+(function_definition
+  name: (identifier) @definition.function)
+	`,
+	"ruby": `
+(class
+  name: (constant) @definition.class)
+(module
+  name: (constant) @definition.module)
+(method
+  name: (identifier) @definition.method)
+(singleton_method
+  name: (identifier) @definition.method)
+	`,
 }
 
 // extractStructure parses the content and extracts structure using Tree-sitter
@@ -629,6 +697,16 @@ func extractImports(language string, tree *treesitter.Tree, content string) ([]s
 	switch language {
 	case "go":
 		queryStr = `(import_spec path: (package_identifier) @name)`
+	case "csharp":
+		queryStr = `(using_directive (qualified_name) @name)`
+	case "javascript", "typescript":
+		queryStr = `(import_declaration source: (string (string_fragment) @name))`
+	case "python":
+		queryStr = `
+(import_statement name: (dotted_name) @name)
+(import_from_statement module_name: (dotted_name) @name)`
+	case "ruby":
+		queryStr = `(call method: (identifier) @method (#eq? @method "require") receiver: (constant)? argument: (string (string_content) @name))`
 	default:
 		return nil, nil // Add support for other languages
 	}
