@@ -68,7 +68,7 @@ func main() {
 	}
 
 	logConfig := zap.NewDevelopmentConfig()
-	logConfig.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
+	logConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	if modeStr == "tui" {
 		mkdirErr := os.MkdirAll(".aiagent", 0755)
 		if mkdirErr != nil {

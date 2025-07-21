@@ -229,7 +229,7 @@ func (t *ProjectTool) executeGetSource(workspace, language string, customFilters
 		"cpp":         {"**/*.cpp", "**/*.hpp", "**/*.h", "CMakeLists.txt"},
 		"rust":        {"**/*.rs", "Cargo.toml"},
 		"zig":         {"**/*.zig", "build.zig"},
-		"go":          {"**/*.go", "go.mod"},
+		"go":          {"**/*.go"},
 		"csharp":      {"**/*.cs", "**/*.csproj", "*.sln"},
 		"objective-c": {"**/*.m", "**/*.h"},
 		"swift":       {"**/*.swift", "Package.swift"},
@@ -354,35 +354,33 @@ func (t *ProjectTool) executeGetSource(workspace, language string, customFilters
 
 func (t *ProjectTool) executeGetStructure(workspace, language string, customFilters []string, maxFileSize int) (string, error) {
 	defaultFilters := map[string][]string{
-		"all":         {"**/*"},
-		"shell":       {"**/*.sh", "**/*.bash", "**.zsh", "**/*.pwsh"},
-		"assembly":    {"**/*.asm", "**/*.s"},
-		"c":           {"**/*.c", "**/*.h", "Makefile"},
-		"cpp":         {"**/*.cpp", "**/*.hpp", "**/*.h", "CMakeLists.txt"},
-		"rust":        {"**/*.rs", "Cargo.toml"},
-		"zig":         {"**/*.zig", "build.zig"},
-		"go":          {"**/*.go", "go.mod"},
-		"csharp":      {"**/*.cs", "**/*.csproj", "*.sln"},
-		"objective-c": {"**/*.m", "**/*.h"},
-		"swift":       {"**/*.swift", "Package.swift"},
-		"java":        {"**/*.java", "**/*.xml"},
-		"kotlin":      {"**/*.kt", "**/*.kts", "build.gradle.kts"},
-		"clojure":     {"**/*.clj", "**/*.cljs", "project.clj", "deps.edn"},
-		"groovy":      {"**/*.groovy", "build.gradle"},
-		"lua":         {"**/*.lua"},
-		"elixir":      {"**/*.ex", "** Tayyip.exs", "mix.exs"},
-		"scala":       {"**/*.scala", "build.sbt"},
-		"dart":        {"**/*.dart", "pubspec.yaml"},
-		"haskell":     {"**/*.hs", "stack.yaml", "cabal.project"},
-		"javascript":  {"**/*.js", "**/*.ts", "package.json"},
-		"typescript":  {"**/*.ts", "**/*.tsx", "package.json"},
-		"python":      {"**/*.py", "requirements.txt", "setup.py"},
-		"ruby":        {"**/*.rb", "Gemfile"},
-		"php":         {"**/*.php", "composer.json"},
-		"perl":        {"**/*.pl", "**/*.pm", "Makefile.PL"},
-		"r":           {"**/*.R", "**/*.r", "DESCRIPTION"},
-		"html":        {"**/*.html", "**/*.htm"},
-		"stylesheet":  {"**/*.css", "**/*.scss", "**/*.less"},
+		"all":        {"**/*"},
+		"assembly":   {"**/*.asm", "**/*.s"},
+		"c":          {"**/*.c", "**/*.h"},
+		"cpp":        {"**/*.cpp", "**/*.hpp", "**/*.h"},
+		"rust":       {"**/*.rs"},
+		"zig":        {"**/*.zig", "build.zig"},
+		"go":         {"**/*.go"},
+		"csharp":     {"**/*.cs"},
+		"swift":      {"**/*.swift", "Package.swift"},
+		"java":       {"**/*.java"},
+		"kotlin":     {"**/*.kt", "**/*.kts"},
+		"clojure":    {"**/*.clj", "**/*.cljs"},
+		"groovy":     {"**/*.groovy"},
+		"lua":        {"**/*.lua"},
+		"elixir":     {"**/*.ex"},
+		"scala":      {"**/*.scala"},
+		"dart":       {"**/*.dart"},
+		"haskell":    {"**/*.hs"},
+		"javascript": {"**/*.js"},
+		"typescript": {"**/*.ts", "**/*.tsx"},
+		"python":     {"**/*.py"},
+		"ruby":       {"**/*.rb"},
+		"php":        {"**/*.php"},
+		"perl":       {"**/*.pl"},
+		"r":          {"**/*.R"},
+		"html":       {"**/*.html", "**/*.htm"},
+		"stylesheet": {"**/*.css", "**/*.scss", "**/*.less"},
 	}
 
 	filters := customFilters
@@ -465,6 +463,7 @@ func (t *ProjectTool) executeGetStructure(workspace, language string, customFilt
 		// Extract structure
 		structure, err := extractStructure(language, content)
 		if err != nil {
+			t.logger.Error("Failed to extract structure", zap.String("path", relPath), zap.String("language", language), zap.Error(err))
 			structures[relPath] = Structure{Error: err.Error()}
 			continue
 		}
@@ -645,7 +644,7 @@ func extractStructure(language, content string) (Structure, error) {
 	// Extract imports (example for Go; customize per language)
 	imports, err := extractImports(language, tree, content)
 	if err != nil {
-		return Structure{}, err
+		imports = nil
 	}
 
 	// Extract entities using tags query
