@@ -14,6 +14,7 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/services"
 	"github.com/drujensen/aiagent/internal/impl/tools"
 
+	_ "github.com/drujensen/aiagent/internal/api"
 	apicontrollers "github.com/drujensen/aiagent/internal/api/controllers"
 	uiapicontrollers "github.com/drujensen/aiagent/internal/ui/controllers"
 

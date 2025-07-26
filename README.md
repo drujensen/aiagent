@@ -9,7 +9,7 @@ AIAgent is an open-source framework for building and interacting with AI agents.
 
 ## Features
 
-- **Multi-Mode Interfaces**: 
+- **Multi-Mode Interfaces**:
   - Interactive Terminal User Interface (TUI) using Bubble Tea for console-based interactions.
   - Web server mode with a modern UI for browser access.
 - **AI Provider Integrations**: Seamless support for OpenAI, Anthropic, Google, DeepSeek, Ollama, Groq, Mistral, Together, and xAI, with easy extensibility for more.
@@ -40,6 +40,15 @@ cd aiagent
 go build -o aiagent main.go
 ```
 
+To generate Swagger API documentation:
+
+```bash
+go install github.com/swaggo/swag/cmd/swag@latest
+swag init --dir ./internal/api --output ./internal/api
+```
+
+This generates `docs.go`, `swagger.json`, and `swagger.yaml` in the `internal/api` directory, which are used to serve the Swagger UI at `http://localhost:8080/swagger/index.html` when running in web server mode.
+
 ### Using Docker
 
 Copy `.env.example` to `.env` and configure as needed. Then:
@@ -68,7 +77,7 @@ Run the web server:
 aiagent serve [--storage=file|mongo]
 ```
 
-Access at `http://localhost:8080` for a browser-based experience.
+Access at `http://localhost:8080` for a browser-based experience, including the Swagger UI at `http://localhost:8080/swagger/index.html`.
 
 ### Examples
 
