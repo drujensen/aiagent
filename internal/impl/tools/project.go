@@ -222,35 +222,33 @@ Please update this file with relevant project information.
 
 func (t *ProjectTool) executeGetSource(workspace, language string, customFilters []string, maxFileSize int) (string, error) {
 	defaultFilters := map[string][]string{
-		"all":         {"**/*"},
-		"shell":       {"**/*.sh", "**/*.bash", "**.zsh", "**/*.pwsh"},
-		"assembly":    {"**/*.asm", "**/*.s"},
-		"c":           {"**/*.c", "**/*.h", "Makefile"},
-		"cpp":         {"**/*.cpp", "**/*.hpp", "**/*.h", "CMakeLists.txt"},
-		"rust":        {"**/*.rs", "Cargo.toml"},
-		"zig":         {"**/*.zig", "build.zig"},
-		"go":          {"**/*.go"},
-		"csharp":      {"**/*.cs", "**/*.csproj", "*.sln"},
-		"objective-c": {"**/*.m", "**/*.h"},
-		"swift":       {"**/*.swift", "Package.swift"},
-		"java":        {"**/*.java", "**/*.xml"},
-		"kotlin":      {"**/*.kt", "**/*.kts", "build.gradle.kts"},
-		"clojure":     {"**/*.clj", "**/*.cljs", "project.clj", "deps.edn"},
-		"groovy":      {"**/*.groovy", "build.gradle"},
-		"lua":         {"**/*.lua"},
-		"elixir":      {"**/*.ex", "**/*.exs", "mix.exs"},
-		"scala":       {"**/*.scala", "build.sbt"},
-		"dart":        {"**/*.dart", "pubspec.yaml"},
-		"haskell":     {"**/*.hs", "stack.yaml", "cabal.project"},
-		"javascript":  {"**/*.js", "**/*.ts", "package.json"},
-		"typescript":  {"**/*.ts", "**/*.tsx", "package.json"},
-		"python":      {"**/*.py", "requirements.txt", "setup.py"},
-		"ruby":        {"**/*.rb", "Gemfile"},
-		"php":         {"**/*.php", "composer.json"},
-		"perl":        {"**/*.pl", "**/*.pm", "Makefile.PL"},
-		"r":           {"**/*.R", "**/*.r", "DESCRIPTION"},
-		"html":        {"**/*.html", "**/*.htm"},
-		"stylesheet":  {"**/*.css", "**/*.scss", "**/*.less"},
+		"all":        {"**/*"},
+		"shell":      {"**/*.sh", "**/*.bash", "**.zsh", "**/*.pwsh"},
+		"assembly":   {"**/*.asm", "**/*.s"},
+		"c":          {"**/*.c", "**/*.h", "Makefile"},
+		"cpp":        {"**/*.cpp", "**/*.hpp", "**/*.h", "CMakeLists.txt"},
+		"rust":       {"**/*.rs", "Cargo.toml"},
+		"zig":        {"**/*.zig", "build.zig"},
+		"go":         {"**/*.go"},
+		"csharp":     {"**/*.cs", "**/*.csproj", "*.sln"},
+		"swift":      {"**/*.swift", "Package.swift"},
+		"java":       {"**/*.java", "**/*.xml"},
+		"kotlin":     {"**/*.kt", "**/*.kts", "build.gradle.kts"},
+		"clojure":    {"**/*.clj", "**/*.cljs", "project.clj", "deps.edn"},
+		"lua":        {"**/*.lua"},
+		"elixir":     {"**/*.ex", "**/*.exs", "mix.exs"},
+		"scala":      {"**/*.scala", "build.sbt"},
+		"dart":       {"**/*.dart", "pubspec.yaml"},
+		"haskell":    {"**/*.hs", "stack.yaml", "cabal.project"},
+		"javascript": {"**/*.js", "**/*.ts", "package.json"},
+		"typescript": {"**/*.ts", "**/*.tsx", "package.json"},
+		"python":     {"**/*.py", "requirements.txt", "setup.py"},
+		"ruby":       {"**/*.rb", "Gemfile"},
+		"php":        {"**/*.php", "composer.json"},
+		"perl":       {"**/*.pl", "**/*.pm", "Makefile.PL"},
+		"r":          {"**/*.R", "**/*.r", "DESCRIPTION"},
+		"html":       {"**/*.html", "**/*.htm"},
+		"stylesheet": {"**/*.css", "**/*.scss", "**/*.less"},
 	}
 
 	filters := customFilters
@@ -366,7 +364,6 @@ func (t *ProjectTool) executeGetStructure(workspace, language string, customFilt
 		"java":       {"**/*.java"},
 		"kotlin":     {"**/*.kt", "**/*.kts"},
 		"clojure":    {"**/*.clj", "**/*.cljs"},
-		"groovy":     {"**/*.groovy"},
 		"lua":        {"**/*.lua"},
 		"elixir":     {"**/*.ex"},
 		"scala":      {"**/*.scala"},
@@ -555,17 +552,18 @@ var languageMap = map[string]*treesitter.Language{
 // Map of language to tags query (copy from tree-sitter-<lang>/queries/tags.scm)
 var tagsQueries = map[string]string{
 	"go": `
-(function_declaration
-  name: (identifier) @definition.function)
-(method_declaration
-  name: (field_identifier) @definition.method)
-(type_declaration
-  (type_spec
-    name: (type_identifier) @definition.type))
-(var_declaration
-  (var_spec name: (identifier) @definition.var))
-(const_declaration
-  (const_spec name: (identifier) @definition.var))
+(source_file
+  (package_clause
+   (package_identifier) @package)
+   (function_declaration
+     name: (identifier) @definition.function))
+
+(source_file
+  (package_clause
+   (package_identifier) @package)
+   (type_declaration
+     (type_spec
+       name: (type_identifier) @definition.type)))
 	`,
 	"csharp": `
 (class_declaration
