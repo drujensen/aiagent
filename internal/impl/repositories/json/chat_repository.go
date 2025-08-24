@@ -6,10 +6,11 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
-	"github.com/drujensen/aiagent/internal/domain/errs"
+	errors "github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
 
 	"github.com/google/uuid"
@@ -95,6 +96,12 @@ func (r *JsonChatRepository) ListChats(ctx context.Context) ([]*entities.Chat, e
 			UpdatedAt: c.UpdatedAt,
 		}
 	}
+
+	// Sort chatsCopy by UpdatedAt in descending order
+	sort.Slice(chatsCopy, func(i, j int) bool {
+		return chatsCopy[i].UpdatedAt.Before(chatsCopy[j].UpdatedAt)
+	})
+
 	return chatsCopy, nil
 }
 

@@ -5,11 +5,12 @@ import (
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
-	"github.com/drujensen/aiagent/internal/domain/errs"
+	errors "github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type MongoChatRepository struct {
@@ -24,7 +25,11 @@ func NewMongoChatRepository(collection *mongo.Collection) *MongoChatRepository {
 
 func (r *MongoChatRepository) ListChats(ctx context.Context) ([]*entities.Chat, error) {
 	var chats []*entities.Chat
-	cursor, err := r.collection.Find(ctx, bson.M{})
+
+	// Define the sort order
+	sortOption := options.Find().SetSort(bson.D{{Key: "updated_at", Value: 1}})
+
+	cursor, err := r.collection.Find(ctx, bson.M{}, sortOption)
 	if err != nil {
 		return nil, errors.InternalErrorf("failed to list chats: %v", err)
 	}
