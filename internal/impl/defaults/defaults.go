@@ -205,7 +205,7 @@ Help users with coding, debugging, and enhancing projects leveraging the tools p
 `
 	localMaxTokens := 4096
 	localContextWindow := 8192
-	tools := []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Bash", "Rg", "Find", "Tree", "Git", "Go", "Python", "Node", "Ruby", "Dotnet"}
+	tools := []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Process"}
 
 	return []entities.Agent{
 		{
@@ -414,93 +414,13 @@ func DefaultTools() []*entities.ToolData {
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		},
+
 		{
 			ID:            "AE3E4944-253D-4188-BEB0-F370A6F9DC6F",
-			ToolType:      "Bash",
-			Name:          "Bash",
-			Description:   "This tool executes a bash command with support for background processes, timeouts, and full output.\n\nThe command is executed in the workspace directory.",
-			Configuration: map[string]string{},
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		},
-		{
-			ID:            "2D22D358-51A7-432D-851F-4E7198084BB5",
 			ToolType:      "Process",
-			Name:          "Rg",
-			Description:   "Searches files for a regex pattern. Very fast, respects .gitignore, ignores hidden files. The command is executed in the workspace directory. The 'arguments' argument should be provided.",
-			Configuration: map[string]string{"command": "rg"},
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		},
-		{
-			ID:            "4E169241-1227-47A9-909F-34D40657A6A9",
-			ToolType:      "Process",
-			Name:          "Find",
-			Description:   "Searches for files based on criteria like name, type, size, and modification time within a directory hierarchy. Provide the full command, including the search path, as the 'arguments' argument. The command is executed in the workspace directory.",
-			Configuration: map[string]string{"command": "find"},
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		},
-		{
-			ID:            "961B2F87-00B7-40B9-A70B-4327918D398A",
-			ToolType:      "Process",
-			Name:          "Tree",
-			Description:   "Displays the directory structure in a hierarchical tree format. Provide the path to display as the 'arguments' argument. If no path is provided, the current directory is displayed. The command is executed in the workspace directory.",
-			Configuration: map[string]string{"command": "tree"},
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		},
-		{
-			ID:            "4EA3F4A2-EFCD-4E9A-A5F8-4DFFAFB018E7",
-			ToolType:      "Process",
-			Name:          "Git",
-			Description:   "Executes git commands. Use this for version control operations. Provide the git command and arguments as a single string. The command is executed in the workspace directory.",
-			Configuration: map[string]string{"command": "git"},
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		},
-		{
-			ID:            "8C4E1573-59D9-463B-AF5F-1EA7620F469D",
-			ToolType:      "Process",
-			Name:          "Go",
-			Description:   "Executes Go commands. Use this to build, test, and run Go programs. Provide the go command and arguments as a single string. The command is executed in the workspace directory.",
-			Configuration: map[string]string{"command": "go"},
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		},
-		{
-			ID:            "50A77E90-D6D3-410C-A7B4-6A3E5E58253E",
-			ToolType:      "Process",
-			Name:          "Python",
-			Description:   "Executes Python. Use this to run Python scripts or execute Python code. Provide the python command and arguments as a single string. The command is executed in the workspace directory.",
-			Configuration: map[string]string{"command": "python"},
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		},
-		{
-			ID:            "5CCC1A23-081C-4DDC-BBEC-7A877C749825",
-			ToolType:      "Process",
-			Name:          "Ruby",
-			Description:   "Executes Ruby. Use this to run Python scripts or execute Ruby code. Provide the python command and arguments as a single string. The command is executed in the workspace directory.",
-			Configuration: map[string]string{"command": "ruby"},
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		},
-		{
-			ID:            "382EE72F-68A2-41C2-B2B6-1F729324BCEC",
-			ToolType:      "Process",
-			Name:          "Node",
-			Description:   "Executes Node.js commands. Use this to run JavaScript files or execute Node.js code. Provide the node command and arguments as a single string. The command is executed in the workspace directory.",
-			Configuration: map[string]string{"command": "node"},
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		},
-		{
-			ID:            "3D596BD2-BB1E-4D4A-8254-F08AC5D75BEA",
-			ToolType:      "Process",
-			Name:          "Dotnet",
-			Description:   "Executes Dotnet commands. Use this to work with Dotnet projects. Provide the dotnet command and arguments as a single string. The command is executed in the workspace directory.",
-			Configuration: map[string]string{"command": "dotnet"},
+			Name:          "Process",
+			Description:   "Executes any command (e.g., python, ruby, node, git) with support for background processes, stdin/stdout/stderr interaction, timeouts, and full output. Can launch interactive environments like Python REPL or Ruby IRB by running in background and using write/read actions. The command is executed in the workspace directory.",
+			Configuration: map[string]string{"workspace": ""},
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		},

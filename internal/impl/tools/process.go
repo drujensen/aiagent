@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -15,12 +17,21 @@ import (
 	"go.uber.org/zap"
 )
 
+type ProcessInfo struct {
+	Cmd          *exec.Cmd
+	Stdin        io.WriteCloser
+	Stdout       io.ReadCloser
+	Stderr       io.ReadCloser
+	StdoutBuffer *bytes.Buffer
+	StderrBuffer *bytes.Buffer
+}
+
 type ProcessTool struct {
 	name          string
 	description   string
-	configuration map[string]string // Includes "command" (e.g., "git"), "workspace", and "extraArgs"
+	configuration map[string]string // Includes "workspace"
 	logger        *zap.Logger
-	processes     map[int]*exec.Cmd // Track background processes by PID
+	processes     map[int]*ProcessInfo // Track background processes by PID
 }
 
 func NewProcessTool(name, description string, configuration map[string]string, logger *zap.Logger) *ProcessTool {
@@ -29,7 +40,7 @@ func NewProcessTool(name, description string, configuration map[string]string, l
 		description:   description,
 		configuration: configuration,
 		logger:        logger,
-		processes:     make(map[int]*exec.Cmd),
+		processes:     make(map[int]*ProcessInfo),
 	}
 }
 
@@ -72,9 +83,21 @@ func (t *ProcessTool) FullDescription() string {
 func (t *ProcessTool) Parameters() []entities.Parameter {
 	return []entities.Parameter{
 		{
-			Name:        "arguments",
+			Name:        "command",
 			Type:        "string",
-			Description: "Arguments to pass to the configured command (e.g., 'clone https://github.com/repo')",
+			Description: "The full command to execute (e.g., 'git clone https://github.com/repo')",
+			Required:    true,
+		},
+		{
+			Name:        "shell",
+			Type:        "boolean",
+			Description: "Run the command through the OS default shell to inherit PATH and environment",
+			Required:    false,
+		},
+		{
+			Name:        "input",
+			Type:        "string",
+			Description: "Input data to send to the process's stdin",
 			Required:    false,
 		},
 		{
@@ -107,8 +130,8 @@ func (t *ProcessTool) Parameters() []entities.Parameter {
 		{
 			Name:        "action",
 			Type:        "string",
-			Enum:        []string{"run", "status", "kill"},
-			Description: "Action to perform: run (default), status (check PID), or kill (stop PID)",
+			Enum:        []string{"run", "write", "read", "status", "kill"},
+			Description: "Action to perform: run (default), write (send to stdin), read (read from stdout/stderr), status (check PID), or kill (stop PID)",
 			Required:    false,
 		},
 	}
@@ -122,7 +145,9 @@ type ProcessResponse struct {
 }
 
 type ProcessArgs struct {
-	Arguments  string   `json:"arguments"`
+	Command    string   `json:"command"`
+	Shell      bool     `json:"shell"`
+	Input      string   `json:"input"`
 	Background bool     `json:"background"`
 	Timeout    int      `json:"timeout"`
 	Env        []string `json:"env"`
@@ -137,12 +162,6 @@ func (t *ProcessTool) Execute(arguments string) (string, error) {
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
 		return "", err
-	}
-
-	baseCommand := t.configuration["command"]
-	if baseCommand == "" {
-		t.logger.Error("Base command not specified in configuration")
-		return "", fmt.Errorf("base command not specified in configuration")
 	}
 
 	workspace := t.configuration["workspace"]
@@ -160,11 +179,15 @@ func (t *ProcessTool) Execute(arguments string) (string, error) {
 
 	switch args.Action {
 	case "run":
-		results, err := t.runCommand(baseCommand, args, workspace)
+		results, err := t.runCommand(args, workspace)
 		if len(results) > 16384 {
 			results = results[:16384] + "...truncated"
 		}
 		return results, err
+	case "write":
+		return t.writeToProcess(args)
+	case "read":
+		return t.readFromProcess(args)
 	case "status":
 		return t.checkStatus(args.PID)
 	case "kill":
@@ -234,129 +257,171 @@ func splitShellArgs(input string) []string {
 	return args
 }
 
-func (t *ProcessTool) runCommand(baseCommand string, args ProcessArgs, workspace string) (string, error) {
-	// Initialize command arguments
-	var cmdArgs []string
-
-	// Add extraArgs from configuration if present
-	if extraArgs, exists := t.configuration["extraArgs"]; exists && extraArgs != "" {
-		extraArgsParsed := splitShellArgs(extraArgs)
-		cmdArgs = append(cmdArgs, extraArgsParsed...)
+func (t *ProcessTool) runCommand(args ProcessArgs, workspace string) (string, error) {
+	// Parse full command if not shell mode
+	var cmd *exec.Cmd
+	cmdArgs := splitShellArgs(args.Command)
+	if args.Shell {
+		var shell, flag string
+		if runtime.GOOS == "windows" {
+			shell = "pwsh"
+			flag = "-Command"
+		} else {
+			shell = "bash"
+			flag = "-c"
+		}
+		cmd = exec.Command(shell, flag, args.Command)
+	} else {
+		if len(cmdArgs) == 0 {
+			return "", fmt.Errorf("no command specified")
+		}
+		cmd = exec.Command(cmdArgs[0], cmdArgs[1:]...)
 	}
-
-	// Append arguments from ProcessArgs if provided
-	if args.Arguments != "" {
-		parsedArgs := splitShellArgs(args.Arguments)
-		cmdArgs = append(cmdArgs, parsedArgs...)
-	}
-
-	// Create the command with the base command and combined arguments
-	cmd := exec.Command(baseCommand, cmdArgs...)
 	cmd.Dir = workspace
 	cmd.Env = append(os.Environ(), args.Env...)
 
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-
 	if args.Background {
-		err := cmd.Start()
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			return "", err
+		}
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return "", err
+		}
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			return "", err
+		}
+		err = cmd.Start()
 		if err != nil {
 			t.logger.Error("Failed to start background command",
-				zap.String("command", baseCommand),
+				zap.String("command", args.Command),
 				zap.Strings("arguments", cmdArgs),
 				zap.Error(err))
 			return "", err
 		}
 		pid := cmd.Process.Pid
-		t.processes[pid] = cmd
+		pi := &ProcessInfo{
+			Cmd:          cmd,
+			Stdin:        stdin,
+			Stdout:       stdout,
+			Stderr:       stderr,
+			StdoutBuffer: &bytes.Buffer{},
+			StderrBuffer: &bytes.Buffer{},
+		}
+		go io.Copy(pi.StdoutBuffer, stdout)
+		go io.Copy(pi.StderrBuffer, stderr)
+		t.processes[pid] = pi
 		t.logger.Info("Background command started",
-			zap.String("command", baseCommand),
+			zap.String("command", args.Command),
 			zap.Strings("arguments", cmdArgs),
 			zap.Int("pid", pid))
+		if args.Input != "" {
+			_, err = io.WriteString(stdin, args.Input+"\n")
+			if err != nil {
+				t.logger.Warn("Failed to write initial input", zap.Error(err))
+			}
+		}
 		resp := ProcessResponse{
 			Stdout: "Command started in background",
 			PID:    pid,
 			Status: "running",
 		}
 		return t.toJSON(resp)
-	}
-
-	if args.Timeout == 0 {
-		args.Timeout = 30 // Default timeout of 30 seconds
-	}
-
-	if args.Timeout > 0 {
-		timer := time.NewTimer(time.Duration(args.Timeout) * time.Second)
-		defer timer.Stop()
-
-		errChan := make(chan error, 1)
-		go func() {
-			errChan <- cmd.Run()
-		}()
-
-		select {
-		case err := <-errChan:
+	} else {
+		var out bytes.Buffer
+		var stderr bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &stderr
+		if args.Input != "" {
+			stdin, err := cmd.StdinPipe()
 			if err != nil {
-				t.logger.Error("Command execution failed",
-					zap.String("command", baseCommand),
-					zap.Strings("arguments", cmdArgs),
-					zap.Error(err),
-					zap.String("stdout", out.String()),
-					zap.String("stderr", stderr.String()))
+				return "", err
+			}
+			go func() {
+				defer stdin.Close()
+				io.WriteString(stdin, args.Input+"\n")
+			}()
+		}
+
+		if args.Timeout == 0 {
+			args.Timeout = 30 // Default timeout of 30 seconds
+		}
+
+		if args.Timeout > 0 {
+			timer := time.NewTimer(time.Duration(args.Timeout) * time.Second)
+			defer timer.Stop()
+
+			errChan := make(chan error, 1)
+			go func() {
+				errChan <- cmd.Run()
+			}()
+
+			select {
+			case err := <-errChan:
+				if err != nil {
+					t.logger.Error("Command execution failed",
+						zap.String("command", args.Command),
+						zap.Strings("arguments", cmdArgs),
+						zap.Error(err),
+						zap.String("stdout", out.String()),
+						zap.String("stderr", stderr.String()))
+					resp := ProcessResponse{
+						Stdout: out.String(),
+						Stderr: stderr.String(),
+						Status: "failed",
+					}
+					return t.toJSON(resp)
+				}
 				resp := ProcessResponse{
 					Stdout: out.String(),
 					Stderr: stderr.String(),
-					Status: "failed",
+					Status: "completed",
+				}
+				t.logger.Info("Command executed successfully",
+					zap.String("command", args.Command),
+					zap.Strings("arguments", cmdArgs))
+				return t.toJSON(resp)
+			case <-timer.C:
+				if cmd.Process != nil {
+					cmd.Process.Kill()
+				}
+				t.logger.Warn("Command timed out",
+					zap.String("command", args.Command),
+					zap.Strings("arguments", cmdArgs),
+					zap.Int("timeout", args.Timeout))
+				resp := ProcessResponse{
+					Stdout: out.String(),
+					Stderr: stderr.String(),
+					Status: "timeout",
 				}
 				return t.toJSON(resp)
 			}
-			resp := ProcessResponse{
-				Stdout: out.String(),
-				Stderr: stderr.String(),
-				Status: "completed",
-			}
-			t.logger.Info("Command executed successfully",
-				zap.String("command", baseCommand),
-				zap.Strings("arguments", cmdArgs))
-			return t.toJSON(resp)
-		case <-timer.C:
-			if cmd.Process != nil {
-				cmd.Process.Kill()
-			}
-			t.logger.Warn("Command timed out",
-				zap.String("command", baseCommand),
-				zap.Strings("arguments", cmdArgs),
-				zap.Int("timeout", args.Timeout))
-			resp := ProcessResponse{
-				Stdout: out.String(),
-				Stderr: stderr.String(),
-				Status: "timeout",
-			}
-			return t.toJSON(resp)
 		}
-	}
 
-	err := cmd.Run()
-	resp := ProcessResponse{
-		Stdout: out.String(),
-		Stderr: stderr.String(),
+		err := cmd.Run()
+		resp := ProcessResponse{
+			Stdout: out.String(),
+			Stderr: stderr.String(),
+		}
+		if err != nil {
+			resp.Status = "failed"
+			t.logger.Error("Command execution failed",
+				zap.String("command", args.Command),
+				zap.Strings("arguments", cmdArgs),
+				zap.Error(err),
+				zap.String("stderr", stderr.String()))
+		} else {
+			resp.Status = "completed"
+			t.logger.Info("Command executed successfully",
+				zap.String("command", args.Command),
+				zap.Strings("arguments", cmdArgs))
+		}
+		return t.toJSON(resp)
 	}
-	if err != nil {
-		resp.Status = "failed"
-		t.logger.Error("Command execution failed",
-			zap.String("command", baseCommand),
-			zap.Strings("arguments", cmdArgs),
-			zap.Error(err),
-			zap.String("stderr", stderr.String()))
-	} else {
-		resp.Status = "completed"
-		t.logger.Info("Command executed successfully",
-			zap.String("command", baseCommand),
-			zap.Strings("arguments", cmdArgs))
-	}
-	return t.toJSON(resp)
 }
 
 func (t *ProcessTool) checkStatus(pid int) (string, error) {
@@ -364,14 +429,17 @@ func (t *ProcessTool) checkStatus(pid int) (string, error) {
 		t.logger.Error("PID is required for status check")
 		return "", fmt.Errorf("PID is required for status check")
 	}
-	cmd, exists := t.processes[pid]
+	pi, exists := t.processes[pid]
 	if !exists {
 		resp := ProcessResponse{
 			Status: "not found",
 		}
 		return t.toJSON(resp)
 	}
-	if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
+	if pi.Cmd.ProcessState != nil && pi.Cmd.ProcessState.Exited() {
+		pi.Stdin.Close()
+		pi.Stdout.Close()
+		pi.Stderr.Close()
 		delete(t.processes, pid)
 		resp := ProcessResponse{
 			PID:    pid,
@@ -393,20 +461,21 @@ func (t *ProcessTool) killProcess(pid int) (string, error) {
 		t.logger.Error("PID is required for kill")
 		return "", fmt.Errorf("PID is required for kill")
 	}
-	cmd, exists := t.processes[pid]
+	pi, exists := t.processes[pid]
 	if !exists {
 		resp := ProcessResponse{
 			Status: "not found",
 		}
 		return t.toJSON(resp)
 	}
-	err := cmd.Process.Signal(syscall.SIGTERM)
+	err := pi.Cmd.Process.Signal(syscall.SIGTERM)
 	if err != nil {
 		t.logger.Error("Failed to terminate process",
 			zap.Int("pid", pid),
 			zap.Error(err))
 		return "", err
 	}
+	pi.Stdin.Close()
 	delete(t.processes, pid)
 	resp := ProcessResponse{
 		PID:    pid,
@@ -423,6 +492,47 @@ func (t *ProcessTool) toJSON(resp ProcessResponse) (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+func (t *ProcessTool) writeToProcess(args ProcessArgs) (string, error) {
+	if args.PID == 0 {
+		return "", fmt.Errorf("PID required for write")
+	}
+	pi, exists := t.processes[args.PID]
+	if !exists {
+		return "", fmt.Errorf("process not found")
+	}
+	if args.Input == "" {
+		return "", fmt.Errorf("input required for write")
+	}
+	_, err := io.WriteString(pi.Stdin, args.Input+"\n")
+	if err != nil {
+		return "", err
+	}
+	resp := ProcessResponse{
+		Status: "written",
+	}
+	return t.toJSON(resp)
+}
+
+func (t *ProcessTool) readFromProcess(args ProcessArgs) (string, error) {
+	if args.PID == 0 {
+		return "", fmt.Errorf("PID required for read")
+	}
+	pi, exists := t.processes[args.PID]
+	if !exists {
+		return "", fmt.Errorf("process not found")
+	}
+	stdout := pi.StdoutBuffer.String()
+	stderr := pi.StderrBuffer.String()
+	pi.StdoutBuffer.Reset()
+	pi.StderrBuffer.Reset()
+	resp := ProcessResponse{
+		Stdout: stdout,
+		Stderr: stderr,
+		Status: "read",
+	}
+	return t.toJSON(resp)
 }
 
 var _ entities.Tool = (*ProcessTool)(nil)

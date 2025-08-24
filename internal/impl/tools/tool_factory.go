@@ -30,14 +30,7 @@ func NewToolFactory() (*ToolFactory, error) {
 			return NewProjectTool(name, description, configuration, logger)
 		},
 	}
-	toolFactory.toolFactories["Bash"] = &ToolFactoryEntry{
-		Name:        "Bash",
-		Description: `This tool executes the bash command with support for background processes, timeouts, and full output. The command is executed in the workspace directory.`,
-		ConfigKeys:  []string{"workspace"},
-		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
-			return NewBashTool(name, description, configuration, logger)
-		},
-	}
+
 	toolFactory.toolFactories["Process"] = &ToolFactoryEntry{
 		Name:        "Process",
 		Description: `This tool executes a configured CLI command with support for background processes, timeouts, and full output. The command is executed in the workspace directory. The extraArgs are prepended with the arguments passed to the tool.`,
