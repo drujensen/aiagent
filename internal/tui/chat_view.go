@@ -143,6 +143,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 					Role:    "user",
 				}
 				c.textarea.Reset()
+				c.activeChat.Messages = append(c.activeChat.Messages, *message)
+				c.SetActiveChat(c.activeChat)
 				c.err = nil
 				ctx, cancel := context.WithCancel(context.Background())
 				c.cancel = cancel
@@ -209,6 +211,13 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		c.isProcessing = false
 		c.cancel = nil
 		c.err = m
+		if len(c.activeChat.Messages) > 0 {
+			lastIdx := len(c.activeChat.Messages) - 1
+			if c.activeChat.Messages[lastIdx].Role == "user" {
+				c.activeChat.Messages = c.activeChat.Messages[:lastIdx]
+			}
+		}
+		c.SetActiveChat(c.activeChat)
 		return c, nil
 
 	case tea.WindowSizeMsg:
@@ -315,7 +324,7 @@ func (c ChatView) View() string {
 
 	if c.isProcessing {
 		elapsed := time.Since(c.startTime).Round(time.Second)
-		sb.WriteString("\n" + c.spinner.View() + fmt.Sprintf(" Thinking... (%ds)", int(elapsed.Seconds())))
+		sb.WriteString("\n" + c.spinner.View() + fmt.Sprintf(" Working... (%ds)", int(elapsed.Seconds())))
 	} else {
 		instructions := "Press Ctrl+P for menu, Tab to switch focus, j/k to navigate, Ctrl+C to exit."
 		sb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions))
