@@ -123,7 +123,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			return c, tea.Quit
 		case "esc":
 			return c, nil
-		case "/":
+		case "ctrl+p":
 			if c.focused == "textarea" {
 				return c, func() tea.Msg { return startCommandsMsg{} }
 			}
@@ -304,7 +304,7 @@ func (c ChatView) View() string {
 		elapsed := time.Since(c.startTime).Round(time.Second)
 		sb.WriteString("\n" + c.spinner.View() + fmt.Sprintf(" Thinking... (%ds)", int(elapsed.Seconds())))
 	} else {
-		instructions := "Press / for menu, Tab to switch focus, j/k to navigate, Ctrl+C to exit."
+		instructions := "Press Ctrl+P for menu, Tab to switch focus, j/k to navigate, Ctrl+C to exit."
 		sb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions))
 	}
 

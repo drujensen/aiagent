@@ -60,6 +60,7 @@ func (t *DirectoryTool) FullDescription() string {
 	b.WriteString("- **list_directory**: Lists files and directories in the specified path.\n")
 	b.WriteString("- **directory_tree**: Builds a hierarchical tree of the directory structure.\n")
 	b.WriteString("- **move**: Moves a file or directory to a new location.\n")
+	b.WriteString("- **delete**: Deletes a file or directory (requires confirm=true).\n")
 	b.WriteString("\n## Configuration\n")
 	b.WriteString("| Key           | Value         |\n")
 	b.WriteString("|---------------|---------------|\n")
@@ -74,7 +75,7 @@ func (t *DirectoryTool) Parameters() []entities.Parameter {
 		{
 			Name:        "operation",
 			Type:        "string",
-			Enum:        []string{"create_directory", "list_directory", "directory_tree", "move"},
+			Enum:        []string{"create_directory", "list_directory", "directory_tree", "move", "delete"},
 			Description: "The directory operation to perform",
 			Required:    true,
 		},
@@ -88,6 +89,18 @@ func (t *DirectoryTool) Parameters() []entities.Parameter {
 			Name:        "destination",
 			Type:        "string",
 			Description: "Destination path (for move operation)",
+			Required:    false,
+		},
+		{
+			Name:        "depth_limit",
+			Type:        "integer",
+			Description: "Maximum recursion depth for directory_tree (default: unlimited)",
+			Required:    false,
+		},
+		{
+			Name:        "confirm",
+			Type:        "boolean",
+			Description: "Confirm deletion for delete operation",
 			Required:    false,
 		},
 	}
@@ -117,6 +130,8 @@ func (t *DirectoryTool) Execute(arguments string) (string, error) {
 		Operation   string `json:"operation"`
 		Path        string `json:"path"`
 		Destination string `json:"destination"`
+		DepthLimit  int    `json:"depth_limit"`
+		Confirm     bool   `json:"confirm"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
@@ -176,7 +191,11 @@ func (t *DirectoryTool) Execute(arguments string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("invalid path: %v", err)
 		}
-		tree, err := t.buildDirectoryTree(fullPath)
+		depth := args.DepthLimit
+		if depth == 0 {
+			depth = -1 // unlimited
+		}
+		tree, err := t.buildDirectoryTree(fullPath, depth, 1)
 		if err != nil {
 			t.logger.Error("Failed to build directory tree", zap.String("path", fullPath), zap.Error(err))
 			return "", fmt.Errorf("failed to build directory tree: %v", err)
@@ -209,6 +228,22 @@ func (t *DirectoryTool) Execute(arguments string) (string, error) {
 		}
 		t.logger.Info("File moved successfully", zap.String("source", srcPath), zap.String("dest", dstPath))
 		return "File moved successfully", nil
+	case "delete":
+		if !args.Confirm {
+			t.logger.Warn("Deletion requires confirmation", zap.String("path", args.Path))
+			return "", fmt.Errorf("deletion requires confirm=true")
+		}
+		fullPath, err := t.validatePath(args.Path)
+		if err != nil {
+			return "", fmt.Errorf("invalid path: %v", err)
+		}
+		err = os.RemoveAll(fullPath)
+		if err != nil {
+			t.logger.Error("Failed to delete", zap.String("path", fullPath), zap.Error(err))
+			return "", fmt.Errorf("failed to delete: %v", err)
+		}
+		t.logger.Info("Deleted successfully", zap.String("path", fullPath))
+		return "Deleted successfully", nil
 
 	default:
 		t.logger.Error("Unknown operation", zap.String("operation", args.Operation))
@@ -216,7 +251,10 @@ func (t *DirectoryTool) Execute(arguments string) (string, error) {
 	}
 }
 
-func (t *DirectoryTool) buildDirectoryTree(path string) ([]TreeEntry, error) {
+func (t *DirectoryTool) buildDirectoryTree(path string, depthLimit int, currentDepth int) ([]TreeEntry, error) {
+	if depthLimit >= 0 && currentDepth > depthLimit {
+		return []TreeEntry{}, nil
+	}
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
@@ -230,7 +268,7 @@ func (t *DirectoryTool) buildDirectoryTree(path string) ([]TreeEntry, error) {
 		}
 		if entry.IsDir() {
 			treeEntry.Type = "directory"
-			children, err := t.buildDirectoryTree(filepath.Join(path, entry.Name()))
+			children, err := t.buildDirectoryTree(filepath.Join(path, entry.Name()), depthLimit, currentDepth+1)
 			if err != nil {
 				continue
 			}

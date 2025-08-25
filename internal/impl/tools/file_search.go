@@ -53,6 +53,8 @@ func (t *FileSearchTool) FullDescription() string {
 	b.WriteString("This tool searches for text in files or directories. Returns a JSON array with line numbers and matching lines. Use `all_files=true` to search all files in a directory recursively. Limited to 1000 lines or 10MB per file.\n")
 	b.WriteString("  - Example: Search single file: `path='file.txt', pattern='text'`\n")
 	b.WriteString("  - Example: Search all files: `path='.', pattern='text', all_files=true`\n")
+	b.WriteString("  - Example: Search Go files: `path='.', pattern='func', all_files=true, file_pattern='*.go'`\n")
+	b.WriteString("  - Example: Case-sensitive: `path='file.txt', pattern='Text', case_sensitive=true`\n")
 	b.WriteString("\n## Configuration\n")
 	b.WriteString("| Key           | Value         |\n")
 	b.WriteString("|---------------|---------------|\n")
@@ -80,6 +82,18 @@ func (t *FileSearchTool) Parameters() []entities.Parameter {
 			Name:        "all_files",
 			Type:        "boolean",
 			Description: "Search all files in directory recursively",
+			Required:    false,
+		},
+		{
+			Name:        "file_pattern",
+			Type:        "string",
+			Description: "Glob pattern to filter files (e.g., '*.go') when all_files=true",
+			Required:    false,
+		},
+		{
+			Name:        "case_sensitive",
+			Type:        "boolean",
+			Description: "Perform case-sensitive search (default: false)",
 			Required:    false,
 		},
 	}
@@ -119,9 +133,11 @@ func (t *FileSearchTool) checkFileSize(path string) (bool, error) {
 func (t *FileSearchTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing file search command", zap.String("arguments", arguments))
 	var args struct {
-		Path     string `json:"path"`
-		Pattern  string `json:"pattern"`
-		AllFiles bool   `json:"all_files"`
+		Path          string `json:"path"`
+		Pattern       string `json:"pattern"`
+		AllFiles      bool   `json:"all_files"`
+		FilePattern   string `json:"file_pattern"`
+		CaseSensitive bool   `json:"case_sensitive"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
@@ -143,7 +159,7 @@ func (t *FileSearchTool) Execute(arguments string) (string, error) {
 	}
 	var jsonResponse []byte
 	if args.AllFiles {
-		results, err := t.searchMultipleFiles(fullPath, args.Pattern)
+		results, err := t.searchMultipleFiles(fullPath, args.Pattern, args.FilePattern, args.CaseSensitive)
 		if err != nil {
 			t.logger.Error("Failed to search multiple files", zap.String("path", fullPath), zap.Error(err))
 			return "", err
@@ -160,7 +176,7 @@ func (t *FileSearchTool) Execute(arguments string) (string, error) {
 			return "", fmt.Errorf("failed to marshal multi-file search results: %v", err)
 		}
 	} else {
-		results, err := t.search(fullPath, args.Pattern)
+		results, err := t.search(fullPath, args.Pattern, args.CaseSensitive)
 		if err != nil {
 			t.logger.Error("Failed to search file", zap.String("path", fullPath), zap.Error(err))
 			return "", err
@@ -185,7 +201,7 @@ func (t *FileSearchTool) Execute(arguments string) (string, error) {
 	return resultsStr, nil
 }
 
-func (t *FileSearchTool) search(filePath, pattern string) ([]LineResult, error) {
+func (t *FileSearchTool) search(filePath, pattern string, caseSensitive bool) ([]LineResult, error) {
 	if ok, err := t.checkFileSize(filePath); !ok {
 		return nil, err
 	}
@@ -199,7 +215,6 @@ func (t *FileSearchTool) search(filePath, pattern string) ([]LineResult, error) 
 	var results []LineResult
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
-	lowerPattern := strings.ToLower(pattern)
 	const maxLines = 1000
 
 	for scanner.Scan() {
@@ -209,11 +224,20 @@ func (t *FileSearchTool) search(filePath, pattern string) ([]LineResult, error) 
 			return nil, fmt.Errorf("file exceeds line limit of %d lines", maxLines)
 		}
 		line := scanner.Text()
-		if strings.Contains(strings.ToLower(line), lowerPattern) {
-			results = append(results, LineResult{
-				Line: lineNum,
-				Text: line,
-			})
+		if caseSensitive {
+			if strings.Contains(line, pattern) {
+				results = append(results, LineResult{
+					Line: lineNum,
+					Text: line,
+				})
+			}
+		} else {
+			if strings.Contains(strings.ToLower(line), strings.ToLower(pattern)) {
+				results = append(results, LineResult{
+					Line: lineNum,
+					Text: line,
+				})
+			}
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -229,7 +253,7 @@ func (t *FileSearchTool) search(filePath, pattern string) ([]LineResult, error) 
 	return results, nil
 }
 
-func (t *FileSearchTool) searchMultipleFiles(dirPath, pattern string) (map[string][]LineResult, error) {
+func (t *FileSearchTool) searchMultipleFiles(dirPath, pattern, filePattern string, caseSensitive bool) (map[string][]LineResult, error) {
 	results := make(map[string][]LineResult)
 	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -239,12 +263,18 @@ func (t *FileSearchTool) searchMultipleFiles(dirPath, pattern string) (map[strin
 		if info.IsDir() {
 			return nil
 		}
+		if filePattern != "" {
+			matched, err := filepath.Match(filePattern, info.Name())
+			if err != nil || !matched {
+				return nil
+			}
+		}
 		relPath, err := filepath.Rel(dirPath, path)
 		if err != nil {
 			t.logger.Warn("Failed to get relative path", zap.String("path", path), zap.Error(err))
 			return nil
 		}
-		fileResults, err := t.search(path, pattern)
+		fileResults, err := t.search(path, pattern, caseSensitive)
 		if err == nil && len(fileResults) > 0 {
 			results[relPath] = fileResults
 		}
