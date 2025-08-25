@@ -198,11 +198,11 @@ For software engineering tasks (e.g., bugs, features):
 	maxTokens := 65536
 	bigContextWindow := 256000
 
-	tools := []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Process"}
+	tools := []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process"}
 
 	return []entities.Agent{
 		{
-			ID:              "DESIGN-0000-0000-0000-000000000001",
+			ID:              "54AE685D-8A73-423A-A10E-EF7BE9BF8CB8",
 			Name:            "Design",
 			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
 			ProviderType:    "xai",
@@ -219,7 +219,7 @@ For software engineering tasks (e.g., bugs, features):
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "PLAN-0000-0000-0000-000000000002",
+			ID:              "B020132C-331A-436B-A8BA-A8639BC20436",
 			Name:            "Plan",
 			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
 			ProviderType:    "xai",
@@ -236,7 +236,7 @@ For software engineering tasks (e.g., bugs, features):
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "BUILD-0000-0000-0000-000000000003",
+			ID:              "6B0866FA-F10B-496C-93D5-7263B0F936B3",
 			Name:            "Build",
 			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
 			ProviderType:    "xai",
@@ -253,7 +253,7 @@ For software engineering tasks (e.g., bugs, features):
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "TEST-0000-0000-0000-000000000004",
+			ID:              "E8A375A3-81BC-4EAB-8ADC-F62F94FD81D1",
 			Name:            "Test",
 			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
 			ProviderType:    "xai",
@@ -270,7 +270,7 @@ For software engineering tasks (e.g., bugs, features):
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "DEPLOY-0000-0000-0000-000000000005",
+			ID:              "5AEFC437-A72E-4B47-901F-865DDF6D8B74",
 			Name:            "Deploy",
 			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
 			ProviderType:    "xai",
@@ -335,6 +335,15 @@ func DefaultTools() []*entities.ToolData {
 			ToolType:      "FileSearch",
 			Name:          "FileSearch",
 			Description:   "This tool searches for content in a file.",
+			Configuration: map[string]string{},
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+		{
+			ID:            "E29341C7-ADC3-424E-A49A-829409CB7082",
+			ToolType:      "Directory",
+			Name:          "Directory",
+			Description:   "This tool supports directory management",
 			Configuration: map[string]string{},
 			CreatedAt:     now,
 			UpdatedAt:     now,

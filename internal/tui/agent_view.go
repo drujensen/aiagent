@@ -17,6 +17,7 @@ type AgentView struct {
 	width        int
 	height       int
 	err          error
+	mode         string // "view" or "switch"
 }
 
 func NewAgentView(agentService services.AgentService) AgentView {
@@ -34,6 +35,7 @@ func NewAgentView(agentService services.AgentService) AgentView {
 	return AgentView{
 		agentService: agentService,
 		list:         l,
+		mode:         "view",
 	}
 }
 
@@ -53,6 +55,13 @@ func (v AgentView) Update(msg tea.Msg) (AgentView, tea.Cmd) {
 		switch m.String() {
 		case "esc":
 			return v, func() tea.Msg { return agentsCancelledMsg{} }
+		case "enter":
+			if v.mode != "switch" {
+				return v, nil
+			}
+			if selected, ok := v.list.SelectedItem().(*entities.Agent); ok {
+				return v, func() tea.Msg { return agentSelectedMsg{agentID: selected.ID} }
+			}
 		}
 
 	case agentsFetchedMsg:
@@ -99,6 +108,9 @@ func (v AgentView) View() string {
 
 	var sb strings.Builder
 	instructions := "Use arrows or j/k to navigate, Esc to return to chat"
+	if v.mode == "switch" {
+		instructions += ", Enter to switch agent"
+	}
 	view := innerBorder.Render(v.list.View()) + "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions)
 	sb.WriteString(view)
 

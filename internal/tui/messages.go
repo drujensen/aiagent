@@ -53,3 +53,8 @@ type (
 )
 
 type errMsg error
+
+type (
+	startAgentSwitchMsg struct{}
+	agentSelectedMsg    struct{ agentID string }
+)

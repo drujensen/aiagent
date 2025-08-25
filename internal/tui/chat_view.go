@@ -32,6 +32,7 @@ type ChatView struct {
 	focused      string // "textarea" or "viewport"
 	width        int
 	height       int
+	currentAgent *entities.Agent
 }
 
 func NewChatView(chatService services.ChatService, agentService services.AgentService, activeChat *entities.Chat) ChatView {
@@ -80,6 +81,14 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 
 func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 	c.activeChat = chat
+	ctx := context.Background()
+	agent, err := c.agentService.GetAgent(ctx, chat.AgentID)
+	if err != nil {
+		c.err = err
+		c.currentAgent = nil
+	} else {
+		c.currentAgent = agent
+	}
 	var sb strings.Builder
 	for _, message := range chat.Messages {
 		if message.Role == "user" {
@@ -89,6 +98,9 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 		} else {
 			sb.WriteString(c.systemStyle.Render("System: Tool Called") + "\n")
 		}
+	}
+	if len(chat.Messages) > 0 && chat.Messages[len(chat.Messages)-1].Role != "system" {
+		sb.WriteString(c.systemStyle.Render("System: Switched to new agent\n"))
 	}
 	c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render(sb.String()))
 	c.viewport.GotoBottom()
@@ -127,6 +139,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			if c.focused == "textarea" {
 				return c, func() tea.Msg { return startCommandsMsg{} }
 			}
+		case "ctrl+a":
+			return c, func() tea.Msg { return startAgentSwitchMsg{} }
 		case "enter":
 			if c.focused == "textarea" {
 				input := c.textarea.Value()
@@ -327,7 +341,17 @@ func (c ChatView) View() string {
 		sb.WriteString("\n" + c.spinner.View() + fmt.Sprintf(" Working... (%ds)", int(elapsed.Seconds())))
 	} else {
 		instructions := "Press Ctrl+P for menu, Tab to switch focus, j/k to navigate, Ctrl+C to exit."
-		sb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions))
+		var agentInfo string
+		if c.currentAgent != nil {
+			agentInfo = fmt.Sprintf("%s (%s: %s)", c.currentAgent.Name, c.currentAgent.ProviderType, c.currentAgent.Model)
+		} else {
+			agentInfo = "No agent selected"
+		}
+		footerStyle := lipgloss.NewStyle().Width(c.width - 4)
+		leftStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Inline(true)
+		rightStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Align(lipgloss.Right).Inline(true).Width(c.width - 4 - len(instructions))
+		footer := footerStyle.Render(lipgloss.JoinHorizontal(lipgloss.Top, leftStyle.Render(instructions), rightStyle.Render(agentInfo)))
+		sb.WriteString("\n" + footer)
 	}
 
 	// Render error if any

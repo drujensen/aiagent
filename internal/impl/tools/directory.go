@@ -55,7 +55,7 @@ func (t *DirectoryTool) FullDescription() string {
 	b.WriteString(t.Description())
 	b.WriteString("\n\n")
 	b.WriteString("## Usage Instructions\n")
-	b.WriteString("This tool supports directory and file management operations:\n")
+	b.WriteString("This tool supports directory management operations:\n")
 	b.WriteString("- **create_directory**: Creates a new directory at the specified path.\n")
 	b.WriteString("- **list_directory**: Lists files and directories in the specified path.\n")
 	b.WriteString("- **directory_tree**: Builds a hierarchical tree of the directory structure.\n")

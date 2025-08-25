@@ -3,7 +3,6 @@ package tui
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/drujensen/aiagent/internal/domain/entities"
@@ -34,7 +33,6 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 
 	activeChat, err := chatService.GetActiveChat(ctx)
 	if err != nil {
-		fmt.Println("Error getting active chat:", err)
 		activeChat = nil
 	}
 
@@ -156,6 +154,24 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			t.chatView.SetActiveChat(t.activeChat)
 		}
 		return t, nil
+
+	case startAgentSwitchMsg:
+		if t.activeChat == nil {
+			return t, nil
+		}
+		t.state = "agents/list"
+		t.agentView.mode = "switch"
+		return t, t.agentView.Init()
+	case agentSelectedMsg:
+		ctx := context.Background()
+		updatedChat, err := t.chatService.UpdateChat(ctx, t.activeChat.ID, msg.agentID, t.activeChat.Name)
+		if err != nil {
+			return t, func() tea.Msg { return errMsg(err) }
+		}
+		t.activeChat = updatedChat
+		t.chatView.SetActiveChat(updatedChat)
+		t.state = "chat/view"
+		return t, t.chatView.Init()
 
 	// Handle tools view messages
 	case startToolsMsg:
