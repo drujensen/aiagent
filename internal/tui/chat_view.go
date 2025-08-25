@@ -141,6 +141,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			}
 		case "ctrl+a":
 			return c, func() tea.Msg { return startAgentSwitchMsg{} }
+		case "ctrl+n":
+			return c, func() tea.Msg { return startCreateChatMsg("") }
 		case "enter":
 			if c.focused == "textarea" {
 				input := c.textarea.Value()

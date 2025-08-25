@@ -13,7 +13,7 @@ type CommandItem struct {
 	desc string
 }
 
-func (i CommandItem) Title() string       { return "/" + i.name }
+func (i CommandItem) Title() string       { return i.name }
 func (i CommandItem) Description() string { return i.desc }
 func (i CommandItem) FilterValue() string { return i.name }
 
@@ -25,13 +25,13 @@ type CommandMenu struct {
 
 func NewCommandMenu() CommandMenu {
 	items := []list.Item{
-		CommandItem{name: "new", desc: "Create a new chat"},
-		CommandItem{name: "history", desc: "View chat history"},
-		CommandItem{name: "agents", desc: "View available agents"},
-		CommandItem{name: "tools", desc: "View available tools"},
-		CommandItem{name: "usage", desc: "Show usage statistics"},
-		CommandItem{name: "help", desc: "Show help screen"},
-		CommandItem{name: "exit", desc: "Exit the application"},
+		CommandItem{name: "New", desc: "Create a new chat"},
+		CommandItem{name: "History", desc: "View chat history"},
+		CommandItem{name: "Agents", desc: "View available agents"},
+		CommandItem{name: "Tools", desc: "View available tools"},
+		CommandItem{name: "Usage", desc: "Show usage statistics"},
+		CommandItem{name: "Help", desc: "Show help screen"},
+		CommandItem{name: "Exit", desc: "Exit the application"},
 	}
 
 	delegate := list.NewDefaultDelegate()
