@@ -238,6 +238,19 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		}
 		c.viewport.GotoBottom()
 		return c, nil
+	case tea.MouseMsg:
+		viewportYStart := 1
+		viewportBlockHeight := c.viewport.Height + 2
+		viewportYEnd := viewportYStart + viewportBlockHeight
+		if m.Y >= viewportYStart && m.Y < viewportYEnd {
+			switch m.Type {
+			case tea.MouseWheelUp:
+				c.viewport.LineUp(3)
+			case tea.MouseWheelDown:
+				c.viewport.LineDown(3)
+			}
+		}
+		return c, nil
 	}
 
 	return c, tea.Batch(cmds...)
