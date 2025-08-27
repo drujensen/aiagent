@@ -322,7 +322,50 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		reqBody["messages"] = apiMessages
 	}
 
+	// Validate that all tool calls have responses before returning
+	newMessages = ensureToolCallResponses(newMessages, m.logger)
+
 	return newMessages, nil
+}
+
+// ensureToolCallResponses validates that every tool call has a corresponding response
+// and creates error responses for any orphaned tool calls
+func ensureToolCallResponses(messages []*entities.Message, logger *zap.Logger) []*entities.Message {
+	// Collect all tool call IDs from assistant messages
+	toolCallIDs := make(map[string]bool)
+	for _, msg := range messages {
+		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
+			for _, toolCall := range msg.ToolCalls {
+				toolCallIDs[toolCall.ID] = false // false = no response found yet
+			}
+		}
+	}
+
+	// Mark tool calls that have responses
+	for _, msg := range messages {
+		if msg.Role == "tool" && msg.ToolCallID != "" {
+			if _, exists := toolCallIDs[msg.ToolCallID]; exists {
+				toolCallIDs[msg.ToolCallID] = true // response found
+			}
+		}
+	}
+
+	// Create error responses for orphaned tool calls
+	for toolCallID, hasResponse := range toolCallIDs {
+		if !hasResponse {
+			logger.Warn("Found orphaned tool call without response in AI integration", zap.String("tool_call_id", toolCallID))
+			errorMessage := &entities.Message{
+				ID:         uuid.New().String(),
+				Role:       "tool",
+				Content:    "Tool execution failed: No response generated",
+				ToolCallID: toolCallID,
+				Timestamp:  time.Now(),
+			}
+			messages = append(messages, errorMessage)
+		}
+	}
+
+	return messages
 }
 
 // GetUsage returns the token usage statistics

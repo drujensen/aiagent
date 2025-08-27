@@ -336,13 +336,12 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 
 				toolName := toolCall.Function.Name
 				tool, err := m.toolRepo.GetToolByName(toolName)
-				if err != nil {
-					m.logger.Warn("Failed to get tool", zap.String("toolName", toolName), zap.Error(err))
-					continue // Skip to next tool call if tool not found
-				}
 
 				var toolResult string
-				if tool != nil {
+				if err != nil {
+					toolResult = fmt.Sprintf("Tool %s could not be retrieved: %v", toolName, err)
+					m.logger.Warn("Failed to get tool", zap.String("toolName", toolName), zap.Error(err))
+				} else if tool != nil {
 					result, err := (*tool).Execute(toolCall.Function.Arguments)
 					if err != nil {
 						toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
@@ -394,8 +393,51 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 		}
 	}
 
+	// Validate that all tool calls have responses before returning
+	newMessages = ensureToolCallResponsesAnthropic(newMessages, m.logger)
+
 	m.logger.Info("Generated messages", zap.Any("messages", newMessages))
 	return newMessages, nil
+}
+
+// ensureToolCallResponsesAnthropic validates that every tool call has a corresponding response
+// and creates error responses for any orphaned tool calls
+func ensureToolCallResponsesAnthropic(messages []*entities.Message, logger *zap.Logger) []*entities.Message {
+	// Collect all tool call IDs from assistant messages
+	toolCallIDs := make(map[string]bool)
+	for _, msg := range messages {
+		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
+			for _, toolCall := range msg.ToolCalls {
+				toolCallIDs[toolCall.ID] = false // false = no response found yet
+			}
+		}
+	}
+
+	// Mark tool calls that have responses
+	for _, msg := range messages {
+		if msg.Role == "tool" && msg.ToolCallID != "" {
+			if _, exists := toolCallIDs[msg.ToolCallID]; exists {
+				toolCallIDs[msg.ToolCallID] = true // response found
+			}
+		}
+	}
+
+	// Create error responses for orphaned tool calls
+	for toolCallID, hasResponse := range toolCallIDs {
+		if !hasResponse {
+			logger.Warn("Found orphaned tool call without response in Anthropic integration", zap.String("tool_call_id", toolCallID))
+			errorMessage := &entities.Message{
+				ID:         uuid.New().String(),
+				Role:       "tool",
+				Content:    "Tool execution failed: No response generated",
+				ToolCallID: toolCallID,
+				Timestamp:  time.Now(),
+			}
+			messages = append(messages, errorMessage)
+		}
+	}
+
+	return messages
 }
 
 // GetUsage returns usage information
