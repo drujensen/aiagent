@@ -1,10 +1,10 @@
 package apicontrollers
 
 import (
+	"fmt"
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/services"
-	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"

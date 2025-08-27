@@ -1,8 +1,8 @@
 package interfaces
 
 import (
-	"github.com/drujensen/aiagent/internal/domain/entities"
 	"context"
+	"github.com/drujensen/aiagent/internal/domain/entities"
 )
 
 type ToolRepository interface {

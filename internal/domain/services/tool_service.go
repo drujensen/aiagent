@@ -1,10 +1,10 @@
 package services
 
 import (
+	"context"
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
-	"context"
 	"time"
 
 	"go.uber.org/zap"

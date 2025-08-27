@@ -41,7 +41,7 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	ta.Focus()
 	ta.Prompt = "┃ "
 	ta.SetWidth(30)
-	ta.SetHeight(3)
+	ta.SetHeight(2)
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
 	ta.ShowLineNumbers = false
 	ta.KeyMap.InsertNewline.SetEnabled(false)
@@ -243,8 +243,11 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		innerHeight := c.height - 4
 
 		c.viewport.Width = innerWidth
-		// Subtract textarea height (3), instructions (1), possible error (1), and adjust for borders
-		c.viewport.Height = innerHeight - 3 - 1 - 1 - 2
+		// Subtract textarea height (2), instructions (1), and adjust for borders
+		c.viewport.Height = innerHeight - 2 - 1 - 2
+		if c.viewport.Height < 1 {
+			c.viewport.Height = 1
+		}
 
 		c.textarea.SetWidth(innerWidth)
 
@@ -259,6 +262,13 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 					sb.WriteString(c.systemStyle.Render("System: Tool Called") + "\n")
 				}
 			}
+			// Add error as temporary system message if present
+			if c.err != nil {
+				if sb.Len() > 0 {
+					sb.WriteString("\n")
+				}
+				sb.WriteString(c.systemStyle.Render("System: Error - ") + c.err.Error() + "\n")
+			}
 			c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render(sb.String()))
 		}
 		c.viewport.GotoBottom()
@@ -270,9 +280,9 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		if m.Y >= viewportYStart && m.Y < viewportYEnd {
 			switch m.Type {
 			case tea.MouseWheelUp:
-				c.viewport.LineUp(3)
+				c.viewport.LineUp(2)
 			case tea.MouseWheelDown:
-				c.viewport.LineDown(3)
+				c.viewport.LineDown(2)
 			}
 		}
 		return c, nil
@@ -306,30 +316,37 @@ func (c ChatView) View() string {
 		vpStyle = focusedBorder.Width(c.width - 4).Height(c.viewport.Height)
 	}
 
+	var content strings.Builder
+
 	// Check if activeChat is nil OR has no messages
 	if c.activeChat == nil || len(c.activeChat.Messages) == 0 {
-		c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render("How can I help you today?"))
-
-		sb.WriteString(vpStyle.Render(c.viewport.View()))
-
+		content.WriteString("How can I help you today?")
 	} else {
 		// Display chat messages
-		var chatContent strings.Builder
 		for _, message := range c.activeChat.Messages {
 			if message.Role == "user" {
-				chatContent.WriteString(c.userStyle.Render("User: ") + message.Content + "\n")
+				content.WriteString(c.userStyle.Render("User: ") + message.Content + "\n")
 			} else if message.Role == "assistant" {
-				chatContent.WriteString(c.asstStyle.Render("Assistant: ") + message.Content + "\n")
+				content.WriteString(c.asstStyle.Render("Assistant: ") + message.Content + "\n")
 			} else {
-				chatContent.WriteString(c.systemStyle.Render("System: Tool Called") + "\n")
+				content.WriteString(c.systemStyle.Render("System: Tool Called") + "\n")
 			}
 		}
-
-		//Set the viewport to contain the chat messages
-		c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render(chatContent.String()))
-
-		sb.WriteString(vpStyle.Render(c.viewport.View()))
 	}
+
+	// Add error as temporary system message if present
+	if c.err != nil {
+		if content.Len() > 0 {
+			content.WriteString("\n")
+		}
+		content.WriteString(c.systemStyle.Render("System: Error - ") + c.err.Error() + "\n")
+		c.err = nil // Clear error after displaying
+	}
+
+	// Set the viewport content
+	c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render(content.String()))
+
+	sb.WriteString(vpStyle.Render(c.viewport.View()))
 
 	// Style textarea
 	taStyle := unfocusedBorder.Width(c.width - 4).Height(c.textarea.Height())
@@ -340,7 +357,7 @@ func (c ChatView) View() string {
 
 	if c.isProcessing {
 		elapsed := time.Since(c.startTime).Round(time.Second)
-		sb.WriteString("\n" + c.spinner.View() + fmt.Sprintf(" Working... (%ds)", int(elapsed.Seconds())))
+		sb.WriteString("\n" + c.spinner.View() + fmt.Sprintf(" Working... (%ds) esc to interrupt", int(elapsed.Seconds())))
 	} else {
 		instructions := "Press Ctrl+P for menu, Tab to switch focus, j/k to navigate, Ctrl+C to exit."
 		var agentInfo string
@@ -354,11 +371,6 @@ func (c ChatView) View() string {
 		rightStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Align(lipgloss.Right).Inline(true).Width(c.width - 4 - len(instructions))
 		footer := footerStyle.Render(lipgloss.JoinHorizontal(lipgloss.Top, leftStyle.Render(instructions), rightStyle.Render(agentInfo)))
 		sb.WriteString("\n" + footer)
-	}
-
-	// Render error if any
-	if c.err != nil {
-		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Render(fmt.Sprintf("\n%s", c.err.Error())))
 	}
 
 	// Wrap everything in the outer border

@@ -26,6 +26,7 @@ func (c *AgentController) RegisterRoutes(e *echo.Group) {
 }
 
 // ListAgents godoc
+//
 //	@Summary		List all agents
 //	@Description	Retrieves a list of all agents.
 //	@Tags			agents
