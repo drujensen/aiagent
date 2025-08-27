@@ -2,21 +2,13 @@ package tools
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
-
-	treesitter "github.com/smacker/go-tree-sitter"
-	"github.com/smacker/go-tree-sitter/csharp"
-	"github.com/smacker/go-tree-sitter/golang"
-	"github.com/smacker/go-tree-sitter/javascript"
-	"github.com/smacker/go-tree-sitter/python"
-	"github.com/smacker/go-tree-sitter/ruby"
-	"github.com/smacker/go-tree-sitter/typescript/typescript"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
 
@@ -68,12 +60,18 @@ func (t *ProjectTool) FullDescription() string {
 	b.WriteString("  - Override with 'filters' array for custom patterns.\n")
 	b.WriteString("  - Use 'max_file_size' to limit individual file parsing (in bytes; if exceeded, structure is replaced with a message).\n")
 	b.WriteString("\n## Supported Languages and Default Filters\n")
+	b.WriteString("- c: **/*.c, **/*.h, Makefile\n")
+	b.WriteString("- cpp: **/*.cpp, **/*.hpp, **/*.h, CMakeLists.txt\n")
 	b.WriteString("- go: **/*.go, go.mod\n")
 	b.WriteString("- csharp: **/*.cs, **/*.csproj, *.sln\n")
-	b.WriteString("- python: **/*.py\n")
+	b.WriteString("- java: **/*.java, **/*.xml\n")
+	b.WriteString("- kotlin: **/*.kt, **/*.kts, build.gradle.kts\n")
 	b.WriteString("- javascript: **/*.js, **/*.ts, package.json\n")
 	b.WriteString("- typescript: **/*.ts, **/*.tsx, package.json\n")
+	b.WriteString("- python: **/*.py, requirements.txt, setup.py\n")
 	b.WriteString("- ruby: **/*.rb, Gemfile\n")
+	b.WriteString("- rust: **/*.rs, Cargo.toml\n")
+	b.WriteString("- swift: **/*.swift, Package.swift\n")
 	b.WriteString("\n## Configuration\n")
 	b.WriteString("| Key           | Value         |\n")
 	b.WriteString("|---------------|---------------|\n")
@@ -97,7 +95,7 @@ func (t *ProjectTool) Parameters() []entities.Parameter {
 			Type:        "string",
 			Description: "Programming language to determine default file patterns and parsing (e.g., 'go', 'csharp')",
 			Required:    false,
-			Enum:        []string{"all", "shell", "assembly", "c", "cpp", "rust", "zig", "go", "csharp", "objective-c", "swift", "java", "kotlin", "clojure", "groovy", "lua", "elixir", "scala", "dart", "haskell", "javascript", "typescript", "python", "ruby", "php", "perl", "r", "html", "stylesheet"},
+			Enum:        []string{"all", "shell", "assembly", "c", "cpp", "rust", "go", "csharp", "objective-c", "swift", "java", "kotlin", "clojure", "groovy", "lua", "elixir", "scala", "dart", "haskell", "javascript", "typescript", "python", "ruby", "php", "perl", "r", "html", "stylesheet"},
 		},
 		{
 			Name:        "filters",
@@ -112,6 +110,12 @@ func (t *ProjectTool) Parameters() []entities.Parameter {
 			Description: "Maximum file size in bytes; if exceeded, content/structure is replaced with a message (default: 0, no limit)",
 			Required:    false,
 		},
+		{
+			Name:        "max_total_size",
+			Type:        "integer",
+			Description: "Maximum total output size in characters; if exceeded, remaining files are skipped (default: 200000)",
+			Required:    false,
+		},
 	}
 }
 
@@ -119,14 +123,20 @@ func (t *ProjectTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing project tool", zap.String("arguments", arguments))
 
 	var args struct {
-		Operation   string   `json:"operation"`
-		Language    string   `json:"language,omitempty"`
-		Filters     []string `json:"filters,omitempty"`
-		MaxFileSize int      `json:"max_file_size,omitempty"`
+		Operation    string   `json:"operation"`
+		Language     string   `json:"language,omitempty"`
+		Filters      []string `json:"filters,omitempty"`
+		MaxFileSize  int      `json:"max_file_size,omitempty"`
+		MaxTotalSize int      `json:"max_total_size,omitempty"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
 		return "", fmt.Errorf("failed to parse arguments: %v", err)
+	}
+
+	// Set default max_total_size if not provided
+	if args.MaxTotalSize == 0 {
+		args.MaxTotalSize = 200000
 	}
 
 	// Get workspace
@@ -144,9 +154,9 @@ func (t *ProjectTool) Execute(arguments string) (string, error) {
 	case "read":
 		return t.executeRead(workspace)
 	case "get_source":
-		return t.executeGetSource(workspace, args.Language, args.Filters, args.MaxFileSize)
+		return t.executeGetSource(workspace, args.Language, args.Filters, args.MaxFileSize, args.MaxTotalSize)
 	case "get_structure":
-		return t.executeGetStructure(workspace, args.Language, args.Filters, args.MaxFileSize)
+		return t.executeGetStructure(workspace, args.Language, args.Filters, args.MaxFileSize, args.MaxTotalSize)
 	default:
 		t.logger.Error("Invalid operation", zap.String("operation", args.Operation))
 		return "", fmt.Errorf("invalid operation: %s", args.Operation)
@@ -220,7 +230,7 @@ Please update this file with relevant project information.
 	return string(jsonResponse), nil
 }
 
-func (t *ProjectTool) executeGetSource(workspace, language string, customFilters []string, maxFileSize int) (string, error) {
+func (t *ProjectTool) executeGetSource(workspace, language string, customFilters []string, maxFileSize, maxTotalSize int) (string, error) {
 	defaultFilters := map[string][]string{
 		"all":        {"**/*"},
 		"shell":      {"**/*.sh", "**/*.bash", "**.zsh", "**/*.pwsh"},
@@ -228,8 +238,7 @@ func (t *ProjectTool) executeGetSource(workspace, language string, customFilters
 		"c":          {"**/*.c", "**/*.h", "Makefile"},
 		"cpp":        {"**/*.cpp", "**/*.hpp", "**/*.h", "CMakeLists.txt"},
 		"rust":       {"**/*.rs", "Cargo.toml"},
-		"zig":        {"**/*.zig", "build.zig"},
-		"go":         {"**/*.go"},
+		"go":         {"**/*.go", "go.mod"},
 		"csharp":     {"**/*.cs", "**/*.csproj", "*.sln"},
 		"swift":      {"**/*.swift", "Package.swift"},
 		"java":       {"**/*.java", "**/*.xml"},
@@ -328,16 +337,26 @@ func (t *ProjectTool) executeGetSource(workspace, language string, customFilters
 		return files[i].Path < files[j].Path
 	})
 
+	// Limit total size
+	totalSize := len(tree)
+	fileContents := make(map[string]string)
+	for _, file := range files {
+		contentSize := len(file.Content)
+		if totalSize+contentSize > maxTotalSize {
+			t.logger.Info("Stopping file inclusion due to size limit", zap.Int("current_size", totalSize), zap.Int("max_size", maxTotalSize))
+			break
+		}
+		fileContents[file.Path] = file.Content
+		totalSize += contentSize
+	}
+
 	// Build JSON response
 	response := struct {
 		FileMap      string            `json:"file_map"`
 		FileContents map[string]string `json:"file_contents"`
 	}{
 		FileMap:      tree,
-		FileContents: make(map[string]string),
-	}
-	for _, file := range files {
-		response.FileContents[file.Path] = file.Content
+		FileContents: fileContents,
 	}
 
 	jsonResponse, err := json.Marshal(response)
@@ -350,17 +369,16 @@ func (t *ProjectTool) executeGetSource(workspace, language string, customFilters
 	return string(jsonResponse), nil
 }
 
-func (t *ProjectTool) executeGetStructure(workspace, language string, customFilters []string, maxFileSize int) (string, error) {
+func (t *ProjectTool) executeGetStructure(workspace, language string, customFilters []string, maxFileSize, maxTotalSize int) (string, error) {
 	defaultFilters := map[string][]string{
 		"all":        {"**/*"},
 		"assembly":   {"**/*.asm", "**/*.s"},
 		"c":          {"**/*.c", "**/*.h"},
 		"cpp":        {"**/*.cpp", "**/*.hpp", "**/*.h"},
 		"rust":       {"**/*.rs"},
-		"zig":        {"**/*.zig", "build.zig"},
 		"go":         {"**/*.go"},
 		"csharp":     {"**/*.cs"},
-		"swift":      {"**/*.swift", "Package.swift"},
+		"swift":      {"**/*.swift"},
 		"java":       {"**/*.java"},
 		"kotlin":     {"**/*.kt", "**/*.kts"},
 		"clojure":    {"**/*.clj", "**/*.cljs"},
@@ -438,8 +456,9 @@ func (t *ProjectTool) executeGetStructure(workspace, language string, customFilt
 	// Sort files by path
 	sort.Strings(filePaths)
 
-	// Extract structures
+	// Extract structures with size limit
 	structures := make(map[string]Structure)
+	totalSize := len(tree)
 	for _, path := range filePaths {
 		relPath, _ := filepath.Rel(workspace, path)
 
@@ -458,13 +477,25 @@ func (t *ProjectTool) executeGetStructure(workspace, language string, customFilt
 		content = string(byteContent)
 
 		// Extract structure
+		if runtime.GOOS == "windows" {
+			structures[relPath] = Structure{Language: language, Error: "Tree-sitter parsing not supported on Windows"}
+			continue
+		}
 		structure, err := extractStructure(language, content)
 		if err != nil {
 			t.logger.Error("Failed to extract structure", zap.String("path", relPath), zap.String("language", language), zap.Error(err))
 			structures[relPath] = Structure{Error: err.Error()}
 			continue
 		}
+
+		// Estimate size and check limit
+		structureJSON, _ := json.Marshal(structure)
+		if totalSize+len(structureJSON) > maxTotalSize {
+			t.logger.Info("Stopping structure extraction due to size limit", zap.Int("current_size", totalSize), zap.Int("max_size", maxTotalSize))
+			break
+		}
 		structures[relPath] = structure
+		totalSize += len(structureJSON)
 	}
 
 	// Build JSON response
@@ -537,198 +568,6 @@ type CodeEntity struct {
 	StartLine int    `json:"start_line"`
 	EndLine   int    `json:"end_line"`
 	// Add more fields as needed, e.g., Fields []string for struct fields
-}
-
-// Map of language names to Tree-sitter language objects
-var languageMap = map[string]*treesitter.Language{
-	"go":         golang.GetLanguage(),
-	"csharp":     csharp.GetLanguage(),
-	"javascript": javascript.GetLanguage(),
-	"typescript": typescript.GetLanguage(),
-	"python":     python.GetLanguage(),
-	"ruby":       ruby.GetLanguage(),
-}
-
-// Map of language to tags query (copy from tree-sitter-<lang>/queries/tags.scm)
-var tagsQueries = map[string]string{
-	"go": `
-(source_file
-  (package_clause
-   (package_identifier) @package)
-   (function_declaration
-     name: (identifier) @definition.function))
-
-(source_file
-  (package_clause
-   (package_identifier) @package)
-   (type_declaration
-     (type_spec
-       name: (type_identifier) @definition.type)))
-	`,
-	"csharp": `
-(class_declaration
-  name: (identifier) @definition.class)
-(interface_declaration
-  name: (identifier) @definition.interface)
-(struct_declaration
-  name: (identifier) @definition.struct)
-(enum_declaration
-  name: (identifier) @definition.enum)
-(method_declaration
-  name: (identifier) @definition.method)
-(property_declaration
-  name: (identifier) @definition.property)
-(field_declaration
-  (variable_declaration
-    (variable_declarator
-      name: (identifier) @definition.field)))
-	`,
-	"javascript": `
-(function_declaration
-  name: (identifier) @definition.function)
-(method_definition
-  name: (property_identifier) @definition.method)
-(class_declaration
-  name: (identifier) @definition.class)
-(variable_declarator
-  name: (identifier) @definition.var)
-	`,
-	"typescript": `
-(function_declaration
-  name: (identifier) @definition.function)
-(method_definition
-  name: (property_identifier) @definition.method)
-(class_declaration
-  name: (type_identifier) @definition.class)
-(interface_declaration
-  name: (type_identifier) @definition.interface)
-(type_alias_declaration
-  name: (type_identifier) @definition.type)
-(variable_declarator
-  name: (identifier) @definition.var)
-	`,
-	"python": `
-(class_definition
-  name: (identifier) @definition.class)
-(function_definition
-  name: (identifier) @definition.function)
-	`,
-	"ruby": `
-(class
-  name: (constant) @definition.class)
-(module
-  name: (constant) @definition.module)
-(method
-  name: (identifier) @definition.method)
-(singleton_method
-  name: (identifier) @definition.method)
-	`,
-}
-
-// extractStructure parses the content and extracts structure using Tree-sitter
-func extractStructure(language, content string) (Structure, error) {
-	lang, ok := languageMap[language]
-	if !ok {
-		return Structure{Language: language}, fmt.Errorf("unsupported language for parsing: %s", language)
-	}
-
-	parser := treesitter.NewParser()
-	parser.SetLanguage(lang)
-	tree, err := parser.ParseCtx(context.Background(), nil, []byte(content))
-	if err != nil {
-		return Structure{}, err
-	}
-
-	// Extract imports (example for Go; customize per language)
-	imports, err := extractImports(language, tree, content)
-	if err != nil {
-		imports = nil
-	}
-
-	// Extract entities using tags query
-	queryStr, ok := tagsQueries[language]
-	if !ok {
-		return Structure{Imports: imports, Language: language}, nil // No entities if no query
-	}
-	q, err := treesitter.NewQuery([]byte(queryStr), lang)
-	if err != nil {
-		return Structure{}, err
-	}
-	cursor := treesitter.NewQueryCursor()
-	cursor.Exec(q, tree.RootNode())
-
-	var entities []CodeEntity
-	for {
-		match, found := cursor.NextMatch()
-		if !found {
-			break
-		}
-		for _, capture := range match.Captures {
-			captureName := q.CaptureNameForId(capture.Index)
-			if strings.HasPrefix(captureName, "definition.") {
-				kind := strings.TrimPrefix(captureName, "definition.")
-				entityName := capture.Node.Content([]byte(content))
-				startLine := int(capture.Node.StartPoint().Row) + 1
-				endLine := int(capture.Node.EndPoint().Row) + 1
-				entities = append(entities, CodeEntity{
-					Type:      kind,
-					Name:      entityName,
-					StartLine: startLine,
-					EndLine:   endLine,
-				})
-				// Optional: For types like "type" (struct), traverse node for fields, etc.
-			}
-		}
-	}
-
-	return Structure{
-		Language: language,
-		Imports:  imports,
-		Entities: entities,
-	}, nil
-}
-
-// extractImports extracts import statements (customize per language)
-func extractImports(language string, tree *treesitter.Tree, content string) ([]string, error) {
-	var queryStr string
-	switch language {
-	case "go":
-		queryStr = `(import_spec path: (package_identifier) @name)`
-	case "csharp":
-		queryStr = `(using_directive (qualified_name) @name)`
-	case "javascript", "typescript":
-		queryStr = `(import_declaration source: (string (string_fragment) @name))`
-	case "python":
-		queryStr = `
-(import_statement name: (dotted_name) @name)
-(import_from_statement module_name: (dotted_name) @name)`
-	case "ruby":
-		queryStr = `(call method: (identifier) @method (#eq? @method "require") receiver: (constant)? argument: (string (string_content) @name))`
-	default:
-		return nil, nil // Add support for other languages
-	}
-
-	lang := languageMap[language]
-	q, err := treesitter.NewQuery([]byte(queryStr), lang)
-	if err != nil {
-		return nil, err
-	}
-	cursor := treesitter.NewQueryCursor()
-	cursor.Exec(q, tree.RootNode())
-
-	var imports []string
-	for {
-		match, found := cursor.NextMatch()
-		if !found {
-			break
-		}
-		for _, capture := range match.Captures {
-			if q.CaptureNameForId(capture.Index) == "name" {
-				imports = append(imports, capture.Node.Content([]byte(content)))
-			}
-		}
-	}
-	return imports, nil
 }
 
 var _ entities.Tool = (*ProjectTool)(nil)
