@@ -1,4 +1,4 @@
-# AI Agent Codebase Guide
+# Codebase Guidelines
 
 ## Build Commands
 - Run TUI (default): `go run . [--storage=file|mongo]`

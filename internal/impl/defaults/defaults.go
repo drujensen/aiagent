@@ -17,9 +17,8 @@ func DefaultProviders() []*entities.Provider {
 			APIKeyName: "XAI_API_KEY",
 			Models: []entities.ModelPricing{
 				{Name: "grok-4", InputPricePerMille: 3.00, OutputPricePerMille: 15.00, ContextWindow: 256000},
-				{Name: "grok-3-fast", InputPricePerMille: 5.00, OutputPricePerMille: 25.00, ContextWindow: 131072},
+				{Name: "grok-code-fast", InputPricePerMille: 0.20, OutputPricePerMille: 1.50, ContextWindow: 256000},
 				{Name: "grok-3", InputPricePerMille: 3.00, OutputPricePerMille: 15.00, ContextWindow: 131072},
-				{Name: "grok-3-mini-fast", InputPricePerMille: 0.60, OutputPricePerMille: 4.00, ContextWindow: 131072},
 				{Name: "grok-3-mini", InputPricePerMille: 0.30, OutputPricePerMille: 0.50, ContextWindow: 131072},
 			},
 		},
@@ -156,13 +155,13 @@ func DefaultProviders() []*entities.Provider {
 func DefaultAgents() []entities.Agent {
 	temperature := 1.0
 	systemPrompt := `
-### Introduction and Role
+### Interface
 
-You are an interactive CLI tool that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
+You are built as an interactive CLI tool that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
 
 ### Memory
 
-If the current working directory contains a AIAGENT.md file, it is added to project->read tool for:
+If the current working directory contains a AGENTS.md file, it is added to project->read tool for:
 
 1. Storing bash commands (e.g., build, test).
 2. Recording code style preferences.
@@ -191,7 +190,7 @@ For software engineering tasks (e.g., bugs, features):
 1. Use the project -> get_structure or get_source tool to understand the codebase.
 2. Implement changes using available tools.
 3. Verify with tests; check for testing commands.
-4. Run lint and typecheck commands if available; suggest adding to AIAGENT.md.
+4. Run lint and typecheck commands if available; suggest adding to AGENTS.md.
 
 - Never commit changes unless explicitly asked.
 `
@@ -207,7 +206,7 @@ For software engineering tasks (e.g., bugs, features):
 			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
 			ProviderType:    "xai",
 			Endpoint:        "https://api.x.ai",
-			Model:           "grok-4",
+			Model:           "grok-code-fast",
 			APIKey:          "#{XAI_API_KEY}#",
 			SystemPrompt:    `### Introduction and Role\n\nYou are a Design agent, specializing in software architecture, system design, and high-level planning. Use tools to analyze codebases and propose designs.` + systemPrompt,
 			Temperature:     &temperature,
@@ -224,7 +223,7 @@ For software engineering tasks (e.g., bugs, features):
 			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
 			ProviderType:    "xai",
 			Endpoint:        "https://api.x.ai",
-			Model:           "grok-4",
+			Model:           "grok-code-fast",
 			APIKey:          "#{XAI_API_KEY}#",
 			SystemPrompt:    `### Introduction and Role\n\nYou are a Plan agent, specializing in creating detailed plans, breaking down tasks, and outlining steps for implementation.` + systemPrompt,
 			Temperature:     &temperature,
@@ -241,7 +240,7 @@ For software engineering tasks (e.g., bugs, features):
 			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
 			ProviderType:    "xai",
 			Endpoint:        "https://api.x.ai",
-			Model:           "grok-4",
+			Model:           "grok-code-fast",
 			APIKey:          "#{XAI_API_KEY}#",
 			SystemPrompt:    `### Introduction and Role\n\nYou are a Build agent, specializing in writing code, implementing features, and refactoring based on plans and designs.` + systemPrompt,
 			Temperature:     &temperature,
@@ -258,7 +257,7 @@ For software engineering tasks (e.g., bugs, features):
 			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
 			ProviderType:    "xai",
 			Endpoint:        "https://api.x.ai",
-			Model:           "grok-4",
+			Model:           "grok-code-fast",
 			APIKey:          "#{XAI_API_KEY}#",
 			SystemPrompt:    `### Introduction and Role\n\nYou are a Test agent, specializing in writing tests, debugging, and ensuring code quality through verification.` + systemPrompt,
 			Temperature:     &temperature,
@@ -275,7 +274,7 @@ For software engineering tasks (e.g., bugs, features):
 			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
 			ProviderType:    "xai",
 			Endpoint:        "https://api.x.ai",
-			Model:           "grok-4",
+			Model:           "grok-code-fast",
 			APIKey:          "#{XAI_API_KEY}#",
 			SystemPrompt:    `### Introduction and Role\n\nYou are a Deploy agent, specializing in deployment processes, CI/CD pipelines, and release management.` + systemPrompt,
 			Temperature:     &temperature,
@@ -308,7 +307,7 @@ func DefaultTools() []*entities.ToolData {
 			ToolType:      "Project",
 			Name:          "Project",
 			Description:   "This tool reads project details from a project file to provide context for the agent.",
-			Configuration: map[string]string{"project_file": "AIAGENT.md"},
+			Configuration: map[string]string{"project_file": "AGENTS.md"},
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		},
