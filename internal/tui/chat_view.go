@@ -33,6 +33,8 @@ func formatToolResult(toolName, result string, diff string) string {
 		return formatFileSearchResult(result)
 	case "Memory":
 		return formatMemoryResult(result)
+	case "Task":
+		return formatTaskResult(result)
 	default:
 		// For other tools, try to parse as JSON and display key fields
 		return formatGenericResult(result)
@@ -272,6 +274,68 @@ func formatMemoryResult(result string) string {
 		if output.Len() > 0 {
 			return output.String()
 		}
+	}
+
+	// Fallback to generic formatting
+	return formatGenericResult(result)
+}
+
+// formatTaskResult formats Task tool results
+func formatTaskResult(result string) string {
+	var output strings.Builder
+
+	// Try parsing as a single task (create/update/get result)
+	var task map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &task); err == nil {
+		if id, ok := task["id"].(string); ok {
+			output.WriteString(fmt.Sprintf("Task: %s\n", task["name"]))
+			output.WriteString(fmt.Sprintf("ID: %s\n", id))
+			if content, ok := task["content"].(string); ok && content != "" {
+				output.WriteString(fmt.Sprintf("Content: %s\n", content))
+			}
+			if status, ok := task["status"].(string); ok {
+				output.WriteString(fmt.Sprintf("Status: %s\n", status))
+			}
+			if priority, ok := task["priority"].(string); ok {
+				output.WriteString(fmt.Sprintf("Priority: %s\n", priority))
+			}
+			return output.String()
+		}
+	}
+
+	// Try parsing as array of tasks (list result)
+	var tasks []interface{}
+	if err := json.Unmarshal([]byte(result), &tasks); err == nil && len(tasks) > 0 {
+		output.WriteString(fmt.Sprintf("Tasks (%d total):\n", len(tasks)))
+
+		// Show first 5 tasks
+		maxTasks := 5
+		for i, taskItem := range tasks {
+			if i >= maxTasks {
+				break
+			}
+
+			if taskMap, ok := taskItem.(map[string]interface{}); ok {
+				if name, ok := taskMap["name"].(string); ok {
+					status := "unknown"
+					if s, ok := taskMap["status"].(string); ok {
+						status = s
+					}
+					output.WriteString(fmt.Sprintf("  • %s (%s)\n", name, status))
+				}
+			}
+		}
+
+		if len(tasks) > maxTasks {
+			output.WriteString(fmt.Sprintf("  ... and %d more tasks\n", len(tasks)-maxTasks))
+		}
+
+		return output.String()
+	}
+
+	// Try parsing as simple string result (delete result)
+	if strings.TrimSpace(result) != "" && !strings.Contains(result, "{") {
+		return result
 	}
 
 	// Fallback to generic formatting
@@ -617,7 +681,16 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	}
 
 	if activeChat != nil {
-		cv.SetActiveChat(activeChat)
+		cv.activeChat = activeChat
+		ctx := context.Background()
+		agent, err := agentService.GetAgent(ctx, activeChat.AgentID)
+		if err != nil {
+			cv.err = err
+			cv.currentAgent = nil
+		} else {
+			cv.currentAgent = agent
+		}
+		cv.updateViewportContent()
 	}
 
 	return cv
@@ -633,8 +706,17 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 	} else {
 		c.currentAgent = agent
 	}
+	c.updateViewportContent()
+}
+
+func (c *ChatView) updateViewportContent() {
+	if c.activeChat == nil {
+		c.viewport.SetContent("How can I help you today?")
+		return
+	}
+
 	var sb strings.Builder
-	for _, message := range chat.Messages {
+	for _, message := range c.activeChat.Messages {
 		if message.Role == "user" {
 			sb.WriteString(c.userStyle.Render("User: ") + message.Content + "\n")
 		} else if message.Role == "assistant" {
@@ -656,13 +738,13 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 			sb.WriteString(c.systemStyle.Render("System: ") + message.Content + "\n")
 		}
 	}
-	if len(chat.Messages) > 0 && chat.Messages[len(chat.Messages)-1].Role != "system" {
+	if len(c.activeChat.Messages) > 0 && c.activeChat.Messages[len(c.activeChat.Messages)-1].Role != "system" {
 		sb.WriteString(c.systemStyle.Render("System: Switched to new agent\n"))
 	}
 
 	// Add current tool calls being executed if processing
-	if c.isProcessing && len(chat.Messages) > 0 {
-		lastMsg := chat.Messages[len(chat.Messages)-1]
+	if c.isProcessing && len(c.activeChat.Messages) > 0 {
+		lastMsg := c.activeChat.Messages[len(c.activeChat.Messages)-1]
 		if lastMsg.Role == "assistant" && len(lastMsg.ToolCalls) > 0 {
 			sb.WriteString("\n" + c.systemStyle.Render("Executing tools:") + "\n")
 			for _, toolCall := range lastMsg.ToolCalls {
@@ -671,8 +753,22 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 		}
 	}
 
-	c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render(sb.String()))
-	c.viewport.GotoBottom()
+	// Add error as temporary system message if present
+	if c.err != nil {
+		if sb.Len() > 0 {
+			sb.WriteString("\n")
+		}
+		sb.WriteString(c.systemStyle.Render("System: Error - ") + c.err.Error() + "\n")
+	}
+
+	content := lipgloss.NewStyle().Width(c.viewport.Width).Render(sb.String())
+	c.viewport.SetContent(content)
+
+	// Only scroll to bottom if we're not processing (to avoid jumping during tool execution)
+	// or if this is a new message being added
+	if !c.isProcessing || (c.activeChat != nil && len(c.activeChat.Messages) > 0) {
+		c.viewport.GotoBottom()
+	}
 }
 
 func (c ChatView) Init() tea.Cmd {
@@ -729,7 +825,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				}
 				c.textarea.Reset()
 				c.activeChat.Messages = append(c.activeChat.Messages, *message)
-				c.SetActiveChat(c.activeChat)
+				c.updateViewportContent()
 				c.err = nil
 				ctx, cancel := context.WithCancel(context.Background())
 				c.cancel = cancel
@@ -787,7 +883,16 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 
 	case updatedChatMsg:
 		c.textarea.Reset()
-		c.SetActiveChat(m)
+		c.activeChat = m
+		ctx := context.Background()
+		agent, err := c.agentService.GetAgent(ctx, m.AgentID)
+		if err != nil {
+			c.err = err
+			c.currentAgent = nil
+		} else {
+			c.currentAgent = agent
+		}
+		c.updateViewportContent()
 		c.isProcessing = false
 		c.cancel = nil
 		return c, nil
@@ -802,7 +907,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				c.activeChat.Messages = c.activeChat.Messages[:lastIdx]
 			}
 		}
-		c.SetActiveChat(c.activeChat)
+		c.updateViewportContent()
 		return c, nil
 
 	case tea.WindowSizeMsg:
@@ -821,50 +926,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		c.textarea.SetWidth(innerWidth)
 
 		if c.activeChat != nil {
-			var sb strings.Builder
-			for _, message := range c.activeChat.Messages {
-				if message.Role == "user" {
-					sb.WriteString(c.userStyle.Render("User: ") + message.Content + "\n")
-				} else if message.Role == "assistant" {
-					sb.WriteString(c.asstStyle.Render("Assistant: ") + message.Content + "\n")
-				} else if message.Role == "tool" {
-					sb.WriteString(c.systemStyle.Render("Tool: ") + message.Content + "\n")
-					// Display tool call events
-					for _, event := range message.ToolCallEvents {
-						formattedResult := formatToolResult(event.ToolName, event.Result, event.Diff)
-						statusIcon := getToolStatusIcon(event.Error != "")
-						sb.WriteString(c.systemStyle.Render("  ↳ ") + statusIcon + " " + event.ToolName + ":\n")
-						sb.WriteString(c.systemStyle.Render("    ") + strings.ReplaceAll(formattedResult, "\n", "\n    ") + "\n")
-						if event.Error != "" {
-							errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true) // Red and bold
-							sb.WriteString(errorStyle.Render("    ✗ Error: ") + event.Error + "\n")
-						}
-					}
-				} else {
-					sb.WriteString(c.systemStyle.Render("System: ") + message.Content + "\n")
-				}
-			}
-			// Add current tool calls being executed if processing
-			if c.isProcessing && len(c.activeChat.Messages) > 0 {
-				lastMsg := c.activeChat.Messages[len(c.activeChat.Messages)-1]
-				if lastMsg.Role == "assistant" && len(lastMsg.ToolCalls) > 0 {
-					sb.WriteString("\n" + c.systemStyle.Render("Executing tools:") + "\n")
-					for _, toolCall := range lastMsg.ToolCalls {
-						sb.WriteString(c.systemStyle.Render("  ↳ ") + "🔄 " + toolCall.Function.Name + "\n")
-					}
-				}
-			}
-
-			// Add error as temporary system message if present
-			if c.err != nil {
-				if sb.Len() > 0 {
-					sb.WriteString("\n")
-				}
-				sb.WriteString(c.systemStyle.Render("System: Error - ") + c.err.Error() + "\n")
-			}
-			c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render(sb.String()))
+			c.updateViewportContent()
 		}
-		c.viewport.GotoBottom()
 		return c, nil
 	case tea.MouseMsg:
 		viewportYStart := 1
@@ -908,60 +971,6 @@ func (c ChatView) View() string {
 	if c.focused == "viewport" {
 		vpStyle = focusedBorder.Width(c.width - 4).Height(c.viewport.Height)
 	}
-
-	var content strings.Builder
-
-	// Check if activeChat is nil OR has no messages
-	if c.activeChat == nil || len(c.activeChat.Messages) == 0 {
-		content.WriteString("How can I help you today?")
-	} else {
-		// Display chat messages
-		for _, message := range c.activeChat.Messages {
-			if message.Role == "user" {
-				content.WriteString(c.userStyle.Render("User: ") + message.Content + "\n")
-			} else if message.Role == "assistant" {
-				content.WriteString(c.asstStyle.Render("Assistant: ") + message.Content + "\n")
-			} else if message.Role == "tool" {
-				content.WriteString(c.systemStyle.Render("Tool: ") + message.Content + "\n")
-				// Display tool call events
-				for _, event := range message.ToolCallEvents {
-					formattedResult := formatToolResult(event.ToolName, event.Result, event.Diff)
-					statusIcon := getToolStatusIcon(event.Error != "")
-					content.WriteString(c.systemStyle.Render("  ↳ ") + statusIcon + " " + event.ToolName + ":\n")
-					content.WriteString(c.systemStyle.Render("    ") + strings.ReplaceAll(formattedResult, "\n", "\n    ") + "\n")
-					if event.Error != "" {
-						errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true) // Red and bold
-						content.WriteString(errorStyle.Render("    ✗ Error: ") + event.Error + "\n")
-					}
-				}
-			} else {
-				content.WriteString(c.systemStyle.Render("System: ") + message.Content + "\n")
-			}
-		}
-	}
-
-	// Add error as temporary system message if present
-	if c.err != nil {
-		if content.Len() > 0 {
-			content.WriteString("\n")
-		}
-		content.WriteString(c.systemStyle.Render("System: Error - ") + c.err.Error() + "\n")
-		c.err = nil // Clear error after displaying
-	}
-
-	// Add current tool calls being executed if processing
-	if c.isProcessing && c.activeChat != nil && len(c.activeChat.Messages) > 0 {
-		lastMsg := c.activeChat.Messages[len(c.activeChat.Messages)-1]
-		if lastMsg.Role == "assistant" && len(lastMsg.ToolCalls) > 0 {
-			content.WriteString("\n" + c.systemStyle.Render("Executing tools:") + "\n")
-			for _, toolCall := range lastMsg.ToolCalls {
-				content.WriteString(c.systemStyle.Render("  ↳ ") + "🔄 " + toolCall.Function.Name + "\n")
-			}
-		}
-	}
-
-	// Set the viewport content
-	c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render(content.String()))
 
 	sb.WriteString(vpStyle.Render(c.viewport.View()))
 

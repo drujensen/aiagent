@@ -92,7 +92,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.state = "chat/view"
 		t.chatView.err = errors.New("New chat canceled")
 		if t.activeChat != nil {
-			t.chatView.SetActiveChat(t.activeChat)
+			t.chatView.updateViewportContent()
 		} else {
 			return t, tea.Quit
 		}
@@ -112,13 +112,22 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return t, func() tea.Msg { return errMsg(err) }
 		}
 		t.activeChat = chat
-		t.chatView.SetActiveChat(chat)
+		t.chatView.activeChat = chat
+		ctx2 := context.Background()
+		agent, err := t.agentService.GetAgent(ctx2, chat.AgentID)
+		if err != nil {
+			t.chatView.err = err
+			t.chatView.currentAgent = nil
+		} else {
+			t.chatView.currentAgent = agent
+		}
+		t.chatView.updateViewportContent()
 		t.state = "chat/view"
 		return t, nil
 	case historyCancelledMsg:
 		t.state = "chat/view"
 		if t.activeChat != nil {
-			t.chatView.SetActiveChat(t.activeChat)
+			t.chatView.updateViewportContent()
 		}
 		return t, nil
 
@@ -129,7 +138,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case usageCancelledMsg:
 		t.state = "chat/view"
 		if t.activeChat != nil {
-			t.chatView.SetActiveChat(t.activeChat)
+			t.chatView.updateViewportContent()
 		}
 		return t, nil
 
@@ -151,7 +160,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case agentsCancelledMsg:
 		t.state = "chat/view"
 		if t.activeChat != nil {
-			t.chatView.SetActiveChat(t.activeChat)
+			t.chatView.updateViewportContent()
 		}
 		return t, nil
 
@@ -169,7 +178,16 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return t, func() tea.Msg { return errMsg(err) }
 		}
 		t.activeChat = updatedChat
-		t.chatView.SetActiveChat(updatedChat)
+		t.chatView.activeChat = updatedChat
+		ctx2 := context.Background()
+		agent, err := t.agentService.GetAgent(ctx2, updatedChat.AgentID)
+		if err != nil {
+			t.chatView.err = err
+			t.chatView.currentAgent = nil
+		} else {
+			t.chatView.currentAgent = agent
+		}
+		t.chatView.updateViewportContent()
 		t.state = "chat/view"
 		return t, t.chatView.Init()
 
@@ -180,7 +198,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case toolsCancelledMsg:
 		t.state = "chat/view"
 		if t.activeChat != nil {
-			t.chatView.SetActiveChat(t.activeChat)
+			t.chatView.updateViewportContent()
 		}
 		return t, nil
 
@@ -194,7 +212,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Default back to chat view
 		t.state = "chat/view"
 		if t.activeChat != nil {
-			t.chatView.SetActiveChat(t.activeChat)
+			t.chatView.updateViewportContent()
 		}
 
 		switch msg.command {
@@ -225,7 +243,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case commandsCancelledMsg:
 		t.state = "chat/view"
 		if t.activeChat != nil {
-			t.chatView.SetActiveChat(t.activeChat)
+			t.chatView.updateViewportContent()
 		}
 		return t, nil
 
