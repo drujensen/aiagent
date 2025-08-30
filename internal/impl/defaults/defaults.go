@@ -197,7 +197,7 @@ For software engineering tasks (e.g., bugs, features):
 	maxTokens := 65536
 	bigContextWindow := 256000
 
-	tools := []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process"}
+	tools := []string{"WebSearch", "Project", "Task", "FileRead", "FileWrite", "FileSearch", "Directory", "Process"}
 
 	return []entities.Agent{
 		{
@@ -354,6 +354,15 @@ func DefaultTools() []*entities.ToolData {
 			Name:          "Process",
 			Description:   "Executes any command (e.g., python, ruby, node, git) with support for background processes, stdin/stdout/stderr interaction, timeouts, and full output. Can launch interactive environments like Python REPL or Ruby IRB by running in background and using write/read actions. The command is executed in the workspace directory.",
 			Configuration: map[string]string{"workspace": ""},
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+		{
+			ID:            "FCFDB2BD-829E-4CE6-9CE5-EE9158591EFA",
+			ToolType:      "Task",
+			Name:          "Task",
+			Description:   "This tool provides task management functionality, allowing creation, listing, updating, and deletion of tasks with priorities and statuses.",
+			Configuration: map[string]string{"data_dir": "."},
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		},

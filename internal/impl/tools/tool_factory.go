@@ -140,6 +140,14 @@ func NewToolFactory() (*ToolFactory, error) {
 			return NewMCPTool(name, description, configuration, logger)
 		},
 	}
+	toolFactory.toolFactories["Task"] = &ToolFactoryEntry{
+		Name:        "Task",
+		Description: `This tool provides task management functionality, allowing creation, listing, updating, and deletion of tasks with priorities and statuses.`,
+		ConfigKeys:  []string{"data_dir"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewTaskTool(name, description, configuration, logger)
+		},
+	}
 	return toolFactory, nil
 }
 
