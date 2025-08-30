@@ -31,11 +31,29 @@
                             {{renderMarkdown $msg.Content}}  <!-- Existing text -->
                         </div>
                     </div>
-                {{else}}
-                    <div class="message tool-message">
-                        <div class="message-content">{{renderMarkdown $msg.Content}}</div>
-                    </div>
-                {{end}}
+                 {{else if eq $msg.Role "tool"}}
+                     <div class="message tool-message">
+                         <div class="message-content">{{renderMarkdown $msg.Content}}</div>
+                         {{range $msg.ToolCallEvents}}
+                           <div class="tool-event">
+                             <div class="tool-name">{{.ToolName}}</div>
+                             <div class="tool-result">{{.Result}}</div>
+                             {{if .Diff}}
+                               <div class="tool-diff">
+                                 <pre>{{.Diff}}</pre>
+                               </div>
+                             {{end}}
+                             {{if .Error}}
+                               <div class="tool-error">{{.Error}}</div>
+                             {{end}}
+                           </div>
+                         {{end}}
+                     </div>
+                 {{else}}
+                     <div class="message system-message">
+                         <div class="message-content">{{renderMarkdown $msg.Content}}</div>
+                     </div>
+                 {{end}}
 
                 <!-- End a session when we see the next user message or end of messages -->
                 {{if or (and (lt (add $i 1) (len $.Messages)) (eq (index $.Messages (add $i 1)).Role "user")) (eq $i (sub (len $.Messages) 1))}}

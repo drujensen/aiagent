@@ -291,23 +291,34 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			}
 
 			var toolResult string
+			var toolError string
+			var diff string
 			if tool != nil {
 				result, err := (*tool).Execute(toolCall.Function.Arguments)
 				if err != nil {
 					toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
+					toolError = err.Error()
 				} else {
 					toolResult = result
+					// Extract diff if it's a file write operation
+					if toolName == "FileWrite" {
+						diff = m.extractDiffFromResult(result)
+					}
 				}
 			} else {
 				toolResult = fmt.Sprintf("Tool %s not found", toolName)
+				toolError = "Tool not found"
 			}
+			// Create tool call event
+			toolEvent := entities.NewToolCallEvent(toolName, toolCall.Function.Arguments, toolResult, toolError, diff, nil)
 
 			var newMessage = &entities.Message{
-				ID:         uuid.New().String(),
-				Role:       "tool",
-				Content:    fmt.Sprintf("Tool %s responded: %s", toolName, toolResult),
-				ToolCallID: toolCall.ID,
-				Timestamp:  time.Now(),
+				ID:             uuid.New().String(),
+				Role:           "tool",
+				Content:        fmt.Sprintf("Tool %s responded: %s", toolName, toolResult),
+				ToolCallID:     toolCall.ID,
+				ToolCallEvents: []entities.ToolCallEvent{*toolEvent},
+				Timestamp:      time.Now(),
 			}
 			newMessages = append(newMessages, newMessage)
 
@@ -366,6 +377,17 @@ func ensureToolCallResponses(messages []*entities.Message, logger *zap.Logger) [
 	}
 
 	return messages
+}
+
+// extractDiffFromResult extracts diff from FileWrite tool result
+func (m *AIModelIntegration) extractDiffFromResult(result string) string {
+	var resultData struct {
+		Diff string `json:"diff"`
+	}
+	if err := json.Unmarshal([]byte(result), &resultData); err == nil && resultData.Diff != "" {
+		return resultData.Diff
+	}
+	return ""
 }
 
 // GetUsage returns the token usage statistics

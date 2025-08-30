@@ -338,28 +338,40 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 				tool, err := m.toolRepo.GetToolByName(toolName)
 
 				var toolResult string
+				var toolError string
+				var diff string
 				if err != nil {
 					toolResult = fmt.Sprintf("Tool %s could not be retrieved: %v", toolName, err)
+					toolError = err.Error()
 					m.logger.Warn("Failed to get tool", zap.String("toolName", toolName), zap.Error(err))
 				} else if tool != nil {
 					result, err := (*tool).Execute(toolCall.Function.Arguments)
 					if err != nil {
 						toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
+						toolError = err.Error()
 						m.logger.Warn("Tool execution failed", zap.String("toolName", toolName), zap.Error(err))
 					} else {
 						toolResult = result
+						// Extract diff if it's a file write operation
+						if toolName == "FileWrite" {
+							diff = m.extractDiffFromResult(result)
+						}
 					}
 				} else {
 					toolResult = fmt.Sprintf("Tool %s not found", toolName)
+					toolError = "Tool not found"
 					m.logger.Warn("Tool not found", zap.String("toolName", toolName))
 				}
+				// Create tool call event
+				toolEvent := entities.NewToolCallEvent(toolName, toolCall.Function.Arguments, toolResult, toolError, diff, nil)
 
 				toolResponseMessage := &entities.Message{
-					ID:         uuid.New().String(),
-					Role:       "tool",
-					Content:    toolResult,
-					ToolCallID: toolCall.ID,
-					Timestamp:  time.Now(),
+					ID:             uuid.New().String(),
+					Role:           "tool",
+					Content:        toolResult,
+					ToolCallID:     toolCall.ID,
+					ToolCallEvents: []entities.ToolCallEvent{*toolEvent},
+					Timestamp:      time.Now(),
 				}
 				newMessages = append(newMessages, toolResponseMessage)
 
@@ -438,6 +450,17 @@ func ensureToolCallResponsesAnthropic(messages []*entities.Message, logger *zap.
 	}
 
 	return messages
+}
+
+// extractDiffFromResult extracts diff from FileWrite tool result
+func (m *AnthropicIntegration) extractDiffFromResult(result string) string {
+	var resultData struct {
+		Diff string `json:"diff"`
+	}
+	if err := json.Unmarshal([]byte(result), &resultData); err == nil && resultData.Diff != "" {
+		return resultData.Diff
+	}
+	return ""
 }
 
 // GetUsage returns usage information

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -14,6 +15,615 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/services"
 )
+
+// formatToolResult parses and formats tool execution results for display
+func formatToolResult(toolName, result string, diff string) string {
+	switch toolName {
+	case "FileWrite":
+		return formatFileWriteResult(result, diff)
+	case "FileRead":
+		return formatFileReadResult(result)
+	case "Directory":
+		return formatDirectoryResult(result)
+	case "Process":
+		return formatProcessResult(result)
+	case "Project":
+		return formatProjectResult(result)
+	case "FileSearch":
+		return formatFileSearchResult(result)
+	case "Memory":
+		return formatMemoryResult(result)
+	default:
+		// For other tools, try to parse as JSON and display key fields
+		return formatGenericResult(result)
+	}
+}
+
+// getToolStatusIcon returns an appropriate icon based on tool execution status
+func getToolStatusIcon(hasError bool) string {
+	if hasError {
+		return "❌"
+	}
+	return "✅"
+}
+
+// formatFileWriteResult formats FileWrite tool results
+func formatFileWriteResult(result string, diff string) string {
+	var resultData struct {
+		Diff      string `json:"diff"`
+		LineCount int    `json:"line_count"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
+		return result // Return raw if parsing fails
+	}
+
+	var output strings.Builder
+
+	if resultData.LineCount > 0 {
+		output.WriteString(fmt.Sprintf("File updated (%d lines)", resultData.LineCount))
+	} else {
+		output.WriteString("No changes made to file")
+	}
+
+	if diff != "" {
+		output.WriteString("\n\n" + formatDiff(diff))
+	} else if resultData.Diff != "" {
+		output.WriteString("\n\n" + formatDiff(resultData.Diff))
+	}
+
+	return output.String()
+}
+
+// formatFileSearchResult formats FileSearch tool results
+func formatFileSearchResult(result string) string {
+	var resultData struct {
+		FileResponse struct {
+			Results interface{} `json:"results"` // Can be []LineResult or map[string][]LineResult
+		} `json:"File_response"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
+		return result
+	}
+
+	var output strings.Builder
+
+	// Handle single file results
+	if singleResults, ok := resultData.FileResponse.Results.([]interface{}); ok {
+		output.WriteString(fmt.Sprintf("Search Results (%d matches):\n", len(singleResults)))
+
+		// Show first 10 matches
+		maxMatches := 10
+		for i, match := range singleResults {
+			if i >= maxMatches {
+				break
+			}
+
+			if matchMap, ok := match.(map[string]interface{}); ok {
+				line := int(matchMap["line"].(float64))
+				text := matchMap["text"].(string)
+				output.WriteString(fmt.Sprintf("  %4d: %s\n", line, text))
+			}
+		}
+
+		if len(singleResults) > maxMatches {
+			output.WriteString(fmt.Sprintf("  ... and %d more matches\n", len(singleResults)-maxMatches))
+		}
+
+	} else if multiResults, ok := resultData.FileResponse.Results.(map[string]interface{}); ok {
+		// Handle multi-file results
+		totalMatches := 0
+		fileCount := 0
+
+		output.WriteString("Multi-file Search Results:\n")
+
+		// Show first 5 files with their matches
+		maxFiles := 5
+		for filePath, matches := range multiResults {
+			if fileCount >= maxFiles {
+				break
+			}
+
+			if matchArray, ok := matches.([]interface{}); ok {
+				if len(matchArray) > 0 {
+					output.WriteString(fmt.Sprintf("📄 %s (%d matches):\n", filePath, len(matchArray)))
+					totalMatches += len(matchArray)
+
+					// Show first 5 matches per file
+					maxMatchesPerFile := 5
+					for i, match := range matchArray {
+						if i >= maxMatchesPerFile {
+							break
+						}
+
+						if matchMap, ok := match.(map[string]interface{}); ok {
+							line := int(matchMap["line"].(float64))
+							text := matchMap["text"].(string)
+							output.WriteString(fmt.Sprintf("    %4d: %s\n", line, text))
+						}
+					}
+
+					if len(matchArray) > maxMatchesPerFile {
+						output.WriteString(fmt.Sprintf("    ... and %d more matches\n", len(matchArray)-maxMatchesPerFile))
+					}
+
+					fileCount++
+				}
+			}
+		}
+
+		if len(multiResults) > maxFiles {
+			output.WriteString(fmt.Sprintf("... and %d more files with matches\n", len(multiResults)-maxFiles))
+		}
+
+		output.WriteString(fmt.Sprintf("\nTotal matches: %d across %d files", totalMatches, len(multiResults)))
+	}
+
+	return output.String()
+}
+
+// formatMemoryResult formats Memory tool results
+func formatMemoryResult(result string) string {
+	// Try to parse as different memory result types
+	var output strings.Builder
+
+	// Try parsing as entities array
+	var entities []interface{}
+	if err := json.Unmarshal([]byte(result), &entities); err == nil && len(entities) > 0 {
+		output.WriteString(fmt.Sprintf("Memory Entities (%d created):\n", len(entities)))
+
+		// Show first 5 entities
+		maxEntities := 5
+		for i, entity := range entities {
+			if i >= maxEntities {
+				break
+			}
+
+			if entityMap, ok := entity.(map[string]interface{}); ok {
+				name := entityMap["name"]
+				entityType := entityMap["type"]
+				output.WriteString(fmt.Sprintf("  • %s (%s)\n", name, entityType))
+			}
+		}
+
+		if len(entities) > maxEntities {
+			output.WriteString(fmt.Sprintf("  ... and %d more entities\n", len(entities)-maxEntities))
+		}
+
+		return output.String()
+	}
+
+	// Try parsing as relations array
+	var relations []interface{}
+	if err := json.Unmarshal([]byte(result), &relations); err == nil && len(relations) > 0 {
+		output.WriteString(fmt.Sprintf("Memory Relations (%d created):\n", len(relations)))
+
+		// Show first 5 relations
+		maxRelations := 5
+		for i, relation := range relations {
+			if i >= maxRelations {
+				break
+			}
+
+			if relationMap, ok := relation.(map[string]interface{}); ok {
+				source := relationMap["source"]
+				relationType := relationMap["type"]
+				target := relationMap["target"]
+				output.WriteString(fmt.Sprintf("  • %s --%s--> %s\n", source, relationType, target))
+			}
+		}
+
+		if len(relations) > maxRelations {
+			output.WriteString(fmt.Sprintf("  ... and %d more relations\n", len(relations)-maxRelations))
+		}
+
+		return output.String()
+	}
+
+	// Try parsing as graph structure
+	var graph map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &graph); err == nil {
+		if entities, ok := graph["entities"].([]interface{}); ok {
+			output.WriteString(fmt.Sprintf("Knowledge Graph - Entities (%d):\n", len(entities)))
+
+			// Show first 5 entities
+			maxEntities := 5
+			for i, entity := range entities {
+				if i >= maxEntities {
+					break
+				}
+
+				if entityMap, ok := entity.(map[string]interface{}); ok {
+					name := entityMap["name"]
+					entityType := entityMap["type"]
+					output.WriteString(fmt.Sprintf("  • %s (%s)\n", name, entityType))
+				}
+			}
+
+			if len(entities) > maxEntities {
+				output.WriteString(fmt.Sprintf("  ... and %d more entities\n", len(entities)-maxEntities))
+			}
+		}
+
+		if relations, ok := graph["relations"].([]interface{}); ok {
+			output.WriteString(fmt.Sprintf("\nRelations (%d):\n", len(relations)))
+
+			// Show first 5 relations
+			maxRelations := 5
+			for i, relation := range relations {
+				if i >= maxRelations {
+					break
+				}
+
+				if relationMap, ok := relation.(map[string]interface{}); ok {
+					source := relationMap["source"]
+					relationType := relationMap["type"]
+					target := relationMap["target"]
+					output.WriteString(fmt.Sprintf("  • %s --%s--> %s\n", source, relationType, target))
+				}
+			}
+
+			if len(relations) > maxRelations {
+				output.WriteString(fmt.Sprintf("  ... and %d more relations\n", len(relations)-maxRelations))
+			}
+		}
+
+		if output.Len() > 0 {
+			return output.String()
+		}
+	}
+
+	// Fallback to generic formatting
+	return formatGenericResult(result)
+}
+
+// formatDiff formats diff content with colors and proper formatting
+func formatDiff(diff string) string {
+	if !strings.Contains(diff, "```diff") {
+		return diff
+	}
+
+	// Extract diff content from markdown code block
+	start := strings.Index(diff, "```diff\n")
+	if start == -1 {
+		return diff
+	}
+	start += 8 // Length of "```diff\n"
+
+	end := strings.Index(diff[start:], "\n```")
+	if end == -1 {
+		return diff[start:]
+	}
+
+	diffContent := diff[start : start+end]
+
+	var output strings.Builder
+	output.WriteString("Changes:\n")
+
+	// Define styles for diff elements
+	addStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))     // Green
+	delStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1"))     // Red
+	hunkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))    // Cyan
+	contextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8")) // Gray
+
+	lines := strings.Split(diffContent, "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "+") {
+			output.WriteString(addStyle.Render(line) + "\n")
+		} else if strings.HasPrefix(line, "-") {
+			output.WriteString(delStyle.Render(line) + "\n")
+		} else if strings.HasPrefix(line, "@@") {
+			output.WriteString(hunkStyle.Render(line) + "\n")
+		} else if strings.HasPrefix(line, " ") {
+			output.WriteString(contextStyle.Render(line) + "\n")
+		} else {
+			output.WriteString(line + "\n")
+		}
+	}
+
+	return output.String()
+}
+
+// formatFileReadResult formats FileRead tool results
+func formatFileReadResult(result string) string {
+	var lines []struct {
+		Line int    `json:"line"`
+		Text string `json:"text"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &lines); err != nil {
+		return result
+	}
+
+	if len(lines) == 0 {
+		return "No content found"
+	}
+
+	var output strings.Builder
+	output.WriteString(fmt.Sprintf("Read %d lines:\n", len(lines)))
+
+	// Show first 8 lines with line numbers
+	maxLines := 8
+	if len(lines) > maxLines {
+		for i := 0; i < maxLines; i++ {
+			output.WriteString(fmt.Sprintf("%4d: %s\n", lines[i].Line, lines[i].Text))
+		}
+		output.WriteString(fmt.Sprintf("... and %d more lines", len(lines)-maxLines))
+	} else {
+		for _, line := range lines {
+			output.WriteString(fmt.Sprintf("%4d: %s\n", line.Line, line.Text))
+		}
+	}
+
+	return output.String()
+}
+
+// formatDirectoryResult formats Directory tool results
+func formatDirectoryResult(result string) string {
+	var resultData struct {
+		Path    string   `json:"path"`
+		Entries []string `json:"entries"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
+		return result
+	}
+
+	var output strings.Builder
+	output.WriteString(fmt.Sprintf("Directory listing: %s\n", resultData.Path))
+
+	// Show first 8 entries
+	maxEntries := 8
+	if len(resultData.Entries) > maxEntries {
+		for i := 0; i < maxEntries; i++ {
+			output.WriteString(fmt.Sprintf("  %s\n", resultData.Entries[i]))
+		}
+		output.WriteString(fmt.Sprintf("  ... and %d more entries", len(resultData.Entries)-maxEntries))
+	} else {
+		for _, entry := range resultData.Entries {
+			output.WriteString(fmt.Sprintf("  %s\n", entry))
+		}
+	}
+
+	return output.String()
+}
+
+// formatProcessResult formats Process tool results
+func formatProcessResult(result string) string {
+	var resultData struct {
+		Command string `json:"command"`
+		Stdout  string `json:"stdout"`
+		Stderr  string `json:"stderr"`
+		Status  string `json:"status"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
+		return result
+	}
+
+	var output strings.Builder
+	output.WriteString(fmt.Sprintf("Executed: %s\n", resultData.Command))
+
+	if resultData.Stdout != "" {
+		outputLines := strings.Split(strings.TrimSuffix(resultData.Stdout, "\n"), "\n")
+		output.WriteString(fmt.Sprintf("\nOutput (%d lines):\n", len(outputLines)))
+
+		// Show first 8 lines of output
+		maxLines := 8
+		if len(outputLines) > maxLines {
+			for i := 0; i < maxLines; i++ {
+				output.WriteString(fmt.Sprintf("  %s\n", outputLines[i]))
+			}
+			output.WriteString(fmt.Sprintf("  ... and %d more lines", len(outputLines)-maxLines))
+		} else {
+			for _, line := range outputLines {
+				output.WriteString(fmt.Sprintf("  %s\n", line))
+			}
+		}
+	}
+
+	if resultData.Stderr != "" {
+		errorLines := strings.Split(strings.TrimSuffix(resultData.Stderr, "\n"), "\n")
+		output.WriteString(fmt.Sprintf("\nError (%d lines):\n", len(errorLines)))
+
+		// Show first 8 lines of error
+		maxLines := 8
+		if len(errorLines) > maxLines {
+			for i := 0; i < maxLines; i++ {
+				output.WriteString(fmt.Sprintf("  %s\n", errorLines[i]))
+			}
+			output.WriteString(fmt.Sprintf("  ... and %d more lines", len(errorLines)-maxLines))
+		} else {
+			for _, line := range errorLines {
+				output.WriteString(fmt.Sprintf("  %s\n", line))
+			}
+		}
+	}
+
+	if resultData.Status != "" && resultData.Status != "completed" {
+		output.WriteString(fmt.Sprintf("\nStatus: %s", resultData.Status))
+	}
+
+	return output.String()
+}
+
+// formatProjectResult formats Project tool results (get_source and get_structure)
+func formatProjectResult(result string) string {
+	var resultData struct {
+		FileMap         string               `json:"file_map"`
+		FileContents    map[string]string    `json:"file_contents"`
+		SourceStructure map[string]Structure `json:"source_structure"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
+		return result
+	}
+
+	var output strings.Builder
+
+	// Show file map (directory tree) - limit to reasonable size
+	if resultData.FileMap != "" {
+		output.WriteString("Project Structure:\n")
+		lines := strings.Split(strings.TrimSuffix(resultData.FileMap, "\n"), "\n")
+
+		// Show first 15 lines of directory tree
+		maxLines := 15
+		if len(lines) > maxLines {
+			for i := 0; i < maxLines; i++ {
+				output.WriteString(fmt.Sprintf("  %s\n", lines[i]))
+			}
+			output.WriteString(fmt.Sprintf("  ... and %d more directories/files\n", len(lines)-maxLines))
+		} else {
+			for _, line := range lines {
+				output.WriteString(fmt.Sprintf("  %s\n", line))
+			}
+		}
+		output.WriteString("\n")
+	}
+
+	// Show file contents or structure
+	if len(resultData.FileContents) > 0 {
+		output.WriteString(fmt.Sprintf("Source Files (%d files):\n", len(resultData.FileContents)))
+
+		// Show first 5 files with limited content
+		maxFiles := 5
+		fileCount := 0
+		for path, content := range resultData.FileContents {
+			if fileCount >= maxFiles {
+				break
+			}
+
+			output.WriteString(fmt.Sprintf("📄 %s\n", path))
+
+			// Show first 10 lines of each file
+			lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
+			maxFileLines := 10
+			if len(lines) > maxFileLines {
+				for i := 0; i < maxFileLines; i++ {
+					output.WriteString(fmt.Sprintf("    %d: %s\n", i+1, lines[i]))
+				}
+				output.WriteString(fmt.Sprintf("    ... and %d more lines\n", len(lines)-maxFileLines))
+			} else {
+				for i, line := range lines {
+					output.WriteString(fmt.Sprintf("    %d: %s\n", i+1, line))
+				}
+			}
+			output.WriteString("\n")
+			fileCount++
+		}
+
+		if len(resultData.FileContents) > maxFiles {
+			output.WriteString(fmt.Sprintf("... and %d more files\n", len(resultData.FileContents)-maxFiles))
+		}
+
+	} else if len(resultData.SourceStructure) > 0 {
+		output.WriteString(fmt.Sprintf("Code Structure (%d files):\n", len(resultData.SourceStructure)))
+
+		// Show first 5 files with their structure
+		maxFiles := 5
+		fileCount := 0
+		for path, structure := range resultData.SourceStructure {
+			if fileCount >= maxFiles {
+				break
+			}
+
+			output.WriteString(fmt.Sprintf("🏗️ %s\n", path))
+
+			if structure.Error != "" {
+				output.WriteString(fmt.Sprintf("    Error: %s\n", structure.Error))
+			} else {
+				// Show key structure elements
+				if len(structure.Functions) > 0 {
+					output.WriteString(fmt.Sprintf("    Functions (%d):\n", len(structure.Functions)))
+					maxFuncs := 5
+					for i, fn := range structure.Functions {
+						if i >= maxFuncs {
+							output.WriteString(fmt.Sprintf("      ... and %d more functions\n", len(structure.Functions)-maxFuncs))
+							break
+						}
+						output.WriteString(fmt.Sprintf("      • %s\n", fn.Name))
+					}
+				}
+
+				if len(structure.Classes) > 0 {
+					output.WriteString(fmt.Sprintf("    Classes (%d):\n", len(structure.Classes)))
+					maxClasses := 3
+					for i, cls := range structure.Classes {
+						if i >= maxClasses {
+							output.WriteString(fmt.Sprintf("      ... and %d more classes\n", len(structure.Classes)-maxClasses))
+							break
+						}
+						output.WriteString(fmt.Sprintf("      • %s\n", cls.Name))
+					}
+				}
+			}
+			output.WriteString("\n")
+			fileCount++
+		}
+
+		if len(resultData.SourceStructure) > maxFiles {
+			output.WriteString(fmt.Sprintf("... and %d more files\n", len(resultData.SourceStructure)-maxFiles))
+		}
+	}
+
+	return output.String()
+}
+
+// Structure represents parsed code structure (simplified for display)
+type Structure struct {
+	Language  string     `json:"language"`
+	Functions []Function `json:"functions"`
+	Classes   []Class    `json:"classes"`
+	Error     string     `json:"error,omitempty"`
+}
+
+type Function struct {
+	Name string `json:"name"`
+}
+
+type Class struct {
+	Name string `json:"name"`
+}
+
+// formatGenericResult tries to parse generic JSON results
+func formatGenericResult(result string) string {
+	var jsonData map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &jsonData); err != nil {
+		// If not JSON, check if it's a long text and truncate if needed
+		if len(result) > 500 {
+			lines := strings.Split(result, "\n")
+			if len(lines) > 8 {
+				var output strings.Builder
+				for i := 0; i < 8; i++ {
+					output.WriteString(lines[i] + "\n")
+				}
+				output.WriteString(fmt.Sprintf("... and %d more lines", len(lines)-8))
+				return output.String()
+			}
+		}
+		return result // Return raw if not JSON and not too long
+	}
+
+	var output strings.Builder
+	for key, value := range jsonData {
+		// Handle long string values
+		if str, ok := value.(string); ok && len(str) > 200 {
+			lines := strings.Split(str, "\n")
+			if len(lines) > 8 {
+				var truncated strings.Builder
+				for i := 0; i < 8; i++ {
+					truncated.WriteString(lines[i] + "\n")
+				}
+				truncated.WriteString(fmt.Sprintf("... and %d more lines", len(lines)-8))
+				value = truncated.String()
+			}
+		}
+		output.WriteString(fmt.Sprintf("%s: %v\n", key, value))
+	}
+
+	return output.String()
+}
 
 type ChatView struct {
 	chatService  services.ChatService
@@ -95,13 +705,38 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 			sb.WriteString(c.userStyle.Render("User: ") + message.Content + "\n")
 		} else if message.Role == "assistant" {
 			sb.WriteString(c.asstStyle.Render("Assistant: ") + message.Content + "\n")
+		} else if message.Role == "tool" {
+			sb.WriteString(c.systemStyle.Render("Tool: ") + message.Content + "\n")
+			// Display tool call events
+			for _, event := range message.ToolCallEvents {
+				formattedResult := formatToolResult(event.ToolName, event.Result, event.Diff)
+				statusIcon := getToolStatusIcon(event.Error != "")
+				sb.WriteString(c.systemStyle.Render("  ↳ ") + statusIcon + " " + event.ToolName + ":\n")
+				sb.WriteString(c.systemStyle.Render("    ") + strings.ReplaceAll(formattedResult, "\n", "\n    ") + "\n")
+				if event.Error != "" {
+					errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true) // Red and bold
+					sb.WriteString(errorStyle.Render("    ✗ Error: ") + event.Error + "\n")
+				}
+			}
 		} else {
-			sb.WriteString(c.systemStyle.Render("System: Tool Called") + "\n")
+			sb.WriteString(c.systemStyle.Render("System: ") + message.Content + "\n")
 		}
 	}
 	if len(chat.Messages) > 0 && chat.Messages[len(chat.Messages)-1].Role != "system" {
 		sb.WriteString(c.systemStyle.Render("System: Switched to new agent\n"))
 	}
+
+	// Add current tool calls being executed if processing
+	if c.isProcessing && len(chat.Messages) > 0 {
+		lastMsg := chat.Messages[len(chat.Messages)-1]
+		if lastMsg.Role == "assistant" && len(lastMsg.ToolCalls) > 0 {
+			sb.WriteString("\n" + c.systemStyle.Render("Executing tools:") + "\n")
+			for _, toolCall := range lastMsg.ToolCalls {
+				sb.WriteString(c.systemStyle.Render("  ↳ ") + "🔄 " + toolCall.Function.Name + "\n")
+			}
+		}
+	}
+
 	c.viewport.SetContent(lipgloss.NewStyle().Width(c.viewport.Width).Render(sb.String()))
 	c.viewport.GotoBottom()
 }
@@ -258,10 +893,34 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 					sb.WriteString(c.userStyle.Render("User: ") + message.Content + "\n")
 				} else if message.Role == "assistant" {
 					sb.WriteString(c.asstStyle.Render("Assistant: ") + message.Content + "\n")
+				} else if message.Role == "tool" {
+					sb.WriteString(c.systemStyle.Render("Tool: ") + message.Content + "\n")
+					// Display tool call events
+					for _, event := range message.ToolCallEvents {
+						formattedResult := formatToolResult(event.ToolName, event.Result, event.Diff)
+						statusIcon := getToolStatusIcon(event.Error != "")
+						sb.WriteString(c.systemStyle.Render("  ↳ ") + statusIcon + " " + event.ToolName + ":\n")
+						sb.WriteString(c.systemStyle.Render("    ") + strings.ReplaceAll(formattedResult, "\n", "\n    ") + "\n")
+						if event.Error != "" {
+							errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true) // Red and bold
+							sb.WriteString(errorStyle.Render("    ✗ Error: ") + event.Error + "\n")
+						}
+					}
 				} else {
-					sb.WriteString(c.systemStyle.Render("System: Tool Called") + "\n")
+					sb.WriteString(c.systemStyle.Render("System: ") + message.Content + "\n")
 				}
 			}
+			// Add current tool calls being executed if processing
+			if c.isProcessing && len(c.activeChat.Messages) > 0 {
+				lastMsg := c.activeChat.Messages[len(c.activeChat.Messages)-1]
+				if lastMsg.Role == "assistant" && len(lastMsg.ToolCalls) > 0 {
+					sb.WriteString("\n" + c.systemStyle.Render("Executing tools:") + "\n")
+					for _, toolCall := range lastMsg.ToolCalls {
+						sb.WriteString(c.systemStyle.Render("  ↳ ") + "🔄 " + toolCall.Function.Name + "\n")
+					}
+				}
+			}
+
 			// Add error as temporary system message if present
 			if c.err != nil {
 				if sb.Len() > 0 {
@@ -328,8 +987,21 @@ func (c ChatView) View() string {
 				content.WriteString(c.userStyle.Render("User: ") + message.Content + "\n")
 			} else if message.Role == "assistant" {
 				content.WriteString(c.asstStyle.Render("Assistant: ") + message.Content + "\n")
+			} else if message.Role == "tool" {
+				content.WriteString(c.systemStyle.Render("Tool: ") + message.Content + "\n")
+				// Display tool call events
+				for _, event := range message.ToolCallEvents {
+					formattedResult := formatToolResult(event.ToolName, event.Result, event.Diff)
+					statusIcon := getToolStatusIcon(event.Error != "")
+					content.WriteString(c.systemStyle.Render("  ↳ ") + statusIcon + " " + event.ToolName + ":\n")
+					content.WriteString(c.systemStyle.Render("    ") + strings.ReplaceAll(formattedResult, "\n", "\n    ") + "\n")
+					if event.Error != "" {
+						errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true) // Red and bold
+						content.WriteString(errorStyle.Render("    ✗ Error: ") + event.Error + "\n")
+					}
+				}
 			} else {
-				content.WriteString(c.systemStyle.Render("System: Tool Called") + "\n")
+				content.WriteString(c.systemStyle.Render("System: ") + message.Content + "\n")
 			}
 		}
 	}
@@ -341,6 +1013,17 @@ func (c ChatView) View() string {
 		}
 		content.WriteString(c.systemStyle.Render("System: Error - ") + c.err.Error() + "\n")
 		c.err = nil // Clear error after displaying
+	}
+
+	// Add current tool calls being executed if processing
+	if c.isProcessing && c.activeChat != nil && len(c.activeChat.Messages) > 0 {
+		lastMsg := c.activeChat.Messages[len(c.activeChat.Messages)-1]
+		if lastMsg.Role == "assistant" && len(lastMsg.ToolCalls) > 0 {
+			content.WriteString("\n" + c.systemStyle.Render("Executing tools:") + "\n")
+			for _, toolCall := range lastMsg.ToolCalls {
+				content.WriteString(c.systemStyle.Render("  ↳ ") + "🔄 " + toolCall.Function.Name + "\n")
+			}
+		}
 	}
 
 	// Set the viewport content

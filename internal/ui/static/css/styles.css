@@ -270,6 +270,47 @@ a:active, button:active, .message-content:active {
     max-width: 100%;
 }
 
+.tool-event {
+    margin-top: 10px;
+    padding: 8px;
+    background-color: #333;
+    border-radius: 5px;
+    border-left: 3px solid #464EB8;
+}
+
+.tool-name {
+    font-weight: bold;
+    color: #7B83EB;
+    margin-bottom: 5px;
+}
+
+.tool-result {
+    color: #ccc;
+    margin-bottom: 5px;
+    word-wrap: break-word;
+}
+
+.tool-diff {
+    margin-top: 5px;
+}
+
+.tool-diff pre {
+    background-color: #222;
+    padding: 8px;
+    border-radius: 3px;
+    overflow-x: auto;
+    font-size: 0.9em;
+    color: #aaa;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.tool-error {
+    color: #ff6b6b;
+    margin-top: 5px;
+    font-style: italic;
+}
+
 .message-session {
     display: flex;
     flex-direction: column;

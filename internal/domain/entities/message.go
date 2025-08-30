@@ -23,13 +23,14 @@ type Usage struct {
 }
 
 type Message struct {
-	ID         string     `json:"id" bson:"_id"`
-	Role       string     `json:"role" bson:"role"`
-	Content    string     `json:"content" bson:"content"`
-	ToolCallID string     `json:"tool_call_id,omitempty" bson:"tool_call_id,omitempty"`
-	ToolCalls  []ToolCall `json:"tool_calls" bson:"tool_calls"`
-	Usage      *Usage     `json:"usage,omitempty" bson:"usage,omitempty"`
-	Timestamp  time.Time  `json:"timestamp" bson:"timestamp"`
+	ID             string          `json:"id" bson:"_id"`
+	Role           string          `json:"role" bson:"role"`
+	Content        string          `json:"content" bson:"content"`
+	ToolCallID     string          `json:"tool_call_id,omitempty" bson:"tool_call_id,omitempty"`
+	ToolCalls      []ToolCall      `json:"tool_calls" bson:"tool_calls"`
+	ToolCallEvents []ToolCallEvent `json:"tool_call_events,omitempty" bson:"tool_call_events,omitempty"`
+	Usage          *Usage          `json:"usage,omitempty" bson:"usage,omitempty"`
+	Timestamp      time.Time       `json:"timestamp" bson:"timestamp"`
 }
 
 func NewMessage(role, content string) *Message {
