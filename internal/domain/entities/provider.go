@@ -17,10 +17,11 @@ const (
 
 // ModelPricing represents the cost structure for a specific model
 type ModelPricing struct {
-	Name                string  `json:"name" bson:"name"`                                     // Model name (e.g., "gpt-4o", "claude-3-opus")
-	InputPricePerMille  float64 `json:"input_price_per_mille" bson:"input_price_per_mille"`   // Cost per 1000 input tokens
-	OutputPricePerMille float64 `json:"output_price_per_mille" bson:"output_price_per_mille"` // Cost per 1000 output tokens
-	ContextWindow       int     `json:"context_window" bson:"context_window"`                 // Maximum context length in tokens
+	Name                string   `json:"name" bson:"name"`                                     // Model name (e.g., "gpt-4o", "claude-3-opus")
+	InputPricePerMille  float64  `json:"input_price_per_mille" bson:"input_price_per_mille"`   // Cost per 1000 input tokens
+	OutputPricePerMille float64  `json:"output_price_per_mille" bson:"output_price_per_mille"` // Cost per 1000 output tokens
+	ContextWindow       int      `json:"context_window" bson:"context_window"`                 // Maximum context length in tokens
+	Capabilities        []string `json:"capabilities,omitempty" bson:"capabilities,omitempty"` // Model capabilities (e.g., "vision_analysis", "image_generation")
 }
 
 // Provider represents an AI model provider

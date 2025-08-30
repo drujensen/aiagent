@@ -148,6 +148,32 @@ func NewToolFactory() (*ToolFactory, error) {
 			return NewTaskTool(name, description, configuration, logger)
 		},
 	}
+	toolFactory.toolFactories["Subagent"] = &ToolFactoryEntry{
+		Name:        "Subagent",
+		Description: `This tool enables hierarchical agent orchestration, allowing parent agents to invoke and manage subagents for specific tasks.`,
+		ConfigKeys:  []string{},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			// Note: This will need proper dependency injection in the real implementation
+			// For now, we'll create a basic version
+			return NewSubagentTool(name, description, configuration, logger, nil, nil)
+		},
+	}
+	toolFactory.toolFactories["ImageSubAgent"] = &ToolFactoryEntry{
+		Name:        "ImageSubAgent",
+		Description: `Subagent wrapper for image generation that provides isolation and resource management for AI image creation tasks.`,
+		ConfigKeys:  []string{"provider", "api_key", "base_url", "model", "subagent_mode"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewImageSubagentWrapper(name, description, configuration, logger)
+		},
+	}
+	toolFactory.toolFactories["VisionSubAgent"] = &ToolFactoryEntry{
+		Name:        "VisionSubAgent",
+		Description: `Subagent wrapper for vision analysis that provides isolation and resource management for image understanding tasks.`,
+		ConfigKeys:  []string{"provider", "api_key", "base_url", "model", "subagent_mode"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewVisionSubagentWrapper(name, description, configuration, logger)
+		},
+	}
 	return toolFactory, nil
 }
 

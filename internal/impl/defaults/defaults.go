@@ -17,9 +17,11 @@ func DefaultProviders() []*entities.Provider {
 			APIKeyName: "XAI_API_KEY",
 			Models: []entities.ModelPricing{
 				{Name: "grok-4", InputPricePerMille: 3.00, OutputPricePerMille: 15.00, ContextWindow: 256000},
-				{Name: "grok-code-fast", InputPricePerMille: 0.20, OutputPricePerMille: 1.50, ContextWindow: 256000},
+				{Name: "sonic-fast", InputPricePerMille: 0.20, OutputPricePerMille: 1.50, ContextWindow: 256000},
 				{Name: "grok-3", InputPricePerMille: 3.00, OutputPricePerMille: 15.00, ContextWindow: 131072},
 				{Name: "grok-3-mini", InputPricePerMille: 0.30, OutputPricePerMille: 0.50, ContextWindow: 131072},
+				{Name: "grok-2-image", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 0, Capabilities: []string{"image_generation"}},
+				{Name: "grok-2-vision-latest", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000, Capabilities: []string{"vision_analysis"}},
 			},
 		},
 		{
@@ -29,12 +31,12 @@ func DefaultProviders() []*entities.Provider {
 			BaseURL:    "https://api.openai.com",
 			APIKeyName: "OPENAI_API_KEY",
 			Models: []entities.ModelPricing{
-				{Name: "gpt-4.1", InputPricePerMille: 2.50, OutputPricePerMille: 8.00, ContextWindow: 1000000},
-				{Name: "gpt-4.1-mini", InputPricePerMille: 0.40, OutputPricePerMille: 1.60, ContextWindow: 1000000},
-				{Name: "gpt-4.1-nano", InputPricePerMille: 0.10, OutputPricePerMille: 0.40, ContextWindow: 1000000},
-				{Name: "o4-mini", InputPricePerMille: 1.10, OutputPricePerMille: 4.40, ContextWindow: 200000},
-				{Name: "o3", InputPricePerMille: 2.50, OutputPricePerMille: 40.00, ContextWindow: 200000},
-				{Name: "o3-mini", InputPricePerMille: 1.10, OutputPricePerMille: 4.40, ContextWindow: 200000},
+				{Name: "gpt-4o", InputPricePerMille: 2.50, OutputPricePerMille: 8.00, ContextWindow: 1000000},
+				{Name: "gpt-4o-mini", InputPricePerMille: 0.40, OutputPricePerMille: 1.60, ContextWindow: 1000000},
+				{Name: "o1-preview", InputPricePerMille: 1.10, OutputPricePerMille: 4.40, ContextWindow: 200000},
+				{Name: "o1-mini", InputPricePerMille: 1.10, OutputPricePerMille: 4.40, ContextWindow: 200000},
+				{Name: "dall-e-3", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 0, Capabilities: []string{"image_generation"}},
+				{Name: "gpt-4-vision-preview", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000, Capabilities: []string{"vision_analysis"}},
 			},
 		},
 		{
@@ -57,10 +59,10 @@ func DefaultProviders() []*entities.Provider {
 			BaseURL:    "https://generativelanguage.googleapis.com",
 			APIKeyName: "GEMINI_API_KEY",
 			Models: []entities.ModelPricing{
-				{Name: "gemini-2.5-pro-preview-03-25", InputPricePerMille: 2.50, OutputPricePerMille: 15.00, ContextWindow: 1000000},
-				{Name: "gemini-2.5-flash-preview-04-17", InputPricePerMille: 0.15, OutputPricePerMille: 3.50, ContextWindow: 1000000},
-				{Name: "gemini-2.0-flash", InputPricePerMille: 0.10, OutputPricePerMille: 0.40, ContextWindow: 1000000},
-				{Name: "gemini-2.0-flash-lite", InputPricePerMille: 0.075, OutputPricePerMille: 0.30, ContextWindow: 1000000},
+				{Name: "gemini-2.5-pro-preview-03-25", InputPricePerMille: 2.50, OutputPricePerMille: 15.00, ContextWindow: 1000000, Capabilities: []string{"vision_analysis"}},
+				{Name: "gemini-2.5-flash-preview-04-17", InputPricePerMille: 0.15, OutputPricePerMille: 3.50, ContextWindow: 1000000, Capabilities: []string{"vision_analysis"}},
+				{Name: "gemini-2.0-flash", InputPricePerMille: 0.10, OutputPricePerMille: 0.40, ContextWindow: 1000000, Capabilities: []string{"vision_analysis"}},
+				{Name: "gemini-2.0-flash-lite", InputPricePerMille: 0.075, OutputPricePerMille: 0.30, ContextWindow: 1000000, Capabilities: []string{"vision_analysis"}},
 			},
 		},
 		{
@@ -197,7 +199,7 @@ For software engineering tasks (e.g., bugs, features):
 	maxTokens := 65536
 	bigContextWindow := 256000
 
-	tools := []string{"WebSearch", "Project", "Task", "FileRead", "FileWrite", "FileSearch", "Directory", "Process"}
+	tools := []string{"WebSearch", "Project", "Task", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Subagent"}
 
 	return []entities.Agent{
 		{
@@ -274,7 +276,7 @@ For software engineering tasks (e.g., bugs, features):
 			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
 			ProviderType:    "xai",
 			Endpoint:        "https://api.x.ai",
-			Model:           "grok-code-fast",
+			Model:           "sonic-fast",
 			APIKey:          "#{XAI_API_KEY}#",
 			SystemPrompt:    `### Introduction and Role\n\nYou are a Test agent, specializing in writing tests, debugging, and ensuring code quality through verification.` + systemPrompt,
 			Temperature:     &temperature,
@@ -282,6 +284,59 @@ For software engineering tasks (e.g., bugs, features):
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
 			Tools:           tools,
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		},
+		// Specialized sub-agents for image processing
+		{
+			ID:           "IMAGE_GENERATOR_AGENT",
+			Name:         "Image Generator",
+			ProviderID:   "D2BB79D4-C11C-407A-AF9D-9713524BB3BF", // OpenAI
+			ProviderType: "openai",
+			Endpoint:     "https://api.openai.com",
+			Model:        "dall-e-3",
+			APIKey:       "#{OPENAI_API_KEY}#",
+			SystemPrompt: `### Introduction and Role
+
+You are an Image Generation specialist, focused on creating high-quality images from text prompts.
+Your role is to:
+1. Analyze text descriptions and create detailed image prompts
+2. Generate images using AI image generation models
+3. Ensure images meet quality and content requirements
+4. Provide feedback on image generation results
+
+You specialize in artistic composition, lighting, style, and visual storytelling.`,
+			Temperature:     &temperature,
+			MaxTokens:       &maxTokens,
+			ContextWindow:   &bigContextWindow,
+			ReasoningEffort: "",
+			Tools:           []string{"ImageSubAgent"},
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		},
+		{
+			ID:           "VISION_ANALYST_AGENT",
+			Name:         "Vision Analyst",
+			ProviderID:   "D2BB79D4-C11C-407A-AF9D-9713524BB3BF", // OpenAI
+			ProviderType: "openai",
+			Endpoint:     "https://api.openai.com",
+			Model:        "gpt-4-vision-preview",
+			APIKey:       "#{OPENAI_API_KEY}#",
+			SystemPrompt: `### Introduction and Role
+
+You are a Vision Analysis specialist, focused on analyzing and describing images.
+Your role is to:
+1. Examine images and provide detailed descriptions
+2. Identify objects, scenes, emotions, and contextual information
+3. Analyze composition, lighting, and artistic elements
+4. Provide insights about image content and meaning
+
+You excel at visual interpretation and detailed image analysis.`,
+			Temperature:     &temperature,
+			MaxTokens:       &maxTokens,
+			ContextWindow:   &bigContextWindow,
+			ReasoningEffort: "",
+			Tools:           []string{"VisionSubAgent"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -365,6 +420,43 @@ func DefaultTools() []*entities.ToolData {
 			Configuration: map[string]string{"data_dir": "."},
 			CreatedAt:     now,
 			UpdatedAt:     now,
+		},
+		{
+			ID:            "SUBAGENT_TOOL_DEFAULT",
+			ToolType:      "Subagent",
+			Name:          "Subagent",
+			Description:   "Enables hierarchical agent orchestration and task delegation to specialized subagents.",
+			Configuration: map[string]string{},
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+		{
+			ID:          "IMAGE_SUBAGENT_DEFAULT",
+			ToolType:    "ImageSubAgent",
+			Name:        "Image Subagent",
+			Description: "Subagent wrapper for image generation with isolation and resource management.",
+			Configuration: map[string]string{
+				"provider":      "openai",
+				"api_key":       "#{OPENAI_API_KEY}#",
+				"model":         "dall-e-3",
+				"subagent_mode": "true",
+			},
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:          "VISION_SUBAGENT_DEFAULT",
+			ToolType:    "VisionSubAgent",
+			Name:        "Vision Subagent",
+			Description: "Subagent wrapper for vision analysis with isolation and resource management.",
+			Configuration: map[string]string{
+				"provider":      "openai",
+				"api_key":       "#{OPENAI_API_KEY}#",
+				"model":         "gpt-4-vision-preview",
+				"subagent_mode": "true",
+			},
+			CreatedAt: now,
+			UpdatedAt: now,
 		},
 	}
 }
