@@ -261,6 +261,10 @@ func (t *FileSearchTool) searchMultipleFiles(dirPath, pattern, filePattern strin
 			return nil // Continue walking despite errors
 		}
 		if info.IsDir() {
+			// Skip .git and .aiagent directories
+			if info.Name() == ".git" || info.Name() == ".aiagent" {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if filePattern != "" {

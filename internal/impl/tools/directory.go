@@ -173,6 +173,10 @@ func (t *DirectoryTool) Execute(arguments string) (string, error) {
 		}
 		var formatted []string
 		for _, entry := range entries {
+			// Skip .git and .aiagent directories
+			if entry.IsDir() && (entry.Name() == ".git" || entry.Name() == ".aiagent") {
+				continue
+			}
 			prefix := "[FILE]"
 			if entry.IsDir() {
 				prefix = "[DIR]"
@@ -262,6 +266,10 @@ func (t *DirectoryTool) buildDirectoryTree(path string, depthLimit int, currentD
 
 	var result []TreeEntry
 	for _, entry := range entries {
+		// Skip .git and .aiagent directories
+		if entry.IsDir() && (entry.Name() == ".git" || entry.Name() == ".aiagent") {
+			continue
+		}
 		treeEntry := TreeEntry{
 			Name: entry.Name(),
 			Type: "file",

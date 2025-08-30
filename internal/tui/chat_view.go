@@ -448,12 +448,11 @@ func formatProcessResult(result string) string {
 	return output.String()
 }
 
-// formatProjectResult formats Project tool results (get_source and get_structure)
+// formatProjectResult formats Project tool results (get_source)
 func formatProjectResult(result string) string {
 	var resultData struct {
-		FileMap         string               `json:"file_map"`
-		FileContents    map[string]string    `json:"file_contents"`
-		SourceStructure map[string]Structure `json:"source_structure"`
+		FileMap      string            `json:"file_map"`
+		FileContents map[string]string `json:"file_contents"`
 	}
 
 	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
@@ -516,74 +515,9 @@ func formatProjectResult(result string) string {
 		if len(resultData.FileContents) > maxFiles {
 			output.WriteString(fmt.Sprintf("... and %d more files\n", len(resultData.FileContents)-maxFiles))
 		}
-
-	} else if len(resultData.SourceStructure) > 0 {
-		output.WriteString(fmt.Sprintf("Code Structure (%d files):\n", len(resultData.SourceStructure)))
-
-		// Show first 5 files with their structure
-		maxFiles := 5
-		fileCount := 0
-		for path, structure := range resultData.SourceStructure {
-			if fileCount >= maxFiles {
-				break
-			}
-
-			output.WriteString(fmt.Sprintf("🏗️ %s\n", path))
-
-			if structure.Error != "" {
-				output.WriteString(fmt.Sprintf("    Error: %s\n", structure.Error))
-			} else {
-				// Show key structure elements
-				if len(structure.Functions) > 0 {
-					output.WriteString(fmt.Sprintf("    Functions (%d):\n", len(structure.Functions)))
-					maxFuncs := 5
-					for i, fn := range structure.Functions {
-						if i >= maxFuncs {
-							output.WriteString(fmt.Sprintf("      ... and %d more functions\n", len(structure.Functions)-maxFuncs))
-							break
-						}
-						output.WriteString(fmt.Sprintf("      • %s\n", fn.Name))
-					}
-				}
-
-				if len(structure.Classes) > 0 {
-					output.WriteString(fmt.Sprintf("    Classes (%d):\n", len(structure.Classes)))
-					maxClasses := 3
-					for i, cls := range structure.Classes {
-						if i >= maxClasses {
-							output.WriteString(fmt.Sprintf("      ... and %d more classes\n", len(structure.Classes)-maxClasses))
-							break
-						}
-						output.WriteString(fmt.Sprintf("      • %s\n", cls.Name))
-					}
-				}
-			}
-			output.WriteString("\n")
-			fileCount++
-		}
-
-		if len(resultData.SourceStructure) > maxFiles {
-			output.WriteString(fmt.Sprintf("... and %d more files\n", len(resultData.SourceStructure)-maxFiles))
-		}
 	}
 
 	return output.String()
-}
-
-// Structure represents parsed code structure (simplified for display)
-type Structure struct {
-	Language  string     `json:"language"`
-	Functions []Function `json:"functions"`
-	Classes   []Class    `json:"classes"`
-	Error     string     `json:"error,omitempty"`
-}
-
-type Function struct {
-	Name string `json:"name"`
-}
-
-type Class struct {
-	Name string `json:"name"`
 }
 
 // formatGenericResult tries to parse generic JSON results

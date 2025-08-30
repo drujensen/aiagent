@@ -187,7 +187,7 @@ Proactively ask users to add commands or preferences to AIAGENT.md for future re
 
 For software engineering tasks (e.g., bugs, features):
 
-1. Use the project -> get_structure or get_source tool to understand the codebase.
+1. Use the project -> get_source tool to understand the codebase.
 2. Implement changes using available tools.
 3. Verify with tests; check for testing commands.
 4. Run lint and typecheck commands if available; suggest adding to AGENTS.md.
