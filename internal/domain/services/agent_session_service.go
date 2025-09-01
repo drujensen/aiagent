@@ -15,7 +15,7 @@ type AgentSessionService interface {
 	CreateSession(ctx context.Context, parentAgentID, subagentID, taskID string) (string, error)
 	GetSession(ctx context.Context, sessionID string) (*entities.AgentSession, error)
 	UpdateSessionStatus(ctx context.Context, sessionID, status string) error
-	CompleteSession(ctx context.Context, sessionID string, result interface{}) error
+	CompleteSession(ctx context.Context, sessionID string, result any) error
 	ListActiveSessions(ctx context.Context, agentID string) ([]*entities.AgentSession, error)
 	CleanupExpiredSessions(ctx context.Context) error
 }
@@ -122,7 +122,7 @@ func (s *agentSessionService) UpdateSessionStatus(ctx context.Context, sessionID
 	return nil
 }
 
-func (s *agentSessionService) CompleteSession(ctx context.Context, sessionID string, result interface{}) error {
+func (s *agentSessionService) CompleteSession(ctx context.Context, sessionID string, result any) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 

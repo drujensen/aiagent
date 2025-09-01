@@ -26,6 +26,9 @@ type ChatService interface {
 	UpdateChat(ctx context.Context, id, agentID, name string) (*entities.Chat, error)
 	DeleteChat(ctx context.Context, id string) error
 	SendMessage(ctx context.Context, id string, message *entities.Message) (*entities.Message, error)
+	// Agent-to-agent messaging methods
+	SendAgentMessage(ctx context.Context, fromAgentID, toAgentID, sessionID, message string) error
+	GetAgentConversation(ctx context.Context, sessionID string) ([]entities.Message, error)
 }
 
 type chatService struct {
@@ -602,6 +605,90 @@ func (s *chatService) ensureToolCallResponses(messages []*entities.Message) []*e
 	}
 
 	return messages
+}
+
+// SendAgentMessage sends a message from one agent to another within a session context
+func (s *chatService) SendAgentMessage(ctx context.Context, fromAgentID, toAgentID, sessionID, message string) error {
+	if fromAgentID == "" || toAgentID == "" {
+		return errors.ValidationErrorf("both fromAgentID and toAgentID are required")
+	}
+	if sessionID == "" {
+		return errors.ValidationErrorf("sessionID is required")
+	}
+	if message == "" {
+		return errors.ValidationErrorf("message content is required")
+	}
+
+	// Create or get chat session for agent-to-agent communication
+	chatName := fmt.Sprintf("Agent Session: %s -> %s (%s)", fromAgentID, toAgentID, sessionID)
+
+	// Try to find existing chat for this session
+	existingChat, err := s.findAgentChat(ctx, sessionID)
+	if err != nil {
+		// Create new chat if not found
+		existingChat, err = s.CreateChat(ctx, toAgentID, chatName)
+		if err != nil {
+			return errors.InternalErrorf("failed to create agent chat session: %v", err)
+		}
+		// Store session ID in chat metadata (using a comment for now)
+		existingChat.Name = fmt.Sprintf("%s [SESSION:%s]", chatName, sessionID)
+		if err := s.chatRepo.UpdateChat(ctx, existingChat); err != nil {
+			s.logger.Warn("Failed to update chat with session ID", zap.Error(err))
+		}
+	}
+
+	// Create message from the sending agent
+	agentMessage := &entities.Message{
+		Role:      "user", // Treat as user message for the receiving agent
+		Content:   fmt.Sprintf("[From Agent %s]: %s", fromAgentID, message),
+		Timestamp: time.Now(),
+	}
+
+	// Send the message (this will trigger AI response from the receiving agent)
+	_, err = s.SendMessage(ctx, existingChat.ID, agentMessage)
+	if err != nil {
+		return errors.InternalErrorf("failed to send agent message: %v", err)
+	}
+
+	s.logger.Info("Sent agent-to-agent message",
+		zap.String("from_agent", fromAgentID),
+		zap.String("to_agent", toAgentID),
+		zap.String("session_id", sessionID),
+		zap.String("chat_id", existingChat.ID))
+
+	return nil
+}
+
+// GetAgentConversation retrieves the conversation history for an agent session
+func (s *chatService) GetAgentConversation(ctx context.Context, sessionID string) ([]entities.Message, error) {
+	if sessionID == "" {
+		return nil, errors.ValidationErrorf("sessionID is required")
+	}
+
+	chat, err := s.findAgentChat(ctx, sessionID)
+	if err != nil {
+		return nil, errors.NotFoundErrorf("agent conversation not found for session %s: %v", sessionID, err)
+	}
+
+	return chat.Messages, nil
+}
+
+// findAgentChat finds an existing chat for the given session ID
+func (s *chatService) findAgentChat(ctx context.Context, sessionID string) (*entities.Chat, error) {
+	chats, err := s.chatRepo.ListChats(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Look for chat with session ID in name
+	sessionTag := fmt.Sprintf("[SESSION:%s]", sessionID)
+	for _, chat := range chats {
+		if strings.Contains(chat.Name, sessionTag) {
+			return chat, nil
+		}
+	}
+
+	return nil, errors.NotFoundErrorf("chat not found for session %s", sessionID)
 }
 
 // verify that chatService implements ChatService

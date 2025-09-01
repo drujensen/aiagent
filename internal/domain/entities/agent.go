@@ -8,21 +8,31 @@ import (
 )
 
 type Agent struct {
-	ID              string       `json:"id" bson:"_id"`
-	Name            string       `json:"name" bson:"name"`
-	ProviderID      string       `json:"provider_id" bson:"provider_id"`
-	ProviderType    ProviderType `json:"provider_type" bson:"provider_type"` // Denormalized for easier access
-	Endpoint        string       `json:"endpoint" bson:"endpoint"`           // Will be populated automatically for known providers
-	Model           string       `json:"model" bson:"model"`
-	APIKey          string       `json:"api_key" bson:"api_key"`
-	SystemPrompt    string       `json:"system_prompt" bson:"system_prompt"`
-	Temperature     *float64     `json:"temperature,omitempty" bson:"temperature,omitempty"`
-	MaxTokens       *int         `json:"max_tokens,omitempty" bson:"max_tokens,omitempty"`
-	ContextWindow   *int         `json:"context_window,omitempty" bson:"context_window,omitempty"`
-	ReasoningEffort string       `json:"reasoning_effort" bson:"reasoning_effort"` // low, medium, high, or none
-	Tools           []string     `json:"tools,omitempty" bson:"tools,omitempty"`
-	CreatedAt       time.Time    `json:"created_at" bson:"created_at"`
-	UpdatedAt       time.Time    `json:"updated_at" bson:"updated_at"`
+	ID                  string            `json:"id" bson:"_id"`
+	Name                string            `json:"name" bson:"name"`
+	ProviderID          string            `json:"provider_id" bson:"provider_id"`
+	ProviderType        ProviderType      `json:"provider_type" bson:"provider_type"` // Denormalized for easier access
+	Endpoint            string            `json:"endpoint" bson:"endpoint"`           // Will be populated automatically for known providers
+	Model               string            `json:"model" bson:"model"`
+	APIKey              string            `json:"api_key" bson:"api_key"`
+	SystemPrompt        string            `json:"system_prompt" bson:"system_prompt"`
+	Temperature         *float64          `json:"temperature,omitempty" bson:"temperature,omitempty"`
+	MaxTokens           *int              `json:"max_tokens,omitempty" bson:"max_tokens,omitempty"`
+	ContextWindow       *int              `json:"context_window,omitempty" bson:"context_window,omitempty"`
+	ReasoningEffort     string            `json:"reasoning_effort" bson:"reasoning_effort"` // low, medium, high, or none
+	Tools               []string          `json:"tools,omitempty" bson:"tools,omitempty"`
+	SupportedModalities []string          `json:"supported_modalities,omitempty" bson:"supported_modalities,omitempty"` // ["text", "image", "vision"]
+	PreferredModels     map[string]string `json:"preferred_models,omitempty" bson:"preferred_models,omitempty"`         // modality -> model_id
+	ImageSettings       *ImageConfig      `json:"image_settings,omitempty" bson:"image_settings,omitempty"`
+	CreatedAt           time.Time         `json:"created_at" bson:"created_at"`
+	UpdatedAt           time.Time         `json:"updated_at" bson:"updated_at"`
+}
+
+type ImageConfig struct {
+	MaxResolution string   `json:"max_resolution,omitempty" bson:"max_resolution,omitempty"` // "1024x1024", "1792x1024", etc.
+	Quality       string   `json:"quality,omitempty" bson:"quality,omitempty"`               // "standard", "hd"
+	Style         string   `json:"style,omitempty" bson:"style,omitempty"`                   // "natural", "vivid"
+	Formats       []string `json:"formats,omitempty" bson:"formats,omitempty"`               // ["png", "jpg", "webp", "gif"]
 }
 
 func NewAgent(name, role string, providerID string, providerType ProviderType, endpoint, model, apiKey, systemPrompt string, tools []string) *Agent {

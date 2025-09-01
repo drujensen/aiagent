@@ -81,7 +81,7 @@ func (u *UI) Run() error {
 	homeController := uiapicontrollers.NewHomeController(u.logger, tmpl, u.chatService, u.agentService, u.toolService)
 	agentController := uiapicontrollers.NewAgentController(u.logger, tmpl, u.agentService, u.toolService, u.providerService)
 	chatController := uiapicontrollers.NewChatController(u.logger, tmpl, u.chatService, u.agentService)
-	toolFactory, err := tools.NewToolFactory()
+	toolFactory, err := tools.NewToolFactory(nil, nil)
 	if err != nil {
 		u.logger.Fatal("Failed to initialize tool factory", zap.Error(err))
 	}

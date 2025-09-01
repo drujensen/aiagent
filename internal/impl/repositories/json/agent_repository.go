@@ -1,7 +1,5 @@
 package repositories_json
 
-package repositories_json
-
 import (
 	"context"
 	"encoding/json"
@@ -11,7 +9,7 @@ import (
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
-	"github.com/drujensen/aiagent/internal/domain/errs"
+	errors "github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
 
 	"github.com/google/uuid"

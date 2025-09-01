@@ -15,4 +15,7 @@ type ToolRepository interface {
 	DeleteToolData(ctx context.Context, id string) error
 	GetToolData(ctx context.Context, id string) (*entities.ToolData, error)
 	ListToolData(ctx context.Context) ([]*entities.ToolData, error)
+
+	// InjectDependencies injects required dependencies into tools that need them
+	InjectDependencies(agentRepo AgentRepository, chatService any) error
 }

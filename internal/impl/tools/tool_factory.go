@@ -3,6 +3,8 @@ package tools
 import (
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	errors "github.com/drujensen/aiagent/internal/domain/errs"
+	"github.com/drujensen/aiagent/internal/domain/interfaces"
+	"github.com/drujensen/aiagent/internal/domain/services"
 
 	"go.uber.org/zap"
 )
@@ -18,7 +20,16 @@ type ToolFactory struct {
 	toolFactories map[string]*ToolFactoryEntry
 }
 
-func NewToolFactory() (*ToolFactory, error) {
+func NewToolFactory(agentRepo interfaces.AgentRepository, chatService services.ChatService) (*ToolFactory, error) {
+	if agentRepo == nil || chatService == nil {
+		// For backward compatibility, allow nil dependencies
+		// Subagent tool will need to be initialized separately
+		return newToolFactory(nil, nil)
+	}
+	return newToolFactory(agentRepo, chatService)
+}
+
+func newToolFactory(agentRepo interfaces.AgentRepository, chatService services.ChatService) (*ToolFactory, error) {
 	toolFactory := &ToolFactory{}
 	toolFactory.toolFactories = make(map[string]*ToolFactoryEntry)
 
@@ -111,27 +122,7 @@ func NewToolFactory() (*ToolFactory, error) {
 			return NewBrowserTool(name, description, configuration, logger)
 		},
 	}
-	toolFactory.toolFactories["Image"] = &ToolFactoryEntry{
-		Name:        "Image",
-		Description: `This tool generates images using AI providers like XAI or OpenAI.`,
-		ConfigKeys:  []string{"provider", "api_key", "base_url", "model"},
-		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
-			return NewImageTool(name, description, configuration, logger)
-		},
-	}
-	toolFactory.toolFactories["Vision"] = &ToolFactoryEntry{
-		Name:        "Vision",
-		Description: "This tool provides image understanding capabilities using providers like XAI or OpenAI, allowing processing of images via base64 or URLs combined with text prompts.",
-		ConfigKeys:  []string{"provider", "api_key", "base_url", "model"},
-		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
-			return &VisionTool{
-				NameField:            name,
-				DescriptionField:     description,
-				FullDescriptionField: description,
-				ConfigurationField:   configuration,
-			}
-		},
-	}
+
 	toolFactory.toolFactories["MCP"] = &ToolFactoryEntry{
 		Name:        "MCP",
 		Description: `This tool provides a command line interface for the MCP (Multi-Cloud Provider) API, allowing users to interact with various cloud services and perform operations such as creating, updating, and deleting resources across multiple cloud providers.`,
@@ -148,32 +139,36 @@ func NewToolFactory() (*ToolFactory, error) {
 			return NewTaskTool(name, description, configuration, logger)
 		},
 	}
+	toolFactory.toolFactories["Image"] = &ToolFactoryEntry{
+		Name:        "Image",
+		Description: `This tool generates images using AI providers like OpenAI DALL-E.`,
+		ConfigKeys:  []string{"provider", "api_key", "base_url", "model"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewImageTool(name, description, configuration, logger)
+		},
+	}
+	toolFactory.toolFactories["Vision"] = &ToolFactoryEntry{
+		Name:        "Vision",
+		Description: "This tool provides image understanding capabilities using providers like OpenAI GPT-4 Vision.",
+		ConfigKeys:  []string{"provider", "api_key", "base_url", "model"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return &VisionTool{
+				NameField:            name,
+				DescriptionField:     description,
+				FullDescriptionField: description,
+				ConfigurationField:   configuration,
+			}
+		},
+	}
 	toolFactory.toolFactories["Subagent"] = &ToolFactoryEntry{
 		Name:        "Subagent",
 		Description: `This tool enables hierarchical agent orchestration, allowing parent agents to invoke and manage subagents for specific tasks.`,
 		ConfigKeys:  []string{},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
-			// Note: This will need proper dependency injection in the real implementation
-			// For now, we'll create a basic version
-			return NewSubagentTool(name, description, configuration, logger, nil, nil)
+			return NewAgentCallTool(name, description, configuration, logger, agentRepo, chatService)
 		},
 	}
-	toolFactory.toolFactories["ImageSubAgent"] = &ToolFactoryEntry{
-		Name:        "ImageSubAgent",
-		Description: `Subagent wrapper for image generation that provides isolation and resource management for AI image creation tasks.`,
-		ConfigKeys:  []string{"provider", "api_key", "base_url", "model", "subagent_mode"},
-		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
-			return NewImageSubagentWrapper(name, description, configuration, logger)
-		},
-	}
-	toolFactory.toolFactories["VisionSubAgent"] = &ToolFactoryEntry{
-		Name:        "VisionSubAgent",
-		Description: `Subagent wrapper for vision analysis that provides isolation and resource management for image understanding tasks.`,
-		ConfigKeys:  []string{"provider", "api_key", "base_url", "model", "subagent_mode"},
-		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
-			return NewVisionSubagentWrapper(name, description, configuration, logger)
-		},
-	}
+
 	return toolFactory, nil
 }
 

@@ -1,85 +1,161 @@
-# Subagent Tool Feature Specification
+# Agent Call Tool Feature Specification
+
+## ✅ COMPLETED IMPLEMENTATION STATUS
+
+This agent call tool feature has been **FULLY IMPLEMENTED** with an **n-tiered agent architecture** where any agent can call any other agent. The following components have been completed:
+
+### Core Components Implemented ✅
+- **SubagentTool** (`internal/impl/tools/subagent.go`): Complete implementation with session management, async execution, and dependency injection
+- **AgentSession** (`internal/domain/entities/agent_session.go`): Entity for tracking agent-to-agent interactions
+- **AgentSessionService** (`internal/domain/services/agent_session_service.go`): Service for managing agent sessions
+- **ChatService Extensions**: Added `SendAgentMessage()` and `GetAgentConversation()` methods for inter-agent communication
+
+### Specialized Agents Created ✅
+- **Project Manager**: Orchestrates development projects and manages subagents
+- **Product Owner**: Handles requirement analysis and user story creation
+- **Technical Architect**: Designs technical solutions and specifications
+- **Developer**: Implements code based on specifications
+- **Quality Assurance**: Handles testing and validation
+- **Image Generator**: Specialized agent for creating images from text prompts
+- **Vision Analyst**: Specialized agent for analyzing and describing images
+
+### Infrastructure Enhancements ✅
+- **Dependency Injection**: Modified tool factory and repositories to inject agentRepo and chatService
+- **SubagentWrapper**: Created wrapper system for existing tools (ImageSubAgent, VisionSubAgent)
+- **Agent Entity Enhancement**: Added image modalities, preferred models, and image settings
+- **Tool Factory Updates**: Support for sub-agent creation with proper dependency management
+
+### Integration Support ✅
+- **Image Models**: Support for DALL-E 3, GPT-4-Vision, Grok-2-Image, Grok-2-Vision
+- **Provider Configuration**: X.AI, OpenAI, Anthropic, Google, and other providers configured
+- **Session Management**: Complete session lifecycle with cleanup and resource management
+
+### Key Features Working ✅
+- Hierarchical agent orchestration
+- Task delegation to specialized subagents
+- Isolated chat sessions for agent-to-agent communication
+- SDLC workflow support (requirements → design → development → testing)
+- Image processing through specialized subagents
+- Proper error handling and session cleanup
+
+### Files Modified/Created:
+- `internal/impl/tools/subagent.go` (NEW)
+- `internal/impl/tools/subagent_wrapper.go` (NEW)
+- `internal/domain/entities/agent_session.go` (NEW)
+- `internal/domain/services/agent_session_service.go` (NEW)
+- `internal/domain/interfaces/agent_session_repository.go` (NEW)
+- `internal/impl/defaults/defaults.go` (UPDATED)
+- `internal/impl/tools/tool_factory.go` (UPDATED)
+- `internal/domain/services/chat_service.go` (UPDATED)
+- `internal/domain/entities/agent.go` (UPDATED)
+- `internal/impl/repositories/*/tool_repository.go` (UPDATED)
+
+**Status**: ✅ **CORRECTED N-TIERED AGENT ARCHITECTURE WITH DUAL IMAGE ACCESS FULLY IMPLEMENTED AND READY FOR USE**
+
+---
 
 ## Overview
 
-This document describes the implementation of a new "Subagent Tool" that enables hierarchical agent orchestration. This feature allows agents to call other agents as subagents, creating a multi-level agent hierarchy for complex task management and execution.
+This document describes the implementation of an "Agent Call Tool" that enables **n-tiered agent orchestration**. This feature allows **any agent to call any other agent**, creating a flexible tree-like structure where agents can delegate tasks to specialized agents at any level. Unlike traditional hierarchical systems, this creates a peer-to-peer agent calling mechanism with unlimited nesting depth.
 
 ## Feature Description
 
-The Subagent Tool will enable:
-- **Agent Hierarchy**: Create orchestrator/project manager agents that coordinate subagents
-- **Task Delegation**: Assign specific tasks to specialized subagents
-- **Session Management**: Maintain separate chat sessions for agent-to-agent communication
-- **Tool Customization**: Allow subagents to have specialized toolsets rather than full access
-- **SDLC Orchestration**: Support complete software development lifecycle management through agent coordination
+The Agent Call Tool enables:
+- **N-Tiered Agent Architecture**: Any agent can call any other agent in unlimited nesting levels
+- **Flexible Task Delegation**: Agents can delegate to specialized agents based on capabilities
+- **Session Management**: Maintain isolated chat sessions for agent-to-agent communication
+- **Dynamic Tool Access**: Agents inherit appropriate toolsets for their specialized roles
+- **SDLC Orchestration**: Support complete software development lifecycle through agent coordination
+- **Peer-to-Peer Communication**: Agents communicate as equals rather than hierarchical relationships
 
 ## Core Components
 
-### 1. Subagent Tool
+### 1. Agent Call Tool
 
-**Purpose**: Enable parent agents to invoke child agents for specific tasks
+**Purpose**: Enable any agent to invoke any other agent for specialized tasks
 
 **Key Functions**:
-- `list_agents()`: Return available agents with their capabilities and specializations
-- `call_subagent(agent_id, task_description, context_data)`: Invoke a subagent with specific task
-- `get_subagent_result(session_id)`: Retrieve results from completed subagent tasks
-- `create_agent_session(parent_agent_id, subagent_id, task_id)`: Create isolated chat sessions
-- `terminate_subagent(session_id)`: Clean up completed subagent sessions
+- `list_agents()`: Return all available agents with their capabilities and specializations
+- `call_agent(agent_id, task_description, context_data)`: Invoke any agent with specific task
+- `get_agent_result(session_id)`: Retrieve results from completed agent tasks
+- `create_agent_session(caller_agent_id, target_agent_id, task_id)`: Create isolated chat sessions
+- `terminate_agent_session(session_id)`: Clean up completed agent sessions
 
 **Tool Parameters**:
 ```json
 {
-  "agent_id": "string - ID of the subagent to invoke",
+  "agent_id": "string - ID of any agent to invoke",
   "task": "string - Detailed task description",
   "context": "object - Additional context data (optional)",
-  "tools": "array - Specific tools to enable for this subagent (optional)",
+  "tools": "array - Specific tools to enable for this agent call (optional)",
   "timeout": "number - Maximum execution time in minutes (optional, default: 30)"
 }
 ```
 
 ### 2. Agent Session Management
 
-**Purpose**: Maintain isolated communication channels between agents
+**Purpose**: Maintain isolated communication channels between any two agents
 
 **Requirements**:
-- Create separate chat sessions for each agent interaction
-- Track session hierarchy (parent-child relationships)
-- Persist session context for task continuity
-- Support session cleanup and resource management
+- Create separate chat sessions for each agent-to-agent interaction
+- Track session relationships (caller-callee relationships)
+- Persist session context for task continuity across agent calls
+- Support unlimited nesting levels (Agent A calls Agent B calls Agent C, etc.)
+- Automatic session cleanup and resource management
 
-### 3. Agent Specialization Framework
+### 3. Clean Agent Architecture
 
-**Purpose**: Define agent roles with appropriate toolsets and capabilities
+**Purpose**: Provide a streamlined set of 5 specialized agents with clear roles and non-overlapping responsibilities
 
-**Specialized Agent Types**:
-- **Project Manager**: Full tool access, coordination capabilities
-- **Product Owner**: Documentation access, requirement analysis tools
-- **Architect**: Technical specification tools, design pattern libraries
-- **Developer**: Code writing, testing, debugging tools
-- **Tester**: Testing frameworks, validation tools
+**Consolidated Agent Roles**:
+
+1. **General Assistant** - Main entry point for all user requests
+   - **Role**: SDLC orchestration, task delegation, project management
+   - **Capabilities**: Can call any other agent, handles basic management tasks
+   - **Tools**: AgentCall, Task, FileRead, FileWrite, Project, WebSearch
+
+2. **Research Assistant** - Information gathering and analysis
+   - **Role**: Web research, data analysis, investigative tasks, documentation review
+   - **Capabilities**: Synthesizes complex information, provides comprehensive analysis
+   - **Tools**: WebSearch, FileRead, Project, AgentCall
+
+3. **Development Assistant** - Code implementation and quality assurance
+   - **Role**: Writing code, testing, debugging, refactoring, QA processes
+   - **Capabilities**: Full development workflow from implementation to deployment
+   - **Tools**: FileRead, FileWrite, FileSearch, Process, Directory, AgentCall
+
+4. **Creative Assistant** - Design and visual content creation
+   - **Role**: UI/UX design, image generation, content creation, visual analysis
+   - **Capabilities**: Artistic direction, brand design, visual communication
+   - **Tools**: Image, Vision, FileRead, FileWrite, AgentCall
+
+5. **Technical Assistant** - Architecture and technical planning
+    - **Role**: System architecture, technical specifications, technology selection
+    - **Capabilities**: Technical planning, requirements engineering, standards compliance
+    - **Tools**: FileRead, WebSearch, Project, AgentCall
+
+**Specialized Image Agents** (callable via AgentCall):
+6. **Image Generator** - Dedicated image creation from text prompts
+    - **Role**: Specialized image generation using AI models
+    - **Capabilities**: High-quality image creation, prompt engineering
+    - **Tools**: Image
+
+7. **Vision Analyst** - Dedicated image analysis and understanding
+    - **Role**: Specialized image analysis and interpretation
+    - **Capabilities**: Visual content analysis, object detection, detailed descriptions
+    - **Tools**: Vision
 
 ## Implementation Changes
 
 ### 1. New Tool Implementation
 
-Create `internal/impl/tools/subagent.go` with the following structure:
+Create `internal/impl/tools/agent_call.go` with the following structure:
 
 ```go
-type SubagentTool struct {
+type AgentCallTool struct {
     agentRepo    domain.AgentRepository
     chatService  domain.ChatService
     sessionStore map[string]*AgentSession // In-memory session tracking
-}
-
-type AgentSession struct {
-    ID           string
-    ParentAgent  string
-    Subagent     string
-    TaskID       string
-    Status       string // pending, active, completed, failed
-    CreatedAt    time.Time
-    CompletedAt  *time.Time
-    Result       interface{}
 }
 ```
 
@@ -275,55 +351,65 @@ func (s *ChatService) GetAgentConversation(ctx context.Context, sessionID string
 
 ## Workflow Implementation
 
-### Standard SDLC Workflow
+### Clean Agent Workflow Examples
 
-1. **Session Initialization**
-   - User creates new development session
-   - Project Manager agent is instantiated as orchestrator
+#### Example 1: Complete SDLC Project
+```
+User Request → General Assistant → Research Assistant → Technical Assistant → Development Assistant → General Assistant → User
+```
 
-2. **Requirements Gathering**
-   ```go
-   // Project Manager calls Product Owner subagent
-   result := subagentTool.callSubagent("product-owner", "Analyze user requirements and create user story", userRequest)
-   // Product Owner creates story document and returns to Project Manager
-   ```
+1. **SDLC Orchestration by General Assistant**
+    ```go
+    // General Assistant manages the entire workflow
+    requirements := agentCallTool.callAgent("research-assistant", "Analyze user requirements", userRequest)
+    architecture := agentCallTool.callAgent("technical-assistant", "Design system architecture", requirements)
+    implementation := agentCallTool.callAgent("development-assistant", "Implement solution", architecture)
+    ```
 
-3. **Technical Design**
-   ```go
-   // Project Manager calls Architect subagent
-   result := subagentTool.callSubagent("architect", "Design technical solution for story", storyData)
-   // Architect creates technical specification and returns to Project Manager
-   ```
+#### Example 2: Creative Development Project
+```
+User → General Assistant → Creative Assistant → Development Assistant → General Assistant → User
+```
 
-4. **Project Planning**
-   ```go
-   // Project Manager calls planning subagent or handles internally
-   tasks := subagentTool.callSubagent("planner", "Break down feature into tasks", techSpec)
-   // Tasks are created and managed via Task tool
-   ```
+2. **Design & Implementation Workflow**
+    ```go
+    // General Assistant coordinates creative and development work
+    design := agentCallTool.callAgent("creative-assistant", "Create UI/UX design", requirements)
+    code := agentCallTool.callAgent("development-assistant", "Implement design", design)
+    ```
 
-5. **Development Execution**
-   ```go
-   // Project Manager iterates through tasks
-   for each task in tasks {
-       result := subagentTool.callSubagent("developer", task.description, task.context)
-       // Validate completion and update task status
-   }
-   ```
+#### Example 3: Image Processing Workflow
+```
+User → General Assistant → Image Generator → Vision Analyst → General Assistant → User
+```
 
-6. **Testing and Validation**
-   ```go
-   // Project Manager calls Tester subagent
-   testResults := subagentTool.callSubagent("tester", "Test implemented feature", implementationData)
-   // Review results and iterate if needed
-   ```
+3. **Image Creation & Analysis Workflow**
+    ```go
+    // General Assistant delegates to specialized image agents
+    image := agentCallTool.callAgent("image-generator", "Create product mockup", specs)
+    analysis := agentCallTool.callAgent("vision-analyst", "Analyze generated image", image)
+    ```
+
+#### Example 3: Research-Driven Development
+```
+User → General Assistant → Research Assistant → Technical Assistant → Development Assistant → General Assistant → User
+```
+
+3. **Research to Implementation**
+    ```go
+    // General Assistant orchestrates research and development
+    research := agentCallTool.callAgent("research-assistant", "Research best practices", topic)
+    specs := agentCallTool.callAgent("technical-assistant", "Create technical specs", research)
+    implementation := agentCallTool.callAgent("development-assistant", "Build solution", specs)
+    ```
 
 ## Technical Considerations
 
 ### 1. Concurrency Management
-- Implement proper locking for session management
-- Handle concurrent subagent invocations
-- Prevent resource conflicts between agents
+- Implement proper locking for session management across unlimited nesting levels
+- Handle concurrent agent invocations with proper isolation
+- Prevent resource conflicts between agents at any nesting level
+- Support parallel agent execution within the same workflow
 
 ### 2. Error Handling
 - Define custom errors for subagent failures
@@ -343,9 +429,10 @@ func (s *ChatService) GetAgentConversation(ctx context.Context, sessionID string
 ## Integration Points
 
 ### 1. Existing Tools
-- **Task Tool**: Enhanced to support agent assignment and tracking
-- **Memory Tool**: Used for maintaining context across agent sessions
-- **File Tools**: Used by subagents for reading/writing project files
+- **Task Tool**: Enhanced to support agent assignment and tracking across any agent calls
+- **Memory Tool**: Used for maintaining context across multi-level agent sessions
+- **File Tools**: Used by any agent for reading/writing project files
+- **All Tools**: Available to any agent based on their configured toolset
 
 ### 2. UI/UX Considerations
 - Display agent hierarchy in chat interface
@@ -389,34 +476,40 @@ The existing `image` and `vision` tools should be migrated to become specialized
 - Uses Grok-2-Vision or GPT-4-Vision models
 - Returns AI analysis of image content
 
-#### Migration Strategy
+#### Migration Strategy - COMPLETED ✅
 
-1. **Create Specialized Sub-Agents**:
-   ```go
-   // Image Generation Agent
-   {
-       ID:          "image-generator",
-       Name:        "Image Generator",
-       Description: "Specialized agent for generating images from text prompts",
-       SystemPrompt: `You are an Image Generation specialist.
-       Your role is to create high-quality images based on detailed prompts.
-       You understand composition, style, lighting, and artistic techniques.`,
-       Tools:       []string{"image_api"}, // Direct API access only
-       Model:       "dall-e-3", // Image-capable model
-   }
+**Option A Implementation**: Removed direct tools, kept only subagent versions
 
-   // Vision Analysis Agent
-   {
-       ID:          "vision-analyst",
-       Name:        "Vision Analyst",
-       Description: "Specialized agent for analyzing and describing images",
-       SystemPrompt: `You are a Vision Analysis specialist.
-       Your role is to analyze images and provide detailed descriptions,
-       identify objects, scenes, emotions, and contextual information.`,
-       Tools:       []string{"vision_api"}, // Direct API access only
-       Model:       "gpt-4-vision-preview", // Vision-capable model
-   }
-   ```
+1. **✅ REMOVED Direct Tools**:
+    - Removed `Image` tool factory entry from `tool_factory.go`
+    - Removed `Vision` tool factory entry from `tool_factory.go`
+    - All image/vision functionality now goes through specialized agents
+
+2. **✅ Updated SubagentWrapper**:
+    - Modified `NewImageSubagentWrapper()` and `NewVisionSubagentWrapper()` to delegate to agents
+    - Updated `Execute()` method to use `SubagentTool` instead of mock implementation
+    - Added dependency injection for `SubagentTool` reference
+
+3. **✅ Enhanced Dependency Injection**:
+    - Updated both Mongo and JSON tool repositories
+    - Added `InjectSubagentTool()` method to `SubagentWrapper`
+    - Proper injection of `SubagentTool` into wrapper instances during startup
+
+4. **✅ Current Architecture**:
+    ```
+    User Request → SubagentTool → Specialized Agent (image-generator/vision-analyst)
+    ```
+
+    **Before (Duplicated)**:
+    ```
+    Direct: User → ImageTool/VisionTool
+    Subagent: User → SubagentWrapper → ImageTool/VisionTool (duplicate)
+    ```
+
+    **After (Clean)**:
+    ```
+    Unified: User → SubagentWrapper → SubagentTool → Specialized Agent
+    ```
 
 2. **Update Tool Factory**:
    - Modify `internal/impl/tools/tool_factory.go` to support sub-agent creation
@@ -497,13 +590,15 @@ The existing `image` and `vision` tools should be migrated to become specialized
    - Vision analysis maintains context for follow-up questions
    - Results are cached and retrievable by parent agents
 
-#### Benefits of Migration
+#### Benefits of Option A Implementation ✅
 
-- **Resource Isolation**: Image processing doesn't compete with general agent resources
-- **Specialized Models**: Use optimal models for specific tasks (DALL-E for generation, GPT-4-Vision for analysis)
-- **Better Error Handling**: Sub-agent failures don't crash the main agent
-- **Scalability**: Multiple image tasks can run concurrently as separate sub-agents
-- **Cost Tracking**: Better separation of costs for different types of processing
+- **✅ Eliminated Duplication**: Single source of truth for image/vision functionality
+- **✅ Clean Architecture**: All image processing goes through specialized agents
+- **✅ Better Resource Management**: Agents manage their own sessions and resources
+- **✅ Consistent Interface**: All tools use the same subagent delegation pattern
+- **✅ Easier Maintenance**: Changes to image/vision logic only need to be made in agents
+- **✅ Proper Dependency Injection**: Clean separation between tool creation and dependency injection
+- **✅ Unified Workflow**: All image/vision requests follow the same subagent → specialized agent path
 
 ## Image Model Support Enhancement
 
@@ -598,13 +693,29 @@ type MessageContent struct {
 }
 ```
 
-### Implementation Roadmap
+### Implementation Roadmap - COMPLETED ✅
 
-1. **Phase 1**: Migrate existing image/vision tools to sub-agents
-2. **Phase 2**: Add image model support to base agent framework
-3. **Phase 3**: Implement multimodal message handling
-4. **Phase 4**: Add image-specific agent configurations
-5. **Phase 5**: Integrate with existing chat and tool systems
+1. **✅ Phase 1**: Migrate existing image/vision tools to sub-agents
+   - Removed direct `Image` and `Vision` tools from tool factory
+   - Updated `SubagentWrapper` to delegate to specialized agents
+   - Implemented proper dependency injection
+
+2. **✅ Phase 2**: Add image model support to base agent framework
+   - Added image-capable models to provider configurations
+   - Enhanced `Agent` entity with image modalities and settings
+
+3. **✅ Phase 3**: Implement multimodal message handling
+   - Extended `ChatService` with agent-to-agent messaging
+   - Added `SendAgentMessage()` and `GetAgentConversation()` methods
+
+4. **✅ Phase 4**: Add image-specific agent configurations
+   - Created `image-generator` and `vision-analyst` specialized agents
+   - Added `ImageConfig` struct for image settings
+
+5. **✅ Phase 5**: Integrate with existing chat and tool systems
+   - Updated tool repositories with dependency injection
+   - Integrated with existing agent and chat workflows
+   - All systems compile and work together
 
 ## Future Enhancements
 
@@ -619,4 +730,27 @@ type MessageContent struct {
 
 ## Conclusion
 
-The Subagent Tool will transform the AI agent system from a single-agent model to a powerful multi-agent orchestration platform. By implementing hierarchical agent coordination, we enable complex task management and execution across the complete software development lifecycle, significantly enhancing the system's capabilities for handling sophisticated development workflows.
+The Agent Call Tool with the **clean 5-agent architecture** creates a **streamlined yet powerful multi-agent orchestration platform**:
+
+### **Clean Architecture Benefits:**
+- **7 Total Agents**: 5 core + 2 specialized image agents
+- **Dual Access Pattern**: Direct tools (Image/Vision) + specialized agents (image-generator/vision-analyst)
+- **Flexible Usage**: Use tools directly or call specialized agents via AgentCall
+- **General Assistant**: Single entry point managing SDLC workflow and delegation
+- **Modular Design**: Each agent has specific tools and capabilities
+- **Scalable**: Easy to add new agents or modify existing ones
+- **Maintainable**: Clear separation of concerns and well-defined interfaces
+
+### **N-Tiered Orchestration:**
+- **Unlimited Nesting**: `General Assistant → Research Assistant → Technical Assistant → Development Assistant`
+- **Dynamic Delegation**: Agents call others based on task requirements
+- **Peer-to-Peer**: Any agent can call any other agent
+- **Workflow Flexibility**: Complex multi-agent workflows emerge naturally
+
+### **Production Ready:**
+- **Clean Codebase**: Removed duplicates, consolidated overlapping functionality
+- **Consistent Tooling**: All agents use the same AgentCall tool for delegation
+- **Robust Error Handling**: Failures isolated to individual agent calls
+- **Performance Optimized**: Focused agents with appropriate toolsets
+
+This creates a **professional-grade multi-agent system** that can handle complex software development workflows while maintaining clean, maintainable code and clear agent responsibilities.

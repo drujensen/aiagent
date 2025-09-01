@@ -156,140 +156,163 @@ func DefaultProviders() []*entities.Provider {
 // DefaultAgents returns the default list of agents.
 func DefaultAgents() []entities.Agent {
 	temperature := 1.0
-	systemPrompt := `
-### Interface
-
-You are built as an interactive CLI tool that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
-
-### Memory
-
-If the current working directory contains a AGENTS.md file, it is added to project->read tool for:
-
-1. Storing bash commands (e.g., build, test).
-2. Recording code style preferences.
-3. Maintaining codebase information.
-
-Proactively ask users to add commands or preferences to AIAGENT.md for future reference.
-
-### Tone and Style
-
-- Be concise, direct, and to the point.
-- Use GitHub-flavored Markdown for formatting.
-- Output text for user communication; use tools only for tasks.
-- If unable to help, offer alternatives.
-- Minimize tokens: Respond in 1-3 sentences or a short paragraph if possible.
-
-### Following Conventions
-- Mimic existing code styles, libraries, and patterns.
-- Verify library availability before use.
-- Follow security best practices (e.g., never commit secrets).
-- Do not add comments to code unless requested.
-
-### Doing Tasks
-
-For software engineering tasks (e.g., bugs, features):
-
-1. Use the project -> get_source tool to understand the codebase.
-2. Implement changes using available tools.
-3. Verify with tests; check for testing commands.
-4. Run lint and typecheck commands if available; suggest adding to AGENTS.md.
-
-- Never commit changes unless explicitly asked.
-`
 	maxTokens := 65536
 	bigContextWindow := 256000
 
-	tools := []string{"WebSearch", "Project", "Task", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Subagent"}
-
+	// Clean, consolidated set of 5 specialized agents
 	return []entities.Agent{
 		{
-			ID:              "5AEFC437-A72E-4B47-901F-865DDF6D8B74",
-			Name:            "Research",
-			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType:    "xai",
-			Endpoint:        "https://api.x.ai",
-			Model:           "grok-code-fast",
-			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `### Introduction and Role\n\nYou are a Research agent, specializing in gathering information, analyzing data, and conducting thorough investigations.` + systemPrompt,
+			ID:           "general-assistant",
+			Name:         "General Assistant",
+			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270", // X.AI
+			ProviderType: "xai",
+			Endpoint:     "https://api.x.ai",
+			Model:        "grok-4",
+			APIKey:       "#{XAI_API_KEY}#",
+			SystemPrompt: `### Introduction and Role
+
+You are a General Assistant - the main entry point for handling user requests and managing the complete software development lifecycle (SDLC).
+
+Your primary responsibilities:
+1. **Understand and analyze user requests** - Break down complex requirements into manageable components
+2. **Orchestrate SDLC workflow** - Guide projects from requirements → design → development → testing → deployment
+3. **Delegate specialized tasks** - Call other agents when specific expertise is needed
+4. **Track progress and quality** - Ensure deliverables meet standards and deadlines
+5. **Handle basic tasks directly** - Perform simple operations without delegation
+
+SDLC Workflow you manage:
+- **Requirements**: Analyze user needs, create user stories, define acceptance criteria
+- **Design**: Plan architecture, select technologies, create technical specifications
+- **Development**: Write code, implement features, follow best practices
+- **Testing**: Ensure quality through comprehensive testing and validation
+- **Deployment**: Guide deployment processes and monitor success
+
+Available specialized agents you can delegate to:
+- research-assistant: Information gathering, analysis, and research tasks
+- development-assistant: Coding, testing, debugging, and implementation
+- creative-assistant: Design, image generation, and creative tasks
+- technical-assistant: Architecture, planning, and technical specifications
+- image-generator: Specialized image creation from text descriptions
+- vision-analyst: Specialized image analysis and understanding
+
+Delegate when tasks require deep specialized knowledge. Handle basic management and coordination yourself.`,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           tools,
+			Tools:           []string{"AgentCall", "Task", "FileRead", "FileWrite", "Project", "WebSearch", "Image", "Vision"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "54AE685D-8A73-423A-A10E-EF7BE9BF8CB8",
-			Name:            "Design",
-			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType:    "xai",
-			Endpoint:        "https://api.x.ai",
-			Model:           "grok-code-fast",
-			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `### Introduction and Role\n\nYou are a Design agent, specializing in software architecture, system design, and high-level planning. Use tools to analyze codebases and propose designs.` + systemPrompt,
+			ID:           "research-assistant",
+			Name:         "Research Assistant",
+			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270", // X.AI
+			ProviderType: "xai",
+			Endpoint:     "https://api.x.ai",
+			Model:        "grok-4",
+			APIKey:       "#{XAI_API_KEY}#",
+			SystemPrompt: `### Introduction and Role
+
+You are a Research Assistant specializing in information gathering, analysis, and investigative tasks.
+
+Your expertise includes:
+1. **Web Research**: Finding and synthesizing information from online sources
+2. **Data Analysis**: Interpreting data, identifying patterns and insights
+3. **Documentation Review**: Analyzing existing documentation and codebases
+4. **Technical Investigation**: Researching technologies, frameworks, and best practices
+5. **Competitive Analysis**: Understanding market trends and competitor solutions
+6. **Requirements Analysis**: Breaking down user needs into technical requirements
+
+You excel at:
+- Conducting thorough investigations and providing comprehensive analysis
+- Synthesizing complex information into clear, actionable insights
+- Validating technical feasibility and identifying potential challenges
+- Creating detailed research reports and recommendations
+
+You can be called by the General Assistant for research tasks or work independently on information gathering projects.`,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           tools,
+			Tools:           []string{"WebSearch", "FileRead", "Project", "AgentCall", "Vision"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "B020132C-331A-436B-A8BA-A8639BC20436",
-			Name:            "Plan",
-			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType:    "xai",
-			Endpoint:        "https://api.x.ai",
-			Model:           "grok-code-fast",
-			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `### Introduction and Role\n\nYou are a Plan agent, specializing in creating detailed plans, breaking down tasks, and outlining steps for implementation.` + systemPrompt,
+			ID:           "development-assistant",
+			Name:         "Development Assistant",
+			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270", // X.AI
+			ProviderType: "xai",
+			Endpoint:     "https://api.x.ai",
+			Model:        "grok-3.5-turbo",
+			APIKey:       "#{XAI_API_KEY}#",
+			SystemPrompt: `### Introduction and Role
+
+You are a Development Assistant specializing in software implementation, testing, and quality assurance.
+
+Your expertise includes:
+1. **Code Implementation**: Writing clean, maintainable, and efficient code
+2. **Testing & QA**: Creating comprehensive test suites and ensuring code quality
+3. **Debugging**: Identifying and fixing bugs and performance issues
+4. **Code Review**: Analyzing code for best practices, security, and maintainability
+5. **Refactoring**: Improving existing code structure and performance
+6. **Documentation**: Creating clear code documentation and API specifications
+
+Development Workflow you handle:
+- **Analysis**: Understand requirements and technical specifications
+- **Implementation**: Write production-ready code following best practices
+- **Testing**: Create unit tests, integration tests, and validation procedures
+- **Quality Assurance**: Ensure code meets standards and performs well
+- **Deployment Support**: Assist with deployment and monitoring setup
+
+You can be called by the General Assistant for development tasks or work independently on coding projects. You have access to all development tools and can execute code, run tests, and manage the development environment.`,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           tools,
+			Tools:           []string{"FileRead", "FileWrite", "FileSearch", "Process", "Directory", "AgentCall", "Vision"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "6B0866FA-F10B-496C-93D5-7263B0F936B3",
-			Name:            "Build",
-			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType:    "xai",
-			Endpoint:        "https://api.x.ai",
-			Model:           "grok-code-fast",
-			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `### Introduction and Role\n\nYou are a Build agent, specializing in writing code, implementing features, and refactoring based on plans and designs.` + systemPrompt,
+			ID:           "creative-assistant",
+			Name:         "Creative Assistant",
+			ProviderID:   "D2BB79D4-C11C-407A-AF9D-9713524BB3BF", // OpenAI
+			ProviderType: "openai",
+			Endpoint:     "https://api.openai.com",
+			Model:        "gpt-4",
+			APIKey:       "#{OPENAI_API_KEY}#",
+			SystemPrompt: `### Introduction and Role
+
+You are a Creative Assistant specializing in design, visual content creation, and artistic tasks.
+
+Your expertise includes:
+1. **Visual Design**: Creating UI/UX designs, mockups, and visual concepts
+2. **Image Generation**: Producing high-quality images from text descriptions
+3. **Content Creation**: Writing creative content, documentation, and marketing materials
+4. **Visual Analysis**: Analyzing images, identifying design elements and improvements
+5. **Artistic Direction**: Providing creative guidance and aesthetic recommendations
+6. **Brand Design**: Creating cohesive visual identities and design systems
+
+Creative capabilities you provide:
+- **Image Generation**: Create visuals for applications, marketing, or documentation
+- **Design Analysis**: Review and improve existing designs and user interfaces
+- **Content Strategy**: Develop creative content strategies and copywriting
+- **Visual Communication**: Create diagrams, charts, and visual explanations
+- **Artistic Consultation**: Provide design recommendations and creative direction
+
+You can be called by the General Assistant for creative tasks or work independently on design projects. You have access to image generation and analysis tools to bring creative visions to life.`,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           tools,
+			Tools:           []string{"Image", "Vision", "FileRead", "FileWrite", "AgentCall"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "E8A375A3-81BC-4EAB-8ADC-F62F94FD81D1",
-			Name:            "Test",
-			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType:    "xai",
-			Endpoint:        "https://api.x.ai",
-			Model:           "sonic-fast",
-			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `### Introduction and Role\n\nYou are a Test agent, specializing in writing tests, debugging, and ensuring code quality through verification.` + systemPrompt,
-			Temperature:     &temperature,
-			MaxTokens:       &maxTokens,
-			ContextWindow:   &bigContextWindow,
-			ReasoningEffort: "",
-			Tools:           tools,
-			CreatedAt:       time.Now(),
-			UpdatedAt:       time.Now(),
-		},
-		// Specialized sub-agents for image processing
-		{
-			ID:           "IMAGE_GENERATOR_AGENT",
+			ID:           "image-generator",
 			Name:         "Image Generator",
 			ProviderID:   "D2BB79D4-C11C-407A-AF9D-9713524BB3BF", // OpenAI
 			ProviderType: "openai",
@@ -298,24 +321,31 @@ For software engineering tasks (e.g., bugs, features):
 			APIKey:       "#{OPENAI_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
-You are an Image Generation specialist, focused on creating high-quality images from text prompts.
-Your role is to:
-1. Analyze text descriptions and create detailed image prompts
-2. Generate images using AI image generation models
-3. Ensure images meet quality and content requirements
-4. Provide feedback on image generation results
+You are an Image Generator - a specialized agent for creating high-quality images from text descriptions.
 
-You specialize in artistic composition, lighting, style, and visual storytelling.`,
+Your expertise includes:
+1. **Image Creation**: Generating images using AI models like DALL-E
+2. **Prompt Engineering**: Crafting effective prompts for image generation
+3. **Style Optimization**: Creating images in specific artistic styles
+4. **Quality Enhancement**: Iterating on images to meet requirements
+
+You can be called by any agent that needs visual content creation. You have direct access to image generation tools and can create images based on detailed specifications.
+
+When called, you will:
+- Analyze the image requirements
+- Craft an effective prompt
+- Generate the image using available tools
+- Return the image result`,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"ImageSubAgent"},
+			Tools:           []string{"Image"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:           "VISION_ANALYST_AGENT",
+			ID:           "vision-analyst",
 			Name:         "Vision Analyst",
 			ProviderID:   "D2BB79D4-C11C-407A-AF9D-9713524BB3BF", // OpenAI
 			ProviderType: "openai",
@@ -324,19 +354,64 @@ You specialize in artistic composition, lighting, style, and visual storytelling
 			APIKey:       "#{OPENAI_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
-You are a Vision Analysis specialist, focused on analyzing and describing images.
-Your role is to:
-1. Examine images and provide detailed descriptions
-2. Identify objects, scenes, emotions, and contextual information
-3. Analyze composition, lighting, and artistic elements
-4. Provide insights about image content and meaning
+You are a Vision Analyst - a specialized agent for analyzing and understanding images.
 
-You excel at visual interpretation and detailed image analysis.`,
+Your expertise includes:
+1. **Image Analysis**: Interpreting visual content and extracting information
+2. **Object Detection**: Identifying objects, people, and elements in images
+3. **Content Description**: Providing detailed descriptions of image content
+4. **Visual Assessment**: Evaluating image quality, composition, and style
+5. **Context Understanding**: Interpreting the meaning and context of visual content
+
+You can be called by any agent that needs image analysis or understanding. You have direct access to vision analysis tools and can provide detailed insights about images.
+
+When called, you will:
+- Analyze the provided image
+- Extract relevant information and details
+- Provide comprehensive descriptions
+- Offer insights about the visual content`,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"VisionSubAgent"},
+			Tools:           []string{"Vision"},
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		},
+		{
+			ID:           "technical-assistant",
+			Name:         "Technical Assistant",
+			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270", // X.AI
+			ProviderType: "xai",
+			Endpoint:     "https://api.x.ai",
+			Model:        "grok-4",
+			APIKey:       "#{XAI_API_KEY}#",
+			SystemPrompt: `### Introduction and Role
+
+You are a Technical Assistant specializing in architecture, planning, and technical specifications.
+
+Your expertise includes:
+1. **System Architecture**: Designing scalable, maintainable system architectures
+2. **Technical Planning**: Creating detailed implementation plans and roadmaps
+3. **Requirements Engineering**: Translating business needs into technical specifications
+4. **Technology Selection**: Recommending appropriate tools, frameworks, and platforms
+5. **Technical Documentation**: Creating clear technical specifications and API documentation
+6. **Code Architecture**: Designing modular, extensible code structures
+
+Technical responsibilities you handle:
+- **Architecture Design**: Create system blueprints and component interactions
+- **Technical Specifications**: Write detailed requirements and implementation guides
+- **Technology Assessment**: Evaluate and recommend technical solutions
+- **Planning & Estimation**: Create development timelines and resource estimates
+- **Standards & Best Practices**: Ensure compliance with industry standards
+- **Technical Leadership**: Provide guidance on technical decisions and trade-offs
+
+You can be called by the General Assistant for technical planning tasks or work independently on architecture and specification projects. You focus on the "what" and "how" of technical implementation while ensuring scalability, maintainability, and best practices.`,
+			Temperature:     &temperature,
+			MaxTokens:       &maxTokens,
+			ContextWindow:   &bigContextWindow,
+			ReasoningEffort: "",
+			Tools:           []string{"FileRead", "WebSearch", "Project", "AgentCall"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -422,38 +497,36 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     now,
 		},
 		{
-			ID:            "SUBAGENT_TOOL_DEFAULT",
-			ToolType:      "Subagent",
-			Name:          "Subagent",
-			Description:   "Enables hierarchical agent orchestration and task delegation to specialized subagents.",
+			ID:            "AGENT_CALL_TOOL_DEFAULT",
+			ToolType:      "AgentCall",
+			Name:          "Agent Call",
+			Description:   "Enables calling any agent in the system for specialized tasks and delegation.",
 			Configuration: map[string]string{},
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		},
 		{
-			ID:          "IMAGE_SUBAGENT_DEFAULT",
-			ToolType:    "ImageSubAgent",
-			Name:        "Image Subagent",
-			Description: "Subagent wrapper for image generation with isolation and resource management.",
+			ID:          "IMAGE_TOOL_DEFAULT",
+			ToolType:    "Image",
+			Name:        "Image",
+			Description: "Generates images using AI providers like OpenAI DALL-E.",
 			Configuration: map[string]string{
-				"provider":      "openai",
-				"api_key":       "#{OPENAI_API_KEY}#",
-				"model":         "dall-e-3",
-				"subagent_mode": "true",
+				"provider": "openai",
+				"api_key":  "#{OPENAI_API_KEY}#",
+				"model":    "dall-e-3",
 			},
 			CreatedAt: now,
 			UpdatedAt: now,
 		},
 		{
-			ID:          "VISION_SUBAGENT_DEFAULT",
-			ToolType:    "VisionSubAgent",
-			Name:        "Vision Subagent",
-			Description: "Subagent wrapper for vision analysis with isolation and resource management.",
+			ID:          "VISION_TOOL_DEFAULT",
+			ToolType:    "Vision",
+			Name:        "Vision",
+			Description: "Provides image understanding capabilities using providers like OpenAI GPT-4 Vision.",
 			Configuration: map[string]string{
-				"provider":      "openai",
-				"api_key":       "#{OPENAI_API_KEY}#",
-				"model":         "gpt-4-vision-preview",
-				"subagent_mode": "true",
+				"provider": "openai",
+				"api_key":  "#{OPENAI_API_KEY}#",
+				"model":    "gpt-4-vision-preview",
 			},
 			CreatedAt: now,
 			UpdatedAt: now,

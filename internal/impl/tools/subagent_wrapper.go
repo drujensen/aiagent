@@ -16,12 +16,13 @@ type SubagentWrapper struct {
 	configuration map[string]string
 	logger        *zap.Logger
 	wrappedTool   entities.Tool
+	subagentTool  *AgentCallTool // Reference to the main agent call tool
 }
 
 type SubagentWrapperConfig struct {
-	SubagentID string                 `json:"subagent_id"`
-	ToolName   string                 `json:"tool_name"`
-	Parameters map[string]interface{} `json:"parameters"`
+	SubagentID string         `json:"subagent_id"`
+	ToolName   string         `json:"tool_name"`
+	Parameters map[string]any `json:"parameters"`
 }
 
 func NewSubagentWrapper(subagentID, name, description string, config map[string]string, logger *zap.Logger, wrappedTool entities.Tool) *SubagentWrapper {
@@ -32,6 +33,14 @@ func NewSubagentWrapper(subagentID, name, description string, config map[string]
 		configuration: config,
 		logger:        logger,
 		wrappedTool:   wrappedTool,
+		subagentTool:  nil, // Will be injected later
+	}
+}
+
+// InjectAgentCallTool allows injecting the AgentCallTool dependency after creation
+func (w *SubagentWrapper) InjectAgentCallTool(agentCallTool any) {
+	if act, ok := agentCallTool.(*AgentCallTool); ok {
+		w.subagentTool = act
 	}
 }
 
@@ -87,49 +96,34 @@ func (w *SubagentWrapper) Parameters() []entities.Parameter {
 func (w *SubagentWrapper) Execute(arguments string) (string, error) {
 	w.logger.Debug("Executing subagent wrapper", zap.String("arguments", arguments))
 
-	if w.wrappedTool != nil {
-		// Direct execution mode - just pass through to wrapped tool
-		return w.wrappedTool.Execute(arguments)
+	// Check if we have a SubagentTool to delegate to
+	if w.subagentTool == nil {
+		return "", fmt.Errorf("subagent tool not injected - cannot execute subagent wrapper")
 	}
 
-	// Subagent mode - parse wrapper configuration
-	var config SubagentWrapperConfig
-	if err := json.Unmarshal([]byte(arguments), &config); err != nil {
-		w.logger.Error("Failed to parse subagent wrapper config", zap.Error(err), zap.String("arguments", arguments))
-		return "", fmt.Errorf("failed to parse wrapper config: %v", err)
+	// Create subagent task request
+	taskRequest := map[string]any{
+		"agent_id": w.subagentID,
+		"task":     arguments,
+		"context": map[string]any{
+			"tool_name":  w.name,
+			"parameters": arguments,
+		},
 	}
 
-	// Convert parameters back to JSON for the wrapped tool
-	paramBytes, err := json.Marshal(config.Parameters)
+	// Convert to JSON for SubagentTool
+	taskBytes, err := json.Marshal(taskRequest)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal parameters: %v", err)
+		w.logger.Error("Failed to marshal subagent task", zap.Error(err))
+		return "", fmt.Errorf("failed to marshal subagent task: %v", err)
 	}
 
-	w.logger.Info("Executing wrapped tool as subagent",
+	w.logger.Info("Delegating to subagent",
 		zap.String("subagent_id", w.subagentID),
-		zap.String("tool_name", config.ToolName),
-		zap.String("parameters", string(paramBytes)))
+		zap.String("task", arguments))
 
-	// In a real implementation, this would:
-	// 1. Look up the tool by name from the tool registry
-	// 2. Execute it with the provided parameters
-	// 3. Handle any errors and format the response
-
-	// For now, return a mock response
-	response := map[string]interface{}{
-		"subagent_id": w.subagentID,
-		"tool_name":   config.ToolName,
-		"status":      "completed",
-		"result":      "Tool executed successfully via subagent wrapper",
-		"parameters":  config.Parameters,
-	}
-
-	responseBytes, err := json.Marshal(response)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal response: %v", err)
-	}
-
-	return string(responseBytes), nil
+	// Execute via SubagentTool
+	return w.subagentTool.Execute(string(taskBytes))
 }
 
 // Helper function to create a subagent wrapper for existing tools
@@ -149,18 +143,11 @@ func CreateToolSubagentWrapper(tool entities.Tool, subagentID string, logger *za
 
 // Factory function to create subagent wrappers for image and vision tools
 func NewImageSubagentWrapper(name, description string, configuration map[string]string, logger *zap.Logger) *SubagentWrapper {
-	imageTool := NewImageTool(name, description, configuration, logger)
-	return CreateToolSubagentWrapper(imageTool, "image-generator", logger)
+	return NewSubagentWrapper("image-generator", name, description, configuration, logger, nil)
 }
 
 func NewVisionSubagentWrapper(name, description string, configuration map[string]string, logger *zap.Logger) *SubagentWrapper {
-	visionTool := &VisionTool{
-		NameField:            name,
-		DescriptionField:     description,
-		FullDescriptionField: description,
-		ConfigurationField:   configuration,
-	}
-	return CreateToolSubagentWrapper(visionTool, "vision-analyst", logger)
+	return NewSubagentWrapper("vision-analyst", name, description, configuration, logger, nil)
 }
 
 var _ entities.Tool = (*SubagentWrapper)(nil)

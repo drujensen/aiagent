@@ -150,4 +150,47 @@ func (t *ToolRepository) reloadToolInstances() error {
 	return nil
 }
 
+// InjectDependencies injects required dependencies into tools that need them
+func (t *ToolRepository) InjectDependencies(agentRepo interfaces.AgentRepository, chatService any) error {
+	// First, find the SubagentTool instance
+	var subagentTool any
+	for _, toolPtr := range t.toolInstances {
+		if toolPtr == nil {
+			continue
+		}
+		tool := *toolPtr
+		if tool.Name() == "Subagent" {
+			subagentTool = tool
+			break
+		}
+	}
+
+	// Then inject dependencies into all tools
+	for name, toolPtr := range t.toolInstances {
+		if toolPtr == nil {
+			continue
+		}
+		tool := *toolPtr
+
+		// Inject dependencies into SubagentTool
+		if tool.Name() == "Subagent" {
+			if injector, ok := tool.(interface {
+				InjectDependencies(interfaces.AgentRepository, any)
+			}); ok {
+				t.logger.Info("Injecting dependencies into SubagentTool", zap.String("tool_name", name))
+				injector.InjectDependencies(agentRepo, chatService)
+			}
+		}
+
+		// Inject AgentCallTool into SubagentWrapper instances (ImageSubAgent, VisionSubAgent)
+		if tool.Name() == "Image Subagent" || tool.Name() == "Vision Subagent" {
+			if injector, ok := tool.(interface{ InjectAgentCallTool(any) }); ok && subagentTool != nil {
+				t.logger.Info("Injecting AgentCallTool into SubagentWrapper", zap.String("tool_name", name))
+				injector.InjectAgentCallTool(subagentTool)
+			}
+		}
+	}
+	return nil
+}
+
 var _ interfaces.ToolRepository = (*ToolRepository)(nil)

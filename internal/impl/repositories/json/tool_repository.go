@@ -203,4 +203,47 @@ func (r *JsonToolRepository) DeleteToolData(ctx context.Context, id string) erro
 	return errors.NotFoundErrorf("toolData not found: %s", id)
 }
 
+// InjectDependencies injects required dependencies into tools that need them
+func (r *JsonToolRepository) InjectDependencies(agentRepo interfaces.AgentRepository, chatService any) error {
+	// First, find the SubagentTool instance
+	var subagentTool any
+	for _, toolPtr := range r.toolInstances {
+		if toolPtr == nil {
+			continue
+		}
+		tool := *toolPtr
+		if tool.Name() == "Subagent" {
+			subagentTool = tool
+			break
+		}
+	}
+
+	// Then inject dependencies into all tools
+	for name, toolPtr := range r.toolInstances {
+		if toolPtr == nil {
+			continue
+		}
+		tool := *toolPtr
+
+		// Inject dependencies into SubagentTool
+		if tool.Name() == "Subagent" {
+			if injector, ok := tool.(interface {
+				InjectDependencies(interfaces.AgentRepository, any)
+			}); ok {
+				r.logger.Info("Injecting dependencies into SubagentTool", zap.String("tool_name", name))
+				injector.InjectDependencies(agentRepo, chatService)
+			}
+		}
+
+		// Inject AgentCallTool into SubagentWrapper instances (ImageSubAgent, VisionSubAgent)
+		if tool.Name() == "Image Subagent" || tool.Name() == "Vision Subagent" {
+			if injector, ok := tool.(interface{ InjectAgentCallTool(any) }); ok && subagentTool != nil {
+				r.logger.Info("Injecting AgentCallTool into SubagentWrapper", zap.String("tool_name", name))
+				injector.InjectAgentCallTool(subagentTool)
+			}
+		}
+	}
+	return nil
+}
+
 var _ interfaces.ToolRepository = (*JsonToolRepository)(nil)

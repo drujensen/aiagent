@@ -104,8 +104,8 @@ func main() {
 		logger.Fatal("Failed to get current directory", zap.Error(err))
 	}
 
-	// Initialize tool factory
-	toolFactory, err := tools.NewToolFactory()
+	// Initialize tool factory (dependencies will be injected later)
+	toolFactory, err := tools.NewToolFactory(nil, nil)
 	if err != nil {
 		logger.Fatal("Failed to initialize tool factory", zap.Error(err))
 	}
@@ -154,6 +154,11 @@ func main() {
 	agentService := services.NewAgentService(agentRepo, logger)
 	toolService := services.NewToolService(toolRepo, logger)
 	chatService := services.NewChatService(chatRepo, agentRepo, providerRepo, toolRepo, cfg, logger)
+
+	// Inject dependencies into tools that need them
+	if err := toolRepo.InjectDependencies(agentRepo, chatService); err != nil {
+		logger.Fatal("Failed to inject dependencies into tools", zap.Error(err))
+	}
 
 	if modeStr == "serve" {
 		uiApp := ui.NewUI(chatService, agentService, toolService, providerService, logger)

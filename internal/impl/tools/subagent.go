@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type SubagentTool struct {
+type AgentCallTool struct {
 	name          string
 	description   string
 	configuration map[string]string
@@ -35,28 +35,35 @@ type AgentSession struct {
 	Status      string // pending, active, completed, failed
 	CreatedAt   time.Time
 	CompletedAt *time.Time
-	Result      interface{}
+	Result      any
 	Error       error
-	Context     map[string]interface{}
+	Context     map[string]any
 }
 
-type SubagentRequest struct {
-	AgentID string                 `json:"agent_id"`
-	Task    string                 `json:"task"`
-	Context map[string]interface{} `json:"context,omitempty"`
-	Tools   []string               `json:"tools,omitempty"`
-	Timeout int                    `json:"timeout,omitempty"` // minutes
+type AgentCallRequest struct {
+	AgentID string         `json:"agent_id"`
+	Task    string         `json:"task"`
+	Context map[string]any `json:"context,omitempty"`
+	Tools   []string       `json:"tools,omitempty"`
+	Timeout int            `json:"timeout,omitempty"` // minutes
+}
+
+type AgentCallResponse struct {
+	SessionID string `json:"session_id"`
+	Status    string `json:"status"`
+	Result    any    `json:"result,omitempty"`
+	Error     string `json:"error,omitempty"`
 }
 
 type SubagentResponse struct {
-	SessionID string      `json:"session_id"`
-	Status    string      `json:"status"`
-	Result    interface{} `json:"result,omitempty"`
-	Error     string      `json:"error,omitempty"`
+	SessionID string `json:"session_id"`
+	Status    string `json:"status"`
+	Result    any    `json:"result,omitempty"`
+	Error     string `json:"error,omitempty"`
 }
 
-func NewSubagentTool(name, description string, configuration map[string]string, logger *zap.Logger, agentRepo interfaces.AgentRepository, chatService services.ChatService) *SubagentTool {
-	return &SubagentTool{
+func NewAgentCallTool(name, description string, configuration map[string]string, logger *zap.Logger, agentRepo interfaces.AgentRepository, chatService services.ChatService) *AgentCallTool {
+	return &AgentCallTool{
 		name:          name,
 		description:   description,
 		configuration: configuration,
@@ -67,23 +74,31 @@ func NewSubagentTool(name, description string, configuration map[string]string, 
 	}
 }
 
-func (t *SubagentTool) Name() string {
+// InjectDependencies allows injecting dependencies after tool creation
+func (t *AgentCallTool) InjectDependencies(agentRepo interfaces.AgentRepository, chatService any) {
+	t.agentRepo = agentRepo
+	if cs, ok := chatService.(services.ChatService); ok {
+		t.chatService = cs
+	}
+}
+
+func (t *AgentCallTool) Name() string {
 	return t.name
 }
 
-func (t *SubagentTool) Description() string {
+func (t *AgentCallTool) Description() string {
 	return t.description
 }
 
-func (t *SubagentTool) Configuration() map[string]string {
+func (t *AgentCallTool) Configuration() map[string]string {
 	return t.configuration
 }
 
-func (t *SubagentTool) UpdateConfiguration(config map[string]string) {
+func (t *AgentCallTool) UpdateConfiguration(config map[string]string) {
 	t.configuration = config
 }
 
-func (t *SubagentTool) FullDescription() string {
+func (t *AgentCallTool) FullDescription() string {
 	var b strings.Builder
 	b.WriteString(t.Description() + "\n\n")
 	b.WriteString("Configuration for this tool:\n")
@@ -95,30 +110,30 @@ func (t *SubagentTool) FullDescription() string {
 	return b.String()
 }
 
-func (t *SubagentTool) Parameters() []entities.Parameter {
+func (t *AgentCallTool) Parameters() []entities.Parameter {
 	return []entities.Parameter{
 		{
 			Name:        "agent_id",
 			Type:        "string",
-			Description: "ID of the subagent to invoke",
+			Description: "ID of the agent to invoke",
 			Required:    true,
 		},
 		{
 			Name:        "task",
 			Type:        "string",
-			Description: "Detailed task description for the subagent",
+			Description: "Detailed task description for the agent",
 			Required:    true,
 		},
 		{
 			Name:        "context",
 			Type:        "object",
-			Description: "Additional context data for the subagent (optional)",
+			Description: "Additional context data for the agent (optional)",
 			Required:    false,
 		},
 		{
 			Name:        "tools",
 			Type:        "array",
-			Description: "Specific tools to enable for this subagent (optional)",
+			Description: "Specific tools to enable for this agent (optional)",
 			Required:    false,
 		},
 		{
@@ -130,12 +145,17 @@ func (t *SubagentTool) Parameters() []entities.Parameter {
 	}
 }
 
-func (t *SubagentTool) Execute(arguments string) (string, error) {
-	t.logger.Debug("Executing subagent call", zap.String("arguments", arguments))
+func (t *AgentCallTool) Execute(arguments string) (string, error) {
+	t.logger.Debug("Executing agent call", zap.String("arguments", arguments))
 
-	var req SubagentRequest
+	// Check if dependencies are available
+	if t.agentRepo == nil || t.chatService == nil {
+		return "", fmt.Errorf("agent call tool dependencies not initialized - agent repository and chat service are required")
+	}
+
+	var req AgentCallRequest
 	if err := json.Unmarshal([]byte(arguments), &req); err != nil {
-		t.logger.Error("Failed to parse subagent request", zap.Error(err), zap.String("arguments", arguments))
+		t.logger.Error("Failed to parse agent call request", zap.Error(err), zap.String("arguments", arguments))
 		return "", fmt.Errorf("failed to parse arguments: %v", err)
 	}
 
@@ -167,10 +187,10 @@ func (t *SubagentTool) Execute(arguments string) (string, error) {
 	t.sessionStore[sessionID] = session
 	t.sessionMutex.Unlock()
 
-	// Start subagent execution asynchronously
-	go t.executeSubagent(session, req)
+	// Start agent execution asynchronously
+	go t.executeAgent(session, req)
 
-	response := SubagentResponse{
+	response := AgentCallResponse{
 		SessionID: sessionID,
 		Status:    "pending",
 	}
@@ -183,7 +203,7 @@ func (t *SubagentTool) Execute(arguments string) (string, error) {
 	return string(responseBytes), nil
 }
 
-func (t *SubagentTool) executeSubagent(session *AgentSession, req SubagentRequest) {
+func (t *AgentCallTool) executeAgent(session *AgentSession, req AgentCallRequest) {
 	t.logger.Info("Starting subagent execution",
 		zap.String("session_id", session.ID),
 		zap.String("subagent", session.Subagent),
@@ -239,7 +259,7 @@ func (t *SubagentTool) executeSubagent(session *AgentSession, req SubagentReques
 	time.Sleep(2 * time.Second) // Simulate processing time
 
 	// Mock successful completion
-	result := map[string]interface{}{
+	result := map[string]any{
 		"status":          "completed",
 		"output":          "Subagent task completed successfully",
 		"chat_id":         chat.ID,
@@ -249,7 +269,7 @@ func (t *SubagentTool) executeSubagent(session *AgentSession, req SubagentReques
 	t.completeSession(session.ID, result, nil)
 }
 
-func (t *SubagentTool) GetSessionResult(sessionID string) (*SubagentResponse, error) {
+func (t *AgentCallTool) GetSessionResult(sessionID string) (*AgentCallResponse, error) {
 	t.sessionMutex.RLock()
 	session, exists := t.sessionStore[sessionID]
 	t.sessionMutex.RUnlock()
@@ -258,7 +278,7 @@ func (t *SubagentTool) GetSessionResult(sessionID string) (*SubagentResponse, er
 		return nil, fmt.Errorf("session not found: %s", sessionID)
 	}
 
-	response := &SubagentResponse{
+	response := &AgentCallResponse{
 		SessionID: sessionID,
 		Status:    session.Status,
 		Result:    session.Result,
@@ -271,15 +291,15 @@ func (t *SubagentTool) GetSessionResult(sessionID string) (*SubagentResponse, er
 	return response, nil
 }
 
-func (t *SubagentTool) ListAvailableAgents(ctx context.Context) ([]map[string]interface{}, error) {
+func (t *AgentCallTool) ListAvailableAgents(ctx context.Context) ([]map[string]any, error) {
 	agents, err := t.agentRepo.ListAgents(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list agents: %v", err)
 	}
 
-	var result []map[string]interface{}
+	var result []map[string]any
 	for _, agent := range agents {
-		result = append(result, map[string]interface{}{
+		result = append(result, map[string]any{
 			"id":          agent.ID,
 			"name":        agent.Name,
 			"description": agent.Description,
@@ -291,7 +311,7 @@ func (t *SubagentTool) ListAvailableAgents(ctx context.Context) ([]map[string]in
 	return result, nil
 }
 
-func (t *SubagentTool) updateSessionStatus(sessionID, status string) {
+func (t *AgentCallTool) updateSessionStatus(sessionID, status string) {
 	t.sessionMutex.Lock()
 	defer t.sessionMutex.Unlock()
 
@@ -304,7 +324,7 @@ func (t *SubagentTool) updateSessionStatus(sessionID, status string) {
 	}
 }
 
-func (t *SubagentTool) completeSession(sessionID string, result interface{}, err error) {
+func (t *AgentCallTool) completeSession(sessionID string, result any, err error) {
 	t.sessionMutex.Lock()
 	defer t.sessionMutex.Unlock()
 
@@ -321,17 +341,17 @@ func (t *SubagentTool) completeSession(sessionID string, result interface{}, err
 	}
 }
 
-func (t *SubagentTool) generateSessionID() string {
+func (t *AgentCallTool) generateSessionID() string {
 	return fmt.Sprintf("subagent_%d", time.Now().UnixNano())
 }
 
-func (t *SubagentTool) getCurrentAgentID() string {
+func (t *AgentCallTool) getCurrentAgentID() string {
 	// This would need to be implemented to get the current agent ID from context
 	// For now, return a placeholder
 	return "current-agent"
 }
 
-func (t *SubagentTool) CleanupCompletedSessions() {
+func (t *AgentCallTool) CleanupCompletedSessions() {
 	t.sessionMutex.Lock()
 	defer t.sessionMutex.Unlock()
 
@@ -344,4 +364,4 @@ func (t *SubagentTool) CleanupCompletedSessions() {
 	}
 }
 
-var _ entities.Tool = (*SubagentTool)(nil)
+var _ entities.Tool = (*AgentCallTool)(nil)
