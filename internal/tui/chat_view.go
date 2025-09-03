@@ -18,12 +18,12 @@ import (
 )
 
 // formatToolResult parses and formats tool execution results for display
-func formatToolResult(toolName, result string, diff string) string {
+func formatToolResult(toolName, result, diff, arguments string) string {
 	switch toolName {
 	case "FileWrite":
-		return formatFileWriteResult(result, diff)
+		return formatFileWriteResult(result, diff, arguments)
 	case "FileRead":
-		return formatFileReadResult(result)
+		return formatFileReadResult(result, arguments)
 	case "Directory":
 		return formatDirectoryResult(result)
 	case "Process":
@@ -51,28 +51,47 @@ func getToolStatusIcon(hasError bool) string {
 }
 
 // formatFileWriteResult formats FileWrite tool results
-func formatFileWriteResult(result string, diff string) string {
+func formatFileWriteResult(result string, diff string, arguments string) string {
+	// Extract filename from arguments
+	var args struct {
+		Path string `json:"path"`
+	}
+	var filename string
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Path != "" {
+		filename = args.Path
+	}
+
+	var output strings.Builder
+
+	// Display filename prominently at the top
+	if filename != "" {
+		output.WriteString(fmt.Sprintf("FileWrite: %s\n", filename))
+	} else {
+		output.WriteString("FileWrite\n")
+	}
+
+	// Try to parse as JSON result (for edit/insert/delete operations)
 	var resultData struct {
 		Diff      string `json:"diff"`
 		LineCount int    `json:"line_count"`
 	}
 
-	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
-		return result // Return raw if parsing fails
-	}
+	if err := json.Unmarshal([]byte(result), &resultData); err == nil {
+		// JSON result - likely from edit/insert/delete operations
+		if resultData.LineCount > 0 {
+			output.WriteString(fmt.Sprintf("File updated (%d lines)", resultData.LineCount))
+		} else {
+			output.WriteString("No changes made to file")
+		}
 
-	var output strings.Builder
-
-	if resultData.LineCount > 0 {
-		output.WriteString(fmt.Sprintf("File updated (%d lines)", resultData.LineCount))
+		if diff != "" {
+			output.WriteString("\n\n" + formatDiff(diff))
+		} else if resultData.Diff != "" {
+			output.WriteString("\n\n" + formatDiff(resultData.Diff))
+		}
 	} else {
-		output.WriteString("No changes made to file")
-	}
-
-	if diff != "" {
-		output.WriteString("\n\n" + formatDiff(diff))
-	} else if resultData.Diff != "" {
-		output.WriteString("\n\n" + formatDiff(resultData.Diff))
+		// Simple string result - likely from write operations
+		output.WriteString(result)
 	}
 
 	return output.String()
@@ -366,23 +385,42 @@ func formatDiff(diff string) string {
 	var output strings.Builder
 	output.WriteString("Changes:\n")
 
-	// Define styles for diff elements
-	addStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))     // Green
-	delStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1"))     // Red
-	hunkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))    // Cyan
-	contextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8")) // Gray
+	// Define styles for diff elements with background colors for better visibility
+	addStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("22")). // Dark green background
+		Foreground(lipgloss.Color("15")). // White text
+		Bold(true)
+
+	delStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("52")). // Dark red background
+		Foreground(lipgloss.Color("15")). // White text
+		Bold(true)
+
+	hunkStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("6")). // Cyan
+		Bold(true)
+
+	contextStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("8")) // Gray
 
 	lines := strings.Split(diffContent, "\n")
 	for _, line := range lines {
 		if strings.HasPrefix(line, "+") {
-			output.WriteString(addStyle.Render(line) + "\n")
+			// Added line with green background
+			content := strings.TrimPrefix(line, "+")
+			output.WriteString(addStyle.Render("+"+content) + "\n")
 		} else if strings.HasPrefix(line, "-") {
-			output.WriteString(delStyle.Render(line) + "\n")
+			// Deleted line with red background
+			content := strings.TrimPrefix(line, "-")
+			output.WriteString(delStyle.Render("-"+content) + "\n")
 		} else if strings.HasPrefix(line, "@@") {
+			// Hunk header
 			output.WriteString(hunkStyle.Render(line) + "\n")
 		} else if strings.HasPrefix(line, " ") {
+			// Context line
 			output.WriteString(contextStyle.Render(line) + "\n")
 		} else {
+			// Other lines (file headers, etc.)
 			output.WriteString(line + "\n")
 		}
 	}
@@ -391,7 +429,7 @@ func formatDiff(diff string) string {
 }
 
 // formatFileReadResult formats FileRead tool results
-func formatFileReadResult(result string) string {
+func formatFileReadResult(result string, arguments string) string {
 	var lines []struct {
 		Line int    `json:"line"`
 		Text string `json:"text"`
@@ -405,11 +443,26 @@ func formatFileReadResult(result string) string {
 		return "No content found"
 	}
 
+	// Extract filename from arguments
+	var args struct {
+		Path string `json:"path"`
+	}
+	var filename string
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Path != "" {
+		filename = args.Path
+	}
+
 	var output strings.Builder
+
+	// Display filename prominently at the top
+	if filename != "" {
+		output.WriteString(fmt.Sprintf("FileRead: %s\n", filename))
+	}
+
 	output.WriteString(fmt.Sprintf("Read %d lines:\n", len(lines)))
 
-	// Show first 8 lines with line numbers
-	maxLines := 8
+	// Show first 5 lines with line numbers
+	maxLines := 5
 	if len(lines) > maxLines {
 		for i := 0; i < maxLines; i++ {
 			output.WriteString(fmt.Sprintf("%4d: %s\n", lines[i].Line, lines[i].Text))
@@ -560,9 +613,9 @@ func formatProjectResult(result string) string {
 
 			output.WriteString(fmt.Sprintf("📄 %s\n", path))
 
-			// Show first 10 lines of each file
+			// Show first 5 lines of each file
 			lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
-			maxFileLines := 10
+			maxFileLines := 5
 			if len(lines) > maxFileLines {
 				for i := 0; i < maxFileLines; i++ {
 					output.WriteString(fmt.Sprintf("    %d: %s\n", i+1, lines[i]))
@@ -716,6 +769,8 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 		c.currentAgent = nil
 	} else {
 		c.currentAgent = agent
+		// Clear any previous errors when switching chats
+		c.err = nil
 	}
 
 	// Subscribe to tool call events for this chat
@@ -750,7 +805,7 @@ func (c *ChatView) updateViewportContent() {
 			sb.WriteString(c.systemStyle.Render("Tool: ") + message.Content + "\n")
 			// Display tool call events
 			for _, event := range message.ToolCallEvents {
-				formattedResult := formatToolResult(event.ToolName, event.Result, event.Diff)
+				formattedResult := formatToolResult(event.ToolName, event.Result, event.Diff, event.Arguments)
 				statusIcon := getToolStatusIcon(event.Error != "")
 				sb.WriteString(c.systemStyle.Render("  ↳ ") + statusIcon + " " + event.ToolName + ":\n")
 				sb.WriteString(c.systemStyle.Render("    ") + strings.ReplaceAll(formattedResult, "\n", "\n    ") + "\n")
@@ -917,6 +972,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			c.currentAgent = nil
 		} else {
 			c.currentAgent = agent
+			// Clear any previous errors on successful response
+			c.err = nil
 		}
 		c.updateViewportContent()
 		c.isProcessing = false
