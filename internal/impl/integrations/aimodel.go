@@ -11,6 +11,7 @@ import (
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
+	"github.com/drujensen/aiagent/internal/events"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -25,6 +26,7 @@ type AIModelIntegration struct {
 	toolRepo   interfaces.ToolRepository
 	logger     *zap.Logger
 	lastUsage  *entities.Usage
+	chatID     string // For publishing events
 }
 
 // NewAIModelIntegration creates a new Base integration
@@ -46,12 +48,18 @@ func NewAIModelIntegration(baseURL, apiKey, model string, toolRepo interfaces.To
 		toolRepo:   toolRepo,
 		logger:     logger,
 		lastUsage:  &entities.Usage{},
+		chatID:     "", // Will be set when processing messages
 	}, nil
 }
 
 // For a generic Base-compatible API
 func NewGenericAIModelIntegration(baseURL, apiKey, model string, toolRepo interfaces.ToolRepository, logger *zap.Logger) (*AIModelIntegration, error) {
 	return NewAIModelIntegration(baseURL, apiKey, model, toolRepo, logger)
+}
+
+// SetChatID sets the chat ID for event publishing
+func (m *AIModelIntegration) SetChatID(chatID string) {
+	m.chatID = chatID
 }
 
 // ModelName returns the name of the model being used
@@ -285,6 +293,11 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			}
 			toolName := toolCall.Function.Name
 
+			// Publish tool call started event
+			if m.chatID != "" {
+				events.PublishToolCallStarted(m.chatID, toolCall.ID, toolName, toolCall.Function.Arguments)
+			}
+
 			tool, err := m.toolRepo.GetToolByName(toolName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get tool %s: %v", toolName, err)
@@ -294,20 +307,37 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			var toolError string
 			var diff string
 			if tool != nil {
+				// Publish progress event
+				if m.chatID != "" {
+					events.PublishToolCallProgress(m.chatID, toolCall.ID, toolName, "Executing tool...")
+				}
+
 				result, err := (*tool).Execute(toolCall.Function.Arguments)
 				if err != nil {
 					toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
 					toolError = err.Error()
+					// Publish error event
+					if m.chatID != "" {
+						events.PublishToolCallError(m.chatID, toolCall.ID, toolName, toolError)
+					}
 				} else {
 					toolResult = result
 					// Extract diff if it's a file write operation
 					if toolName == "FileWrite" {
 						diff = m.extractDiffFromResult(result)
 					}
+					// Publish completion event
+					if m.chatID != "" {
+						events.PublishToolCallCompleted(m.chatID, toolCall.ID, toolName, toolResult)
+					}
 				}
 			} else {
 				toolResult = fmt.Sprintf("Tool %s not found", toolName)
 				toolError = "Tool not found"
+				// Publish error event
+				if m.chatID != "" {
+					events.PublishToolCallError(m.chatID, toolCall.ID, toolName, toolError)
+				}
 			}
 			// Create tool call event
 			toolEvent := entities.NewToolCallEvent(toolName, toolCall.Function.Arguments, toolResult, toolError, diff, nil)

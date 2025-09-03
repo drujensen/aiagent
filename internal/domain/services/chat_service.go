@@ -260,6 +260,11 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		return nil, errors.InternalErrorf("failed to initialize AI model: %v", err)
 	}
 
+	// Set chat ID for event publishing
+	if aiModelWithChatID, ok := aiModel.(interface{ SetChatID(string) }); ok {
+		aiModelWithChatID.SetChatID(id)
+	}
+
 	contextLength := 128000
 	if agent.ContextWindow != nil {
 		contextLength = *agent.ContextWindow

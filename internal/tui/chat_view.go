@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/services"
+	"github.com/drujensen/aiagent/internal/events"
 )
 
 // formatToolResult parses and formats tool execution results for display
@@ -624,25 +625,26 @@ func formatGenericResult(result string) string {
 }
 
 type ChatView struct {
-	chatService  services.ChatService
-	agentService services.AgentService
-	activeChat   *entities.Chat
-	viewport     viewport.Model
-	textarea     textarea.Model
-	spinner      spinner.Model
-	userStyle    lipgloss.Style
-	asstStyle    lipgloss.Style
-	systemStyle  lipgloss.Style
-	err          error
-	cancel       context.CancelFunc
-	isProcessing bool
-	startTime    time.Time
-	focused      string // "textarea" or "viewport"
-	width        int
-	height       int
-	currentAgent *entities.Agent
-	lastKey      string
-	lastKeyTime  time.Time
+	chatService      services.ChatService
+	agentService     services.AgentService
+	activeChat       *entities.Chat
+	viewport         viewport.Model
+	textarea         textarea.Model
+	spinner          spinner.Model
+	userStyle        lipgloss.Style
+	asstStyle        lipgloss.Style
+	systemStyle      lipgloss.Style
+	err              error
+	cancel           context.CancelFunc
+	isProcessing     bool
+	startTime        time.Time
+	focused          string // "textarea" or "viewport"
+	width            int
+	height           int
+	currentAgent     *entities.Agent
+	lastKey          string
+	lastKeyTime      time.Time
+	eventUnsubscribe func() // Function to unsubscribe from events
 }
 
 func NewChatView(chatService services.ChatService, agentService services.AgentService, activeChat *entities.Chat) ChatView {
@@ -701,6 +703,11 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 }
 
 func (c *ChatView) SetActiveChat(chat *entities.Chat) {
+	// Unsubscribe from previous chat events
+	if c.eventUnsubscribe != nil {
+		c.eventUnsubscribe()
+	}
+
 	c.activeChat = chat
 	ctx := context.Background()
 	agent, err := c.agentService.GetAgent(ctx, chat.AgentID)
@@ -710,6 +717,20 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 	} else {
 		c.currentAgent = agent
 	}
+
+	// Subscribe to tool call events for this chat
+	if chat != nil {
+		c.eventUnsubscribe = events.SubscribeToToolCallEvents(chat.ID, c.handleToolCallEvent)
+	}
+
+	c.updateViewportContent()
+}
+
+// handleToolCallEvent handles incoming tool call events and updates the display
+func (c *ChatView) handleToolCallEvent(event entities.ToolCallEventData) {
+	// Update the viewport content when we receive tool call events
+	// This will be called from a goroutine, so we need to be careful about thread safety
+	// For now, we'll just trigger a viewport update
 	c.updateViewportContent()
 }
 
@@ -741,9 +762,6 @@ func (c *ChatView) updateViewportContent() {
 		} else {
 			sb.WriteString(c.systemStyle.Render("System: ") + message.Content + "\n")
 		}
-	}
-	if len(c.activeChat.Messages) > 0 && c.activeChat.Messages[len(c.activeChat.Messages)-1].Role != "system" {
-		sb.WriteString(c.systemStyle.Render("System: Switched to new agent\n"))
 	}
 
 	// Add current tool calls being executed if processing
@@ -870,21 +888,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				}
 			}
 			c.lastKey = ""
-		case "g":
-			if c.focused == "viewport" {
-				if c.lastKey == "g" && time.Since(c.lastKeyTime) < 500*time.Millisecond {
-					c.viewport.GotoTop()
-					c.lastKey = ""
-				} else {
-					c.lastKey = "g"
-					c.lastKeyTime = time.Now()
-				}
-			}
-		case "G":
-			if c.focused == "viewport" {
-				c.viewport.GotoBottom()
-			}
-			c.lastKey = ""
+
 		default:
 			if c.focused == "textarea" {
 				var cmd tea.Cmd

@@ -11,6 +11,7 @@ require (
 	github.com/go-rod/rod v0.116.2
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
+	github.com/kelindar/event v1.5.2
 	github.com/labstack/echo/v4 v4.13.3
 	github.com/pkoukk/tiktoken-go v0.1.7
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
