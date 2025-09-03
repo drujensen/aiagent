@@ -641,6 +641,8 @@ type ChatView struct {
 	width        int
 	height       int
 	currentAgent *entities.Agent
+	lastKey      string
+	lastKeyTime  time.Time
 }
 
 func NewChatView(chatService services.ChatService, agentService services.AgentService, activeChat *entities.Chat) ChatView {
@@ -678,6 +680,8 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		focused:      "textarea",
 		width:        30,
 		height:       5,
+		lastKey:      "",
+		lastKeyTime:  time.Time{},
 	}
 
 	if activeChat != nil {
@@ -854,6 +858,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 					cmds = append(cmds, cmd)
 				}
 			}
+			c.lastKey = ""
 		case "k", "up":
 			if c.focused == "viewport" {
 				c.viewport.ScrollUp(1)
@@ -864,6 +869,22 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 					cmds = append(cmds, cmd)
 				}
 			}
+			c.lastKey = ""
+		case "g":
+			if c.focused == "viewport" {
+				if c.lastKey == "g" && time.Since(c.lastKeyTime) < 500*time.Millisecond {
+					c.viewport.GotoTop()
+					c.lastKey = ""
+				} else {
+					c.lastKey = "g"
+					c.lastKeyTime = time.Now()
+				}
+			}
+		case "G":
+			if c.focused == "viewport" {
+				c.viewport.GotoBottom()
+			}
+			c.lastKey = ""
 		default:
 			if c.focused == "textarea" {
 				var cmd tea.Cmd
@@ -872,6 +893,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 					cmds = append(cmds, cmd)
 				}
 			}
+			c.lastKey = ""
 		}
 
 	case spinner.TickMsg:
@@ -985,7 +1007,7 @@ func (c ChatView) View() string {
 		elapsed := time.Since(c.startTime).Round(time.Second)
 		sb.WriteString("\n" + c.spinner.View() + fmt.Sprintf(" Working... (%ds) esc to interrupt", int(elapsed.Seconds())))
 	} else {
-		instructions := "Press Ctrl+P for menu, Tab to switch focus, j/k to navigate, Ctrl+C to exit."
+		instructions := "Press Ctrl+P for menu, Tab to switch focus, j/k/G/gg to navigate, Ctrl+C to exit."
 		var agentInfo string
 		if c.currentAgent != nil {
 			agentInfo = fmt.Sprintf("%s (%s: %s)", c.currentAgent.Name, c.currentAgent.ProviderType, c.currentAgent.Model)
