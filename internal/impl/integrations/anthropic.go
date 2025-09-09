@@ -309,7 +309,8 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 			m.logger.Info("No tool calls generated")
 		}
 
-		if len(toolCalls) == 0 {
+		// Break if no tool calls OR if stop_reason indicates completion
+		if len(toolCalls) == 0 || responseBody.StopReason == "end_turn" || responseBody.StopReason == "max_tokens" || responseBody.StopReason == "stop_sequence" {
 			finalMessage := &entities.Message{
 				ID:        uuid.New().String(),
 				Role:      "assistant",

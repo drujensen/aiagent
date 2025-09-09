@@ -208,7 +208,8 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 
 		var responseBody struct {
 			Choices []struct {
-				Message struct {
+				FinishReason string `json:"finish_reason"`
+				Message      struct {
 					Content   string              `json:"content"`
 					ToolCalls []entities.ToolCall `json:"tool_calls,omitempty"`
 				} `json:"message"`
@@ -244,7 +245,10 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		m.lastUsage.CompletionTokens = responseBody.Usage.CompletionTokens
 		m.lastUsage.TotalTokens = responseBody.Usage.TotalTokens
 
-		if len(toolCalls) == 0 {
+		finishReason := responseBody.Choices[0].FinishReason
+
+		// Break if no tool calls OR if finish_reason indicates completion
+		if len(toolCalls) == 0 || finishReason == "stop" || finishReason == "length" || finishReason == "content_filter" {
 			finalMessage := &entities.Message{
 				ID:        uuid.New().String(),
 				Role:      "assistant",
