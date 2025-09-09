@@ -722,7 +722,7 @@ func (c *ChatView) updateViewportContent() {
 		} else if message.Role == "assistant" {
 			sb.WriteString(c.asstStyle.Render("Assistant: ") + message.Content + "\n")
 		} else if message.Role == "tool" {
-			sb.WriteString(c.systemStyle.Render("Tool: ") + message.Content + "\n")
+			sb.WriteString(c.systemStyle.Render("Tool: ") + "\n")
 			// Display tool call events
 			for _, event := range message.ToolCallEvents {
 				formattedResult := formatToolResult(event.ToolName, event.Result, event.Diff)
