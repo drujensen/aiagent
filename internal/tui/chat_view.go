@@ -624,23 +624,24 @@ func formatGenericResult(result string) string {
 }
 
 type ChatView struct {
-	chatService  services.ChatService
-	agentService services.AgentService
-	activeChat   *entities.Chat
-	viewport     viewport.Model
-	textarea     textarea.Model
-	spinner      spinner.Model
-	userStyle    lipgloss.Style
-	asstStyle    lipgloss.Style
-	systemStyle  lipgloss.Style
-	err          error
-	cancel       context.CancelFunc
-	isProcessing bool
-	startTime    time.Time
-	focused      string // "textarea" or "viewport"
-	width        int
-	height       int
-	currentAgent *entities.Agent
+	chatService     services.ChatService
+	agentService    services.AgentService
+	activeChat      *entities.Chat
+	viewport        viewport.Model
+	textarea        textarea.Model
+	spinner         spinner.Model
+	userStyle       lipgloss.Style
+	asstStyle       lipgloss.Style
+	systemStyle     lipgloss.Style
+	err             error
+	cancel          context.CancelFunc
+	isProcessing    bool
+	startTime       time.Time
+	focused         string // "textarea" or "viewport"
+	width           int
+	height          int
+	currentAgent    *entities.Agent
+	previousAgentID string // Track previous agent ID to detect changes
 }
 
 func NewChatView(chatService services.ChatService, agentService services.AgentService, activeChat *entities.Chat) ChatView {
@@ -697,6 +698,13 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 }
 
 func (c *ChatView) SetActiveChat(chat *entities.Chat) {
+	// Check if agent is changing
+	agentChanged := c.activeChat == nil || c.activeChat.AgentID != chat.AgentID
+	c.previousAgentID = ""
+	if c.activeChat != nil {
+		c.previousAgentID = c.activeChat.AgentID
+	}
+
 	c.activeChat = chat
 	ctx := context.Background()
 	agent, err := c.agentService.GetAgent(ctx, chat.AgentID)
@@ -706,6 +714,16 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 	} else {
 		c.currentAgent = agent
 	}
+
+	// Add system message if agent changed
+	if agentChanged && c.activeChat != nil && len(c.activeChat.Messages) > 0 {
+		systemMsg := &entities.Message{
+			Content: "Switched to new agent",
+			Role:    "system",
+		}
+		c.activeChat.Messages = append(c.activeChat.Messages, *systemMsg)
+	}
+
 	c.updateViewportContent()
 }
 
@@ -738,9 +756,6 @@ func (c *ChatView) updateViewportContent() {
 			sb.WriteString(c.systemStyle.Render("System: ") + message.Content + "\n")
 		}
 	}
-	if len(c.activeChat.Messages) > 0 && c.activeChat.Messages[len(c.activeChat.Messages)-1].Role != "system" {
-		sb.WriteString(c.systemStyle.Render("System: Switched to new agent\n"))
-	}
 
 	// Add current tool calls being executed if processing
 	if c.isProcessing && len(c.activeChat.Messages) > 0 {
@@ -759,6 +774,8 @@ func (c *ChatView) updateViewportContent() {
 			sb.WriteString("\n")
 		}
 		sb.WriteString(c.systemStyle.Render("System: Error - ") + c.err.Error() + "\n")
+		// Clear the error after displaying it once
+		c.err = nil
 	}
 
 	content := lipgloss.NewStyle().Width(c.viewport.Width).Render(sb.String())
@@ -883,6 +900,13 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 
 	case updatedChatMsg:
 		c.textarea.Reset()
+		// Check if agent is changing
+		agentChanged := c.activeChat == nil || c.activeChat.AgentID != m.AgentID
+		c.previousAgentID = ""
+		if c.activeChat != nil {
+			c.previousAgentID = c.activeChat.AgentID
+		}
+
 		c.activeChat = m
 		ctx := context.Background()
 		agent, err := c.agentService.GetAgent(ctx, m.AgentID)
@@ -892,6 +916,16 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		} else {
 			c.currentAgent = agent
 		}
+
+		// Add system message if agent changed
+		if agentChanged && c.activeChat != nil && len(c.activeChat.Messages) > 0 {
+			systemMsg := &entities.Message{
+				Content: "Switched to new agent",
+				Role:    "system",
+			}
+			c.activeChat.Messages = append(c.activeChat.Messages, *systemMsg)
+		}
+
 		c.updateViewportContent()
 		c.isProcessing = false
 		c.cancel = nil
