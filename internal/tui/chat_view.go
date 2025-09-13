@@ -659,8 +659,6 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	ta.ShowLineNumbers = false
 	ta.KeyMap.InsertNewline.SetEnabled(false)
 
-	editor := vimtea.NewEditor()
-
 	us := lipgloss.NewStyle().Foreground(lipgloss.Color("5"))
 	as := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
 	ss := lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
@@ -674,7 +672,6 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		agentService: agentService,
 		activeChat:   activeChat,
 		textarea:     ta,
-		editor:       editor,
 		spinner:      s,
 		userStyle:    us,
 		asstStyle:    as,
@@ -749,9 +746,16 @@ func (c *ChatView) updateEditorContent() {
 			vimtea.WithEnableModeCommand(false),
 			vimtea.WithEnableStatusBar(false),
 			vimtea.WithRelativeNumbers(false),
+			vimtea.WithReadOnly(true),
 		)
+		// Set editor size - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
 		if c.width > 0 && c.height > 0 {
-			c.editor.SetSize(c.width-4, c.height-4)
+			editorWidth := c.width - 4
+			editorHeight := c.height - 10
+			if editorHeight < 1 {
+				editorHeight = 1
+			}
+			c.editor.SetSize(editorWidth, editorHeight)
 		}
 		return
 	}
@@ -826,146 +830,34 @@ func (c *ChatView) updateEditorContent() {
 		vimtea.WithEnableModeCommand(false), // Disable command mode for read-only
 		vimtea.WithEnableStatusBar(false),   // Disable status bar
 		vimtea.WithRelativeNumbers(false),   // Disable relative numbers
+		vimtea.WithReadOnly(true),
 	)
 
-	// Set editor size
+	// Set editor size - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
 	if c.width > 0 && c.height > 0 {
-		c.editor.SetSize(c.width-4, c.height-4)
+		editorWidth := c.width - 4
+		editorHeight := c.height - 10
+		if editorHeight < 1 {
+			editorHeight = 1
+		}
+		c.editor.SetSize(editorWidth, editorHeight)
 	}
 }
 
 func (c ChatView) Init() tea.Cmd {
 	c.textarea.Focus()
 	c.focused = "textarea"
-	// Initialize editor if not already done
-	if c.editor == nil {
-		c.editor = vimtea.NewEditor(
-			vimtea.WithEnableModeCommand(false),
-			vimtea.WithEnableStatusBar(false),
-			vimtea.WithRelativeNumbers(false),
-		)
+	// Initialize editor with proper options
+	c.editor = vimtea.NewEditor(
+		vimtea.WithEnableModeCommand(false),
+		vimtea.WithEnableStatusBar(false),
+		vimtea.WithRelativeNumbers(false),
+		vimtea.WithReadOnly(true),
+	)
 
-		// Configure read-only mode by disabling edit commands
-		c.configureReadOnlyMode()
-
-		// Ensure editor starts in normal mode
-		c.editor.SetMode(vimtea.ModeNormal)
-	}
+	// Ensure editor starts in normal mode
+	c.editor.SetMode(vimtea.ModeNormal)
 	return tea.Batch(textarea.Blink, c.listenForEvents())
-}
-
-// configureReadOnlyMode sets up vimtea to be read-only by disabling edit commands
-func (c *ChatView) configureReadOnlyMode() {
-	// Disable insert mode transitions
-	c.editor.AddBinding(vimtea.KeyBinding{
-		Key:         "i",
-		Mode:        vimtea.ModeNormal,
-		Description: "Disabled - Read-only mode",
-		Handler: func(b vimtea.Buffer) tea.Cmd {
-			return vimtea.SetStatusMsg("Read-only mode: Cannot enter insert mode")
-		},
-	})
-
-	c.editor.AddBinding(vimtea.KeyBinding{
-		Key:         "a",
-		Mode:        vimtea.ModeNormal,
-		Description: "Disabled - Read-only mode",
-		Handler: func(b vimtea.Buffer) tea.Cmd {
-			return vimtea.SetStatusMsg("Read-only mode: Cannot enter insert mode")
-		},
-	})
-
-	c.editor.AddBinding(vimtea.KeyBinding{
-		Key:         "A",
-		Mode:        vimtea.ModeNormal,
-		Description: "Disabled - Read-only mode",
-		Handler: func(b vimtea.Buffer) tea.Cmd {
-			return vimtea.SetStatusMsg("Read-only mode: Cannot enter insert mode")
-		},
-	})
-
-	c.editor.AddBinding(vimtea.KeyBinding{
-		Key:         "o",
-		Mode:        vimtea.ModeNormal,
-		Description: "Disabled - Read-only mode",
-		Handler: func(b vimtea.Buffer) tea.Cmd {
-			return vimtea.SetStatusMsg("Read-only mode: Cannot enter insert mode")
-		},
-	})
-
-	c.editor.AddBinding(vimtea.KeyBinding{
-		Key:         "O",
-		Mode:        vimtea.ModeNormal,
-		Description: "Disabled - Read-only mode",
-		Handler: func(b vimtea.Buffer) tea.Cmd {
-			return vimtea.SetStatusMsg("Read-only mode: Cannot enter insert mode")
-		},
-	})
-
-	// Disable edit commands
-	c.editor.AddBinding(vimtea.KeyBinding{
-		Key:         "x",
-		Mode:        vimtea.ModeNormal,
-		Description: "Disabled - Read-only mode",
-		Handler: func(b vimtea.Buffer) tea.Cmd {
-			return vimtea.SetStatusMsg("Read-only mode: Cannot delete characters")
-		},
-	})
-
-	c.editor.AddBinding(vimtea.KeyBinding{
-		Key:         "dd",
-		Mode:        vimtea.ModeNormal,
-		Description: "Disabled - Read-only mode",
-		Handler: func(b vimtea.Buffer) tea.Cmd {
-			return vimtea.SetStatusMsg("Read-only mode: Cannot delete lines")
-		},
-	})
-
-	c.editor.AddBinding(vimtea.KeyBinding{
-		Key:         "D",
-		Mode:        vimtea.ModeNormal,
-		Description: "Disabled - Read-only mode",
-		Handler: func(b vimtea.Buffer) tea.Cmd {
-			return vimtea.SetStatusMsg("Read-only mode: Cannot delete text")
-		},
-	})
-
-	c.editor.AddBinding(vimtea.KeyBinding{
-		Key:         "c",
-		Mode:        vimtea.ModeNormal,
-		Description: "Disabled - Read-only mode",
-		Handler: func(b vimtea.Buffer) tea.Cmd {
-			return vimtea.SetStatusMsg("Read-only mode: Cannot change text")
-		},
-	})
-
-	c.editor.AddBinding(vimtea.KeyBinding{
-		Key:         "s",
-		Mode:        vimtea.ModeNormal,
-		Description: "Disabled - Read-only mode",
-		Handler: func(b vimtea.Buffer) tea.Cmd {
-			return vimtea.SetStatusMsg("Read-only mode: Cannot substitute text")
-		},
-	})
-
-	// Disable paste commands (since we can't modify)
-	c.editor.AddBinding(vimtea.KeyBinding{
-		Key:         "p",
-		Mode:        vimtea.ModeNormal,
-		Description: "Disabled - Read-only mode",
-		Handler: func(b vimtea.Buffer) tea.Cmd {
-			return vimtea.SetStatusMsg("Read-only mode: Cannot paste")
-		},
-	})
-
-	c.editor.AddBinding(vimtea.KeyBinding{
-		Key:         "P",
-		Mode:        vimtea.ModeNormal,
-		Description: "Disabled - Read-only mode",
-		Handler: func(b vimtea.Buffer) tea.Cmd {
-			return vimtea.SetStatusMsg("Read-only mode: Cannot paste")
-		},
-	})
 }
 
 // listenForEvents returns a command that listens for tool call events
@@ -1152,18 +1044,16 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		c.width = m.Width
 		c.height = m.Height
-		innerWidth := c.width - 4
-		innerHeight := c.height - 4
 
-		// Set editor size
-		editorWidth := innerWidth
-		editorHeight := innerHeight - 2 - 1 - 2
+		// Set editor size - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
+		editorWidth := c.width - 4
+		editorHeight := c.height - 10
 		if editorHeight < 1 {
 			editorHeight = 1
 		}
 		c.editor.SetSize(editorWidth, editorHeight)
 
-		c.textarea.SetWidth(innerWidth)
+		c.textarea.SetWidth(c.width - 4)
 
 		if c.activeChat != nil {
 			c.updateEditorContent()
@@ -1216,10 +1106,14 @@ func (c ChatView) View() string {
 
 	var sb strings.Builder
 
-	// Style editor
-	editorStyle := unfocusedBorder.Width(c.width - 4).Height(c.height - 4)
+	// Style editor - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
+	editorHeight := c.height - 10
+	if editorHeight < 1 {
+		editorHeight = 1
+	}
+	editorStyle := unfocusedBorder.Width(c.width - 4).Height(editorHeight)
 	if c.focused == "editor" {
-		editorStyle = focusedBorder.Width(c.width - 4).Height(c.height - 4)
+		editorStyle = focusedBorder.Width(c.width - 4).Height(editorHeight)
 	}
 
 	sb.WriteString(editorStyle.Render(c.editor.View()))
