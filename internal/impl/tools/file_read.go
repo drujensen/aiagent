@@ -185,13 +185,12 @@ func (t *FileReadTool) Execute(arguments string) (string, error) {
 		return "No lines found in file", fmt.Errorf("no lines found in file")
 	}
 
-	jsonResponse, err := json.Marshal(lines)
-	if err != nil {
-		t.logger.Error("Failed to marshal read results", zap.Error(err))
-		return "", fmt.Errorf("failed to marshal read results: %v", err)
+	var b strings.Builder
+	for _, line := range lines {
+		b.WriteString(fmt.Sprintf("%6d: %s\n", line.Line, line.Text))
 	}
 
-	results := string(jsonResponse)
+	results := b.String()
 	if hasMore {
 		results += "\nWarning: File has more lines beyond the limit. Use offset and limit to read additional sections."
 	}

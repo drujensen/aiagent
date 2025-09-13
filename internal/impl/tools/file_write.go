@@ -56,8 +56,8 @@ func (t *FileWriteTool) FullDescription() string {
 	b.WriteString("2. Use `dry_run=true` with `edit`, `insert`, or `delete` to preview changes and verify the line is correct.\n")
 	b.WriteString("3. After any change, use FileReadTool to check the updated file and get new line numbers, as insertions or deletions shift lines.\n\n")
 	b.WriteString("- **write**: Overwrites or creates a file with new content. Provide `content` to specify the full file content.\n")
-	b.WriteString("- **edit**: Replaces specific lines in a file with new content. Use `start_line`, `end_line`, and `content` to replace the specified lines.\n")
-	b.WriteString("  - Example: To replace lines 5 to 7, set `operation='edit', start_line=5, end_line=7`, and provide the new `content` for those lines.\n")
+	b.WriteString("- **edit**: Replaces specific lines in a file with new content. Use `start_line`, `end_line` (optional, defaults to start_line), and `content` to replace the specified lines.\n")
+	b.WriteString("  - Example: To replace lines 5 to 7, set `operation='edit', start_line=5, end_line=7`, and provide the new `content` for those lines. If end_line is omitted, only line 5 is replaced.\n")
 	b.WriteString("- **insert**: Inserts new content at a specific line. Use `start_line` and `content` to insert the content before the specified line.\n")
 	b.WriteString("  - Example: To insert content at line 5, set `operation='insert', start_line=5`, and provide the `content` to insert.\n")
 	b.WriteString("- **delete**: Deletes specific lines in a file. Use `start_line` and `end_line` to specify the lines to delete.\n")
@@ -102,7 +102,7 @@ func (t *FileWriteTool) Parameters() []entities.Parameter {
 		{
 			Name:        "end_line",
 			Type:        "integer",
-			Description: "The end line for editing or deleting",
+			Description: "The end line for editing or deleting (optional for edit, defaults to start_line)",
 			Required:    false,
 		},
 		{
@@ -179,8 +179,7 @@ func (t *FileWriteTool) Execute(arguments string) (string, error) {
 			return "", fmt.Errorf("invalid path: %v", err)
 		}
 		if args.Operation == "edit" && args.EndLine == 0 {
-			t.logger.Error("End line is required for edit operation")
-			return "", fmt.Errorf("end_line is required for edit operation")
+			args.EndLine = args.StartLine
 		}
 		if args.Operation == "edit" && args.Content == "" {
 			t.logger.Error("Content is required for edit operation")

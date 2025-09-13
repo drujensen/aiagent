@@ -101,7 +101,13 @@ func (t *TaskTool) FullDescription() string {
 	var b strings.Builder
 	b.WriteString(t.Description())
 	b.WriteString("\n\n")
-	b.WriteString("Configuration for this tool:\n")
+	b.WriteString("## Operations\n")
+	b.WriteString("- **create_task**: Create a new task. The name will be automatically derived from the content.\n")
+	b.WriteString("- **list_tasks**: List all tasks.\n")
+	b.WriteString("- **get_task**: Get a specific task by ID.\n")
+	b.WriteString("- **update_task**: Update an existing task.\n")
+	b.WriteString("- **delete_task**: Delete a task by ID.\n")
+	b.WriteString("\n## Configuration\n")
 	b.WriteString("| Key           | Value         |\n")
 	b.WriteString("|---------------|---------------|\n")
 	for key, value := range t.Configuration() {
@@ -128,7 +134,7 @@ func (t *TaskTool) Parameters() []entities.Parameter {
 		{
 			Name:        "name",
 			Type:        "string",
-			Description: "Task name for create/update operations",
+			Description: "Task name for update operations (ignored for create, automatically derived from content)",
 			Required:    false,
 		},
 		{
@@ -177,7 +183,7 @@ func (t *TaskTool) Execute(arguments string) (string, error) {
 
 	switch args.Operation {
 	case "create_task":
-		return t.createTask(args.Name, args.Content, args.Priority)
+		return t.createTask(args.Content, args.Priority)
 	case "list_tasks":
 		return t.listTasks()
 	case "get_task":
@@ -192,9 +198,14 @@ func (t *TaskTool) Execute(arguments string) (string, error) {
 	}
 }
 
-func (t *TaskTool) createTask(name, content, priorityStr string) (string, error) {
-	if name == "" {
-		return "", fmt.Errorf("task name is required")
+func (t *TaskTool) createTask(content, priorityStr string) (string, error) {
+	if content == "" {
+		return "", fmt.Errorf("task content is required")
+	}
+	// Derive name from content
+	name := content
+	if len(content) > 50 {
+		name = content[:47] + "..."
 	}
 
 	priority := entities.TaskPriorityMedium
