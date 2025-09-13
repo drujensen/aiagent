@@ -881,6 +881,26 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 					cmds = append(cmds, cmd)
 				}
 			}
+		case "g", "home":
+			if c.focused == "viewport" {
+				c.viewport.GotoTop()
+			} else {
+				var cmd tea.Cmd
+				c.textarea, cmd = c.textarea.Update(m)
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+			}
+		case "G", "end":
+			if c.focused == "viewport" {
+				c.viewport.GotoBottom()
+			} else {
+				var cmd tea.Cmd
+				c.textarea, cmd = c.textarea.Update(m)
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+			}
 		default:
 			if c.focused == "textarea" {
 				var cmd tea.Cmd
@@ -1015,23 +1035,22 @@ func (c ChatView) View() string {
 	}
 	sb.WriteString(taStyle.Render(c.textarea.View()))
 
+	instructions := "Ctrl+P for menu, Tab to switch focus, g/j/k/G to navigate, Ctrl+C to exit."
 	if c.isProcessing {
 		elapsed := time.Since(c.startTime).Round(time.Second)
-		sb.WriteString("\n" + c.spinner.View() + fmt.Sprintf(" Working... (%ds) esc to interrupt", int(elapsed.Seconds())))
-	} else {
-		instructions := "Press Ctrl+P for menu, Tab to switch focus, j/k to navigate, Ctrl+C to exit."
-		var agentInfo string
-		if c.currentAgent != nil {
-			agentInfo = fmt.Sprintf("%s (%s: %s)", c.currentAgent.Name, c.currentAgent.ProviderType, c.currentAgent.Model)
-		} else {
-			agentInfo = "No agent selected"
-		}
-		footerStyle := lipgloss.NewStyle().Width(c.width - 4)
-		leftStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Inline(true)
-		rightStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Align(lipgloss.Right).Inline(true).Width(c.width - 4 - len(instructions))
-		footer := footerStyle.Render(lipgloss.JoinHorizontal(lipgloss.Top, leftStyle.Render(instructions), rightStyle.Render(agentInfo)))
-		sb.WriteString("\n" + footer)
+		instructions = c.spinner.View() + fmt.Sprintf(" Working... (%ds) esc to interrupt", int(elapsed.Seconds()))
 	}
+
+	agentInfo := "No agent selected"
+	if c.currentAgent != nil {
+		agentInfo = fmt.Sprintf("%s (%s: %s)", c.currentAgent.Name, c.currentAgent.ProviderType, c.currentAgent.Model)
+	}
+
+	footerStyle := lipgloss.NewStyle().Width(c.width - 4)
+	leftStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Inline(true)
+	rightStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Align(lipgloss.Right).Inline(true).Width(c.width - 4 - len(instructions))
+	footer := footerStyle.Render(lipgloss.JoinHorizontal(lipgloss.Top, leftStyle.Render(instructions), rightStyle.Render(agentInfo)))
+	sb.WriteString("\n" + footer)
 
 	// Wrap everything in the outer border
 	return outerStyle.Render(sb.String())
