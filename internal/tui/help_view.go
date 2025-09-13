@@ -43,22 +43,20 @@ func (h HelpView) View() string {
 		return ""
 	}
 
-	// Help content (can be expanded as needed)
-	helpText := `AI Agent TUI Help
+	// Help content (concise)
+	helpText := `Commands:
+/new    - New chat
+/history - Chat history
+/agents  - Available agents
+/tools   - Available tools
+/usage   - Usage stats
+/help    - This help
+/exit    - Exit app
 
-Commands:                                   
-/new          - Start a new chat             
-/history      - View and select from history
-/agents       - View available agents       
-/tools        - View available tools        
-/usage        - Show usage statistics       
-/help         - Show this help screen       
-/exit         - Exit the application        
-
-Usage Tips:                         
-- Type / again to filter lists.      
-- Use arrows or j/k to scroll lists.
-- Press Ctrl+C to force quit.       `
+Tips:
+• Type / to filter lists
+• Use arrows/j/k to navigate
+• Ctrl+C to quit`
 
 	// Outer container style (Vim-like overall border)
 	outerStyle := lipgloss.NewStyle().

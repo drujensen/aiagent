@@ -9,12 +9,12 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/events"
 	"github.com/drujensen/aiagent/internal/domain/services"
+	"github.com/kujtimiihoxha/vimtea"
 )
 
 // formatToolResult parses and formats tool execution results for display
@@ -286,7 +286,7 @@ func formatTaskResult(result string) string {
 	var output strings.Builder
 
 	// Try parsing as a single task (create/update/get result)
-	var task map[string]interface{}
+	var task map[string]any
 	if err := json.Unmarshal([]byte(result), &task); err == nil {
 		if id, ok := task["id"].(string); ok {
 			output.WriteString(fmt.Sprintf("Task: %s\n", task["name"]))
@@ -305,7 +305,7 @@ func formatTaskResult(result string) string {
 	}
 
 	// Try parsing as array of tasks (list result)
-	var tasks []interface{}
+	var tasks []any
 	if err := json.Unmarshal([]byte(result), &tasks); err == nil && len(tasks) > 0 {
 		output.WriteString(fmt.Sprintf("Tasks (%d total):\n", len(tasks)))
 
@@ -316,7 +316,7 @@ func formatTaskResult(result string) string {
 				break
 			}
 
-			if taskMap, ok := taskItem.(map[string]interface{}); ok {
+			if taskMap, ok := taskItem.(map[string]any); ok {
 				if name, ok := taskMap["name"].(string); ok {
 					status := "unknown"
 					if s, ok := taskMap["status"].(string); ok {
@@ -587,7 +587,7 @@ func formatProjectResult(result string) string {
 
 // formatGenericResult tries to parse generic JSON results
 func formatGenericResult(result string) string {
-	var jsonData map[string]interface{}
+	var jsonData map[string]any
 	if err := json.Unmarshal([]byte(result), &jsonData); err != nil {
 		// If not JSON, check if it's a long text and truncate if needed
 		if len(result) > 500 {
@@ -628,7 +628,7 @@ type ChatView struct {
 	chatService     services.ChatService
 	agentService    services.AgentService
 	activeChat      *entities.Chat
-	viewport        viewport.Model
+	editor          vimtea.Editor
 	textarea        textarea.Model
 	spinner         spinner.Model
 	userStyle       lipgloss.Style
@@ -638,7 +638,7 @@ type ChatView struct {
 	cancel          context.CancelFunc
 	isProcessing    bool
 	startTime       time.Time
-	focused         string // "textarea" or "viewport"
+	focused         string // "textarea" or "editor"
 	width           int
 	height          int
 	currentAgent    *entities.Agent
@@ -659,8 +659,6 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	ta.ShowLineNumbers = false
 	ta.KeyMap.InsertNewline.SetEnabled(false)
 
-	vp := viewport.New(30, 5)
-
 	us := lipgloss.NewStyle().Foreground(lipgloss.Color("5"))
 	as := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
 	ss := lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
@@ -674,7 +672,6 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		agentService: agentService,
 		activeChat:   activeChat,
 		textarea:     ta,
-		viewport:     vp,
 		spinner:      s,
 		userStyle:    us,
 		asstStyle:    as,
@@ -695,7 +692,7 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		} else {
 			cv.currentAgent = agent
 		}
-		cv.updateViewportContent()
+		cv.updateEditorContent()
 	}
 
 	// Set up event channel and subscription for real-time tool call updates
@@ -739,12 +736,27 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 		c.activeChat.Messages = append(c.activeChat.Messages, *systemMsg)
 	}
 
-	c.updateViewportContent()
+	c.updateEditorContent()
 }
 
-func (c *ChatView) updateViewportContent() {
+func (c *ChatView) updateEditorContent() {
 	if c.activeChat == nil {
-		c.viewport.SetContent("How can I help you today?")
+		c.editor = vimtea.NewEditor(
+			vimtea.WithContent("How can I help you today?"),
+			vimtea.WithEnableModeCommand(false),
+			vimtea.WithEnableStatusBar(false),
+			vimtea.WithRelativeNumbers(false),
+			vimtea.WithReadOnly(true),
+		)
+		// Set editor size - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
+		if c.width > 0 && c.height > 0 {
+			editorWidth := c.width - 4
+			editorHeight := c.height - 10
+			if editorHeight < 1 {
+				editorHeight = 1
+			}
+			c.editor.SetSize(editorWidth, editorHeight)
+		}
 		return
 	}
 
@@ -811,19 +823,40 @@ func (c *ChatView) updateViewportContent() {
 		c.err = nil
 	}
 
-	content := lipgloss.NewStyle().Width(c.viewport.Width).Render(sb.String())
-	c.viewport.SetContent(content)
+	content := sb.String()
+	// Recreate editor with new content
+	c.editor = vimtea.NewEditor(
+		vimtea.WithContent(content),
+		vimtea.WithEnableModeCommand(false), // Disable command mode for read-only
+		vimtea.WithEnableStatusBar(false),   // Disable status bar
+		vimtea.WithRelativeNumbers(false),   // Disable relative numbers
+		vimtea.WithReadOnly(true),
+	)
 
-	// Only scroll to bottom if we're not processing (to avoid jumping during tool execution)
-	// or if this is a new message being added
-	if !c.isProcessing || (c.activeChat != nil && len(c.activeChat.Messages) > 0) {
-		c.viewport.GotoBottom()
+	// Set editor size - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
+	if c.width > 0 && c.height > 0 {
+		editorWidth := c.width - 4
+		editorHeight := c.height - 10
+		if editorHeight < 1 {
+			editorHeight = 1
+		}
+		c.editor.SetSize(editorWidth, editorHeight)
 	}
 }
 
 func (c ChatView) Init() tea.Cmd {
 	c.textarea.Focus()
 	c.focused = "textarea"
+	// Initialize editor with proper options
+	c.editor = vimtea.NewEditor(
+		vimtea.WithEnableModeCommand(false),
+		vimtea.WithEnableStatusBar(false),
+		vimtea.WithRelativeNumbers(false),
+		vimtea.WithReadOnly(true),
+	)
+
+	// Ensure editor starts in normal mode
+	c.editor.SetMode(vimtea.ModeNormal)
 	return tea.Batch(textarea.Blink, c.listenForEvents())
 }
 
@@ -846,7 +879,12 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 					c.cancel()
 					c.isProcessing = false
 					c.err = fmt.Errorf("request cancelled")
-					c.viewport.GotoBottom()
+					// Send 'G' key to vimtea to go to bottom
+					bottomMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}}
+					newModel, _ := c.editor.Update(bottomMsg)
+					if editor, ok := newModel.(vimtea.Editor); ok {
+						c.editor = editor
+					}
 				}
 				return c, nil
 			}
@@ -883,7 +921,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				}
 				c.textarea.Reset()
 				c.activeChat.Messages = append(c.activeChat.Messages, *message)
-				c.updateViewportContent()
+				c.updateEditorContent()
 				c.err = nil
 				ctx, cancel := context.WithCancel(context.Background())
 				c.cancel = cancel
@@ -893,8 +931,12 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			}
 		case "tab", "shift+tab":
 			if c.focused == "textarea" {
-				c.focused = "viewport"
+				c.focused = "editor"
 				c.textarea.Blur()
+				// Focus the editor
+				if c.editor != nil {
+					c.editor.SetMode(vimtea.ModeNormal)
+				}
 			} else {
 				c.focused = "textarea"
 				c.textarea.Focus()
@@ -902,50 +944,20 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				cmds = append(cmds, cmd)
 			}
 			return c, tea.Batch(cmds...)
-		case "j", "down":
-			if c.focused == "viewport" {
-				c.viewport.ScrollDown(1)
-			} else {
-				var cmd tea.Cmd
-				c.textarea, cmd = c.textarea.Update(m)
-				if cmd != nil {
-					cmds = append(cmds, cmd)
-				}
-			}
-		case "k", "up":
-			if c.focused == "viewport" {
-				c.viewport.ScrollUp(1)
-			} else {
-				var cmd tea.Cmd
-				c.textarea, cmd = c.textarea.Update(m)
-				if cmd != nil {
-					cmds = append(cmds, cmd)
-				}
-			}
-		case "g", "home":
-			if c.focused == "viewport" {
-				c.viewport.GotoTop()
-			} else {
-				var cmd tea.Cmd
-				c.textarea, cmd = c.textarea.Update(m)
-				if cmd != nil {
-					cmds = append(cmds, cmd)
-				}
-			}
-		case "G", "end":
-			if c.focused == "viewport" {
-				c.viewport.GotoBottom()
-			} else {
-				var cmd tea.Cmd
-				c.textarea, cmd = c.textarea.Update(m)
-				if cmd != nil {
-					cmds = append(cmds, cmd)
-				}
-			}
 		default:
 			if c.focused == "textarea" {
 				var cmd tea.Cmd
 				c.textarea, cmd = c.textarea.Update(m)
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+			} else if c.focused == "editor" {
+				// Pass all keystrokes to vimtea editor when focused
+				var cmd tea.Cmd
+				newModel, cmd := c.editor.Update(m)
+				if editor, ok := newModel.(vimtea.Editor); ok {
+					c.editor = editor
+				}
 				if cmd != nil {
 					cmds = append(cmds, cmd)
 				}
@@ -972,7 +984,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				Timestamp:      m.Timestamp,
 			}
 			c.tempMessages = append(c.tempMessages, tempMsg)
-			c.updateViewportContent()
+			// Update editor content with new tool event
+			c.updateEditorContent()
 		}
 		// Continue listening for more events
 		return c, c.listenForEvents()
@@ -1008,7 +1021,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		// Clear temporary messages since we now have the final messages
 		c.tempMessages = nil
 
-		c.updateViewportContent()
+		c.updateEditorContent()
 		c.isProcessing = false
 		c.cancel = nil
 		return c, nil
@@ -1025,38 +1038,47 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		}
 		// Clear temporary messages on error
 		c.tempMessages = nil
-		c.updateViewportContent()
+		c.updateEditorContent()
 		return c, nil
 
 	case tea.WindowSizeMsg:
 		c.width = m.Width
 		c.height = m.Height
-		innerWidth := c.width - 4
-		innerHeight := c.height - 4
 
-		c.viewport.Width = innerWidth
-		// Subtract textarea height (2), instructions (1), and adjust for borders
-		c.viewport.Height = innerHeight - 2 - 1 - 2
-		if c.viewport.Height < 1 {
-			c.viewport.Height = 1
+		// Set editor size - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
+		editorWidth := c.width - 4
+		editorHeight := c.height - 10
+		if editorHeight < 1 {
+			editorHeight = 1
 		}
+		c.editor.SetSize(editorWidth, editorHeight)
 
-		c.textarea.SetWidth(innerWidth)
+		c.textarea.SetWidth(c.width - 4)
 
 		if c.activeChat != nil {
-			c.updateViewportContent()
+			c.updateEditorContent()
 		}
 		return c, nil
 	case tea.MouseMsg:
-		viewportYStart := 1
-		viewportBlockHeight := c.viewport.Height + 2
-		viewportYEnd := viewportYStart + viewportBlockHeight
-		if m.Y >= viewportYStart && m.Y < viewportYEnd {
+		editorYStart := 1
+		editorBlockHeight := c.height - 4 + 2
+		editorYEnd := editorYStart + editorBlockHeight
+		if m.Y >= editorYStart && m.Y < editorYEnd {
 			switch m.Type {
 			case tea.MouseWheelUp:
-				c.viewport.LineUp(2)
+				// Send mouse wheel up to vimtea
+				mouseMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}
+				newModel, _ := c.editor.Update(mouseMsg)
+				if editor, ok := newModel.(vimtea.Editor); ok {
+					c.editor = editor
+				}
 			case tea.MouseWheelDown:
-				c.viewport.LineDown(2)
+				// Send mouse wheel down to vimtea
+				mouseMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
+				newModel, _ := c.editor.Update(mouseMsg)
+				if editor, ok := newModel.(vimtea.Editor); ok {
+					c.editor = editor
+				}
 			}
 		}
 		return c, nil
@@ -1084,13 +1106,17 @@ func (c ChatView) View() string {
 
 	var sb strings.Builder
 
-	// Style viewport
-	vpStyle := unfocusedBorder.Width(c.width - 4).Height(c.viewport.Height)
-	if c.focused == "viewport" {
-		vpStyle = focusedBorder.Width(c.width - 4).Height(c.viewport.Height)
+	// Style editor - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
+	editorHeight := c.height - 10
+	if editorHeight < 1 {
+		editorHeight = 1
+	}
+	editorStyle := unfocusedBorder.Width(c.width - 4).Height(editorHeight)
+	if c.focused == "editor" {
+		editorStyle = focusedBorder.Width(c.width - 4).Height(editorHeight)
 	}
 
-	sb.WriteString(vpStyle.Render(c.viewport.View()))
+	sb.WriteString(editorStyle.Render(c.editor.View()))
 
 	// Style textarea
 	taStyle := unfocusedBorder.Width(c.width - 4).Height(c.textarea.Height())
@@ -1099,7 +1125,7 @@ func (c ChatView) View() string {
 	}
 	sb.WriteString(taStyle.Render(c.textarea.View()))
 
-	instructions := "Ctrl+P for menu, Tab to switch focus, g/j/k/G to navigate, Ctrl+C to exit."
+	instructions := "Ctrl+P: menu | Tab: focus | Vim nav | Ctrl+C: exit"
 	if c.isProcessing {
 		elapsed := time.Since(c.startTime).Round(time.Second)
 		instructions = c.spinner.View() + fmt.Sprintf(" Working... (%ds) esc to interrupt", int(elapsed.Seconds()))
