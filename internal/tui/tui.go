@@ -251,6 +251,11 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
+		case tea.KeyCtrlH:
+			if t.state == "chat/view" {
+				t.state = "chat/history"
+				return t, t.historyView.Init()
+			}
 			return t, tea.Quit
 		}
 

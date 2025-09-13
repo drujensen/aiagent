@@ -50,7 +50,7 @@ func (t *FileReadTool) FullDescription() string {
 	b.WriteString(t.Description())
 	b.WriteString("\n\n")
 	b.WriteString("## Usage Instructions\n")
-	b.WriteString("This tool reads content from a text file. Use `start_line` and `end_line` to specify a range of lines to read. Limited to 1000 lines or 10MB per file.\n")
+	b.WriteString("This tool reads content from a text file. Use `offset` (0-based) and `limit` to specify a range of lines to read. Limited to 2000 lines or 10MB per file.\n")
 	b.WriteString("The tool returns a JSON array with line numbers and text.\n")
 	b.WriteString("\n## Configuration\n")
 	b.WriteString("| Key           | Value         |\n")
@@ -64,21 +64,21 @@ func (t *FileReadTool) FullDescription() string {
 func (t *FileReadTool) Parameters() []entities.Parameter {
 	return []entities.Parameter{
 		{
-			Name:        "path",
+			Name:        "filePath",
 			Type:        "string",
-			Description: "The file path",
+			Description: "The absolute path to the file to read",
 			Required:    true,
 		},
 		{
-			Name:        "start_line",
+			Name:        "offset",
 			Type:        "integer",
-			Description: "The start line for reading",
+			Description: "The line number to start reading from (0-based)",
 			Required:    false,
 		},
 		{
-			Name:        "end_line",
+			Name:        "limit",
 			Type:        "integer",
-			Description: "The end line for reading",
+			Description: "The number of lines to read (defaults to 2000)",
 			Required:    false,
 		},
 	}
@@ -118,21 +118,25 @@ func (t *FileReadTool) checkFileSize(path string) (bool, error) {
 func (t *FileReadTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing file read command", zap.String("arguments", arguments))
 	var args struct {
-		Path      string `json:"path"`
-		StartLine int    `json:"start_line"`
-		EndLine   int    `json:"end_line"`
+		FilePath string `json:"filePath"`
+		Offset   int    `json:"offset"`
+		Limit    int    `json:"limit"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
 		return "", fmt.Errorf("failed to parse arguments: %v", err)
 	}
 
-	if args.Path == "" {
-		t.logger.Error("Path is required")
-		return "", fmt.Errorf("path is required")
+	if args.FilePath == "" {
+		t.logger.Error("FilePath is required")
+		return "", fmt.Errorf("filePath is required")
 	}
 
-	fullPath, err := t.validatePath(args.Path)
+	if args.Limit == 0 {
+		args.Limit = 2000
+	}
+
+	fullPath, err := t.validatePath(args.FilePath)
 	if err != nil {
 		return "", err
 	}
@@ -145,30 +149,31 @@ func (t *FileReadTool) Execute(arguments string) (string, error) {
 	}
 	defer file.Close()
 
-	startLine := args.StartLine
-	endLine := args.EndLine
-	const maxLines = 1000
+	const maxLines = 2000
+	if args.Limit > maxLines {
+		args.Limit = maxLines
+	}
 
 	var lines []LineResult
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
+	readCount := 0
+	hasMore := false
 
 	for scanner.Scan() {
 		lineNum++
-		if lineNum > maxLines {
-			t.logger.Warn("Line count exceeds limit", zap.String("path", fullPath), zap.Int("limit", maxLines))
-			return "", fmt.Errorf("file exceeds line limit of %d lines", maxLines)
-		}
-		if startLine > 0 && lineNum < startLine {
+		if lineNum-1 < args.Offset {
 			continue
 		}
-		if endLine > 0 && lineNum > endLine {
+		if readCount >= args.Limit {
+			hasMore = true
 			break
 		}
 		lines = append(lines, LineResult{
 			Line: lineNum,
 			Text: scanner.Text(),
 		})
+		readCount++
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -187,11 +192,14 @@ func (t *FileReadTool) Execute(arguments string) (string, error) {
 	}
 
 	results := string(jsonResponse)
+	if hasMore {
+		results += "\nWarning: File has more lines beyond the limit. Use offset and limit to read additional sections."
+	}
 	if len(results) > 16384 {
 		results = results[:16384] + "...truncated"
 	}
 
-	t.logger.Info("File read successfully", zap.String("path", fullPath), zap.Int("lines", len(lines)))
+	t.logger.Info("File read successfully", zap.String("path", fullPath), zap.Int("lines", len(lines)), zap.Bool("hasMore", hasMore))
 	return results, nil
 }
 
