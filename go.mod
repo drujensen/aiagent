@@ -37,6 +37,7 @@ require (
 	github.com/go-openapi/swag v0.23.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+	github.com/kelindar/event v1.5.2 // indirect
 	github.com/klauspost/compress v1.17.2 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect

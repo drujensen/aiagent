@@ -7,6 +7,7 @@ type (
 	startCreateChatMsg    string
 	canceledCreateChatMsg struct{}
 	cancelSpinnerMsg      struct{}
+	toolCallEventMsg      *entities.ToolCallEvent
 )
 
 type (

@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/drujensen/aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/domain/events"
 	"github.com/drujensen/aiagent/internal/domain/services"
 )
 
@@ -641,7 +642,10 @@ type ChatView struct {
 	width           int
 	height          int
 	currentAgent    *entities.Agent
-	previousAgentID string // Track previous agent ID to detect changes
+	previousAgentID string                       // Track previous agent ID to detect changes
+	tempMessages    []entities.Message           // Temporary messages for real-time tool events
+	eventCancel     func()                       // Event subscription cancel function
+	eventChan       chan *entities.ToolCallEvent // Channel for receiving tool call events
 }
 
 func NewChatView(chatService services.ChatService, agentService services.AgentService, activeChat *entities.Chat) ChatView {
@@ -693,6 +697,17 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		}
 		cv.updateViewportContent()
 	}
+
+	// Set up event channel and subscription for real-time tool call updates
+	cv.eventChan = make(chan *entities.ToolCallEvent, 10) // Buffered channel
+	cv.eventCancel = events.SubscribeToToolCallEvents(func(data events.ToolCallEventData) {
+		// Send event to channel (non-blocking)
+		select {
+		case cv.eventChan <- data.Event:
+		default:
+			// Channel full, drop event to avoid blocking
+		}
+	})
 
 	return cv
 }
@@ -757,6 +772,24 @@ func (c *ChatView) updateViewportContent() {
 		}
 	}
 
+	// Add temporary tool call messages for real-time updates during processing
+	if c.isProcessing && len(c.tempMessages) > 0 {
+		for _, tempMsg := range c.tempMessages {
+			sb.WriteString(c.systemStyle.Render("Tool: ") + "\n")
+			// Display tool call events
+			for _, event := range tempMsg.ToolCallEvents {
+				formattedResult := formatToolResult(event.ToolName, event.Result, event.Diff)
+				statusIcon := getToolStatusIcon(event.Error != "")
+				sb.WriteString(c.systemStyle.Render("  ↳ ") + statusIcon + " " + event.ToolName + ":\n")
+				sb.WriteString(c.systemStyle.Render("    ") + strings.ReplaceAll(formattedResult, "\n", "\n    ") + "\n")
+				if event.Error != "" {
+					errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true) // Red and bold
+					sb.WriteString(errorStyle.Render("    ✗ Error: ") + event.Error + "\n")
+				}
+			}
+		}
+	}
+
 	// Add current tool calls being executed if processing
 	if c.isProcessing && len(c.activeChat.Messages) > 0 {
 		lastMsg := c.activeChat.Messages[len(c.activeChat.Messages)-1]
@@ -791,7 +824,15 @@ func (c *ChatView) updateViewportContent() {
 func (c ChatView) Init() tea.Cmd {
 	c.textarea.Focus()
 	c.focused = "textarea"
-	return textarea.Blink
+	return tea.Batch(textarea.Blink, c.listenForEvents())
+}
+
+// listenForEvents returns a command that listens for tool call events
+func (c *ChatView) listenForEvents() tea.Cmd {
+	return func() tea.Msg {
+		event := <-c.eventChan
+		return toolCallEventMsg(event)
+	}
 }
 
 func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
@@ -918,6 +959,24 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			return c, cmd
 		}
 
+	case toolCallEventMsg:
+		// Handle real-time tool call event
+		if c.isProcessing && c.activeChat != nil {
+			// Create a temporary message for the tool call event
+			tempMsg := entities.Message{
+				ID:             m.ID,
+				Role:           "tool",
+				Content:        m.Result,
+				ToolCallID:     "", // Will be set when final message arrives
+				ToolCallEvents: []entities.ToolCallEvent{*m},
+				Timestamp:      m.Timestamp,
+			}
+			c.tempMessages = append(c.tempMessages, tempMsg)
+			c.updateViewportContent()
+		}
+		// Continue listening for more events
+		return c, c.listenForEvents()
+
 	case updatedChatMsg:
 		c.textarea.Reset()
 		// Check if agent is changing
@@ -946,6 +1005,9 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			c.activeChat.Messages = append(c.activeChat.Messages, *systemMsg)
 		}
 
+		// Clear temporary messages since we now have the final messages
+		c.tempMessages = nil
+
 		c.updateViewportContent()
 		c.isProcessing = false
 		c.cancel = nil
@@ -961,6 +1023,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				c.activeChat.Messages = c.activeChat.Messages[:lastIdx]
 			}
 		}
+		// Clear temporary messages on error
+		c.tempMessages = nil
 		c.updateViewportContent()
 		return c, nil
 

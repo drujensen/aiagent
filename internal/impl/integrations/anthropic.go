@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/domain/events"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
 
 	"github.com/google/uuid"
@@ -365,6 +366,9 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 				}
 				// Create tool call event
 				toolEvent := entities.NewToolCallEvent(toolName, toolCall.Function.Arguments, toolResult, toolError, diff, nil)
+
+				// Publish real-time event for TUI updates
+				events.PublishToolCallEvent(toolEvent)
 
 				toolResponseMessage := &entities.Message{
 					ID:             uuid.New().String(),
