@@ -92,7 +92,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.state = "chat/view"
 		t.chatView.err = errors.New("New chat canceled")
 		if t.activeChat != nil {
-			t.chatView.updateViewportContent()
+			t.chatView.updateEditorContent()
 		} else {
 			return t, tea.Quit
 		}
@@ -121,13 +121,13 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			t.chatView.currentAgent = agent
 		}
-		t.chatView.updateViewportContent()
+		t.chatView.updateEditorContent()
 		t.state = "chat/view"
 		return t, nil
 	case historyCancelledMsg:
 		t.state = "chat/view"
 		if t.activeChat != nil {
-			t.chatView.updateViewportContent()
+			t.chatView.updateEditorContent()
 		}
 		return t, nil
 
@@ -138,7 +138,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case usageCancelledMsg:
 		t.state = "chat/view"
 		if t.activeChat != nil {
-			t.chatView.updateViewportContent()
+			t.chatView.updateEditorContent()
 		}
 		return t, nil
 
@@ -160,7 +160,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case agentsCancelledMsg:
 		t.state = "chat/view"
 		if t.activeChat != nil {
-			t.chatView.updateViewportContent()
+			t.chatView.updateEditorContent()
 		}
 		return t, nil
 
@@ -187,7 +187,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			t.chatView.currentAgent = agent
 		}
-		t.chatView.updateViewportContent()
+		t.chatView.updateEditorContent()
 		t.state = "chat/view"
 		return t, t.chatView.Init()
 
@@ -198,7 +198,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case toolsCancelledMsg:
 		t.state = "chat/view"
 		if t.activeChat != nil {
-			t.chatView.updateViewportContent()
+			t.chatView.updateEditorContent()
 		}
 		return t, nil
 
@@ -212,7 +212,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Default back to chat view
 		t.state = "chat/view"
 		if t.activeChat != nil {
-			t.chatView.updateViewportContent()
+			t.chatView.updateEditorContent()
 		}
 
 		switch msg.command {
@@ -243,7 +243,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case commandsCancelledMsg:
 		t.state = "chat/view"
 		if t.activeChat != nil {
-			t.chatView.updateViewportContent()
+			t.chatView.updateEditorContent()
 		}
 		return t, nil
 
