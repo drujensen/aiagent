@@ -682,6 +682,14 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		height:       5,
 	}
 
+	// Initialize the vimtea editor
+	cv.editor = vimtea.NewEditor(
+		vimtea.WithEnableModeCommand(false),
+		vimtea.WithEnableStatusBar(false),
+		vimtea.WithRelativeNumbers(false),
+		vimtea.WithReadOnly(true),
+	)
+
 	if activeChat != nil {
 		cv.activeChat = activeChat
 		ctx := context.Background()
@@ -692,8 +700,8 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		} else {
 			cv.currentAgent = agent
 		}
-		cv.updateEditorContent()
 	}
+	cv.updateEditorContent()
 
 	// Set up event channel and subscription for real-time tool call updates
 	cv.eventChan = make(chan *entities.ToolCallEvent, 10) // Buffered channel
