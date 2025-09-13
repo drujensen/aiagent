@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -53,8 +54,9 @@ func (t *FileWriteTool) FullDescription() string {
 	b.WriteString("## Usage Instructions\n")
 	b.WriteString("This tool supports writing and modifying text files. **Critical**: Follow these steps to avoid errors:\n")
 	b.WriteString("1. Use the FileReadTool to confirm the exact line number and surrounding content before making changes.\n")
-	b.WriteString("2. Use `dry_run=true` with `edit`, `insert`, or `delete` to preview changes and verify the line is correct.\n")
-	b.WriteString("3. After any change, use FileReadTool to check the updated file and get new line numbers, as insertions or deletions shift lines.\n\n")
+	b.WriteString("2. Always use `dry_run=true` first with `edit`, `insert`, or `delete` to preview changes and verify correctness. Check the diff output carefully to ensure no syntax errors or duplicates are introduced.\n")
+	b.WriteString("3. After any change, use FileReadTool to check the updated file and get new line numbers, as insertions or deletions shift lines.\n")
+	b.WriteString("4. If editing code, consider running a build or syntax check after changes to catch issues early.\n\n")
 	b.WriteString("- **write**: Overwrites or creates a file with new content. Provide `content` to specify the full file content.\n")
 	b.WriteString("- **edit**: Replaces specific lines in a file with new content. Use `start_line`, `end_line` (optional, defaults to start_line), and `content` to replace the specified lines.\n")
 	b.WriteString("  - Example: To replace lines 5 to 7, set `operation='edit', start_line=5, end_line=7`, and provide the new `content` for those lines. If end_line is omitted, only line 5 is replaced.\n")
@@ -279,6 +281,13 @@ func (t *FileWriteTool) applyLineEdit(filePath, operation string, startLine, end
 		if err != nil {
 			t.logger.Error("Failed to write edited file", zap.String("path", filePath), zap.Error(err))
 			return "", fmt.Errorf("failed to write to file: %v", err)
+		}
+		// If it's a Go file, run go fmt to fix formatting
+		if strings.HasSuffix(filePath, ".go") {
+			if err := exec.Command("go", "fmt", filePath).Run(); err != nil {
+				t.logger.Warn("Failed to run go fmt", zap.String("path", filePath), zap.Error(err))
+				// Don't fail the edit, just warn
+			}
 		}
 		t.logger.Info("File edited successfully", zap.String("path", filePath), zap.String("operation", operation))
 	}

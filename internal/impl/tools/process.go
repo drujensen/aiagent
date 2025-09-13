@@ -70,7 +70,7 @@ func (t *ProcessTool) FullDescription() string {
 	// Add configuration header
 	b.WriteString("Configuration for this tool:\n")
 	b.WriteString("| Key           | Value         |\n")
-	b.WriteString("|---------------|---------------|\n")
+	b.WriteString("|---|---|\n")
 
 	// Loop through configuration and add key-value pairs to the table
 	for key, value := range t.Configuration() {
@@ -138,10 +138,11 @@ func (t *ProcessTool) Parameters() []entities.Parameter {
 }
 
 type ProcessResponse struct {
-	Stdout string `json:"stdout"`
-	Stderr string `json:"stderr"`
-	PID    int    `json:"pid,omitempty"`
-	Status string `json:"status,omitempty"`
+	Command string `json:"command"`
+	Stdout  string `json:"stdout"`
+	Stderr  string `json:"stderr"`
+	PID     int    `json:"pid,omitempty"`
+	Status  string `json:"status,omitempty"`
 }
 
 type ProcessArgs struct {
@@ -326,9 +327,10 @@ func (t *ProcessTool) runCommand(args ProcessArgs, workspace string) (string, er
 			}
 		}
 		resp := ProcessResponse{
-			Stdout: "Command started in background",
-			PID:    pid,
-			Status: "running",
+			Command: args.Command,
+			Stdout:  "Command started in background",
+			PID:     pid,
+			Status:  "running",
 		}
 		return t.toJSON(resp)
 	} else {
@@ -370,16 +372,18 @@ func (t *ProcessTool) runCommand(args ProcessArgs, workspace string) (string, er
 						zap.String("stdout", out.String()),
 						zap.String("stderr", stderr.String()))
 					resp := ProcessResponse{
-						Stdout: out.String(),
-						Stderr: stderr.String(),
-						Status: "failed",
+						Command: args.Command,
+						Stdout:  out.String(),
+						Stderr:  stderr.String(),
+						Status:  "failed",
 					}
 					return t.toJSON(resp)
 				}
 				resp := ProcessResponse{
-					Stdout: out.String(),
-					Stderr: stderr.String(),
-					Status: "completed",
+					Command: args.Command,
+					Stdout:  out.String(),
+					Stderr:  stderr.String(),
+					Status:  "completed",
 				}
 				t.logger.Info("Command executed successfully",
 					zap.String("command", args.Command),
@@ -394,9 +398,10 @@ func (t *ProcessTool) runCommand(args ProcessArgs, workspace string) (string, er
 					zap.Strings("arguments", cmdArgs),
 					zap.Int("timeout", args.Timeout))
 				resp := ProcessResponse{
-					Stdout: out.String(),
-					Stderr: stderr.String(),
-					Status: "timeout",
+					Command: args.Command,
+					Stdout:  out.String(),
+					Stderr:  stderr.String(),
+					Status:  "timeout",
 				}
 				return t.toJSON(resp)
 			}
@@ -404,8 +409,9 @@ func (t *ProcessTool) runCommand(args ProcessArgs, workspace string) (string, er
 
 		err := cmd.Run()
 		resp := ProcessResponse{
-			Stdout: out.String(),
-			Stderr: stderr.String(),
+			Command: args.Command,
+			Stdout:  out.String(),
+			Stderr:  stderr.String(),
 		}
 		if err != nil {
 			resp.Status = "failed"
@@ -432,7 +438,8 @@ func (t *ProcessTool) checkStatus(pid int) (string, error) {
 	pi, exists := t.processes[pid]
 	if !exists {
 		resp := ProcessResponse{
-			Status: "not found",
+			Command: "status",
+			Status:  "not found",
 		}
 		return t.toJSON(resp)
 	}
@@ -442,15 +449,17 @@ func (t *ProcessTool) checkStatus(pid int) (string, error) {
 		pi.Stderr.Close()
 		delete(t.processes, pid)
 		resp := ProcessResponse{
-			PID:    pid,
-			Status: "exited",
+			Command: "status",
+			PID:     pid,
+			Status:  "exited",
 		}
 		t.logger.Info("Background process has exited", zap.Int("pid", pid))
 		return t.toJSON(resp)
 	}
 	resp := ProcessResponse{
-		PID:    pid,
-		Status: "running",
+		Command: "status",
+		PID:     pid,
+		Status:  "running",
 	}
 	t.logger.Info("Background process status checked", zap.Int("pid", pid))
 	return t.toJSON(resp)
@@ -464,7 +473,8 @@ func (t *ProcessTool) killProcess(pid int) (string, error) {
 	pi, exists := t.processes[pid]
 	if !exists {
 		resp := ProcessResponse{
-			Status: "not found",
+			Command: "kill",
+			Status:  "not found",
 		}
 		return t.toJSON(resp)
 	}
@@ -478,8 +488,9 @@ func (t *ProcessTool) killProcess(pid int) (string, error) {
 	pi.Stdin.Close()
 	delete(t.processes, pid)
 	resp := ProcessResponse{
-		PID:    pid,
-		Status: "terminated",
+		Command: "kill",
+		PID:     pid,
+		Status:  "terminated",
 	}
 	t.logger.Info("Background process terminated", zap.Int("pid", pid))
 	return t.toJSON(resp)
@@ -510,7 +521,8 @@ func (t *ProcessTool) writeToProcess(args ProcessArgs) (string, error) {
 		return "", err
 	}
 	resp := ProcessResponse{
-		Status: "written",
+		Command: "write",
+		Status:  "written",
 	}
 	return t.toJSON(resp)
 }
@@ -528,9 +540,10 @@ func (t *ProcessTool) readFromProcess(args ProcessArgs) (string, error) {
 	pi.StdoutBuffer.Reset()
 	pi.StderrBuffer.Reset()
 	resp := ProcessResponse{
-		Stdout: stdout,
-		Stderr: stderr,
-		Status: "read",
+		Command: "read",
+		Stdout:  stdout,
+		Stderr:  stderr,
+		Status:  "read",
 	}
 	return t.toJSON(resp)
 }
