@@ -320,10 +320,17 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			// Publish real-time event for TUI updates
 			events.PublishToolCallEvent(toolEvent)
 
+			var content string
+			if toolError != "" {
+				content = fmt.Sprintf("Tool %s failed with error: %s", toolName, toolError)
+			} else {
+				content = fmt.Sprintf("Tool %s succeeded: %s", toolName, toolResult)
+			}
+
 			var newMessage = &entities.Message{
 				ID:             uuid.New().String(),
 				Role:           "tool",
-				Content:        fmt.Sprintf("Tool %s responded: %s", toolName, toolResult),
+				Content:        content,
 				ToolCallID:     toolCall.ID,
 				ToolCallEvents: []entities.ToolCallEvent{*toolEvent},
 				Timestamp:      time.Now(),
@@ -332,7 +339,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 
 			toolResponseMsg := map[string]any{
 				"role":         "tool",
-				"content":      newMessage.Content,
+				"content":      content,
 				"tool_call_id": toolCall.ID,
 			}
 			apiMessages = append(apiMessages, toolResponseMsg)

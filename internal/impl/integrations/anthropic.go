@@ -370,10 +370,17 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 				// Publish real-time event for TUI updates
 				events.PublishToolCallEvent(toolEvent)
 
+				var content string
+				if toolError != "" {
+					content = fmt.Sprintf("Tool %s failed with error: %s", toolName, toolError)
+				} else {
+					content = fmt.Sprintf("Tool %s succeeded: %s", toolName, toolResult)
+				}
+
 				toolResponseMessage := &entities.Message{
 					ID:             uuid.New().String(),
 					Role:           "tool",
-					Content:        toolResult,
+					Content:        content,
 					ToolCallID:     toolCall.ID,
 					ToolCallEvents: []entities.ToolCallEvent{*toolEvent},
 					Timestamp:      time.Now(),
