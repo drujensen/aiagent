@@ -1125,14 +1125,10 @@ func (c ChatView) View() string {
 
 	var sb strings.Builder
 
-	// Style editor - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
-	editorHeight := c.height - 10
-	if editorHeight < 1 {
-		editorHeight = 1
-	}
-	editorStyle := unfocusedBorder.Width(c.width - 4).Height(editorHeight)
+	// Style editor - let outer container limit height to handle text wrapping
+	editorStyle := unfocusedBorder.Width(c.width - 4)
 	if c.focused == "editor" {
-		editorStyle = focusedBorder.Width(c.width - 4).Height(editorHeight)
+		editorStyle = focusedBorder.Width(c.width - 4)
 	}
 
 	sb.WriteString(editorStyle.Render(c.editor.View()))

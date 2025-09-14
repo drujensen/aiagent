@@ -24,18 +24,21 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Build binaries
-        env:
-          VERSION: ${{ steps.get_version.outputs.VERSION }}
-        run: |
-          LDFLAGS="-X 'main.version=$VERSION'"
-          GOOS=linux GOARCH=amd64 go build -ldflags="$LDFLAGS" -o aiagent-linux-x86_64 main.go
-          GOOS=linux GOARCH=arm64 go build -ldflags="$LDFLAGS" -o aiagent-linux-arm64 main.go
-          GOOS=linux GOARCH=riscv64 go build -ldflags="$LDFLAGS" -o aiagent-linux-riscv64 main.go
-          GOOS=darwin GOARCH=amd64 go build -ldflags="$LDFLAGS" -o aiagent-macos-x86_64 main.go
-          GOOS=darwin GOARCH=arm64 go build -ldflags="$LDFLAGS" -o aiagent-macos-arm64 main.go
-          GOOS=windows GOARCH=amd64 go build -ldflags="$LDFLAGS" -o aiagent-windows-x86_64.exe main.go
-          GOOS=windows GOARCH=arm64 go build -ldflags="$LDFLAGS" -o aiagent-windows-arm64.exe main.go
+       - name: Install xvfb
+         run: sudo apt-get update && sudo apt-get install -y xvfb
+
+       - name: Build binaries
+         env:
+           VERSION: ${{ steps.get_version.outputs.VERSION }}
+         run: |
+           LDFLAGS="-X 'main.version=$VERSION'"
+           xvfb-run -a go build -ldflags="$LDFLAGS" -o aiagent-linux-x86_64 main.go
+           GOOS=linux GOARCH=arm64 go build -ldflags="$LDFLAGS" -o aiagent-linux-arm64 main.go
+           GOOS=linux GOARCH=riscv64 go build -ldflags="$LDFLAGS" -o aiagent-linux-riscv64 main.go
+           GOOS=darwin GOARCH=amd64 go build -ldflags="$LDFLAGS" -o aiagent-macos-x86_64 main.go
+           GOOS=darwin GOARCH=arm64 go build -ldflags="$LDFLAGS" -o aiagent-macos-arm64 main.go
+           GOOS=windows GOARCH=amd64 go build -ldflags="$LDFLAGS" -o aiagent-windows-x86_64.exe main.go
+           GOOS=windows GOARCH=arm64 go build -ldflags="$LDFLAGS" -o aiagent-windows-arm64.exe main.go
 
       - name: Upload binaries to release
         uses: softprops/action-gh-release@v1

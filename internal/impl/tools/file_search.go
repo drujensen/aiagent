@@ -157,6 +157,16 @@ func (t *FileSearchTool) Execute(arguments string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	// Check if path is a directory and all_files is not set
+	info, err := os.Stat(fullPath)
+	if err != nil {
+		return "", fmt.Errorf("path does not exist: %v", err)
+	}
+	if info.IsDir() && !args.AllFiles {
+		return "", fmt.Errorf("path '%s' is a directory, use all_files=true to search all files in the directory", args.Path)
+	}
+
 	var jsonResponse []byte
 	if args.AllFiles {
 		results, err := t.searchMultipleFiles(fullPath, args.Pattern, args.FilePattern, args.CaseSensitive)
