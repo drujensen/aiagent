@@ -85,4 +85,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/kujtimiihoxha/vimtea => github.com/drujensen/vimtea v0.0.0-20250913171217-6fb02a80c831
+replace github.com/kujtimiihoxha/vimtea => github.com/drujensen/vimtea v0.0.0-20250914014127-0751909f39e5

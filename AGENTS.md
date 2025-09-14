@@ -31,6 +31,8 @@
 The message view uses vimtea (github.com/kujtimiihoxha/vimtea) for Vim-like navigation in read-only mode:
 - **Navigation**: h/j/k/l, w/W, b/B, gg/G, search (/), etc.
 - **Visual Mode**: v, V, Ctrl+v for selection and clipboard copying
+- **Line Numbers**: Ctrl+L to toggle line numbers on/off, or use `:zn` command
+- **Commands**: :set number/:set nonumber to control line numbers
 - **Disabled**: Insert mode (i, a, A, o, O) and all editing commands (d, c, s, etc.)
 - **Clipboard**: Yank operations (y) copy to system clipboard
 - **Real-time Updates**: Tool events append to editor content during processing

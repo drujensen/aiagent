@@ -625,27 +625,28 @@ func formatGenericResult(result string) string {
 }
 
 type ChatView struct {
-	chatService     services.ChatService
-	agentService    services.AgentService
-	activeChat      *entities.Chat
-	editor          vimtea.Editor
-	textarea        textarea.Model
-	spinner         spinner.Model
-	userStyle       lipgloss.Style
-	asstStyle       lipgloss.Style
-	systemStyle     lipgloss.Style
-	err             error
-	cancel          context.CancelFunc
-	isProcessing    bool
-	startTime       time.Time
-	focused         string // "textarea" or "editor"
-	width           int
-	height          int
-	currentAgent    *entities.Agent
-	previousAgentID string                       // Track previous agent ID to detect changes
-	tempMessages    []entities.Message           // Temporary messages for real-time tool events
-	eventCancel     func()                       // Event subscription cancel function
-	eventChan       chan *entities.ToolCallEvent // Channel for receiving tool call events
+	chatService        services.ChatService
+	agentService       services.AgentService
+	activeChat         *entities.Chat
+	editor             vimtea.Editor
+	textarea           textarea.Model
+	spinner            spinner.Model
+	userStyle          lipgloss.Style
+	asstStyle          lipgloss.Style
+	systemStyle        lipgloss.Style
+	err                error
+	cancel             context.CancelFunc
+	isProcessing       bool
+	startTime          time.Time
+	focused            string // "textarea" or "editor"
+	width              int
+	height             int
+	currentAgent       *entities.Agent
+	previousAgentID    string                       // Track previous agent ID to detect changes
+	tempMessages       []entities.Message           // Temporary messages for real-time tool events
+	eventCancel        func()                       // Event subscription cancel function
+	eventChan          chan *entities.ToolCallEvent // Channel for receiving tool call events
+	lineNumbersEnabled bool                         // Track whether line numbers are enabled
 }
 
 func NewChatView(chatService services.ChatService, agentService services.AgentService, activeChat *entities.Chat) ChatView {
@@ -668,26 +669,28 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	cv := ChatView{
-		chatService:  chatService,
-		agentService: agentService,
-		activeChat:   activeChat,
-		textarea:     ta,
-		spinner:      s,
-		userStyle:    us,
-		asstStyle:    as,
-		systemStyle:  ss,
-		err:          nil,
-		focused:      "textarea",
-		width:        30,
-		height:       5,
+		chatService:        chatService,
+		agentService:       agentService,
+		activeChat:         activeChat,
+		textarea:           ta,
+		spinner:            s,
+		userStyle:          us,
+		asstStyle:          as,
+		systemStyle:        ss,
+		err:                nil,
+		focused:            "textarea",
+		width:              30,
+		height:             5,
+		lineNumbersEnabled: false, // Start with line numbers disabled
 	}
 
 	// Initialize the vimtea editor
 	cv.editor = vimtea.NewEditor(
-		vimtea.WithEnableModeCommand(false),
+		vimtea.WithEnableModeCommand(true), // Enable command mode for :set commands
 		vimtea.WithEnableStatusBar(false),
-		vimtea.WithRelativeNumbers(false),
+		vimtea.WithShowLineNumbers(cv.lineNumbersEnabled),
 		vimtea.WithReadOnly(true),
+		vimtea.WithSelectedStyle(lipgloss.NewStyle().Background(lipgloss.Color("#586e75"))),
 	)
 
 	if activeChat != nil {
@@ -751,10 +754,11 @@ func (c *ChatView) updateEditorContent() {
 	if c.activeChat == nil {
 		c.editor = vimtea.NewEditor(
 			vimtea.WithContent("How can I help you today?"),
-			vimtea.WithEnableModeCommand(false),
+			vimtea.WithEnableModeCommand(true), // Enable command mode for :set commands
 			vimtea.WithEnableStatusBar(false),
-			vimtea.WithRelativeNumbers(false),
+			vimtea.WithShowLineNumbers(c.lineNumbersEnabled),
 			vimtea.WithReadOnly(true),
+			vimtea.WithSelectedStyle(lipgloss.NewStyle().Background(lipgloss.Color("#586e75"))),
 		)
 		// Set editor size - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
 		if c.width > 0 && c.height > 0 {
@@ -835,10 +839,11 @@ func (c *ChatView) updateEditorContent() {
 	// Recreate editor with new content
 	c.editor = vimtea.NewEditor(
 		vimtea.WithContent(content),
-		vimtea.WithEnableModeCommand(false), // Disable command mode for read-only
-		vimtea.WithEnableStatusBar(false),   // Disable status bar
-		vimtea.WithRelativeNumbers(false),   // Disable relative numbers
+		vimtea.WithEnableModeCommand(true),               // Enable command mode for :set commands
+		vimtea.WithEnableStatusBar(false),                // Disable status bar
+		vimtea.WithShowLineNumbers(c.lineNumbersEnabled), // Use current line numbers setting
 		vimtea.WithReadOnly(true),
+		vimtea.WithSelectedStyle(lipgloss.NewStyle().Background(lipgloss.Color("#586e75"))),
 	)
 
 	// Set editor size - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
@@ -857,10 +862,11 @@ func (c ChatView) Init() tea.Cmd {
 	c.focused = "textarea"
 	// Initialize editor with proper options
 	c.editor = vimtea.NewEditor(
-		vimtea.WithEnableModeCommand(false),
+		vimtea.WithEnableModeCommand(true), // Enable command mode for :set commands
 		vimtea.WithEnableStatusBar(false),
-		vimtea.WithRelativeNumbers(false),
+		vimtea.WithShowLineNumbers(c.lineNumbersEnabled),
 		vimtea.WithReadOnly(true),
+		vimtea.WithSelectedStyle(lipgloss.NewStyle().Background(lipgloss.Color("#586e75"))),
 	)
 
 	// Ensure editor starts in normal mode
@@ -912,6 +918,11 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			return c, func() tea.Msg { return startAgentSwitchMsg{} }
 		case "ctrl+n":
 			return c, func() tea.Msg { return startCreateChatMsg("") }
+		case "ctrl+l":
+			// Toggle line numbers
+			c.lineNumbersEnabled = !c.lineNumbersEnabled
+			c.updateEditorContent()
+			return c, nil
 		case "enter":
 			if c.focused == "textarea" {
 				input := c.textarea.Value()

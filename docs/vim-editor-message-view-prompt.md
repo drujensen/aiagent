@@ -45,9 +45,10 @@ Messages displayed in simple viewport in `internal/tui/chat_view.go` with basic 
 
 ### Phase 3: Testing and Polish
 1. **Unit Tests**: Test vim navigation within message view
-2. **Integration Tests**: Verify real-time tool events display correctly  
+2. **Integration Tests**: Verify real-time tool events display correctly
 3. **Performance**: Ensure large chat histories don't impact responsiveness
 4. **Key Bindings**: Verify all unwanted commands are properly disabled
+5. **Line Numbers**: Test Ctrl+L toggle and :set number/:set nonumber commands
 
 ### Technical Considerations
 - **Performance**: vimtea may need optimization for very large message buffers
@@ -64,6 +65,7 @@ Messages displayed in simple viewport in `internal/tui/chat_view.go` with basic 
 ### Success Criteria
 - Full Vim navigation (h/j/k/l, word movement, line jumps, search, etc.)
 - Visual mode selection and clipboard copy working
+- Line numbers can be toggled with Ctrl+L, :zn command, or :set commands
 - No ability to enter insert mode or modify content
 - Real-time tool events display properly during processing
 - Existing message history loads and displays correctly
