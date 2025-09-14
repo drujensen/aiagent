@@ -156,17 +156,10 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 	reqBody["messages"] = apiMessages
 
 	var newMessages []*entities.Message
-	const maxToolCallRounds = 5
-	toolCallRound := 0
 
 	for {
 		if ctx.Err() == context.Canceled {
 			return nil, fmt.Errorf("operation canceled by user")
-		}
-
-		toolCallRound++
-		if toolCallRound > maxToolCallRounds {
-			return nil, fmt.Errorf("maximum tool call rounds (%d) exceeded, possible infinite loop", maxToolCallRounds)
 		}
 
 		jsonBody, err := json.Marshal(reqBody)
