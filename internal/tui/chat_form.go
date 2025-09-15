@@ -75,6 +75,15 @@ func NewChatForm(chatService services.ChatService, agentService services.AgentSe
 func (c *ChatForm) SetChatName(name string) {
 	c.chatName = name
 	c.nameField.SetValue(name)
+	// Reset form state for new chat session
+	c.focused = "name"
+	c.err = nil
+	// Ensure name field has focus
+	c.nameField.Focus()
+	// Reset agent selection to first item or none
+	if len(c.agents) > 0 {
+		c.agentsList.Select(0)
+	}
 }
 
 func (c ChatForm) Init() tea.Cmd {

@@ -219,6 +219,9 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "new":
 			t.state = "chat/create"
 			t.chatForm.SetChatName("") // No name provided
+			// Clear active chat in chat view to show welcome message
+			t.chatView.activeChat = nil
+			t.chatView.updateEditorContent()
 			return t, t.chatForm.Init()
 		case "history":
 			t.state = "chat/history"

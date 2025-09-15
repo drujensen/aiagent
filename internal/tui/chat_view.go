@@ -751,9 +751,9 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 }
 
 func (c *ChatView) updateEditorContent() {
-	if c.activeChat == nil {
+	if c.activeChat == nil || len(c.activeChat.Messages) == 0 {
 		c.editor = vimtea.NewEditor(
-			vimtea.WithContent("How can I help you today?"),
+			vimtea.WithContent("How can I help you today?\n"),
 			vimtea.WithEnableModeCommand(true), // Enable command mode for :set commands
 			vimtea.WithEnableStatusBar(false),
 			vimtea.WithShowLineNumbers(c.lineNumbersEnabled),
