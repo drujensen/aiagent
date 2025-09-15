@@ -366,7 +366,7 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 					m.logger.Warn("Tool not found", zap.String("toolName", toolName))
 				}
 				// Create tool call event
-				toolEvent := entities.NewToolCallEvent(toolName, toolCall.Function.Arguments, toolResult, toolError, diff, nil)
+				toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, toolResult, toolError, diff, nil)
 
 				// Publish real-time event for TUI updates
 				events.PublishToolCallEvent(toolEvent)

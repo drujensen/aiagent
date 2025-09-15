@@ -358,6 +358,7 @@ type ChatView struct {
 	eventCancel        func()                       // Event subscription cancel function
 	eventChan          chan *entities.ToolCallEvent // Channel for receiving tool call events
 	lineNumbersEnabled bool                         // Track whether line numbers are enabled
+	toolCallStatus     map[string]bool              // Track completion status of tool calls (toolCallID -> completed)
 }
 
 func NewChatView(chatService services.ChatService, agentService services.AgentService, activeChat *entities.Chat) ChatView {
@@ -393,6 +394,7 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		width:              30,
 		height:             5,
 		lineNumbersEnabled: false, // Start with line numbers disabled
+		toolCallStatus:     make(map[string]bool),
 	}
 
 	// Initialize the vimtea editor
@@ -659,6 +661,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				}
 				c.textarea.Reset()
 				c.activeChat.Messages = append(c.activeChat.Messages, *message)
+				// Initialize tool call status tracking for this message
+				c.toolCallStatus = make(map[string]bool)
 				c.updateEditorContent()
 				// Scroll to bottom to show the new user message
 				bottomMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}}
@@ -723,6 +727,11 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 	case toolCallEventMsg:
 		// Handle real-time tool call event
 		if c.isProcessing && c.activeChat != nil {
+			// Mark this tool call as completed
+			if m.ToolCallID != "" {
+				c.toolCallStatus[m.ToolCallID] = true
+			}
+
 			// Create a temporary message for the tool call event
 			tempMsg := entities.Message{
 				ID:             m.ID,
@@ -767,8 +776,9 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			c.activeChat.Messages = append(c.activeChat.Messages, *systemMsg)
 		}
 
-		// Clear temporary messages since we now have the final messages
+		// Clear temporary messages and tool call status since we now have the final messages
 		c.tempMessages = nil
+		c.toolCallStatus = make(map[string]bool)
 
 		c.updateEditorContent()
 		c.isProcessing = false
@@ -785,8 +795,9 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				c.activeChat.Messages = c.activeChat.Messages[:lastIdx]
 			}
 		}
-		// Clear temporary messages on error
+		// Clear temporary messages and tool call status on error
 		c.tempMessages = nil
+		c.toolCallStatus = make(map[string]bool)
 		c.updateEditorContent()
 		return c, nil
 

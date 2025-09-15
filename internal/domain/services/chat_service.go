@@ -371,6 +371,19 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		lastMsg.AddUsage(usage.PromptTokens, usage.CompletionTokens, inputPricePerMille, outputPricePerMille)
 	}
 
+	// Check if this is a partial response due to cancellation
+	isPartialResponse := ctx.Err() == context.Canceled && len(newMessages) > 0
+	if isPartialResponse {
+		s.logger.Info("Processing partial response due to cancellation", zap.Int("messageCount", len(newMessages)))
+		// For partial responses, add a note about cancellation
+		if len(newMessages) > 0 {
+			lastMsg := newMessages[len(newMessages)-1]
+			if lastMsg.Role == "assistant" && !strings.Contains(lastMsg.Content, "cancelled") {
+				lastMsg.Content += "\n\n[Processing cancelled by user - partial results shown]"
+			}
+		}
+	}
+
 	// Validate that all tool calls have responses
 	newMessages = s.ensureToolCallResponses(newMessages)
 

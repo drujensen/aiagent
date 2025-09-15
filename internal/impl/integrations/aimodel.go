@@ -94,13 +94,15 @@ func convertToBaseMessages(messages []*entities.Message) []map[string]any {
 
 func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]any) ([]*entities.Message, error) {
 	if ctx.Err() == context.Canceled {
-		return nil, fmt.Errorf("operation canceled by user")
+		// Return empty results for early cancellation (no work done yet)
+		return []*entities.Message{}, nil
 	}
 
 	tools := make([]map[string]any, len(toolList))
 	for i, tool := range toolList {
 		if ctx.Err() == context.Canceled {
-			return nil, fmt.Errorf("operation canceled by user")
+			// Return empty results for early cancellation (no work done yet)
+			return []*entities.Message{}, nil
 		}
 
 		requiredFields := make([]string, 0)
@@ -344,7 +346,9 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 
 		for _, toolCall := range toolCalls {
 			if ctx.Err() == context.Canceled {
-				return nil, fmt.Errorf("operation canceled by user")
+				// Return partial results - validate completed tool calls and return what we have
+				newMessages = ensureToolCallResponses(newMessages, m.logger)
+				return newMessages, nil
 			}
 
 			if toolCall.Type != "function" {
@@ -385,7 +389,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			fullContent, summaryContent := m.extractToolContent(toolName, toolResult, toolError)
 
 			// Create tool call event with summary for TUI
-			toolEvent := entities.NewToolCallEvent(toolName, toolCall.Function.Arguments, summaryContent, toolError, diff, nil)
+			toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, summaryContent, toolError, diff, nil)
 
 			// Publish real-time event for TUI updates
 			events.PublishToolCallEvent(toolEvent)
