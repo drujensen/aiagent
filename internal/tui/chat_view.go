@@ -490,7 +490,10 @@ func (c *ChatView) updateEditorContent() {
 		if message.Role == "user" {
 			sb.WriteString(c.userStyle.Render("User: ") + message.Content + "\n")
 		} else if message.Role == "assistant" {
-			sb.WriteString(c.asstStyle.Render("Assistant: ") + message.Content + "\n")
+			// Skip displaying tool execution announcements in TUI
+			if len(message.ToolCalls) == 0 {
+				sb.WriteString(c.asstStyle.Render("Assistant: ") + message.Content + "\n")
+			}
 		} else if message.Role == "tool" {
 			sb.WriteString(c.systemStyle.Render("Tool: ") + "\n")
 			// Display tool call events
@@ -531,7 +534,7 @@ func (c *ChatView) updateEditorContent() {
 	if c.isProcessing && len(c.activeChat.Messages) > 0 {
 		lastMsg := c.activeChat.Messages[len(c.activeChat.Messages)-1]
 		if lastMsg.Role == "assistant" && len(lastMsg.ToolCalls) > 0 {
-			sb.WriteString("\n" + c.systemStyle.Render("Executing tools:") + "\n")
+			sb.WriteString("\n" + c.systemStyle.Render("Executing tools:") + "\n\n")
 			for _, toolCall := range lastMsg.ToolCalls {
 				sb.WriteString(c.systemStyle.Render("  ↳ ") + "🔄 " + toolCall.Function.Name + "\n")
 			}
@@ -543,7 +546,7 @@ func (c *ChatView) updateEditorContent() {
 		if sb.Len() > 0 {
 			sb.WriteString("\n")
 		}
-		sb.WriteString(c.systemStyle.Render("System: Error - ") + c.err.Error() + "\n")
+		sb.WriteString(c.systemStyle.Render("System: Error - "+c.err.Error()) + "\n\n")
 		// Clear the error after displaying it once
 		c.err = nil
 	}
