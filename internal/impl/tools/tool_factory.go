@@ -142,7 +142,7 @@ func NewToolFactory() (*ToolFactory, error) {
 	}
 	toolFactory.toolFactories["Task"] = &ToolFactoryEntry{
 		Name:        "Task",
-		Description: `This tool provides task management functionality, allowing creation, listing, updating, and deletion of tasks with priorities and statuses.`,
+		Description: `Simple task management for Build and Plan agents. Use 'write' to create/update tasks and 'read' to list all tasks.`,
 		ConfigKeys:  []string{"data_dir"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewTaskTool(name, description, configuration, logger)

@@ -7,6 +7,26 @@
 - Run specific test: `go test ./path/to/package -run TestFunctionName`
 - Build and run with Docker: `docker-compose up --build`
 
+## Development Commands
+- **Lint**: `go fmt ./...` - Format Go code
+- **Vet**: `go vet ./...` - Report suspicious constructs
+- **Mod tidy**: `go mod tidy` - Clean up module dependencies
+- **Build**: `go build .` - Compile the project
+- **Test with coverage**: `go test ./... -cover` - Run tests with coverage
+- **Test verbose**: `go test ./... -v` - Run tests with verbose output
+- **Race detection**: `go test ./... -race` - Run tests with race detection
+- **Benchmark**: `go test ./... -bench=.` - Run benchmarks
+
+## Quality Assurance Workflow
+For the Build agent to ensure code quality, run these commands in order:
+1. `go fmt ./...` - Format code
+2. `go vet ./...` - Check for suspicious code
+3. `go mod tidy` - Clean dependencies
+4. `go build .` - Compile and check for build errors
+5. `go test ./...` - Run all tests
+
+If any command fails, analyze the errors, fix the issues, and repeat the workflow until all commands pass successfully.
+
 ## Code Style Guidelines
 - **Architecture**: Domain-Driven Design (DDD) with clear separation between domain and impl
 - **Error Handling**: Use detailed error messages with `fmt.Errorf`, always check and propagate errors

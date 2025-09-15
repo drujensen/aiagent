@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -52,19 +51,18 @@ func (t *FileWriteTool) FullDescription() string {
 	b.WriteString(t.Description())
 	b.WriteString("\n\n")
 	b.WriteString("## Usage Instructions\n")
-	b.WriteString("This tool supports writing and modifying text files. **Critical**: Follow these steps to avoid errors:\n")
-	b.WriteString("1. Use the FileReadTool to confirm the exact line number and surrounding content before making changes.\n")
-	b.WriteString("2. Always use `dry_run=true` first with `edit`, `insert`, or `delete` to preview changes and verify correctness. Check the diff output carefully to ensure no syntax errors or duplicates are introduced.\n")
-	b.WriteString("3. After any change, use FileReadTool to check the updated file and get new line numbers, as insertions or deletions shift lines.\n")
-	b.WriteString("4. If editing code, consider running a build or syntax check after changes to catch issues early.\n\n")
-	b.WriteString("- **write**: Overwrites or creates a file with new content. Provide `content` to specify the full file content.\n")
-	b.WriteString("- **edit**: Replaces specific lines in a file with new content. Use `start_line`, `end_line` (optional, defaults to start_line), and `content` to replace the specified lines.\n")
-	b.WriteString("  - Example: To replace lines 5 to 7, set `operation='edit', start_line=5, end_line=7`, and provide the new `content` for those lines. If end_line is omitted, only line 5 is replaced.\n")
-	b.WriteString("- **insert**: Inserts new content at a specific line. Use `start_line` and `content` to insert the content before the specified line.\n")
-	b.WriteString("  - Example: To insert content at line 5, set `operation='insert', start_line=5`, and provide the `content` to insert.\n")
-	b.WriteString("- **delete**: Deletes specific lines in a file. Use `start_line` and `end_line` to specify the lines to delete.\n")
-	b.WriteString("  - Example: To delete lines 5 to 7, set `operation='delete', start_line=5, end_line=7`.\n")
-	b.WriteString("  - Use `dry_run=true` to preview changes without applying them for `edit`, `insert`, or `delete` operations.\n")
+	b.WriteString("This tool provides PRECISE file editing using exact string matching. **Critical**: Always read the file first to get the exact content.\n")
+	b.WriteString("1. Use FileReadTool to get the current file content and exact strings to replace\n")
+	b.WriteString("2. Provide the EXACT old_string including whitespace, indentation, and line breaks\n")
+	b.WriteString("3. The replacement will ONLY occur if old_string matches exactly\n")
+	b.WriteString("4. Use replace_all=true to replace all occurrences, false for first occurrence only\n")
+	b.WriteString("5. If you get 'old_string not found', re-read the file to get the exact content\n\n")
+	b.WriteString("- **write**: Overwrites or creates a file with new content\n")
+	b.WriteString("- **edit**: Replace exact string matches in a file (RECOMMENDED)\n")
+	b.WriteString("  - Requires: path, old_string, new_string\n")
+	b.WriteString("  - Optional: replace_all (defaults to false)\n")
+	b.WriteString("- **Safety**: Only replaces when strings match exactly\n")
+	b.WriteString("- **Precision**: No line number drift or positioning errors\n")
 	b.WriteString("\n## Configuration\n")
 	b.WriteString("| Key           | Value         |\n")
 	b.WriteString("|---------------|---------------|\n")
@@ -79,38 +77,32 @@ func (t *FileWriteTool) Parameters() []entities.Parameter {
 		{
 			Name:        "operation",
 			Type:        "string",
-			Enum:        []string{"write", "edit", "insert", "delete"},
-			Description: "The file write operation to perform",
+			Enum:        []string{"write", "edit"},
+			Description: "The file operation to perform (write or edit)",
 			Required:    true,
 		},
 		{
 			Name:        "path",
 			Type:        "string",
-			Description: "The file path",
+			Description: "The file path to edit",
 			Required:    true,
 		},
 		{
 			Name:        "content",
 			Type:        "string",
-			Description: "Content to write, edit, or insert",
+			Description: "Content to write (for write operation) or new_string (for edit operation)",
 			Required:    true,
 		},
 		{
-			Name:        "start_line",
-			Type:        "integer",
-			Description: "The start line for editing, inserting, or deleting",
+			Name:        "old_string",
+			Type:        "string",
+			Description: "The exact string to replace (for edit operation only)",
 			Required:    false,
 		},
 		{
-			Name:        "end_line",
-			Type:        "integer",
-			Description: "The end line for editing or deleting (optional for edit, defaults to start_line)",
-			Required:    false,
-		},
-		{
-			Name:        "dry_run",
+			Name:        "replace_all",
 			Type:        "boolean",
-			Description: "Preview changes without applying them (for edit, insert, or delete operations)",
+			Description: "Replace all occurrences (for edit operation, defaults to false)",
 			Required:    false,
 		},
 	}
@@ -135,34 +127,37 @@ func (t *FileWriteTool) validatePath(path string) (string, error) {
 }
 
 func (t *FileWriteTool) Execute(arguments string) (string, error) {
-	t.logger.Debug("Executing file write command", zap.String("arguments", arguments))
+	t.logger.Debug("Executing precise file write command", zap.String("arguments", arguments))
+
 	var args struct {
-		Operation string `json:"operation"`
-		Path      string `json:"path"`
-		Content   string `json:"content"`
-		DryRun    bool   `json:"dry_run"`
-		StartLine int    `json:"start_line"`
-		EndLine   int    `json:"end_line"`
+		Operation  string `json:"operation"`
+		Path       string `json:"path"`
+		Content    string `json:"content"`
+		OldString  string `json:"old_string"`
+		ReplaceAll bool   `json:"replace_all"`
 	}
+
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
 		return "", fmt.Errorf("failed to parse arguments: %v", err)
 	}
 
 	if args.Operation == "" {
-		t.logger.Error("Operation is required")
 		return "", fmt.Errorf("operation is required")
 	}
 	if args.Path == "" {
-		t.logger.Error("Path is required")
 		return "", fmt.Errorf("path is required")
+	}
+
+	fullPath, err := t.validatePath(args.Path)
+	if err != nil {
+		return "", fmt.Errorf("invalid path: %v", err)
 	}
 
 	switch args.Operation {
 	case "write":
-		fullPath, err := t.validatePath(args.Path)
-		if err != nil {
-			return "", fmt.Errorf("invalid path: %v", err)
+		if args.Content == "" {
+			return "", fmt.Errorf("content is required for write operation")
 		}
 		err = os.WriteFile(fullPath, []byte(args.Content), 0644)
 		if err != nil {
@@ -172,100 +167,52 @@ func (t *FileWriteTool) Execute(arguments string) (string, error) {
 		t.logger.Info("File written successfully", zap.String("path", fullPath))
 		return "File written successfully", nil
 
-	case "edit", "insert", "delete":
-		if args.StartLine == 0 {
-			args.StartLine = 1
+	case "edit":
+		if args.OldString == "" {
+			return "", fmt.Errorf("old_string is required for edit operation")
 		}
-		fullPath, err := t.validatePath(args.Path)
-		if err != nil {
-			return "", fmt.Errorf("invalid path: %v", err)
+		if args.Content == "" {
+			return "", fmt.Errorf("content (new_string) is required for edit operation")
 		}
-		if args.Operation == "edit" && args.EndLine == 0 {
-			args.EndLine = args.StartLine
-		}
-		if args.Operation == "edit" && args.Content == "" {
-			t.logger.Error("Content is required for edit operation")
-			return "", fmt.Errorf("content is required for edit operation")
-		}
-		if args.Operation == "insert" && args.Content == "" {
-			t.logger.Error("Content is required for insert operation")
-			return "", fmt.Errorf("content is required for insert operation")
-		}
-		if args.Operation == "delete" && args.EndLine == 0 {
-			args.EndLine = args.StartLine
-		}
-		results, err := t.applyLineEdit(fullPath, args.Operation, args.StartLine, args.EndLine, args.Content, args.DryRun)
-		return results, err
+		return t.applyPreciseEdit(fullPath, args.OldString, args.Content, args.ReplaceAll)
 
 	default:
 		t.logger.Error("Unknown operation", zap.String("operation", args.Operation))
-		return "", fmt.Errorf("unknown operation: %s", args.Operation)
+		return "", fmt.Errorf("unknown operation: %s (supported: write, edit)", args.Operation)
 	}
 }
 
-func (t *FileWriteTool) applyLineEdit(filePath, operation string, startLine, endLine int, content string, dryRun bool) (string, error) {
-	file, err := os.Open(filePath)
+func (t *FileWriteTool) applyPreciseEdit(filePath, oldString, newString string, replaceAll bool) (string, error) {
+	// Read the file
+	content, err := os.ReadFile(filePath)
 	if err != nil {
-		t.logger.Error("Failed to read file for edit", zap.String("path", filePath), zap.Error(err))
+		t.logger.Error("Failed to read file", zap.String("path", filePath), zap.Error(err))
 		return "", fmt.Errorf("failed to read file: %v", err)
 	}
-	defer file.Close()
 
-	var originalLines []string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		originalLines = append(originalLines, scanner.Text())
-	}
-	if err := scanner.Err(); err != nil {
-		t.logger.Error("Error reading file lines", zap.Error(err))
-		return "", fmt.Errorf("error reading file lines: %v", err)
+	fileContent := string(content)
+
+	// Check if old_string exists
+	if !strings.Contains(fileContent, oldString) {
+		t.logger.Error("old_string not found in file", zap.String("path", filePath))
+		return "", fmt.Errorf("old_string not found in file - ensure exact match including whitespace and indentation. Use FileReadTool to get the exact content")
 	}
 
-	if startLine > len(originalLines)+1 || startLine < 1 {
-		t.logger.Error("Invalid start line", zap.Int("start_line", startLine), zap.Int("file_lines", len(originalLines)))
-		return "", fmt.Errorf("start_line %d is invalid, must be between 1 and %d. Use 'read' to get current line numbers", startLine, len(originalLines)+1)
-	}
-	if (operation == "edit" || operation == "delete") && endLine > len(originalLines) {
-		t.logger.Error("End line exceeds file length", zap.Int("end_line", endLine), zap.Int("file_lines", len(originalLines)))
-		return "", fmt.Errorf("end_line %d exceeds file length %d. Use 'read' to get current line numbers", endLine, len(originalLines))
-	}
-	if (operation == "edit" || operation == "delete") && endLine < startLine {
-		t.logger.Error("End line is less than start line", zap.Int("start_line", startLine), zap.Int("end_line", endLine))
-		return "", fmt.Errorf("end_line %d is less than start_line %d", endLine, startLine)
+	// Count occurrences
+	occurrences := strings.Count(fileContent, oldString)
+
+	// Perform replacement
+	var newContent string
+	if replaceAll {
+		newContent = strings.ReplaceAll(fileContent, oldString, newString)
+	} else {
+		newContent = strings.Replace(fileContent, oldString, newString, 1)
 	}
 
-	var modifiedLines []string
-	switch operation {
-	case "edit":
-		newContentLines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
-		modifiedLines = append(modifiedLines, originalLines[:startLine-1]...)
-		modifiedLines = append(modifiedLines, newContentLines...)
-		if endLine < len(originalLines) {
-			modifiedLines = append(modifiedLines, originalLines[endLine:]...)
-		}
-	case "insert":
-		newContentLines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
-		modifiedLines = append(modifiedLines, originalLines[:startLine-1]...)
-		modifiedLines = append(modifiedLines, newContentLines...)
-		modifiedLines = append(modifiedLines, originalLines[startLine-1:]...)
-	case "delete":
-		modifiedLines = append(modifiedLines, originalLines[:startLine-1]...)
-		if endLine < len(originalLines) {
-			modifiedLines = append(modifiedLines, originalLines[endLine:]...)
-		}
-	}
-
-	original := strings.Join(originalLines, "\n")
-	modified := strings.Join(modifiedLines, "\n")
-
-	if modified == original {
-		t.logger.Warn("No changes made to the file", zap.String("path", filePath))
-		return fmt.Sprintf("No changes made to the file\nLine count: %d", len(originalLines)), nil
-	}
-
+	// Generate diff
 	diff := difflib.UnifiedDiff{
-		A:        difflib.SplitLines(original),
-		B:        difflib.SplitLines(modified),
+		A:        difflib.SplitLines(fileContent),
+		B:        difflib.SplitLines(newContent),
 		FromFile: filePath,
 		ToFile:   filePath,
 		Context:  3,
@@ -276,29 +223,40 @@ func (t *FileWriteTool) applyLineEdit(filePath, operation string, startLine, end
 		return "", fmt.Errorf("failed to generate diff: %v", err)
 	}
 
-	if !dryRun {
-		err = os.WriteFile(filePath, []byte(modified+"\n"), 0644)
-		if err != nil {
-			t.logger.Error("Failed to write edited file", zap.String("path", filePath), zap.Error(err))
-			return "", fmt.Errorf("failed to write to file: %v", err)
-		}
-		// If it's a Go file, run go fmt to fix formatting
-		if strings.HasSuffix(filePath, ".go") {
-			if err := exec.Command("go", "fmt", filePath).Run(); err != nil {
-				t.logger.Warn("Failed to run go fmt", zap.String("path", filePath), zap.Error(err))
-				// Don't fail the edit, just warn
-			}
-		}
-		t.logger.Info("File edited successfully", zap.String("path", filePath), zap.String("operation", operation))
+	// Write the file
+	err = os.WriteFile(filePath, []byte(newContent), 0644)
+	if err != nil {
+		t.logger.Error("Failed to write file", zap.String("path", filePath), zap.Error(err))
+		return "", fmt.Errorf("failed to write file: %v", err)
 	}
 
-	result := struct {
-		Diff      string `json:"diff"`
-		LineCount int    `json:"line_count"`
-	}{
-		Diff:      "```diff\n" + diffStr + "\n```",
-		LineCount: len(modifiedLines),
+	// Auto-format Go files
+	if strings.HasSuffix(filePath, ".go") {
+		if err := exec.Command("go", "fmt", filePath).Run(); err != nil {
+			t.logger.Warn("Failed to run go fmt", zap.String("path", filePath), zap.Error(err))
+			// Don't fail the edit, just warn
+		}
 	}
+
+	t.logger.Info("File edited successfully",
+		zap.String("path", filePath),
+		zap.Int("occurrences", occurrences),
+		zap.Bool("replace_all", replaceAll))
+
+	result := struct {
+		Success     bool   `json:"success"`
+		Path        string `json:"path"`
+		Occurrences int    `json:"occurrences"`
+		ReplacedAll bool   `json:"replaced_all"`
+		Diff        string `json:"diff"`
+	}{
+		Success:     true,
+		Path:        filePath,
+		Occurrences: occurrences,
+		ReplacedAll: replaceAll,
+		Diff:        "```diff\n" + diffStr + "\n```",
+	}
+
 	jsonResponse, err := json.Marshal(result)
 	if err != nil {
 		t.logger.Error("Failed to marshal edit results", zap.Error(err))

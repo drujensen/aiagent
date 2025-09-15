@@ -250,7 +250,8 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		finishReason := responseBody.Choices[0].FinishReason
 
 		// Break if no tool calls OR if finish_reason indicates completion
-		if len(toolCalls) == 0 || finishReason == "stop" || finishReason == "length" || finishReason == "content_filter" {
+		// Continue processing if there are tool calls OR if finish_reason is "tool_calls"
+		if len(toolCalls) == 0 && (finishReason == "stop" || finishReason == "length" || finishReason == "content_filter") {
 			finalMessage := &entities.Message{
 				ID:        uuid.New().String(),
 				Role:      "assistant",
