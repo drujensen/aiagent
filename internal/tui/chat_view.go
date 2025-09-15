@@ -660,6 +660,12 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				c.textarea.Reset()
 				c.activeChat.Messages = append(c.activeChat.Messages, *message)
 				c.updateEditorContent()
+				// Scroll to bottom to show the new user message
+				bottomMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}}
+				newModel, _ := c.editor.Update(bottomMsg)
+				if editor, ok := newModel.(vimtea.Editor); ok {
+					c.editor = editor
+				}
 				c.err = nil
 				ctx, cancel := context.WithCancel(context.Background())
 				c.cancel = cancel
