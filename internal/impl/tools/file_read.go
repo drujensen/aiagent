@@ -185,21 +185,57 @@ func (t *FileReadTool) Execute(arguments string) (string, error) {
 		return "No lines found in file", fmt.Errorf("no lines found in file")
 	}
 
-	var b strings.Builder
-	for _, line := range lines {
-		b.WriteString(fmt.Sprintf("%6d: %s\n", line.Line, line.Text))
+	// Create TUI-friendly summary (first 5 lines only)
+	var result strings.Builder
+	result.WriteString(fmt.Sprintf("📄 %s (%d lines total)\n\n", filepath.Base(fullPath), lineNum))
+
+	previewLines := 5
+	if len(lines) < previewLines {
+		previewLines = len(lines)
 	}
 
-	results := b.String()
-	if hasMore {
-		results += "\nWarning: File has more lines beyond the limit. Use offset and limit to read additional sections."
+	for i := 0; i < previewLines; i++ {
+		result.WriteString(fmt.Sprintf("%6d: %s\n", lines[i].Line, lines[i].Text))
 	}
-	if len(results) > 16384 {
-		results = results[:16384] + "...truncated"
+
+	if len(lines) > 5 {
+		result.WriteString(fmt.Sprintf("... and %d more lines\n", len(lines)-5))
+	}
+
+	if hasMore {
+		result.WriteString("\n⚠️  File has more content beyond the limit. Use offset and limit to read additional sections.")
+	}
+
+	// For AI processing, include full content as structured data
+	// The TUI will only show the summary above
+	fullContent := make([]string, len(lines))
+	for i, line := range lines {
+		fullContent[i] = fmt.Sprintf("%6d: %s", line.Line, line.Text)
+	}
+
+	// Create JSON response with summary for TUI and full data for AI
+	response := struct {
+		Summary     string   `json:"summary"`
+		FullContent []string `json:"full_content"`
+		FilePath    string   `json:"file_path"`
+		TotalLines  int      `json:"total_lines"`
+		HasMore     bool     `json:"has_more"`
+	}{
+		Summary:     result.String(),
+		FullContent: fullContent,
+		FilePath:    fullPath,
+		TotalLines:  lineNum,
+		HasMore:     hasMore,
+	}
+
+	jsonResult, err := json.Marshal(response)
+	if err != nil {
+		t.logger.Error("Failed to marshal file read response", zap.Error(err))
+		return result.String(), nil // Fallback to summary only
 	}
 
 	t.logger.Info("File read successfully", zap.String("path", fullPath), zap.Int("lines", len(lines)), zap.Bool("hasMore", hasMore))
-	return results, nil
+	return string(jsonResult), nil
 }
 
 var _ entities.Tool = (*FileReadTool)(nil)

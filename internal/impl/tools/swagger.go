@@ -183,19 +183,51 @@ func (t *SwaggerTool) Execute(arguments string) (string, error) {
 		}
 	}
 
-	// Prepare response
-	response := SwaggerResponse{
-		Endpoints: endpoints,
-		RawSpec:   string(body), // Optionally include the raw spec
+	// Create TUI-friendly summary
+	var summary strings.Builder
+	summary.WriteString(fmt.Sprintf("📋 Swagger API: %s\n", swaggerURL))
+	summary.WriteString(fmt.Sprintf("🔗 Endpoints: %d\n\n", len(endpoints)))
+
+	// Show first 5 endpoints
+	previewCount := 5
+	if len(endpoints) < previewCount {
+		previewCount = len(endpoints)
 	}
-	resultJSON, err := json.Marshal(response)
+
+	for i := 0; i < previewCount; i++ {
+		endpoint := endpoints[i]
+		summary.WriteString(fmt.Sprintf("  %s %s\n", endpoint.Method, endpoint.Path))
+		if endpoint.Description != "" {
+			summary.WriteString(fmt.Sprintf("    %s\n", endpoint.Description))
+		}
+		summary.WriteString("\n")
+	}
+
+	if len(endpoints) > 5 {
+		summary.WriteString(fmt.Sprintf("  ... and %d more endpoints\n", len(endpoints)-5))
+	}
+
+	// Create JSON response with summary for TUI and full data for AI
+	response := struct {
+		Summary   string            `json:"summary"`
+		URL       string            `json:"url"`
+		Endpoints []SwaggerEndpoint `json:"endpoints"`
+		RawSpec   string            `json:"raw_spec"`
+	}{
+		Summary:   summary.String(),
+		URL:       swaggerURL,
+		Endpoints: endpoints,
+		RawSpec:   string(body),
+	}
+
+	jsonResult, err := json.Marshal(response)
 	if err != nil {
-		t.logger.Error("Failed to marshal response", zap.Error(err))
-		return "", err
+		t.logger.Error("Failed to marshal swagger response", zap.Error(err))
+		return summary.String(), nil // Fallback to summary only
 	}
 
 	t.logger.Info("Swagger spec fetched and parsed", zap.String("url", swaggerURL))
-	return string(resultJSON), nil
+	return string(jsonResult), nil
 }
 
 var _ entities.Tool = (*SwaggerTool)(nil)

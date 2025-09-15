@@ -17,28 +17,26 @@ import (
 	"github.com/kujtimiihoxha/vimtea"
 )
 
-// formatToolResult parses and formats tool execution results for display
+// formatToolResult formats tool execution results for display
 func formatToolResult(toolName, result string, diff string) string {
 	switch toolName {
 	case "FileWrite":
 		return formatFileWriteResult(result, diff)
-	case "FileRead":
-		return formatFileReadResult(result)
-	case "Directory":
-		return formatDirectoryResult(result)
-	case "Process":
-		return formatProcessResult(result)
-	case "Project":
-		return formatProjectResult(result)
 	case "FileSearch":
 		return formatFileSearchResult(result)
 	case "Memory":
 		return formatMemoryResult(result)
-	case "Task":
-		return formatTaskResult(result)
 	default:
-		// For other tools, try to parse as JSON and display key fields
-		return formatGenericResult(result)
+		// Try to extract summary from JSON responses
+		var jsonResponse struct {
+			Summary string `json:"summary"`
+		}
+		if err := json.Unmarshal([]byte(result), &jsonResponse); err == nil && jsonResponse.Summary != "" {
+			// Return only the summary for TUI display
+			return jsonResponse.Summary
+		}
+		// For non-JSON results or JSON without summary, return as-is
+		return result
 	}
 }
 
@@ -80,90 +78,17 @@ func formatFileWriteResult(result string, diff string) string {
 
 // formatFileSearchResult formats FileSearch tool results
 func formatFileSearchResult(result string) string {
-	var resultData struct {
-		FileResponse struct {
-			Results interface{} `json:"results"` // Can be []LineResult or map[string][]LineResult
-		} `json:"File_response"`
+	var response struct {
+		Summary string `json:"summary"`
 	}
 
-	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		// If parsing fails, return the original result
 		return result
 	}
 
-	var output strings.Builder
-
-	// Handle single file results
-	if singleResults, ok := resultData.FileResponse.Results.([]interface{}); ok {
-		output.WriteString(fmt.Sprintf("Search Results (%d matches):\n", len(singleResults)))
-
-		// Show first 10 matches
-		maxMatches := 10
-		for i, match := range singleResults {
-			if i >= maxMatches {
-				break
-			}
-
-			if matchMap, ok := match.(map[string]interface{}); ok {
-				line := int(matchMap["line"].(float64))
-				text := matchMap["text"].(string)
-				output.WriteString(fmt.Sprintf("  %4d: %s\n", line, text))
-			}
-		}
-
-		if len(singleResults) > maxMatches {
-			output.WriteString(fmt.Sprintf("  ... and %d more matches\n", len(singleResults)-maxMatches))
-		}
-
-	} else if multiResults, ok := resultData.FileResponse.Results.(map[string]interface{}); ok {
-		// Handle multi-file results
-		totalMatches := 0
-		fileCount := 0
-
-		output.WriteString("Multi-file Search Results:\n")
-
-		// Show first 5 files with their matches
-		maxFiles := 5
-		for filePath, matches := range multiResults {
-			if fileCount >= maxFiles {
-				break
-			}
-
-			if matchArray, ok := matches.([]interface{}); ok {
-				if len(matchArray) > 0 {
-					output.WriteString(fmt.Sprintf("📄 %s (%d matches):\n", filePath, len(matchArray)))
-					totalMatches += len(matchArray)
-
-					// Show first 5 matches per file
-					maxMatchesPerFile := 5
-					for i, match := range matchArray {
-						if i >= maxMatchesPerFile {
-							break
-						}
-
-						if matchMap, ok := match.(map[string]interface{}); ok {
-							line := int(matchMap["line"].(float64))
-							text := matchMap["text"].(string)
-							output.WriteString(fmt.Sprintf("    %4d: %s\n", line, text))
-						}
-					}
-
-					if len(matchArray) > maxMatchesPerFile {
-						output.WriteString(fmt.Sprintf("    ... and %d more matches\n", len(matchArray)-maxMatchesPerFile))
-					}
-
-					fileCount++
-				}
-			}
-		}
-
-		if len(multiResults) > maxFiles {
-			output.WriteString(fmt.Sprintf("... and %d more files with matches\n", len(multiResults)-maxFiles))
-		}
-
-		output.WriteString(fmt.Sprintf("\nTotal matches: %d across %d files", totalMatches, len(multiResults)))
-	}
-
-	return output.String()
+	// Return only the summary for TUI display
+	return response.Summary
 }
 
 // formatMemoryResult formats Memory tool results
@@ -283,64 +208,17 @@ func formatMemoryResult(result string) string {
 
 // formatTaskResult formats Task tool results
 func formatTaskResult(result string) string {
-	var output strings.Builder
-
-	// Try parsing as a single task (create/update/get result)
-	var task map[string]any
-	if err := json.Unmarshal([]byte(result), &task); err == nil {
-		if id, ok := task["id"].(string); ok {
-			output.WriteString(fmt.Sprintf("Task: %s\n", task["name"]))
-			output.WriteString(fmt.Sprintf("ID: %s\n", id))
-			if content, ok := task["content"].(string); ok && content != "" {
-				output.WriteString(fmt.Sprintf("Content: %s\n", content))
-			}
-			if status, ok := task["status"].(string); ok {
-				output.WriteString(fmt.Sprintf("Status: %s\n", status))
-			}
-			if priority, ok := task["priority"].(string); ok {
-				output.WriteString(fmt.Sprintf("Priority: %s\n", priority))
-			}
-			return output.String()
-		}
+	var response struct {
+		Summary string `json:"summary"`
 	}
 
-	// Try parsing as array of tasks (list result)
-	var tasks []any
-	if err := json.Unmarshal([]byte(result), &tasks); err == nil && len(tasks) > 0 {
-		output.WriteString(fmt.Sprintf("Tasks (%d total):\n", len(tasks)))
-
-		// Show first 5 tasks
-		maxTasks := 5
-		for i, taskItem := range tasks {
-			if i >= maxTasks {
-				break
-			}
-
-			if taskMap, ok := taskItem.(map[string]any); ok {
-				if name, ok := taskMap["name"].(string); ok {
-					status := "unknown"
-					if s, ok := taskMap["status"].(string); ok {
-						status = s
-					}
-					output.WriteString(fmt.Sprintf("  • %s (%s)\n", name, status))
-				}
-			}
-		}
-
-		if len(tasks) > maxTasks {
-			output.WriteString(fmt.Sprintf("  ... and %d more tasks\n", len(tasks)-maxTasks))
-		}
-
-		return output.String()
-	}
-
-	// Try parsing as simple string result (delete result)
-	if strings.TrimSpace(result) != "" && !strings.Contains(result, "{") {
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		// If parsing fails, return the original result
 		return result
 	}
 
-	// Fallback to generic formatting
-	return formatGenericResult(result)
+	// Return only the summary for TUI display
+	return response.Summary
 }
 
 // formatDiff formats diff content with colors and proper formatting
@@ -390,199 +268,19 @@ func formatDiff(diff string) string {
 	return output.String()
 }
 
-// formatFileReadResult formats FileRead tool results
-func formatFileReadResult(result string) string {
-	var lines []struct {
-		Line int    `json:"line"`
-		Text string `json:"text"`
-	}
-
-	if err := json.Unmarshal([]byte(result), &lines); err != nil {
-		return result
-	}
-
-	if len(lines) == 0 {
-		return "No content found"
-	}
-
-	var output strings.Builder
-	output.WriteString(fmt.Sprintf("Read %d lines:\n", len(lines)))
-
-	// Show first 8 lines with line numbers
-	maxLines := 8
-	if len(lines) > maxLines {
-		for i := 0; i < maxLines; i++ {
-			output.WriteString(fmt.Sprintf("%4d: %s\n", lines[i].Line, lines[i].Text))
-		}
-		output.WriteString(fmt.Sprintf("... and %d more lines", len(lines)-maxLines))
-	} else {
-		for _, line := range lines {
-			output.WriteString(fmt.Sprintf("%4d: %s\n", line.Line, line.Text))
-		}
-	}
-
-	return output.String()
-}
-
 // formatDirectoryResult formats Directory tool results
 func formatDirectoryResult(result string) string {
-	var resultData struct {
-		Path    string   `json:"path"`
-		Entries []string `json:"entries"`
+	var response struct {
+		Summary string `json:"summary"`
 	}
 
-	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		// If parsing fails, return the original result
 		return result
 	}
 
-	var output strings.Builder
-	output.WriteString(fmt.Sprintf("Directory listing: %s\n", resultData.Path))
-
-	// Show first 8 entries
-	maxEntries := 8
-	if len(resultData.Entries) > maxEntries {
-		for i := 0; i < maxEntries; i++ {
-			output.WriteString(fmt.Sprintf("  %s\n", resultData.Entries[i]))
-		}
-		output.WriteString(fmt.Sprintf("  ... and %d more entries", len(resultData.Entries)-maxEntries))
-	} else {
-		for _, entry := range resultData.Entries {
-			output.WriteString(fmt.Sprintf("  %s\n", entry))
-		}
-	}
-
-	return output.String()
-}
-
-// formatProcessResult formats Process tool results
-func formatProcessResult(result string) string {
-	var resultData struct {
-		Command string `json:"command"`
-		Stdout  string `json:"stdout"`
-		Stderr  string `json:"stderr"`
-		Status  string `json:"status"`
-	}
-
-	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
-		return result
-	}
-
-	var output strings.Builder
-	output.WriteString(fmt.Sprintf("Executed: %s\n", resultData.Command))
-
-	if resultData.Stdout != "" {
-		outputLines := strings.Split(strings.TrimSuffix(resultData.Stdout, "\n"), "\n")
-		output.WriteString(fmt.Sprintf("\nOutput (%d lines):\n", len(outputLines)))
-
-		// Show first 8 lines of output
-		maxLines := 8
-		if len(outputLines) > maxLines {
-			for i := 0; i < maxLines; i++ {
-				output.WriteString(fmt.Sprintf("  %s\n", outputLines[i]))
-			}
-			output.WriteString(fmt.Sprintf("  ... and %d more lines", len(outputLines)-maxLines))
-		} else {
-			for _, line := range outputLines {
-				output.WriteString(fmt.Sprintf("  %s\n", line))
-			}
-		}
-	}
-
-	if resultData.Stderr != "" {
-		errorLines := strings.Split(strings.TrimSuffix(resultData.Stderr, "\n"), "\n")
-		output.WriteString(fmt.Sprintf("\nError (%d lines):\n", len(errorLines)))
-
-		// Show first 8 lines of error
-		maxLines := 8
-		if len(errorLines) > maxLines {
-			for i := 0; i < maxLines; i++ {
-				output.WriteString(fmt.Sprintf("  %s\n", errorLines[i]))
-			}
-			output.WriteString(fmt.Sprintf("  ... and %d more lines", len(errorLines)-maxLines))
-		} else {
-			for _, line := range errorLines {
-				output.WriteString(fmt.Sprintf("  %s\n", line))
-			}
-		}
-	}
-
-	if resultData.Status != "" && resultData.Status != "completed" {
-		output.WriteString(fmt.Sprintf("\nStatus: %s", resultData.Status))
-	}
-
-	return output.String()
-}
-
-// formatProjectResult formats Project tool results (get_source)
-func formatProjectResult(result string) string {
-	var resultData struct {
-		FileMap      string            `json:"file_map"`
-		FileContents map[string]string `json:"file_contents"`
-	}
-
-	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
-		return result
-	}
-
-	var output strings.Builder
-
-	// Show file map (directory tree) - limit to reasonable size
-	if resultData.FileMap != "" {
-		output.WriteString("Project Structure:\n")
-		lines := strings.Split(strings.TrimSuffix(resultData.FileMap, "\n"), "\n")
-
-		// Show first 15 lines of directory tree
-		maxLines := 15
-		if len(lines) > maxLines {
-			for i := 0; i < maxLines; i++ {
-				output.WriteString(fmt.Sprintf("  %s\n", lines[i]))
-			}
-			output.WriteString(fmt.Sprintf("  ... and %d more directories/files\n", len(lines)-maxLines))
-		} else {
-			for _, line := range lines {
-				output.WriteString(fmt.Sprintf("  %s\n", line))
-			}
-		}
-		output.WriteString("\n")
-	}
-
-	// Show file contents or structure
-	if len(resultData.FileContents) > 0 {
-		output.WriteString(fmt.Sprintf("Source Files (%d files):\n", len(resultData.FileContents)))
-
-		// Show first 5 files with limited content
-		maxFiles := 5
-		fileCount := 0
-		for path, content := range resultData.FileContents {
-			if fileCount >= maxFiles {
-				break
-			}
-
-			output.WriteString(fmt.Sprintf("📄 %s\n", path))
-
-			// Show first 10 lines of each file
-			lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
-			maxFileLines := 10
-			if len(lines) > maxFileLines {
-				for i := 0; i < maxFileLines; i++ {
-					output.WriteString(fmt.Sprintf("    %d: %s\n", i+1, lines[i]))
-				}
-				output.WriteString(fmt.Sprintf("    ... and %d more lines\n", len(lines)-maxFileLines))
-			} else {
-				for i, line := range lines {
-					output.WriteString(fmt.Sprintf("    %d: %s\n", i+1, line))
-				}
-			}
-			output.WriteString("\n")
-			fileCount++
-		}
-
-		if len(resultData.FileContents) > maxFiles {
-			output.WriteString(fmt.Sprintf("... and %d more files\n", len(resultData.FileContents)-maxFiles))
-		}
-	}
-
-	return output.String()
+	// Return only the summary for TUI display
+	return response.Summary
 }
 
 // formatGenericResult tries to parse generic JSON results

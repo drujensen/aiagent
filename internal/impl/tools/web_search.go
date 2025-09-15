@@ -174,29 +174,69 @@ func (t *WebSearchTool) Execute(arguments string) (string, error) {
 		return "", err
 	}
 
-	// Build the output string
-	var output string
+	// Create TUI-friendly summary
+	var summary strings.Builder
+	summary.WriteString(fmt.Sprintf("🔍 Web Search: %s\n\n", query))
+
 	if result.Answer != "" {
-		output = "Answer: " + result.Answer + "\n\n"
-	}
-	if len(result.Results) > 0 {
-		if output != "" {
-			output += "Top Results:\n"
-		} else {
-			output = "Top Results:\n"
-		}
-		for i, res := range result.Results {
-			if i >= 3 {
-				break
-			}
-			output += fmt.Sprintf("%d. %s - %s\n   %s\n", i+1, res.Title, res.URL, res.Content)
-		}
-	} else if output == "" {
-		output = "No results found"
+		summary.WriteString(fmt.Sprintf("💡 Answer: %s\n\n", result.Answer))
 	}
 
-	t.logger.Info("Search completed", zap.String("result", output))
-	return output, nil
+	if len(result.Results) > 0 {
+		summary.WriteString("📋 Top Results:\n")
+		previewCount := 3
+		if len(result.Results) < previewCount {
+			previewCount = len(result.Results)
+		}
+
+		for i := 0; i < previewCount; i++ {
+			res := result.Results[i]
+			summary.WriteString(fmt.Sprintf("%d. %s\n", i+1, res.Title))
+			summary.WriteString(fmt.Sprintf("   %s\n", res.URL))
+
+			// Truncate content preview to 100 characters
+			contentPreview := res.Content
+			if len(contentPreview) > 100 {
+				contentPreview = contentPreview[:100] + "..."
+			}
+			summary.WriteString(fmt.Sprintf("   %s\n\n", contentPreview))
+		}
+
+		if len(result.Results) > 3 {
+			summary.WriteString(fmt.Sprintf("... and %d more results\n", len(result.Results)-3))
+		}
+	} else if result.Answer == "" {
+		summary.WriteString("❌ No results found")
+	}
+
+	// Create JSON response with summary for TUI and full data for AI
+	response := struct {
+		Summary     string `json:"summary"`
+		Query       string `json:"query"`
+		Answer      string `json:"answer"`
+		FullResults []struct {
+			Title   string  `json:"title"`
+			URL     string  `json:"url"`
+			Content string  `json:"content"`
+			Score   float64 `json:"score"`
+		} `json:"full_results"`
+		TotalResults int `json:"total_results"`
+	}{
+		Summary:      summary.String(),
+		Query:        query,
+		Answer:       result.Answer,
+		FullResults:  result.Results,
+		TotalResults: len(result.Results),
+	}
+
+	jsonResult, err := json.Marshal(response)
+	if err != nil {
+		t.logger.Error("Failed to marshal web search response", zap.Error(err))
+		return summary.String(), nil // Fallback to summary only
+	}
+
+	t.logger.Info("Web search completed", zap.String("query", query), zap.Int("results", len(result.Results)))
+	return string(jsonResult), nil
 }
 
 var _ entities.Tool = (*WebSearchTool)(nil)

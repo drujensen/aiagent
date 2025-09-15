@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
@@ -316,8 +317,11 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				toolResult = fmt.Sprintf("Tool %s not found", toolName)
 				toolError = "Tool not found"
 			}
-			// Create tool call event
-			toolEvent := entities.NewToolCallEvent(toolName, toolCall.Function.Arguments, toolResult, toolError, diff, nil)
+			// Extract full data for AI and summary for TUI
+			fullContent, summaryContent := m.extractToolContent(toolName, toolResult, toolError)
+
+			// Create tool call event with summary for TUI
+			toolEvent := entities.NewToolCallEvent(toolName, toolCall.Function.Arguments, summaryContent, toolError, diff, nil)
 
 			// Publish real-time event for TUI updates
 			events.PublishToolCallEvent(toolEvent)
@@ -326,7 +330,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			if toolError != "" {
 				content = fmt.Sprintf("Tool %s failed with error: %s", toolName, toolError)
 			} else {
-				content = fmt.Sprintf("Tool %s succeeded: %s", toolName, toolResult)
+				content = fullContent // Full data for AI reasoning
 			}
 
 			var newMessage = &entities.Message{
@@ -405,6 +409,176 @@ func (m *AIModelIntegration) extractDiffFromResult(result string) string {
 		return resultData.Diff
 	}
 	return ""
+}
+
+// extractToolContent extracts full content for AI and summary for TUI from tool results
+func (m *AIModelIntegration) extractToolContent(toolName, result, toolError string) (fullContent, summaryContent string) {
+	if toolError != "" {
+		fullContent = fmt.Sprintf("Tool %s failed with error: %s", toolName, toolError)
+		summaryContent = fullContent
+		return
+	}
+
+	// Try to parse as JSON with summary and full data
+	var jsonData map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &jsonData); err != nil {
+		// Not JSON, use result as-is for both AI and TUI
+		fullContent = fmt.Sprintf("Tool %s succeeded: %s", toolName, result)
+		summaryContent = result
+		return
+	}
+
+	// Extract summary for TUI
+	if summary, ok := jsonData["summary"].(string); ok {
+		summaryContent = summary
+	} else {
+		summaryContent = result
+	}
+
+	// Create full content for AI based on tool type
+	switch toolName {
+	case "Directory":
+		fullContent = m.formatDirectoryForAI(jsonData)
+	case "Process":
+		fullContent = m.formatProcessForAI(jsonData)
+	case "FileRead":
+		fullContent = m.formatFileReadForAI(jsonData)
+	case "Project":
+		fullContent = m.formatProjectForAI(jsonData)
+	case "Task":
+		fullContent = m.formatTaskForAI(jsonData)
+	default:
+		// For unknown tools, include all data
+		fullContent = fmt.Sprintf("Tool %s succeeded with result: %s", toolName, result)
+	}
+
+	return
+}
+
+func (m *AIModelIntegration) formatDirectoryForAI(data map[string]interface{}) string {
+	var result strings.Builder
+	result.WriteString("Directory listing results:\n")
+
+	if path, ok := data["path"].(string); ok {
+		result.WriteString(fmt.Sprintf("Path: %s\n", path))
+	}
+	if totalDirs, ok := data["total_dirs"].(float64); ok {
+		result.WriteString(fmt.Sprintf("Total directories: %d\n", int(totalDirs)))
+	}
+	if totalFiles, ok := data["total_files"].(float64); ok {
+		result.WriteString(fmt.Sprintf("Total files: %d\n", int(totalFiles)))
+	}
+	if fullList, ok := data["full_list"].([]interface{}); ok {
+		result.WriteString("\nComplete file list:\n")
+		for _, item := range fullList {
+			if itemStr, ok := item.(string); ok {
+				result.WriteString(fmt.Sprintf("- %s\n", itemStr))
+			}
+		}
+	}
+
+	return result.String()
+}
+
+func (m *AIModelIntegration) formatProcessForAI(data map[string]interface{}) string {
+	var result strings.Builder
+	result.WriteString("Process execution results:\n")
+
+	if command, ok := data["command"].(string); ok {
+		result.WriteString(fmt.Sprintf("Command: %s\n", command))
+	}
+	if status, ok := data["status"].(string); ok {
+		result.WriteString(fmt.Sprintf("Status: %s\n", status))
+	}
+	if pid, ok := data["pid"].(float64); ok && pid > 0 {
+		result.WriteString(fmt.Sprintf("PID: %d\n", int(pid)))
+	}
+	if stdout, ok := data["stdout"].(string); ok && stdout != "" {
+		result.WriteString(fmt.Sprintf("\nStdout:\n%s\n", stdout))
+	}
+	if stderr, ok := data["stderr"].(string); ok && stderr != "" {
+		result.WriteString(fmt.Sprintf("\nStderr:\n%s\n", stderr))
+	}
+
+	return result.String()
+}
+
+func (m *AIModelIntegration) formatFileReadForAI(data map[string]interface{}) string {
+	var result strings.Builder
+	result.WriteString("File read results:\n")
+
+	if filePath, ok := data["file_path"].(string); ok {
+		result.WriteString(fmt.Sprintf("File: %s\n", filePath))
+	}
+	if totalLines, ok := data["total_lines"].(float64); ok {
+		result.WriteString(fmt.Sprintf("Total lines: %d\n", int(totalLines)))
+	}
+	if hasMore, ok := data["has_more"].(bool); ok && hasMore {
+		result.WriteString("Note: File has more content beyond the displayed limit.\n")
+	}
+	if fullContent, ok := data["full_content"].([]interface{}); ok {
+		result.WriteString("\nComplete file content:\n")
+		for _, line := range fullContent {
+			if lineStr, ok := line.(string); ok {
+				result.WriteString(fmt.Sprintf("%s\n", lineStr))
+			}
+		}
+	}
+
+	return result.String()
+}
+
+func (m *AIModelIntegration) formatProjectForAI(data map[string]interface{}) string {
+	var result strings.Builder
+	result.WriteString("Project source code results:\n")
+
+	if totalFiles, ok := data["total_files"].(float64); ok {
+		result.WriteString(fmt.Sprintf("Total files: %d\n", int(totalFiles)))
+	}
+	if fileMap, ok := data["file_map"].(string); ok {
+		result.WriteString(fmt.Sprintf("\nDirectory structure:\n%s\n", fileMap))
+	}
+	if fileContents, ok := data["file_contents"].(map[string]interface{}); ok {
+		result.WriteString("\nFile contents:\n")
+		for path, content := range fileContents {
+			if contentStr, ok := content.(string); ok {
+				result.WriteString(fmt.Sprintf("\n--- %s ---\n%s\n", path, contentStr))
+			}
+		}
+	}
+
+	return result.String()
+}
+
+func (m *AIModelIntegration) formatTaskForAI(data map[string]interface{}) string {
+	var result strings.Builder
+	result.WriteString("Task management results:\n")
+
+	if total, ok := data["total"].(float64); ok {
+		result.WriteString(fmt.Sprintf("Total tasks: %d\n", int(total)))
+	}
+	if fullTasks, ok := data["full_tasks"].([]interface{}); ok {
+		result.WriteString("\nComplete task list:\n")
+		for _, task := range fullTasks {
+			if taskData, ok := task.(map[string]interface{}); ok {
+				if id, ok := taskData["id"].(string); ok {
+					result.WriteString(fmt.Sprintf("ID: %s\n", id))
+				}
+				if content, ok := taskData["content"].(string); ok {
+					result.WriteString(fmt.Sprintf("Content: %s\n", content))
+				}
+				if status, ok := taskData["status"].(string); ok {
+					result.WriteString(fmt.Sprintf("Status: %s\n", status))
+				}
+				if createdAt, ok := taskData["created_at"].(string); ok {
+					result.WriteString(fmt.Sprintf("Created: %s\n", createdAt))
+				}
+				result.WriteString("\n")
+			}
+		}
+	}
+
+	return result.String()
 }
 
 // GetUsage returns the token usage statistics

@@ -312,12 +312,38 @@ func (t *MCPTool) Execute(arguments string) (string, error) {
 		return "", fmt.Errorf("error executing MCP method: %w", err)
 	}
 
-	// Marshal the result to string and return
-	resultJSON, err := json.Marshal(result)
-	if err != nil {
-		return "", fmt.Errorf("error marshaling result: %w", err)
+	// Create TUI-friendly summary
+	var summary strings.Builder
+	summary.WriteString(fmt.Sprintf("🔧 MCP Tool: %s\n", t.Name()))
+
+	// Try to create a meaningful summary from the result
+	if resultMap, ok := result.(map[string]any); ok {
+		// Show key-value pairs from the result
+		summary.WriteString("📊 Result:\n")
+		for key, value := range resultMap {
+			summary.WriteString(fmt.Sprintf("  %s: %v\n", key, value))
+		}
+	} else {
+		summary.WriteString("✅ Tool executed successfully")
 	}
-	return string(resultJSON), nil
+
+	// Create JSON response with summary for TUI and full data for AI
+	response := struct {
+		Summary string `json:"summary"`
+		Tool    string `json:"tool"`
+		Result  any    `json:"result"`
+	}{
+		Summary: summary.String(),
+		Tool:    t.Name(),
+		Result:  result,
+	}
+
+	jsonResult, err := json.Marshal(response)
+	if err != nil {
+		return "", fmt.Errorf("error marshaling MCP response: %w", err)
+	}
+
+	return string(jsonResult), nil
 }
 
 var _ entities.Tool = (*MCPTool)(nil)

@@ -234,24 +234,44 @@ func (t *FetchTool) doRequest(req *http.Request, headers []string) (string, erro
 		return "", err
 	}
 
-	result := struct {
-		Status int    `json:"status"`
-		Body   string `json:"body"`
-	}{
-		Status: resp.StatusCode,
-		Body:   string(body),
+	// Create TUI-friendly summary
+	var summary strings.Builder
+	summary.WriteString(fmt.Sprintf("🌐 HTTP %s: %s\n", req.Method, req.URL.String()))
+	summary.WriteString(fmt.Sprintf("📊 Status: %d %s\n", resp.StatusCode, http.StatusText(resp.StatusCode)))
+
+	// Show response body preview (first 200 characters)
+	bodyStr := string(body)
+	if len(bodyStr) > 200 {
+		summary.WriteString(fmt.Sprintf("📄 Response: %s...\n", bodyStr[:200]))
+	} else {
+		summary.WriteString(fmt.Sprintf("📄 Response: %s\n", bodyStr))
 	}
 
-	resultJSON, err := json.Marshal(result)
+	// Create JSON response with summary for TUI and full data for AI
+	response := struct {
+		Summary string `json:"summary"`
+		Method  string `json:"method"`
+		URL     string `json:"url"`
+		Status  int    `json:"status"`
+		Body    string `json:"body"`
+	}{
+		Summary: summary.String(),
+		Method:  req.Method,
+		URL:     req.URL.String(),
+		Status:  resp.StatusCode,
+		Body:    bodyStr,
+	}
+
+	jsonResult, err := json.Marshal(response)
 	if err != nil {
-		t.logger.Error("Failed to marshal response", zap.Error(err))
-		return "", err
+		t.logger.Error("Failed to marshal fetch response", zap.Error(err))
+		return summary.String(), nil // Fallback to summary only
 	}
 
 	t.logger.Debug("Request completed",
 		zap.Int("status", resp.StatusCode),
 		zap.String("url", req.URL.String()))
-	return string(resultJSON), nil
+	return string(jsonResult), nil
 }
 
 var _ entities.Tool = (*FetchTool)(nil)

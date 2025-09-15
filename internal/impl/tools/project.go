@@ -210,20 +210,47 @@ Please update this file with relevant project information.
 		return "", fmt.Errorf("failed to read project file: %v", err)
 	}
 
-	// Return the file contents as a JSON response
+	contentStr := string(content)
+
+	// Create TUI-friendly summary (first 5 lines only)
+	var summary strings.Builder
+	summary.WriteString(fmt.Sprintf("📄 Project File: %s\n\n", filepath.Base(fullPath)))
+
+	lines := strings.Split(contentStr, "\n")
+	previewLines := 5
+	if len(lines) < previewLines {
+		previewLines = len(lines)
+	}
+
+	for i := 0; i < previewLines; i++ {
+		if lines[i] != "" {
+			summary.WriteString(fmt.Sprintf("  %s\n", lines[i]))
+		}
+	}
+
+	if len(lines) > 5 {
+		summary.WriteString(fmt.Sprintf("  ... and %d more lines\n", len(lines)-5))
+	}
+
+	// Create JSON response with summary for TUI and full content for AI
 	response := struct {
+		Summary string `json:"summary"`
+		Path    string `json:"path"`
 		Content string `json:"content"`
 	}{
-		Content: string(content),
+		Summary: summary.String(),
+		Path:    fullPath,
+		Content: contentStr,
 	}
-	jsonResponse, err := json.Marshal(response)
+
+	jsonResult, err := json.Marshal(response)
 	if err != nil {
-		t.logger.Error("Failed to marshal response", zap.Error(err))
-		return "", fmt.Errorf("failed to marshal response: %v", err)
+		t.logger.Error("Failed to marshal project read response", zap.Error(err))
+		return summary.String(), nil // Fallback to summary only
 	}
 
 	t.logger.Info("Project file read successfully", zap.String("path", fullPath))
-	return string(jsonResponse), nil
+	return string(jsonResult), nil
 }
 
 func (t *ProjectTool) executeGetSource(workspace, language string, customFilters []string, maxFileSize, maxTotalSize int) (string, error) {
@@ -346,23 +373,51 @@ func (t *ProjectTool) executeGetSource(workspace, language string, customFilters
 		totalSize += contentSize
 	}
 
-	// Build JSON response
-	response := struct {
-		FileMap      string            `json:"file_map"`
-		FileContents map[string]string `json:"file_contents"`
-	}{
-		FileMap:      tree,
-		FileContents: fileContents,
+	// Create TUI-friendly summary
+	var summary strings.Builder
+	summary.WriteString(fmt.Sprintf("📁 Project Source (%d files, %d with content)\n\n", len(files), len(fileContents)))
+
+	// Show first 5 files in the summary
+	previewCount := 5
+	if len(files) < previewCount {
+		previewCount = len(files)
 	}
 
-	jsonResponse, err := json.Marshal(response)
+	for i := 0; i < previewCount; i++ {
+		file := files[i]
+		contentPreview := file.Content
+		if len(contentPreview) > 100 {
+			contentPreview = contentPreview[:100] + "..."
+		}
+		summary.WriteString(fmt.Sprintf("📄 %s\n", file.Path))
+		summary.WriteString(fmt.Sprintf("   Preview: %s\n\n", strings.ReplaceAll(contentPreview, "\n", " ")))
+	}
+
+	if len(files) > 5 {
+		summary.WriteString(fmt.Sprintf("... and %d more files\n", len(files)-5))
+	}
+
+	// Create JSON response with summary for TUI and full data for AI
+	response := struct {
+		Summary      string            `json:"summary"`
+		FileMap      string            `json:"file_map"`
+		FileContents map[string]string `json:"file_contents"`
+		TotalFiles   int               `json:"total_files"`
+	}{
+		Summary:      summary.String(),
+		FileMap:      tree,
+		FileContents: fileContents,
+		TotalFiles:   len(files),
+	}
+
+	jsonResult, err := json.Marshal(response)
 	if err != nil {
-		t.logger.Error("Failed to marshal response", zap.Error(err))
-		return "", fmt.Errorf("failed to marshal response: %v", err)
+		t.logger.Error("Failed to marshal project response", zap.Error(err))
+		return summary.String(), nil // Fallback to summary only
 	}
 
 	t.logger.Info("Source code retrieved successfully", zap.String("workspace", workspace), zap.Int("files", len(files)))
-	return string(jsonResponse), nil
+	return string(jsonResult), nil
 }
 
 // buildDirectoryTree generates a tree representation of the directory (ignores .git)

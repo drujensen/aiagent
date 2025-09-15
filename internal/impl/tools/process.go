@@ -181,10 +181,10 @@ func (t *ProcessTool) Execute(arguments string) (string, error) {
 	switch args.Action {
 	case "run":
 		results, err := t.runCommand(args, workspace)
-		if len(results) > 16384 {
-			results = results[:16384] + "...truncated"
+		if err != nil {
+			return results, err
 		}
-		return results, err
+		return t.formatRunOutput(results)
 	case "write":
 		return t.writeToProcess(args)
 	case "read":
@@ -496,6 +496,188 @@ func (t *ProcessTool) killProcess(pid int) (string, error) {
 	return t.toJSON(resp)
 }
 
+func (t *ProcessTool) formatRunOutput(jsonOutput string) (string, error) {
+	// Parse the JSON response
+	var resp ProcessResponse
+	if err := json.Unmarshal([]byte(jsonOutput), &resp); err != nil {
+		// If parsing fails, return original output
+		return jsonOutput, nil
+	}
+
+	// Create TUI-friendly summary
+	var summary strings.Builder
+
+	// Command and status
+	summary.WriteString(fmt.Sprintf("⚙️  %s\n", resp.Command))
+	summary.WriteString(fmt.Sprintf("📊 Status: %s\n", resp.Status))
+
+	if resp.PID > 0 {
+		summary.WriteString(fmt.Sprintf("🆔 PID: %d\n", resp.PID))
+	}
+
+	summary.WriteString("\n")
+
+	// Handle stdout
+	if resp.Stdout != "" {
+		lines := strings.Split(strings.TrimSpace(resp.Stdout), "\n")
+		totalLines := len(lines)
+
+		summary.WriteString(fmt.Sprintf("📤 Stdout (%d lines):\n", totalLines))
+
+		// Show first 10 lines
+		previewLines := 10
+		if totalLines < previewLines {
+			previewLines = totalLines
+		}
+
+		for i := 0; i < previewLines; i++ {
+			summary.WriteString(fmt.Sprintf("   %s\n", lines[i]))
+		}
+
+		if totalLines > 10 {
+			summary.WriteString(fmt.Sprintf("   ... and %d more lines\n", totalLines-10))
+		}
+	}
+
+	// Handle stderr
+	if resp.Stderr != "" {
+		if resp.Stdout != "" {
+			summary.WriteString("\n")
+		}
+
+		lines := strings.Split(strings.TrimSpace(resp.Stderr), "\n")
+		totalLines := len(lines)
+
+		summary.WriteString(fmt.Sprintf("⚠️  Stderr (%d lines):\n", totalLines))
+
+		// Show first 5 lines of stderr
+		previewLines := 5
+		if totalLines < previewLines {
+			previewLines = totalLines
+		}
+
+		for i := 0; i < previewLines; i++ {
+			summary.WriteString(fmt.Sprintf("   %s\n", lines[i]))
+		}
+
+		if totalLines > 5 {
+			summary.WriteString(fmt.Sprintf("   ... and %d more lines\n", totalLines-5))
+		}
+	}
+
+	// Create JSON response with summary for TUI and full data for AI
+	response := struct {
+		Summary string `json:"summary"`
+		Command string `json:"command"`
+		Stdout  string `json:"stdout"`
+		Stderr  string `json:"stderr"`
+		PID     int    `json:"pid,omitempty"`
+		Status  string `json:"status"`
+	}{
+		Summary: summary.String(),
+		Command: resp.Command,
+		Stdout:  resp.Stdout,
+		Stderr:  resp.Stderr,
+		PID:     resp.PID,
+		Status:  resp.Status,
+	}
+
+	jsonResult, err := json.Marshal(response)
+	if err != nil {
+		t.logger.Error("Failed to marshal process response", zap.Error(err))
+		return summary.String(), nil // Fallback to summary only
+	}
+
+	return string(jsonResult), nil
+}
+
+func (t *ProcessTool) formatReadOutput(jsonOutput string) (string, error) {
+	// Parse the JSON response
+	var resp ProcessResponse
+	if err := json.Unmarshal([]byte(jsonOutput), &resp); err != nil {
+		// If parsing fails, return original output
+		return jsonOutput, nil
+	}
+
+	// Create TUI-friendly summary
+	var summary strings.Builder
+
+	summary.WriteString(fmt.Sprintf("📖 Reading from PID %d\n", resp.PID))
+
+	// Handle stdout
+	if resp.Stdout != "" {
+		lines := strings.Split(strings.TrimSpace(resp.Stdout), "\n")
+		totalLines := len(lines)
+
+		summary.WriteString(fmt.Sprintf("📤 Stdout (%d lines):\n", totalLines))
+
+		// Show first 10 lines
+		previewLines := 10
+		if totalLines < previewLines {
+			previewLines = totalLines
+		}
+
+		for i := 0; i < previewLines; i++ {
+			summary.WriteString(fmt.Sprintf("   %s\n", lines[i]))
+		}
+
+		if totalLines > 10 {
+			summary.WriteString(fmt.Sprintf("   ... and %d more lines\n", totalLines-10))
+		}
+	}
+
+	// Handle stderr
+	if resp.Stderr != "" {
+		if resp.Stdout != "" {
+			summary.WriteString("\n")
+		}
+
+		lines := strings.Split(strings.TrimSpace(resp.Stderr), "\n")
+		totalLines := len(lines)
+
+		summary.WriteString(fmt.Sprintf("⚠️  Stderr (%d lines):\n", totalLines))
+
+		// Show first 5 lines of stderr
+		previewLines := 5
+		if totalLines < previewLines {
+			previewLines = totalLines
+		}
+
+		for i := 0; i < previewLines; i++ {
+			summary.WriteString(fmt.Sprintf("   %s\n", lines[i]))
+		}
+
+		if totalLines > 5 {
+			summary.WriteString(fmt.Sprintf("   ... and %d more lines\n", totalLines-5))
+		}
+	}
+
+	// Create JSON response with summary for TUI and full data for AI
+	response := struct {
+		Summary string `json:"summary"`
+		Command string `json:"command"`
+		Stdout  string `json:"stdout"`
+		Stderr  string `json:"stderr"`
+		PID     int    `json:"pid,omitempty"`
+		Status  string `json:"status"`
+	}{
+		Summary: summary.String(),
+		Command: resp.Command,
+		Stdout:  resp.Stdout,
+		Stderr:  resp.Stderr,
+		PID:     resp.PID,
+		Status:  resp.Status,
+	}
+
+	jsonResult, err := json.Marshal(response)
+	if err != nil {
+		t.logger.Error("Failed to marshal process read response", zap.Error(err))
+		return summary.String(), nil // Fallback to summary only
+	}
+
+	return string(jsonResult), nil
+}
+
 func (t *ProcessTool) toJSON(resp ProcessResponse) (string, error) {
 	data, err := json.Marshal(resp)
 	if err != nil {
@@ -545,7 +727,11 @@ func (t *ProcessTool) readFromProcess(args ProcessArgs) (string, error) {
 		Stderr:  stderr,
 		Status:  "read",
 	}
-	return t.toJSON(resp)
+	jsonOutput, err := t.toJSON(resp)
+	if err != nil {
+		return "", err
+	}
+	return t.formatReadOutput(jsonOutput)
 }
 
 var _ entities.Tool = (*ProcessTool)(nil)

@@ -260,8 +260,9 @@ func (t *TaskTool) readTasks() (string, error) {
 		return t.tasks[i].CreatedAt.After(t.tasks[j].CreatedAt)
 	})
 
-	var result strings.Builder
-	result.WriteString(fmt.Sprintf("📋 Current Tasks (%d total):\n\n", len(t.tasks)))
+	// Create TUI-friendly summary (checkboxes only, no IDs)
+	var summary strings.Builder
+	summary.WriteString(fmt.Sprintf("📋 Current Tasks (%d total):\n\n", len(t.tasks)))
 
 	for _, task := range t.tasks {
 		// Simple checkbox display
@@ -270,12 +271,50 @@ func (t *TaskTool) readTasks() (string, error) {
 			checkbox = "☑"
 		}
 
-		result.WriteString(fmt.Sprintf("%s %s\n", checkbox, task.Content))
-		result.WriteString(fmt.Sprintf("   ID: %s\n", task.ID))
+		summary.WriteString(fmt.Sprintf("%s %s\n", checkbox, task.Content))
+	}
+
+	// Create full task data for AI (includes IDs and metadata)
+	type TaskData struct {
+		ID        string `json:"id"`
+		Content   string `json:"content"`
+		Status    string `json:"status"`
+		CreatedAt string `json:"created_at"`
+	}
+
+	fullTasks := make([]TaskData, len(t.tasks))
+	for i, task := range t.tasks {
+		status := "pending"
+		if task.Status == entities.TaskStatusCompleted {
+			status = "completed"
+		}
+		fullTasks[i] = TaskData{
+			ID:        task.ID,
+			Content:   task.Content,
+			Status:    status,
+			CreatedAt: task.CreatedAt.Format("2006-01-02 15:04:05"),
+		}
+	}
+
+	// Create JSON response with summary for TUI and full data for AI
+	response := struct {
+		Summary   string     `json:"summary"`
+		FullTasks []TaskData `json:"full_tasks"`
+		Total     int        `json:"total"`
+	}{
+		Summary:   summary.String(),
+		FullTasks: fullTasks,
+		Total:     len(t.tasks),
+	}
+
+	jsonResult, err := json.Marshal(response)
+	if err != nil {
+		t.logger.Error("Failed to marshal task response", zap.Error(err))
+		return summary.String(), nil // Fallback to summary only
 	}
 
 	t.logger.Info("Tasks listed", zap.Int("count", len(t.tasks)))
-	return result.String(), nil
+	return string(jsonResult), nil
 }
 
 var _ entities.Tool = (*TaskTool)(nil)

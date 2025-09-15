@@ -243,13 +243,30 @@ func (t *FileWriteTool) applyPreciseEdit(filePath, oldString, newString string, 
 		zap.Int("occurrences", occurrences),
 		zap.Bool("replace_all", replaceAll))
 
-	result := struct {
+	// Create TUI-friendly summary
+	var summary strings.Builder
+	summary.WriteString(fmt.Sprintf("✏️  File Edit: %s\n", filepath.Base(filePath)))
+
+	if occurrences == 0 {
+		summary.WriteString("No changes made - pattern not found")
+	} else {
+		action := "replaced"
+		if replaceAll {
+			action = "replaced all"
+		}
+		summary.WriteString(fmt.Sprintf("✅ %s %d occurrence(s)", action, occurrences))
+	}
+
+	// Create JSON response with summary for TUI and full data for AI
+	response := struct {
+		Summary     string `json:"summary"`
 		Success     bool   `json:"success"`
 		Path        string `json:"path"`
 		Occurrences int    `json:"occurrences"`
 		ReplacedAll bool   `json:"replaced_all"`
 		Diff        string `json:"diff"`
 	}{
+		Summary:     summary.String(),
 		Success:     true,
 		Path:        filePath,
 		Occurrences: occurrences,
@@ -257,13 +274,13 @@ func (t *FileWriteTool) applyPreciseEdit(filePath, oldString, newString string, 
 		Diff:        "```diff\n" + diffStr + "\n```",
 	}
 
-	jsonResponse, err := json.Marshal(result)
+	jsonResult, err := json.Marshal(response)
 	if err != nil {
-		t.logger.Error("Failed to marshal edit results", zap.Error(err))
-		return "", fmt.Errorf("failed to marshal edit results: %v", err)
+		t.logger.Error("Failed to marshal file write response", zap.Error(err))
+		return summary.String(), nil // Fallback to summary only
 	}
 
-	return string(jsonResponse), nil
+	return string(jsonResult), nil
 }
 
 var _ entities.Tool = (*FileWriteTool)(nil)

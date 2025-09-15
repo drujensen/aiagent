@@ -172,6 +172,7 @@ func (t *DirectoryTool) Execute(arguments string) (string, error) {
 			return "", fmt.Errorf("failed to list directory: %v", err)
 		}
 		var formatted []string
+		var dirs, files int
 		for _, entry := range entries {
 			// Skip .git and .aiagent directories
 			if entry.IsDir() && (entry.Name() == ".git" || entry.Name() == ".aiagent") {
@@ -180,15 +181,54 @@ func (t *DirectoryTool) Execute(arguments string) (string, error) {
 			prefix := "[FILE]"
 			if entry.IsDir() {
 				prefix = "[DIR]"
+				dirs++
+			} else {
+				files++
 			}
 			formatted = append(formatted, prefix+" "+entry.Name())
 		}
-		results := strings.Join(formatted, "\n")
-		if len(results) > 16384 {
-			results = results[:16384] + "...truncated"
+
+		// Create TUI-friendly summary
+		var summary strings.Builder
+		summary.WriteString(fmt.Sprintf("📂 %s (%d directories, %d files)\n\n", filepath.Base(fullPath), dirs, files))
+
+		// Show first 10 entries
+		previewCount := 10
+		if len(formatted) < previewCount {
+			previewCount = len(formatted)
 		}
+
+		for i := 0; i < previewCount; i++ {
+			summary.WriteString(formatted[i] + "\n")
+		}
+
+		if len(formatted) > 10 {
+			summary.WriteString(fmt.Sprintf("\n... and %d more items\n", len(formatted)-10))
+		}
+
+		// Create JSON response with summary for TUI and full data for AI
+		response := struct {
+			Summary    string   `json:"summary"`
+			FullList   []string `json:"full_list"`
+			Path       string   `json:"path"`
+			TotalDirs  int      `json:"total_dirs"`
+			TotalFiles int      `json:"total_files"`
+		}{
+			Summary:    summary.String(),
+			FullList:   formatted,
+			Path:       fullPath,
+			TotalDirs:  dirs,
+			TotalFiles: files,
+		}
+
+		jsonResult, err := json.Marshal(response)
+		if err != nil {
+			t.logger.Error("Failed to marshal directory response", zap.Error(err))
+			return summary.String(), nil // Fallback to summary only
+		}
+
 		t.logger.Info("Directory listed successfully", zap.String("path", fullPath))
-		return results, nil
+		return string(jsonResult), nil
 
 	case "directory_tree":
 		fullPath, err := t.validatePath(args.Path)
@@ -204,13 +244,41 @@ func (t *DirectoryTool) Execute(arguments string) (string, error) {
 			t.logger.Error("Failed to build directory tree", zap.String("path", fullPath), zap.Error(err))
 			return "", fmt.Errorf("failed to build directory tree: %v", err)
 		}
-		jsonTree, _ := json.MarshalIndent(tree, "", "  ")
-		results := string(jsonTree)
-		if len(results) > 16384 {
-			results = results[:16384] + "...truncated"
+
+		// Count total items
+		totalDirs, totalFiles := t.countTreeItems(tree)
+
+		// Create TUI-friendly summary
+		var summary strings.Builder
+		summary.WriteString(fmt.Sprintf("🌳 Directory Tree: %s (%d directories, %d files)\n\n", filepath.Base(fullPath), totalDirs, totalFiles))
+
+		// Convert to readable text format (first 15 lines)
+		textTree := t.treeToText(tree, "", 0, 15)
+		summary.WriteString(textTree)
+
+		// Create JSON response with summary for TUI and full data for AI
+		response := struct {
+			Summary    string      `json:"summary"`
+			FullTree   []TreeEntry `json:"full_tree"`
+			Path       string      `json:"path"`
+			TotalDirs  int         `json:"total_dirs"`
+			TotalFiles int         `json:"total_files"`
+		}{
+			Summary:    summary.String(),
+			FullTree:   tree,
+			Path:       fullPath,
+			TotalDirs:  totalDirs,
+			TotalFiles: totalFiles,
 		}
+
+		jsonResult, err := json.Marshal(response)
+		if err != nil {
+			t.logger.Error("Failed to marshal directory tree response", zap.Error(err))
+			return summary.String(), nil // Fallback to summary only
+		}
+
 		t.logger.Info("Directory tree built successfully", zap.String("path", fullPath))
-		return results, nil
+		return string(jsonResult), nil
 
 	case "move":
 		if args.Destination == "" {
@@ -285,6 +353,54 @@ func (t *DirectoryTool) buildDirectoryTree(path string, depthLimit int, currentD
 		result = append(result, treeEntry)
 	}
 	return result, nil
+}
+
+func (t *DirectoryTool) countTreeItems(tree []TreeEntry) (dirs, files int) {
+	for _, entry := range tree {
+		if entry.Type == "directory" {
+			dirs++
+			childDirs, childFiles := t.countTreeItems(entry.Children)
+			dirs += childDirs
+			files += childFiles
+		} else {
+			files++
+		}
+	}
+	return dirs, files
+}
+
+func (t *DirectoryTool) treeToText(tree []TreeEntry, prefix string, currentLines, maxLines int) string {
+	var result strings.Builder
+	for i, entry := range tree {
+		if currentLines >= maxLines {
+			result.WriteString(fmt.Sprintf("%s... and more items\n", prefix))
+			return result.String()
+		}
+
+		isLast := i == len(tree)-1
+		connector := "├── "
+		childPrefix := prefix + "│   "
+		if isLast {
+			connector = "└── "
+			childPrefix = prefix + "    "
+		}
+
+		icon := "📄"
+		if entry.Type == "directory" {
+			icon = "📁"
+		}
+
+		result.WriteString(fmt.Sprintf("%s%s %s %s\n", prefix, connector, icon, entry.Name))
+		currentLines++
+
+		if entry.Type == "directory" && len(entry.Children) > 0 {
+			childText := t.treeToText(entry.Children, childPrefix, currentLines, maxLines)
+			result.WriteString(childText)
+			// Count lines in child text (rough estimate)
+			currentLines += strings.Count(childText, "\n")
+		}
+	}
+	return result.String()
 }
 
 var _ entities.Tool = (*DirectoryTool)(nil)
