@@ -50,11 +50,15 @@ func (t *FileSearchTool) FullDescription() string {
 	b.WriteString(t.Description())
 	b.WriteString("\n\n")
 	b.WriteString("## Usage Instructions\n")
-	b.WriteString("This tool searches for text in files or directories. Returns a JSON array with line numbers and matching lines. Use `all_files=true` to search all files in a directory recursively. Limited to 1000 lines or 10MB per file.\n")
-	b.WriteString("  - Example: Search single file: `path='file.txt', pattern='text'`\n")
-	b.WriteString("  - Example: Search all files: `path='.', pattern='text', all_files=true`\n")
-	b.WriteString("  - Example: Search Go files: `path='.', pattern='func', all_files=true, file_pattern='*.go'`\n")
-	b.WriteString("  - Example: Case-sensitive: `path='file.txt', pattern='Text', case_sensitive=true`\n")
+	b.WriteString("This tool searches for text in files or directories. Returns a JSON array with line numbers and matching lines. Limited to 1000 lines or 10MB per file.\n")
+	b.WriteString("\n## Simplified Usage\n")
+	b.WriteString("- **Directory search**: When searching directories (like '.'), `all_files` is automatically enabled\n")
+	b.WriteString("- **File search**: For single files, just specify the file path\n")
+	b.WriteString("\n## Examples\n")
+	b.WriteString("  - Search current directory: `path='.', pattern='function'` (all_files automatically enabled)\n")
+	b.WriteString("  - Search single file: `path='file.txt', pattern='text'`\n")
+	b.WriteString("  - Search Go files only: `path='.', pattern='func', file_pattern='*.go'`\n")
+	b.WriteString("  - Case-sensitive search: `path='file.txt', pattern='Text', case_sensitive=true`\n")
 	b.WriteString("\n## Configuration\n")
 	b.WriteString("| Key           | Value         |\n")
 	b.WriteString("|---------------|---------------|\n")
@@ -81,7 +85,7 @@ func (t *FileSearchTool) Parameters() []entities.Parameter {
 		{
 			Name:        "all_files",
 			Type:        "boolean",
-			Description: "Search all files in directory recursively",
+			Description: "Search all files in directory recursively (automatically enabled for directories)",
 			Required:    false,
 		},
 		{
@@ -158,13 +162,15 @@ func (t *FileSearchTool) Execute(arguments string) (string, error) {
 		return "", err
 	}
 
-	// Check if path is a directory and all_files is not set
+	// Check if path is a directory and automatically set all_files=true if not specified
 	info, err := os.Stat(fullPath)
 	if err != nil {
 		return "", fmt.Errorf("path does not exist: %v", err)
 	}
 	if info.IsDir() && !args.AllFiles {
-		return "", fmt.Errorf("path '%s' is a directory, use all_files=true to search all files in the directory", args.Path)
+		// Automatically enable all_files for directories to simplify usage
+		args.AllFiles = true
+		t.logger.Debug("Automatically enabled all_files for directory search", zap.String("path", fullPath))
 	}
 
 	var summary strings.Builder
