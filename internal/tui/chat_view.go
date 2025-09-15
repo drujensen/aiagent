@@ -760,6 +760,8 @@ func (c *ChatView) updateEditorContent() {
 			vimtea.WithReadOnly(true),
 			vimtea.WithSelectedStyle(lipgloss.NewStyle().Background(lipgloss.Color("#586e75"))),
 		)
+		// Ensure editor is not focused initially
+		c.editor.SetFocus(false)
 		// Set editor size - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
 		if c.width > 0 && c.height > 0 {
 			editorWidth := c.width - 4
@@ -845,6 +847,8 @@ func (c *ChatView) updateEditorContent() {
 		vimtea.WithReadOnly(true),
 		vimtea.WithSelectedStyle(lipgloss.NewStyle().Background(lipgloss.Color("#586e75"))),
 	)
+	// Ensure editor maintains current focus state
+	c.editor.SetFocus(c.focused == "editor")
 
 	// Set editor size - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
 	if c.width > 0 && c.height > 0 {
@@ -869,8 +873,9 @@ func (c ChatView) Init() tea.Cmd {
 		vimtea.WithSelectedStyle(lipgloss.NewStyle().Background(lipgloss.Color("#586e75"))),
 	)
 
-	// Ensure editor starts in normal mode
+	// Ensure editor starts in normal mode and is not focused
 	c.editor.SetMode(vimtea.ModeNormal)
+	c.editor.SetFocus(false)
 	return tea.Batch(textarea.Blink, c.listenForEvents())
 }
 
@@ -955,10 +960,15 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				// Focus the editor
 				if c.editor != nil {
 					c.editor.SetMode(vimtea.ModeNormal)
+					c.editor.SetFocus(true)
 				}
 			} else {
 				c.focused = "textarea"
 				c.textarea.Focus()
+				// Unfocus the editor
+				if c.editor != nil {
+					c.editor.SetFocus(false)
+				}
 				cmd := textarea.Blink
 				cmds = append(cmds, cmd)
 			}
