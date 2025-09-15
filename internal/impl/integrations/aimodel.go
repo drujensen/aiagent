@@ -262,6 +262,9 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			zap.Int("iteration", iterationCount))
 
 		// Handle different finish_reason values
+		shouldBreak := false
+		var finalContent string
+
 		switch finishReason {
 		case "tool_calls":
 			m.logger.Info("AI requested tool calls - continuing processing",
@@ -269,14 +272,8 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		case "stop":
 			if len(toolCalls) == 0 {
 				m.logger.Info("AI finished with stop - ending processing")
-				finalMessage := &entities.Message{
-					ID:        uuid.New().String(),
-					Role:      "assistant",
-					Content:   content,
-					Timestamp: time.Now(),
-				}
-				newMessages = append(newMessages, finalMessage)
-				break
+				finalContent = content
+				shouldBreak = true
 			} else {
 				m.logger.Info("AI finished with stop but has tool calls - continuing processing",
 					zap.Int("toolCallsCount", len(toolCalls)))
@@ -284,14 +281,8 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		case "length":
 			if len(toolCalls) == 0 {
 				m.logger.Warn("AI finished due to length limit - ending processing")
-				finalMessage := &entities.Message{
-					ID:        uuid.New().String(),
-					Role:      "assistant",
-					Content:   content + "\n\n[Response truncated due to length limit]",
-					Timestamp: time.Now(),
-				}
-				newMessages = append(newMessages, finalMessage)
-				break
+				finalContent = content + "\n\n[Response truncated due to length limit]"
+				shouldBreak = true
 			} else {
 				m.logger.Warn("AI finished due to length limit but has tool calls - continuing processing",
 					zap.Int("toolCallsCount", len(toolCalls)))
@@ -299,14 +290,8 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		case "content_filter":
 			if len(toolCalls) == 0 {
 				m.logger.Warn("AI finished due to content filter - ending processing")
-				finalMessage := &entities.Message{
-					ID:        uuid.New().String(),
-					Role:      "assistant",
-					Content:   content + "\n\n[Response filtered by content policy]",
-					Timestamp: time.Now(),
-				}
-				newMessages = append(newMessages, finalMessage)
-				break
+				finalContent = content + "\n\n[Response filtered by content policy]"
+				shouldBreak = true
 			} else {
 				m.logger.Warn("AI finished due to content filter but has tool calls - continuing processing",
 					zap.Int("toolCallsCount", len(toolCalls)))
@@ -315,15 +300,26 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			m.logger.Warn("Unknown finish_reason - treating as completion",
 				zap.String("finishReason", finishReason))
 			if len(toolCalls) == 0 {
-				finalMessage := &entities.Message{
-					ID:        uuid.New().String(),
-					Role:      "assistant",
-					Content:   content,
-					Timestamp: time.Now(),
-				}
-				newMessages = append(newMessages, finalMessage)
-				break
+				finalContent = content
+				shouldBreak = true
 			}
+		}
+
+		if shouldBreak {
+			finalMessage := &entities.Message{
+				ID:        uuid.New().String(),
+				Role:      "assistant",
+				Content:   finalContent,
+				Timestamp: time.Now(),
+			}
+			newMessages = append(newMessages, finalMessage)
+			break
+		}
+
+		// If we didn't break above, there are tool calls to process
+		if len(toolCalls) == 0 {
+			// This shouldn't happen, but break to be safe
+			break
 		}
 
 		contentMsg := "Executing tool call."
@@ -515,6 +511,8 @@ func (m *AIModelIntegration) extractToolContent(toolName, result, toolError stri
 		fullContent = m.formatProcessForAI(jsonData)
 	case "FileRead":
 		fullContent = m.formatFileReadForAI(jsonData)
+	case "FileWrite":
+		fullContent = m.formatFileWriteForAI(jsonData)
 	case "Project":
 		fullContent = m.formatProjectForAI(jsonData)
 	case "Task":
@@ -525,6 +523,26 @@ func (m *AIModelIntegration) extractToolContent(toolName, result, toolError stri
 	}
 
 	return
+}
+
+func (m *AIModelIntegration) formatFileWriteForAI(data map[string]interface{}) string {
+	var result strings.Builder
+	result.WriteString("File write/edit operation completed:\n")
+
+	if path, ok := data["path"].(string); ok {
+		result.WriteString(fmt.Sprintf("File: %s\n", path))
+	}
+	if occurrences, ok := data["occurrences"].(float64); ok {
+		result.WriteString(fmt.Sprintf("Occurrences replaced: %d\n", int(occurrences)))
+	}
+	if replacedAll, ok := data["replaced_all"].(bool); ok && replacedAll {
+		result.WriteString("Replaced all occurrences: true\n")
+	}
+	if diff, ok := data["diff"].(string); ok && diff != "" {
+		result.WriteString(fmt.Sprintf("Changes made:\n%s\n", diff))
+	}
+
+	return result.String()
 }
 
 func (m *AIModelIntegration) formatDirectoryForAI(data map[string]interface{}) string {

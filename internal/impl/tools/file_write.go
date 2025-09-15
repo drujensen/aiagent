@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
 
@@ -109,6 +110,12 @@ func (t *FileWriteTool) Parameters() []entities.Parameter {
 }
 
 func (t *FileWriteTool) validatePath(path string) (string, error) {
+	// Ensure path is valid UTF-8
+	if !utf8.ValidString(path) {
+		t.logger.Error("Path contains invalid UTF-8", zap.String("path", path))
+		return "", fmt.Errorf("path contains invalid UTF-8")
+	}
+
 	workspace := t.configuration["workspace"]
 	if workspace == "" {
 		var err error
@@ -190,7 +197,23 @@ func (t *FileWriteTool) applyPreciseEdit(filePath, oldString, newString string, 
 		return "", fmt.Errorf("failed to read file: %v", err)
 	}
 
-	fileContent := string(content)
+	// Declare variables at function scope
+	var fileContent string
+	var newContent string
+	var occurrences int
+	var diffStr string
+
+	// Ensure content is valid UTF-8
+	if !utf8.Valid(content) {
+		t.logger.Warn("File contains invalid UTF-8, treating as binary", zap.String("path", filePath))
+		// For binary files, don't generate diff
+		fileContent = fmt.Sprintf("Binary file: %s", filepath.Base(filePath))
+		newContent = fileContent
+		occurrences = 1 // Pretend we made a change
+		diffStr = fmt.Sprintf("Binary file modified: %s", filepath.Base(filePath))
+	} else {
+		fileContent = string(content)
+	}
 
 	// Check if old_string exists
 	if !strings.Contains(fileContent, oldString) {
@@ -199,10 +222,9 @@ func (t *FileWriteTool) applyPreciseEdit(filePath, oldString, newString string, 
 	}
 
 	// Count occurrences
-	occurrences := strings.Count(fileContent, oldString)
+	occurrences = strings.Count(fileContent, oldString)
 
 	// Perform replacement
-	var newContent string
 	if replaceAll {
 		newContent = strings.ReplaceAll(fileContent, oldString, newString)
 	} else {
@@ -210,17 +232,39 @@ func (t *FileWriteTool) applyPreciseEdit(filePath, oldString, newString string, 
 	}
 
 	// Generate diff
+	// Sanitize file path for diff header
+	sanitizedPath := filepath.Base(filePath)
+	if !utf8.ValidString(sanitizedPath) {
+		sanitizedPath = "file"
+	}
 	diff := difflib.UnifiedDiff{
 		A:        difflib.SplitLines(fileContent),
 		B:        difflib.SplitLines(newContent),
-		FromFile: filePath,
-		ToFile:   filePath,
+		FromFile: sanitizedPath,
+		ToFile:   sanitizedPath,
 		Context:  3,
 	}
-	diffStr, err := difflib.GetUnifiedDiffString(diff)
+	diffStr, err = difflib.GetUnifiedDiffString(diff)
 	if err != nil {
 		t.logger.Error("Failed to generate diff", zap.Error(err))
 		return "", fmt.Errorf("failed to generate diff: %v", err)
+	}
+
+	// Ensure diffStr is valid UTF-8
+	if !utf8.ValidString(diffStr) {
+		t.logger.Warn("Generated diff contains invalid UTF-8, using placeholder", zap.String("path", filePath))
+		diffStr = fmt.Sprintf("File modified: %s", filepath.Base(filePath))
+	}
+
+	// Truncate diffStr if extremely large (to prevent memory issues)
+	if len(diffStr) > 200000 {
+		t.logger.Warn("Generated diff is extremely large, truncating", zap.String("path", filePath), zap.Int("size", len(diffStr)))
+		lines := strings.Split(diffStr, "\n")
+		truncatedLines := lines
+		if len(lines) > 500 {
+			truncatedLines = lines[:500]
+		}
+		diffStr = strings.Join(truncatedLines, "\n") + "\n... (diff truncated)"
 	}
 
 	// Write the file
@@ -243,7 +287,7 @@ func (t *FileWriteTool) applyPreciseEdit(filePath, oldString, newString string, 
 		zap.Int("occurrences", occurrences),
 		zap.Bool("replace_all", replaceAll))
 
-	// Create TUI-friendly summary
+	// Create TUI-friendly summary with diff preview
 	var summary strings.Builder
 	summary.WriteString(fmt.Sprintf("✏️  File Edit: %s\n", filepath.Base(filePath)))
 
@@ -254,30 +298,59 @@ func (t *FileWriteTool) applyPreciseEdit(filePath, oldString, newString string, 
 		if replaceAll {
 			action = "replaced all"
 		}
-		summary.WriteString(fmt.Sprintf("✅ %s %d occurrence(s)", action, occurrences))
+		summary.WriteString(fmt.Sprintf("✅ %s %d occurrence(s)\n\n", action, occurrences))
+
+		// Add a preview of the diff for TUI
+		lines := strings.Split(diffStr, "\n")
+		previewLines := 0
+
+		for _, line := range lines {
+			if line != "" {
+				// Add color indicators for TUI
+				if strings.HasPrefix(line, "+") {
+					summary.WriteString("🟢 " + line + "\n")
+				} else if strings.HasPrefix(line, "-") {
+					summary.WriteString("🔴 " + line + "\n")
+				} else if strings.HasPrefix(line, "@@") {
+					summary.WriteString("🔵 " + line + "\n")
+				} else if strings.HasPrefix(line, " ") {
+					summary.WriteString("   " + line + "\n")
+				} else {
+					summary.WriteString(line + "\n")
+				}
+				previewLines++
+			}
+		}
 	}
 
 	// Create JSON response with summary for TUI and full data for AI
-	response := struct {
-		Summary     string `json:"summary"`
-		Success     bool   `json:"success"`
-		Path        string `json:"path"`
-		Occurrences int    `json:"occurrences"`
-		ReplacedAll bool   `json:"replaced_all"`
-		Diff        string `json:"diff"`
-	}{
-		Summary:     summary.String(),
-		Success:     true,
-		Path:        filePath,
-		Occurrences: occurrences,
-		ReplacedAll: replaceAll,
-		Diff:        "```diff\n" + diffStr + "\n```",
+	response := map[string]interface{}{
+		"summary":      summary.String(),
+		"success":      true,
+		"path":         filePath,
+		"occurrences":  occurrences,
+		"replaced_all": replaceAll,
+		"diff":         diffStr,
 	}
 
 	jsonResult, err := json.Marshal(response)
 	if err != nil {
 		t.logger.Error("Failed to marshal file write response", zap.Error(err))
-		return summary.String(), nil // Fallback to summary only
+		// Try to marshal without the diff
+		fallbackResponse := map[string]interface{}{
+			"summary":      summary.String(),
+			"success":      true,
+			"path":         filePath,
+			"occurrences":  occurrences,
+			"replaced_all": replaceAll,
+			"diff":         "Diff too large or invalid",
+		}
+		fallbackJson, err2 := json.Marshal(fallbackResponse)
+		if err2 != nil {
+			t.logger.Error("Failed to marshal fallback response", zap.Error(err2))
+			return summary.String(), nil // Fallback to summary only
+		}
+		return string(fallbackJson), nil
 	}
 
 	return string(jsonResult), nil

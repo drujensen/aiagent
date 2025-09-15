@@ -51,22 +51,31 @@ func getToolStatusIcon(hasError bool) string {
 // formatFileWriteResult formats FileWrite tool results
 func formatFileWriteResult(result string, diff string) string {
 	var resultData struct {
-		Diff      string `json:"diff"`
-		LineCount int    `json:"line_count"`
+		Summary     string `json:"summary"`
+		Success     bool   `json:"success"`
+		Path        string `json:"path"`
+		Occurrences int    `json:"occurrences"`
+		ReplacedAll bool   `json:"replaced_all"`
+		Diff        string `json:"diff"`
 	}
 
 	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
+		// If parsing fails, try to extract summary from JSON
+		var jsonResponse struct {
+			Summary string `json:"summary"`
+		}
+		if err2 := json.Unmarshal([]byte(result), &jsonResponse); err2 == nil && jsonResponse.Summary != "" {
+			return jsonResponse.Summary
+		}
 		return result // Return raw if parsing fails
 	}
 
 	var output strings.Builder
 
-	if resultData.LineCount > 0 {
-		output.WriteString(fmt.Sprintf("File updated (%d lines)", resultData.LineCount))
-	} else {
-		output.WriteString("No changes made to file")
-	}
+	// Use the summary from the JSON response
+	output.WriteString(resultData.Summary)
 
+	// Add the diff if available
 	if diff != "" {
 		output.WriteString("\n\n" + formatDiff(diff))
 	} else if resultData.Diff != "" {
@@ -223,23 +232,27 @@ func formatTaskResult(result string) string {
 
 // formatDiff formats diff content with colors and proper formatting
 func formatDiff(diff string) string {
-	if !strings.Contains(diff, "```diff") {
-		return diff
-	}
+	var diffContent string
 
-	// Extract diff content from markdown code block
-	start := strings.Index(diff, "```diff\n")
-	if start == -1 {
-		return diff
-	}
-	start += 8 // Length of "```diff\n"
+	if strings.Contains(diff, "```diff") {
+		// Extract diff content from markdown code block
+		start := strings.Index(diff, "```diff\n")
+		if start == -1 {
+			return diff
+		}
+		start += 8 // Length of "```diff\n"
 
-	end := strings.Index(diff[start:], "\n```")
-	if end == -1 {
-		return diff[start:]
+		end := strings.Index(diff[start:], "\n```")
+		if end == -1 {
+			diffContent = diff[start:]
+		} else {
+			// Extract the actual diff content (without the closing ```)
+			diffContent = diff[start : start+end]
+		}
+	} else {
+		// Raw diff content
+		diffContent = diff
 	}
-
-	diffContent := diff[start : start+end]
 
 	var output strings.Builder
 	output.WriteString("Changes:\n")
@@ -848,7 +861,7 @@ func (c ChatView) View() string {
 	}
 	sb.WriteString(taStyle.Render(c.textarea.View()))
 
-	instructions := "Ctrl+P: menu | Tab: focus | Vim nav | Ctrl+C: exit"
+	instructions := "Ctrl+P: menu | Tab: focus | Ctrl+C: exit"
 	if c.isProcessing {
 		elapsed := time.Since(c.startTime).Round(time.Second)
 		instructions = c.spinner.View() + fmt.Sprintf(" Working... (%ds) esc to interrupt", int(elapsed.Seconds()))

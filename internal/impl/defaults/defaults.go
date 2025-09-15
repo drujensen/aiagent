@@ -216,7 +216,7 @@ You are an AI assistant specialized in software engineering tasks. Your role is 
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"WebSearch", "Project", "FileRead", "FileSearch", "Directory", "Process"},
+			Tools:           []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},

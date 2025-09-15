@@ -144,6 +144,76 @@ func TestTaskTool_SimplifiedInterface(t *testing.T) {
 	}
 }
 
+func TestTaskTool_CreateBuyMilkTask(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir, err := os.MkdirTemp("", "tasktool_buymilk_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create logger
+	logger := zap.NewNop()
+
+	// Create TaskTool
+	config := map[string]string{"data_dir": tempDir}
+	tool := NewTaskTool("test-task", "Test Task Tool", config, logger)
+
+	// Create a new task "Buy Milk"
+	result, err := tool.Execute(`{"operation": "write", "content": "Buy Milk"}`)
+	if err != nil {
+		t.Fatalf("Failed to create task: %v", err)
+	}
+
+	// Parse JSON response
+	var response struct {
+		Summary   string `json:"summary"`
+		FullTasks []struct {
+			ID      string `json:"id"`
+			Content string `json:"content"`
+			Status  string `json:"status"`
+		} `json:"full_tasks"`
+	}
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("Failed to parse JSON response: %v", err)
+	}
+
+	// Verify the task was created correctly
+	if response.Summary != "✅ Task created: Buy Milk" {
+		t.Errorf("Expected summary '✅ Task created: Buy Milk', got '%s'", response.Summary)
+	}
+	if len(response.FullTasks) != 1 {
+		t.Errorf("Expected 1 task, got %d", len(response.FullTasks))
+	}
+	if response.FullTasks[0].Content != "Buy Milk" {
+		t.Errorf("Expected content 'Buy Milk', got '%s'", response.FullTasks[0].Content)
+	}
+	if response.FullTasks[0].Status != "not done" {
+		t.Errorf("Expected status 'not done', got '%s'", response.FullTasks[0].Status)
+	}
+
+	// Read tasks to verify it's listed
+	result, err = tool.Execute(`{"operation": "read"}`)
+	if err != nil {
+		t.Fatalf("Failed to read tasks: %v", err)
+	}
+
+	var readResponse struct {
+		Summary   string `json:"summary"`
+		FullTasks []struct {
+			Content string `json:"content"`
+			Status  string `json:"status"`
+		} `json:"full_tasks"`
+	}
+	if err := json.Unmarshal([]byte(result), &readResponse); err != nil {
+		t.Fatalf("Failed to parse read JSON response: %v", err)
+	}
+
+	if !contains(readResponse.Summary, "Buy Milk") {
+		t.Errorf("Expected read summary to contain 'Buy Milk', got: %s", readResponse.Summary)
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || containsAt(s, substr)))
 }
