@@ -420,7 +420,7 @@ func DefaultTools() []*entities.ToolData {
 			ID:            "FCFDB2BD-829E-4CE6-9CE5-EE9158591EFA",
 			ToolType:      "Task",
 			Name:          "Task",
-			Description:   "This tool provides task management functionality, allowing creation, listing, updating, and deletion of tasks with priorities and statuses.",
+			Description:   "Ultra-simple task management: use 'write' to create/update tasks (requires 'content' for new tasks), use 'read' to list all tasks.",
 			Configuration: map[string]string{"data_dir": "."},
 			CreatedAt:     now,
 			UpdatedAt:     now,

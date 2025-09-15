@@ -100,21 +100,34 @@ func (t *TaskTool) FullDescription() string {
 	b.WriteString("\n\n")
 	b.WriteString("## Ultra-Simple Task Management\n")
 	b.WriteString("Brain-dead easy task tracking for Build and Plan agents.\n\n")
-	b.WriteString("## Operations\n")
-	b.WriteString("- **write**: Create new tasks or mark existing ones as done\n")
+	b.WriteString("## Required Parameters\n")
+	b.WriteString("- **operation**: Must be 'write' or 'read'\n")
+	b.WriteString("- **content**: Required when creating new tasks (operation='write' without id)\n")
+	b.WriteString("- **id**: Optional, used to update existing tasks\n")
+	b.WriteString("- **done**: Optional boolean to mark tasks complete/incomplete\n")
+	b.WriteString("\n## Operations\n")
+	b.WriteString("- **write**: Create new tasks or update existing ones\n")
 	b.WriteString("- **read**: List all current tasks\n")
 	b.WriteString("\n## Usage Pattern\n")
-	b.WriteString("1. **Plan Agent**: Use 'write' to create tasks\n")
-	b.WriteString("2. **Build Agent**: Use 'read' to see tasks, then 'write' with done=true to complete them\n")
+	b.WriteString("1. **Plan Agent**: Use 'write' with 'content' to create tasks\n")
+	b.WriteString("2. **Build Agent**: Use 'read' to see tasks, then 'write' with 'id' and 'done' to complete them\n")
 	b.WriteString("\n## Display Format\n")
 	b.WriteString("- **☐ Task description**: Task not done\n")
 	b.WriteString("- **☑ Task description**: Task completed\n")
 	b.WriteString("\n## Examples\n")
-	b.WriteString("**Create task**: `{\"operation\": \"write\", \"content\": \"Implement user authentication\"}`\n")
-	b.WriteString("**Mark as done**: `{\"operation\": \"write\", \"id\": \"task-123\", \"done\": true}`\n")
-	b.WriteString("**Mark as not done**: `{\"operation\": \"write\", \"id\": \"task-123\", \"done\": false}`\n")
-	b.WriteString("**Update content**: `{\"operation\": \"write\", \"id\": \"task-123\", \"content\": \"New description\"}`\n")
-	b.WriteString("**List tasks**: `{\"operation\": \"read\"}`\n")
+	b.WriteString("**Create new task**: `{\"operation\": \"write\", \"content\": \"Implement user authentication\"}`\n")
+	b.WriteString("**Mark task as done**: `{\"operation\": \"write\", \"id\": \"task-123\", \"done\": true}`\n")
+	b.WriteString("**Mark task as not done**: `{\"operation\": \"write\", \"id\": \"task-123\", \"done\": false}`\n")
+	b.WriteString("**Update task content**: `{\"operation\": \"write\", \"id\": \"task-123\", \"content\": \"New description\"}`\n")
+	b.WriteString("**List all tasks**: `{\"operation\": \"read\"}`\n")
+	b.WriteString("\n## Quick Reference\n")
+	b.WriteString("- To create: `write` + `content`\n")
+	b.WriteString("- To update: `write` + `id` + optional `content` or `done`\n")
+	b.WriteString("- To list: `read` (no other parameters needed)\n")
+	b.WriteString("\n## Important Notes\n")
+	b.WriteString("- Always include 'content' when creating new tasks\n")
+	b.WriteString("- Use 'id' to update existing tasks\n")
+	b.WriteString("- 'done' is optional and defaults to false for new tasks\n")
 	b.WriteString("\n## Configuration\n")
 	b.WriteString("| Key           | Value         |\n")
 	b.WriteString("|---------------|---------------|\n")
@@ -136,7 +149,7 @@ func (t *TaskTool) Parameters() []entities.Parameter {
 		{
 			Name:        "content",
 			Type:        "string",
-			Description: "Task description (required for new tasks)",
+			Description: "Task description - REQUIRED when creating new tasks (operation='write' without id). Example: 'Implement user authentication'",
 			Required:    false,
 		},
 		{
@@ -170,7 +183,7 @@ func (t *TaskTool) Execute(arguments string) (string, error) {
 	}
 
 	if args.Operation == "" {
-		return "", fmt.Errorf("operation is required")
+		return "", fmt.Errorf("operation is required - must be 'write' or 'read'")
 	}
 
 	switch args.Operation {
@@ -179,7 +192,7 @@ func (t *TaskTool) Execute(arguments string) (string, error) {
 	case "read":
 		return t.readTasks()
 	default:
-		return "", fmt.Errorf("unknown operation: %s (use 'write' or 'read')", args.Operation)
+		return "", fmt.Errorf("unknown operation: %s - valid operations are 'write' and 'read'", args.Operation)
 	}
 }
 
@@ -197,7 +210,28 @@ func (t *TaskTool) writeTask(content string, done *bool, id string) (string, err
 	if id == "" {
 		// Create new task
 		if content == "" {
-			return "", fmt.Errorf("content is required for new tasks")
+			// Provide helpful guidance in JSON format
+			response := struct {
+				Summary   string     `json:"summary"`
+				FullTasks []struct{} `json:"full_tasks"`
+				Error     string     `json:"error"`
+				Examples  []string   `json:"examples"`
+			}{
+				Summary:   "❌ Missing content for new task",
+				FullTasks: []struct{}{},
+				Error:     "content parameter is required when creating new tasks",
+				Examples: []string{
+					`{"operation": "write", "content": "Implement user authentication"}`,
+					`{"operation": "write", "id": "task-123", "done": true}`,
+					`{"operation": "read"}`,
+				},
+			}
+
+			jsonResult, err := json.Marshal(response)
+			if err != nil {
+				return "", fmt.Errorf("failed to marshal guidance response: %v", err)
+			}
+			return string(jsonResult), nil
 		}
 
 		task := &entities.Task{
@@ -221,7 +255,38 @@ func (t *TaskTool) writeTask(content string, done *bool, id string) (string, err
 			doneStr = "done"
 		}
 		t.logger.Info("Task created", zap.String("id", task.ID), zap.String("content", content), zap.String("status", doneStr))
-		return fmt.Sprintf("✅ Task created: %s", content), nil
+
+		// Return JSON response
+		response := struct {
+			Summary   string `json:"summary"`
+			FullTasks []struct {
+				ID        string `json:"id"`
+				Content   string `json:"content"`
+				Status    string `json:"status"`
+				CreatedAt string `json:"created_at"`
+			} `json:"full_tasks"`
+		}{
+			Summary: fmt.Sprintf("✅ Task created: %s", content),
+			FullTasks: []struct {
+				ID        string `json:"id"`
+				Content   string `json:"content"`
+				Status    string `json:"status"`
+				CreatedAt string `json:"created_at"`
+			}{
+				{
+					ID:        task.ID,
+					Content:   task.Content,
+					Status:    doneStr,
+					CreatedAt: task.CreatedAt.Format("2006-01-02 15:04:05"),
+				},
+			},
+		}
+
+		jsonResult, err := json.Marshal(response)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal task creation response: %v", err)
+		}
+		return string(jsonResult), nil
 
 	} else {
 		// Update existing task
@@ -243,7 +308,38 @@ func (t *TaskTool) writeTask(content string, done *bool, id string) (string, err
 					doneStr = "done"
 				}
 				t.logger.Info("Task updated", zap.String("id", id), zap.String("status", doneStr))
-				return fmt.Sprintf("✅ Task updated: %s", task.Content), nil
+
+				// Return JSON response
+				response := struct {
+					Summary   string `json:"summary"`
+					FullTasks []struct {
+						ID        string `json:"id"`
+						Content   string `json:"content"`
+						Status    string `json:"status"`
+						UpdatedAt string `json:"updated_at"`
+					} `json:"full_tasks"`
+				}{
+					Summary: fmt.Sprintf("✅ Task updated: %s", task.Content),
+					FullTasks: []struct {
+						ID        string `json:"id"`
+						Content   string `json:"content"`
+						Status    string `json:"status"`
+						UpdatedAt string `json:"updated_at"`
+					}{
+						{
+							ID:        task.ID,
+							Content:   task.Content,
+							Status:    doneStr,
+							UpdatedAt: task.UpdatedAt.Format("2006-01-02 15:04:05"),
+						},
+					},
+				}
+
+				jsonResult, err := json.Marshal(response)
+				if err != nil {
+					return "", fmt.Errorf("failed to marshal task update response: %v", err)
+				}
+				return string(jsonResult), nil
 			}
 		}
 		return "", fmt.Errorf("task not found: %s", id)
@@ -252,7 +348,21 @@ func (t *TaskTool) writeTask(content string, done *bool, id string) (string, err
 
 func (t *TaskTool) readTasks() (string, error) {
 	if len(t.tasks) == 0 {
-		return "📝 No tasks found. Use 'write' operation to create tasks.", nil
+		response := struct {
+			Summary   string     `json:"summary"`
+			FullTasks []struct{} `json:"full_tasks"`
+			Message   string     `json:"message"`
+		}{
+			Summary:   "📝 No tasks found",
+			FullTasks: []struct{}{},
+			Message:   "Use 'write' operation to create tasks",
+		}
+
+		jsonResult, err := json.Marshal(response)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal empty tasks response: %v", err)
+		}
+		return string(jsonResult), nil
 	}
 
 	// Sort tasks by creation time (newest first)

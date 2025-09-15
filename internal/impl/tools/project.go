@@ -53,10 +53,11 @@ func (t *ProjectTool) FullDescription() string {
 	b.WriteString("## Usage Instructions\n")
 	b.WriteString("This tool provides project details and source code in JSON format.\n")
 	b.WriteString("- 'read': Reads the project markdown file.\n")
-	b.WriteString("- 'get_source': Provides file map (directory tree) and full file contents for relevant files based on language or custom filters.\n")
-	b.WriteString("  - Use 'language' to set default file patterns (e.g., 'go' for **/*.go and go.mod).\n")
-	b.WriteString("  - Override with 'filters' array for custom patterns.\n")
-	b.WriteString("  - Use 'max_file_size' to limit individual file parsing (in bytes; if exceeded, content is replaced with a message).\n")
+	b.WriteString("- 'get_source': Provides file map (directory tree) and full file contents for relevant files.\n")
+	b.WriteString("  - Language is auto-detected from project files (go.mod, package.json, etc.) if not specified.\n")
+	b.WriteString("  - Use 'language' to override auto-detection (e.g., 'go', 'python', 'javascript').\n")
+	b.WriteString("  - Override with 'filters' array for custom file patterns.\n")
+	b.WriteString("  - Use 'max_file_size' to limit individual file parsing (in bytes).\n")
 	b.WriteString("\n## Supported Languages and Default Filters\n")
 	b.WriteString("- c: **/*.c, **/*.h, Makefile\n")
 	b.WriteString("- cpp: **/*.cpp, **/*.hpp, **/*.h, CMakeLists.txt\n")
@@ -253,6 +254,45 @@ Please update this file with relevant project information.
 	return string(jsonResult), nil
 }
 
+func (t *ProjectTool) detectLanguage(workspace string) string {
+	// Check for language-specific files to auto-detect the project type
+	languageFiles := map[string][]string{
+		"go":         {"go.mod"},
+		"python":     {"requirements.txt", "setup.py", "pyproject.toml"},
+		"javascript": {"package.json"},
+		"typescript": {"package.json", "tsconfig.json"},
+		"rust":       {"Cargo.toml"},
+		"ruby":       {"Gemfile"},
+		"php":        {"composer.json"},
+		"csharp":     {"*.sln", "*.csproj"},
+		"java":       {"pom.xml", "build.gradle"},
+		"kotlin":     {"build.gradle.kts"},
+		"swift":      {"Package.swift"},
+		"c":          {"Makefile"},
+		"cpp":        {"CMakeLists.txt", "Makefile"},
+	}
+
+	for lang, files := range languageFiles {
+		for _, file := range files {
+			// Check for exact file matches
+			if file[0] != '*' {
+				fullPath := filepath.Join(workspace, file)
+				if _, err := os.Stat(fullPath); err == nil {
+					return lang
+				}
+			} else {
+				// Check for pattern matches
+				matches, err := filepath.Glob(filepath.Join(workspace, file))
+				if err == nil && len(matches) > 0 {
+					return lang
+				}
+			}
+		}
+	}
+
+	return "" // No language detected
+}
+
 func (t *ProjectTool) executeGetSource(workspace, language string, customFilters []string, maxFileSize, maxTotalSize int) (string, error) {
 	defaultFilters := map[string][]string{
 		"all":        {"**/*"},
@@ -293,7 +333,20 @@ func (t *ProjectTool) executeGetSource(workspace, language string, customFilters
 				return "", fmt.Errorf("unsupported language: %s", language)
 			}
 		} else {
-			filters = defaultFilters["all"]
+			// Auto-detect language or use source-focused default
+			detectedLanguage := t.detectLanguage(workspace)
+			if detectedLanguage != "" {
+				t.logger.Info("Auto-detected language", zap.String("language", detectedLanguage))
+				filters = defaultFilters[detectedLanguage]
+			} else {
+				// Use source-focused default instead of "all"
+				filters = []string{
+					"**/*.go", "**/*.py", "**/*.js", "**/*.ts", "**/*.java", "**/*.cpp", "**/*.c", "**/*.h",
+					"**/*.rs", "**/*.rb", "**/*.php", "**/*.cs", "**/*.swift", "**/*.kt", "**/*.scala",
+					"go.mod", "go.sum", "package.json", "Cargo.toml", "Gemfile", "composer.json",
+					"requirements.txt", "setup.py", "Makefile", "CMakeLists.txt", "*.sln", "**/*.csproj",
+				}
+			}
 		}
 	}
 
@@ -303,7 +356,7 @@ func (t *ProjectTool) executeGetSource(workspace, language string, customFilters
 		return "", err
 	}
 
-	// Collect matching files (ignores .git)
+	// Collect matching files (ignores .git and common non-source directories)
 	var files []struct {
 		Path    string
 		Content string
@@ -313,8 +366,12 @@ func (t *ProjectTool) executeGetSource(workspace, language string, customFilters
 			return err
 		}
 		if info.IsDir() {
-			// Skip .git and .aiagent directories
-			if info.Name() == ".git" || info.Name() == ".aiagent" {
+			// Skip .git, .aiagent, and common non-source directories
+			if info.Name() == ".git" || info.Name() == ".aiagent" ||
+				info.Name() == "node_modules" || info.Name() == "bin" ||
+				info.Name() == "dist" || info.Name() == "build" ||
+				info.Name() == "target" || info.Name() == ".next" ||
+				info.Name() == ".nuxt" || info.Name() == ".vuepress" {
 				return filepath.SkipDir
 			}
 			return nil
