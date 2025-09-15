@@ -157,9 +157,14 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 	reqBody["messages"] = apiMessages
 
 	var newMessages []*entities.Message
+	iterationCount := 0
 
 	for {
+		iterationCount++
+		m.logger.Info("Starting AI processing iteration", zap.Int("iteration", iterationCount))
+
 		if ctx.Err() == context.Canceled {
+			m.logger.Info("Processing canceled by user", zap.Int("iteration", iterationCount))
 			return nil, fmt.Errorf("operation canceled by user")
 		}
 
@@ -250,17 +255,75 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 
 		finishReason := responseBody.Choices[0].FinishReason
 
-		// Break if no tool calls OR if finish_reason indicates completion
-		// Continue processing if there are tool calls OR if finish_reason is "tool_calls"
-		if len(toolCalls) == 0 && (finishReason == "stop" || finishReason == "length" || finishReason == "content_filter") {
-			finalMessage := &entities.Message{
-				ID:        uuid.New().String(),
-				Role:      "assistant",
-				Content:   content,
-				Timestamp: time.Now(),
+		m.logger.Info("AI response analysis",
+			zap.String("finishReason", finishReason),
+			zap.Int("toolCallsCount", len(toolCalls)),
+			zap.Bool("hasContent", content != ""),
+			zap.Int("iteration", iterationCount))
+
+		// Handle different finish_reason values
+		switch finishReason {
+		case "tool_calls":
+			m.logger.Info("AI requested tool calls - continuing processing",
+				zap.Int("toolCallsCount", len(toolCalls)))
+		case "stop":
+			if len(toolCalls) == 0 {
+				m.logger.Info("AI finished with stop - ending processing")
+				finalMessage := &entities.Message{
+					ID:        uuid.New().String(),
+					Role:      "assistant",
+					Content:   content,
+					Timestamp: time.Now(),
+				}
+				newMessages = append(newMessages, finalMessage)
+				break
+			} else {
+				m.logger.Info("AI finished with stop but has tool calls - continuing processing",
+					zap.Int("toolCallsCount", len(toolCalls)))
 			}
-			newMessages = append(newMessages, finalMessage)
-			break
+		case "length":
+			if len(toolCalls) == 0 {
+				m.logger.Warn("AI finished due to length limit - ending processing")
+				finalMessage := &entities.Message{
+					ID:        uuid.New().String(),
+					Role:      "assistant",
+					Content:   content + "\n\n[Response truncated due to length limit]",
+					Timestamp: time.Now(),
+				}
+				newMessages = append(newMessages, finalMessage)
+				break
+			} else {
+				m.logger.Warn("AI finished due to length limit but has tool calls - continuing processing",
+					zap.Int("toolCallsCount", len(toolCalls)))
+			}
+		case "content_filter":
+			if len(toolCalls) == 0 {
+				m.logger.Warn("AI finished due to content filter - ending processing")
+				finalMessage := &entities.Message{
+					ID:        uuid.New().String(),
+					Role:      "assistant",
+					Content:   content + "\n\n[Response filtered by content policy]",
+					Timestamp: time.Now(),
+				}
+				newMessages = append(newMessages, finalMessage)
+				break
+			} else {
+				m.logger.Warn("AI finished due to content filter but has tool calls - continuing processing",
+					zap.Int("toolCallsCount", len(toolCalls)))
+			}
+		default:
+			m.logger.Warn("Unknown finish_reason - treating as completion",
+				zap.String("finishReason", finishReason))
+			if len(toolCalls) == 0 {
+				finalMessage := &entities.Message{
+					ID:        uuid.New().String(),
+					Role:      "assistant",
+					Content:   content,
+					Timestamp: time.Now(),
+				}
+				newMessages = append(newMessages, finalMessage)
+				break
+			}
 		}
 
 		contentMsg := "Executing tool call."
@@ -293,29 +356,34 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			}
 			toolName := toolCall.Function.Name
 
-			tool, err := m.toolRepo.GetToolByName(toolName)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get tool %s: %v", toolName, err)
-			}
-
 			var toolResult string
 			var toolError string
 			var diff string
-			if tool != nil {
+
+			tool, err := m.toolRepo.GetToolByName(toolName)
+			if err != nil {
+				m.logger.Warn("Tool not found, treating as execution error", zap.String("toolName", toolName), zap.Error(err))
+				toolResult = fmt.Sprintf("Tool %s not found: %v", toolName, err)
+				toolError = err.Error()
+			} else if tool != nil {
+				m.logger.Info("Executing tool", zap.String("toolName", toolName))
 				result, err := (*tool).Execute(toolCall.Function.Arguments)
 				if err != nil {
+					m.logger.Error("Tool execution failed",
+						zap.String("toolName", toolName),
+						zap.Error(err))
 					toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
 					toolError = err.Error()
 				} else {
+					m.logger.Info("Tool executed successfully",
+						zap.String("toolName", toolName),
+						zap.Int("resultLength", len(result)))
 					toolResult = result
 					// Extract diff if it's a file write operation
 					if toolName == "FileWrite" {
 						diff = m.extractDiffFromResult(result)
 					}
 				}
-			} else {
-				toolResult = fmt.Sprintf("Tool %s not found", toolName)
-				toolError = "Tool not found"
 			}
 			// Extract full data for AI and summary for TUI
 			fullContent, summaryContent := m.extractToolContent(toolName, toolResult, toolError)
@@ -352,6 +420,10 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		}
 
 		reqBody["messages"] = apiMessages
+
+		m.logger.Info("Completed iteration, preparing for next AI call",
+			zap.Int("iteration", iterationCount),
+			zap.Int("totalMessages", len(apiMessages)))
 	}
 
 	// Validate that all tool calls have responses before returning

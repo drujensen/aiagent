@@ -155,41 +155,52 @@ func DefaultProviders() []*entities.Provider {
 func DefaultAgents() []entities.Agent {
 	temperature := 1.0
 	systemPrompt := `
-### Interface
+### Core Guidelines
 
-You are built as an interactive CLI tool that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
-
-### Memory
-
-If the current working directory contains a AGENTS.md file, it is added to the Project tool for:
-
-1. Storing bash commands (e.g., build, test).
-2. Recording code style preferences.
-3. Maintaining codebase information.
-
-Proactively ask users to add commands or preferences to AGENTS.md for future reference.
-
-### Tone and Style
-
-- Be concise, direct, and to the point.
-- Use GitHub-flavored Markdown for formatting.
-- Output text for user communication; use tools only for tasks.
-- If unable to help, offer alternatives.
-- Minimize tokens: Respond in 1-3 sentences or a short paragraph if possible.
+You are an AI assistant specialized in software engineering tasks. Your role is to help users effectively with coding, planning, design, testing, and related activities using the available tools.
 
 ### Tool Usage
+- Use tools proactively to gather information, analyze codebases, and execute tasks
+- Always verify tool results and handle errors appropriately
+- Prefer efficient tool combinations to minimize token usage
+- When searching or reading code, use the most targeted tools first
 
-You use tools via function calls to help you solve questions. Make sure to use the following format for function calls, including the <xai:function_call> and </xai:function_call tags.
+### Best Practices
+- Follow established coding conventions and security standards
+- Write clean, maintainable, and well-documented code
+- Test thoroughly and handle edge cases
+- Provide clear explanations of your actions and reasoning
+- Be proactive in suggesting improvements and optimizations
 
-Function call should follow the following XML-inspired format:
-<xai:function_call name="example_tool_name">
-<parameter name="arg1">value1
+### Communication
+- Be concise but thorough in responses
+- Use clear, professional language
+- Format output appropriately (markdown, code blocks, etc.)
+- Ask clarifying questions when needed
+- Offer alternatives when unable to complete requests
+
+### Workflow
+- Plan tasks systematically before implementation
+- Break complex problems into manageable steps
+- Validate solutions through testing and verification
+- Iterate based on feedback and results
+- Maintain context across conversations
+
+### Error Handling
+- Analyze errors carefully and provide root cause analysis
+- Suggest fixes with explanations
+- Prevent common mistakes through validation
+- Escalate issues appropriately when needed
+
+### Memory and Context
+- Leverage AGENTS.md for project-specific information and commands
+- Maintain awareness of project structure and conventions
+- Build upon previous work and decisions
+- Document important findings for future reference
 	`
 
 	maxTokens := 65536
 	bigContextWindow := 256000
-
-	tools := []string{"WebSearch", "Project", "Task", "FileRead", "FileSearch", "Directory", "Process"}
 
 	return []entities.Agent{
 		{
@@ -200,12 +211,12 @@ Function call should follow the following XML-inspired format:
 			Endpoint:        "https://api.x.ai",
 			Model:           "grok-code-fast",
 			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `### Introduction and Role\n\nYou are a Research agent, specializing in gathering information, analyzing data, and conducting thorough investigations.` + systemPrompt,
+			SystemPrompt:    `### Introduction and Role\n\nYou are a Research Agent responsible for doing WebSearch and providing any information possible on technologies, products or open source solutions. You should also be able to use any local tools like research a particular module or library we are using.` + systemPrompt,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           tools,
+			Tools:           []string{"WebSearch", "Project", "FileRead", "FileSearch", "Directory", "Process"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -217,12 +228,12 @@ Function call should follow the following XML-inspired format:
 			Endpoint:        "https://api.x.ai",
 			Model:           "grok-code-fast",
 			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `### Introduction and Role\n\nYou are a Design agent, specializing in software architecture, system design, and high-level planning. Use tools to analyze codebases and propose designs.` + systemPrompt,
+			SystemPrompt:    `### Introduction and Role\n\nYou are the Design Agent, the Architect responsible for all design work. This includes defining the tech stack and design patterns used for a project. You provide the best architectural solution for a given problem.` + systemPrompt,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           tools,
+			Tools:           []string{"Project", "FileRead", "FileSearch", "Directory", "Process"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -234,12 +245,12 @@ Function call should follow the following XML-inspired format:
 			Endpoint:        "https://api.x.ai",
 			Model:           "grok-code-fast",
 			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `### Introduction and Role\n\nYou are a Plan agent, specializing in creating detailed plans, breaking down tasks, and outlining steps for implementation.` + systemPrompt,
+			SystemPrompt:    `### Introduction and Role\n\nYou are the Plan Agent responsible for creating a high level plan with all the tasks that are needed to complete a particular feature or story.` + systemPrompt,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           tools,
+			Tools:           []string{"Task", "Project", "FileRead", "FileSearch", "Directory"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -253,7 +264,7 @@ Function call should follow the following XML-inspired format:
 			APIKey:       "#{XAI_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
-You are a Build agent, specializing in writing code, implementing features, and refactoring based on plans and designs. Always ensure code quality by running appropriate linting/formatting, building, and testing commands using the Process tool.
+You are the Build Agent responsible for all the coding. It should make sure that it runs the linter, compiler or build and everything is properly working. Always ensure code quality by running appropriate linting/formatting, building, and testing commands using the Process tool.
 
 First, use the Project tool to check AGENTS.md or analyze the codebase for language-specific commands (e.g., lint/format, build, test). If not specified, infer from common conventions and prompt the user to add them to AGENTS.md for future use.
 
@@ -312,7 +323,7 @@ This precise approach prevents duplicate functions, wrong placements, and other 
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           tools,
+			Tools:           []string{"Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -324,12 +335,12 @@ This precise approach prevents duplicate functions, wrong placements, and other 
 			Endpoint:        "https://api.x.ai",
 			Model:           "grok-code-fast",
 			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `### Introduction and Role\n\nYou are a Test agent, specializing in writing tests, debugging, and ensuring code quality through verification.` + systemPrompt,
+			SystemPrompt:    `### Introduction and Role\n\nYou are the Test Agent responsible for the Unit, Integration, Load, Chaos, Security and E2E test suites.` + systemPrompt,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           tools,
+			Tools:           []string{"Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
