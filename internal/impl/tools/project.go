@@ -293,6 +293,75 @@ func (t *ProjectTool) detectLanguage(workspace string) string {
 	return "" // No language detected
 }
 
+// matchPattern matches a file path against a glob pattern, supporting ** for recursive matching
+func matchPattern(pattern, path string) (bool, error) {
+	// For patterns without **, use standard filepath.Match
+	if !strings.Contains(pattern, "**") {
+		return filepath.Match(pattern, path)
+	}
+
+	// For ** patterns, use a simple implementation
+	return matchGlobPattern(pattern, path)
+}
+
+// matchGlobPattern implements basic ** support
+func matchGlobPattern(pattern, path string) (bool, error) {
+	// Split pattern and path by "/"
+	patternParts := strings.Split(pattern, "/")
+	pathParts := strings.Split(path, "/")
+
+	return matchGlobParts(patternParts, pathParts, 0, 0)
+}
+
+// matchGlobParts recursively matches pattern parts against path parts
+func matchGlobParts(patternParts, pathParts []string, patternIdx, pathIdx int) (bool, error) {
+	// If we've consumed all pattern parts, we need to have consumed all path parts too
+	if patternIdx >= len(patternParts) {
+		return pathIdx >= len(pathParts), nil
+	}
+
+	// If we've consumed all path parts but still have pattern parts, no match
+	if pathIdx >= len(pathParts) {
+		// Special case: if the remaining pattern is just **, it matches empty
+		if patternIdx < len(patternParts) && patternParts[patternIdx] == "**" {
+			return matchGlobParts(patternParts, pathParts, patternIdx+1, pathIdx)
+		}
+		return false, nil
+	}
+
+	patternPart := patternParts[patternIdx]
+	pathPart := pathParts[pathIdx]
+
+	switch {
+	case patternPart == "**":
+		// ** can match zero or more directories
+		// Try matching zero directories first
+		if matched, _ := matchGlobParts(patternParts, pathParts, patternIdx+1, pathIdx); matched {
+			return true, nil
+		}
+		// Try matching one or more directories
+		return matchGlobParts(patternParts, pathParts, patternIdx, pathIdx+1)
+
+	case strings.Contains(patternPart, "*"):
+		// Pattern contains wildcards, use filepath.Match
+		matched, err := filepath.Match(patternPart, pathPart)
+		if err != nil {
+			return false, err
+		}
+		if matched {
+			return matchGlobParts(patternParts, pathParts, patternIdx+1, pathIdx+1)
+		}
+		return false, nil
+
+	default:
+		// Exact match
+		if patternPart == pathPart {
+			return matchGlobParts(patternParts, pathParts, patternIdx+1, pathIdx+1)
+		}
+		return false, nil
+	}
+}
+
 func (t *ProjectTool) executeGetSource(workspace, language string, customFilters []string, maxFileSize, maxTotalSize int) (string, error) {
 	defaultFilters := map[string][]string{
 		"all":        {"**/*"},
@@ -383,7 +452,7 @@ func (t *ProjectTool) executeGetSource(workspace, language string, customFilters
 		}
 
 		for _, pattern := range filters {
-			matched, err := filepath.Match(pattern, relPath)
+			matched, err := matchPattern(pattern, relPath)
 			if err != nil {
 				return err
 			}
