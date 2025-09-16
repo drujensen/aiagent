@@ -59,6 +59,24 @@ func formatFileWriteResult(result string, diff string) string {
 		Diff        string `json:"diff"`
 	}
 
+	// First, try to use the diff parameter if available
+	if diff != "" {
+		// Try to parse JSON to get summary
+		if err := json.Unmarshal([]byte(result), &resultData); err == nil && resultData.Summary != "" {
+			var output strings.Builder
+			output.WriteString(resultData.Summary)
+			output.WriteString("\n\n" + formatDiff(diff))
+			return output.String()
+		} else {
+			// If JSON parsing fails, create a simple summary
+			var output strings.Builder
+			output.WriteString("File modified successfully\n\n")
+			output.WriteString(formatDiff(diff))
+			return output.String()
+		}
+	}
+
+	// If no diff parameter, try to parse the full JSON result
 	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
 		// If parsing fails, try to extract summary from JSON
 		var jsonResponse struct {
@@ -75,10 +93,8 @@ func formatFileWriteResult(result string, diff string) string {
 	// Use the summary from the JSON response
 	output.WriteString(resultData.Summary)
 
-	// Add the diff if available
-	if diff != "" {
-		output.WriteString("\n\n" + formatDiff(diff))
-	} else if resultData.Diff != "" {
+	// Add the diff from JSON if available
+	if resultData.Diff != "" {
 		output.WriteString("\n\n" + formatDiff(resultData.Diff))
 	}
 
@@ -238,20 +254,30 @@ func formatDiff(diff string) string {
 		// Extract diff content from markdown code block
 		start := strings.Index(diff, "```diff\n")
 		if start == -1 {
-			return diff
-		}
-		start += 8 // Length of "```diff\n"
-
-		end := strings.Index(diff[start:], "\n```")
-		if end == -1 {
-			diffContent = diff[start:]
+			diffContent = diff
 		} else {
-			// Extract the actual diff content (without the closing ```)
-			diffContent = diff[start : start+end]
+			start += 8 // Length of "```diff\n"
+			end := strings.Index(diff[start:], "\n```")
+			if end == -1 {
+				diffContent = diff[start:]
+			} else {
+				// Extract the actual diff content (without the closing ```)
+				diffContent = diff[start : start+end]
+			}
 		}
 	} else {
 		// Raw diff content
 		diffContent = diff
+	}
+
+	// Check if this looks like a unified diff
+	hasDiffMarkers := strings.Contains(diffContent, "---") ||
+		strings.Contains(diffContent, "+++") ||
+		strings.Contains(diffContent, "@@")
+
+	if !hasDiffMarkers {
+		// If it doesn't look like a diff, just return the content
+		return diffContent
 	}
 
 	var output strings.Builder
@@ -262,18 +288,21 @@ func formatDiff(diff string) string {
 	delStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1"))     // Red
 	hunkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))    // Cyan
 	contextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8")) // Gray
+	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("4"))    // Blue
 
 	lines := strings.Split(diffContent, "\n")
 	for _, line := range lines {
-		if strings.HasPrefix(line, "+") {
+		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
 			output.WriteString(addStyle.Render(line) + "\n")
-		} else if strings.HasPrefix(line, "-") {
+		} else if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
 			output.WriteString(delStyle.Render(line) + "\n")
 		} else if strings.HasPrefix(line, "@@") {
 			output.WriteString(hunkStyle.Render(line) + "\n")
 		} else if strings.HasPrefix(line, " ") {
 			output.WriteString(contextStyle.Render(line) + "\n")
-		} else {
+		} else if strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---") {
+			output.WriteString(fileStyle.Render(line) + "\n")
+		} else if line != "" {
 			output.WriteString(line + "\n")
 		}
 	}

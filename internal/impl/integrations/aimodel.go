@@ -474,12 +474,30 @@ func ensureToolCallResponses(messages []*entities.Message, logger *zap.Logger) [
 
 // extractDiffFromResult extracts diff from FileWrite tool result
 func (m *AIModelIntegration) extractDiffFromResult(result string) string {
+	// First, try to extract from top-level diff field
 	var resultData struct {
 		Diff string `json:"diff"`
 	}
 	if err := json.Unmarshal([]byte(result), &resultData); err == nil && resultData.Diff != "" {
 		return resultData.Diff
 	}
+
+	// If that fails, try to parse as a generic map and look for diff field
+	var genericData map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &genericData); err == nil {
+		if diff, ok := genericData["diff"]; ok {
+			if diffStr, ok := diff.(string); ok && diffStr != "" {
+				return diffStr
+			}
+		}
+	}
+
+	// If still no diff found, check if the result contains diff-like content
+	// (unified diff format starts with --- or +++ or @@)
+	if strings.Contains(result, "---") || strings.Contains(result, "+++") || strings.Contains(result, "@@") {
+		return result
+	}
+
 	return ""
 }
 

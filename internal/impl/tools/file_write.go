@@ -166,13 +166,105 @@ func (t *FileWriteTool) Execute(arguments string) (string, error) {
 		if args.Content == "" {
 			return "", fmt.Errorf("content is required for write operation")
 		}
+
+		// Read existing content for diff generation
+		var oldContent string
+		if existingContent, err := os.ReadFile(fullPath); err == nil {
+			if utf8.Valid(existingContent) {
+				oldContent = string(existingContent)
+			} else {
+				oldContent = fmt.Sprintf("Binary file: %s", filepath.Base(fullPath))
+			}
+		} else {
+			// File doesn't exist, old content is empty
+			oldContent = ""
+		}
+
+		newContent := args.Content
+
+		// Generate diff
+		sanitizedPath := filepath.Base(fullPath)
+		if !utf8.ValidString(sanitizedPath) {
+			sanitizedPath = "file"
+		}
+		diff := difflib.UnifiedDiff{
+			A:        difflib.SplitLines(oldContent),
+			B:        difflib.SplitLines(newContent),
+			FromFile: sanitizedPath,
+			ToFile:   sanitizedPath,
+			Context:  3,
+		}
+		diffStr, err := difflib.GetUnifiedDiffString(diff)
+		if err != nil {
+			t.logger.Error("Failed to generate diff", zap.Error(err))
+			diffStr = fmt.Sprintf("File written: %s", filepath.Base(fullPath))
+		}
+
+		// Ensure diffStr is valid UTF-8
+		if !utf8.ValidString(diffStr) {
+			t.logger.Warn("Generated diff contains invalid UTF-8, using placeholder", zap.String("path", fullPath))
+			diffStr = fmt.Sprintf("File written: %s", filepath.Base(fullPath))
+		}
+
 		err = os.WriteFile(fullPath, []byte(args.Content), 0644)
 		if err != nil {
 			t.logger.Error("Failed to write file", zap.String("path", fullPath), zap.Error(err))
 			return "", fmt.Errorf("failed to write file: %v", err)
 		}
+
 		t.logger.Info("File written successfully", zap.String("path", fullPath))
-		return "File written successfully", nil
+
+		// Create TUI-friendly summary with diff preview
+		var summary strings.Builder
+		if oldContent == "" {
+			summary.WriteString(fmt.Sprintf("✏️  File Created: %s\n", filepath.Base(fullPath)))
+		} else {
+			summary.WriteString(fmt.Sprintf("✏️  File Overwritten: %s\n", filepath.Base(fullPath)))
+		}
+
+		// Add a preview of the diff for TUI
+		lines := strings.Split(diffStr, "\n")
+		previewLines := 0
+		maxPreviewLines := 20
+
+		for _, line := range lines {
+			if line != "" {
+				if previewLines >= maxPreviewLines {
+					summary.WriteString("... (diff truncated)\n")
+					break
+				}
+				// Add color indicators for TUI
+				if strings.HasPrefix(line, "+") {
+					summary.WriteString("🟢 " + line + "\n")
+				} else if strings.HasPrefix(line, "-") {
+					summary.WriteString("🔴 " + line + "\n")
+				} else if strings.HasPrefix(line, "@@") {
+					summary.WriteString("🔵 " + line + "\n")
+				} else if strings.HasPrefix(line, " ") {
+					summary.WriteString("   " + line + "\n")
+				} else {
+					summary.WriteString(line + "\n")
+				}
+				previewLines++
+			}
+		}
+
+		// Create JSON response with summary for TUI and full data for AI
+		response := map[string]interface{}{
+			"summary":   summary.String(),
+			"success":   true,
+			"path":      fullPath,
+			"operation": "write",
+			"diff":      diffStr,
+		}
+
+		jsonResult, err := json.Marshal(response)
+		if err != nil {
+			t.logger.Error("Failed to marshal file write response", zap.Error(err))
+			return summary.String(), nil
+		}
+
+		return string(jsonResult), nil
 
 	case "edit":
 		if args.OldString == "" {

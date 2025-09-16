@@ -39,9 +39,25 @@ func TestFileWriteTool_WriteOperation(t *testing.T) {
 		t.Fatalf("Failed to write file: %v", err)
 	}
 
-	expected := "File written successfully"
-	if result != expected {
-		t.Errorf("Expected result '%s', got '%s'", expected, result)
+	// Parse the JSON result
+	var resultData map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
+		t.Fatalf("Failed to parse JSON result: %v", err)
+	}
+
+	// Check that it's successful
+	if success, ok := resultData["success"].(bool); !ok || !success {
+		t.Errorf("Expected success=true, got %v", resultData["success"])
+	}
+
+	// Check that it has a diff
+	if diff, ok := resultData["diff"].(string); !ok || diff == "" {
+		t.Errorf("Expected non-empty diff, got %v", resultData["diff"])
+	}
+
+	// Check that summary contains "File Created"
+	if summary, ok := resultData["summary"].(string); !ok || !strings.Contains(summary, "File Created") {
+		t.Errorf("Expected summary to contain 'File Created', got %v", resultData["summary"])
 	}
 
 	// Verify file was created
