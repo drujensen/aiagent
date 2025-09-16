@@ -613,7 +613,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				if c.cancel != nil {
 					c.cancel()
 					c.isProcessing = false
-					c.err = fmt.Errorf("request cancelled")
+					// Don't set error immediately - let the sendMessageCmd complete with partial results
 					// Send 'G' key to vimtea to go to bottom
 					bottomMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}}
 					newModel, _ := c.editor.Update(bottomMsg)
@@ -789,7 +789,9 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		c.isProcessing = false
 		c.cancel = nil
 		c.err = m
-		if len(c.activeChat.Messages) > 0 {
+		// Don't remove user's message if the error is due to cancellation
+		// The server should have saved the user's message and any partial results
+		if len(c.activeChat.Messages) > 0 && !strings.Contains(m.Error(), "canceled") {
 			lastIdx := len(c.activeChat.Messages) - 1
 			if c.activeChat.Messages[lastIdx].Role == "user" {
 				c.activeChat.Messages = c.activeChat.Messages[:lastIdx]
@@ -906,9 +908,23 @@ func sendMessageCmd(cs services.ChatService, chatID string, msg *entities.Messag
 	return func() tea.Msg {
 		_, err := cs.SendMessage(ctx, chatID, msg)
 		if err != nil {
+			// Even on error, try to get the updated chat state
+			// The user's message might have been saved before the error occurred
+			getChatCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			updatedChat, getChatErr := cs.GetChat(getChatCtx, chatID)
+			if getChatErr == nil && len(updatedChat.Messages) > 0 {
+				// Return the updated chat with the user's message
+				return updatedChatMsg(updatedChat)
+			}
+			// If we can't get the updated chat, return the original error
 			return errMsg(err)
 		}
-		updatedChat, err := cs.GetChat(ctx, chatID)
+		// Use a new context for GetChat in case the original context was cancelled
+		// We still want to retrieve the chat with partial results
+		getChatCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		updatedChat, err := cs.GetChat(getChatCtx, chatID)
 		if err != nil {
 			return errMsg(err)
 		}
