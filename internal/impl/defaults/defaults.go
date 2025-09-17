@@ -426,7 +426,7 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     now,
 		},
 		{
-			ID:            "F1234567-89AB-CDEF-0123-456789ABCDEF",
+			ID:            "69216685-CE00-496B-A464-1767233B0440",
 			ToolType:      "Fetch",
 			Name:          "Fetch",
 			Description:   "This tool performs HTTP requests to fetch data from web APIs and endpoints.",
@@ -435,7 +435,7 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     now,
 		},
 		{
-			ID:            "S1234567-89AB-CDEF-0123-456789ABCDEF",
+			ID:            "FE4663FE-B3B2-4270-93E3-6834B429C903",
 			ToolType:      "Swagger",
 			Name:          "Swagger",
 			Description:   "This tool parses and analyzes Swagger/OpenAPI specifications for API documentation and testing.",
