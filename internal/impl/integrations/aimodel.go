@@ -257,6 +257,18 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 
 		finishReason := responseBody.Choices[0].FinishReason
 
+		// Validate content for malformed tool call syntax
+		if strings.Contains(content, "<xai:function_call>") || strings.Contains(content, `{"content">`) {
+			m.logger.Warn("Detected malformed tool call syntax in AI response, treating as content only",
+				zap.String("content", content))
+			// Remove malformed syntax and treat as regular content
+			content = strings.ReplaceAll(content, "<xai:function_call>", "")
+			content = strings.ReplaceAll(content, `{"content">`, "")
+			// Clear tool calls since they're malformed
+			toolCalls = nil
+			finishReason = "stop"
+		}
+
 		m.logger.Info("AI response analysis",
 			zap.String("finishReason", finishReason),
 			zap.Int("toolCallsCount", len(toolCalls)),

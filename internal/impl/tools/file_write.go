@@ -286,6 +286,10 @@ func (t *FileWriteTool) applyPreciseEdit(filePath, oldString, newString string, 
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		t.logger.Error("Failed to read file", zap.String("path", filePath), zap.Error(err))
+		// Provide helpful guidance for file not found errors
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("file does not exist: %s. For creating new files, use operation='write' instead of operation='edit'", filePath)
+		}
 		return "", fmt.Errorf("failed to read file: %v", err)
 	}
 
