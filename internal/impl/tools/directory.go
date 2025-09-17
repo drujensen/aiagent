@@ -21,6 +21,7 @@ type DirectoryTool struct {
 
 type TreeEntry struct {
 	Name     string      `json:"name"`
+	Path     string      `json:"path"`
 	Type     string      `json:"type"`
 	Children []TreeEntry `json:"children,omitempty"`
 }
@@ -185,12 +186,13 @@ func (t *DirectoryTool) Execute(arguments string) (string, error) {
 			} else {
 				files++
 			}
-			formatted = append(formatted, prefix+" "+entry.Name())
+			fullEntryPath := filepath.Join(fullPath, entry.Name())
+			formatted = append(formatted, prefix+" "+fullEntryPath)
 		}
 
 		// Create TUI-friendly summary
 		var summary strings.Builder
-		summary.WriteString(fmt.Sprintf("📂 %s (%d directories, %d files)\n\n", filepath.Base(fullPath), dirs, files))
+		summary.WriteString(fmt.Sprintf("📂 %s (%d directories, %d files)\n\n", fullPath, dirs, files))
 
 		// Show first 10 entries
 		previewCount := 10
@@ -250,7 +252,7 @@ func (t *DirectoryTool) Execute(arguments string) (string, error) {
 
 		// Create TUI-friendly summary
 		var summary strings.Builder
-		summary.WriteString(fmt.Sprintf("🌳 Directory Tree: %s (%d directories, %d files)\n\n", filepath.Base(fullPath), totalDirs, totalFiles))
+		summary.WriteString(fmt.Sprintf("🌳 Directory Tree: %s (%d directories, %d files)\n\n", fullPath, totalDirs, totalFiles))
 
 		// Convert to readable text format (first 15 lines)
 		textTree := t.treeToText(tree, "", 0, 15)
@@ -338,13 +340,15 @@ func (t *DirectoryTool) buildDirectoryTree(path string, depthLimit int, currentD
 		if entry.IsDir() && (entry.Name() == ".git" || entry.Name() == ".aiagent") {
 			continue
 		}
+		entryPath := filepath.Join(path, entry.Name())
 		treeEntry := TreeEntry{
 			Name: entry.Name(),
+			Path: entryPath,
 			Type: "file",
 		}
 		if entry.IsDir() {
 			treeEntry.Type = "directory"
-			children, err := t.buildDirectoryTree(filepath.Join(path, entry.Name()), depthLimit, currentDepth+1)
+			children, err := t.buildDirectoryTree(entryPath, depthLimit, currentDepth+1)
 			if err != nil {
 				continue
 			}
@@ -390,7 +394,7 @@ func (t *DirectoryTool) treeToText(tree []TreeEntry, prefix string, currentLines
 			icon = "📁"
 		}
 
-		result.WriteString(fmt.Sprintf("%s%s %s %s\n", prefix, connector, icon, entry.Name))
+		result.WriteString(fmt.Sprintf("%s%s %s %s\n", prefix, connector, icon, entry.Path))
 		currentLines++
 
 		if entry.Type == "directory" && len(entry.Children) > 0 {
