@@ -92,7 +92,7 @@ func convertToBaseMessages(messages []*entities.Message) []map[string]any {
 	return apiMessages
 }
 
-func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]any) ([]*entities.Message, error) {
+func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]any, callback interfaces.MessageCallback) ([]*entities.Message, error) {
 	if ctx.Err() == context.Canceled {
 		// Return empty results for early cancellation (no work done yet)
 		return []*entities.Message{}, nil
@@ -327,6 +327,14 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				Timestamp: time.Now(),
 			}
 			newMessages = append(newMessages, finalMessage)
+
+			// Save incrementally if callback is provided
+			if callback != nil {
+				if err := callback([]*entities.Message{finalMessage}); err != nil {
+					m.logger.Error("Failed to save final message incrementally", zap.Error(err))
+				}
+			}
+
 			break
 		}
 
@@ -348,6 +356,13 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			Timestamp: time.Now(),
 		}
 		newMessages = append(newMessages, toolCallMessage)
+
+		// Save incrementally if callback is provided
+		if callback != nil {
+			if err := callback([]*entities.Message{toolCallMessage}); err != nil {
+				m.logger.Error("Failed to save tool call message incrementally", zap.Error(err))
+			}
+		}
 
 		assistantMsg := map[string]any{
 			"role":       "assistant",
@@ -422,6 +437,13 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				Timestamp:      time.Now(),
 			}
 			newMessages = append(newMessages, newMessage)
+
+			// Save incrementally if callback is provided
+			if callback != nil {
+				if err := callback([]*entities.Message{newMessage}); err != nil {
+					m.logger.Error("Failed to save tool response message incrementally", zap.Error(err))
+				}
+			}
 
 			toolResponseMsg := map[string]any{
 				"role":         "tool",

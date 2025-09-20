@@ -6,10 +6,13 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/entities"
 )
 
+// MessageCallback is a function that can be called to save messages incrementally
+type MessageCallback func(messages []*entities.Message) error
+
 // AIModelIntegration defines the interface for AI model providers
 type AIModelIntegration interface {
-	// GenerateResponse generates response(s) from the AI model
-	GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]any) ([]*entities.Message, error)
+	// GenerateResponse generates response(s) from the AI model with incremental saving
+	GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]any, callback MessageCallback) ([]*entities.Message, error)
 
 	// GetUsage returns token usage information for billing/reporting
 	GetUsage() (*entities.Usage, error)

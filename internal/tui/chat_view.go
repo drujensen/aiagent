@@ -382,12 +382,12 @@ type ChatView struct {
 	width              int
 	height             int
 	currentAgent       *entities.Agent
-	previousAgentID    string                       // Track previous agent ID to detect changes
-	tempMessages       []entities.Message           // Temporary messages for real-time tool events
-	eventCancel        func()                       // Event subscription cancel function
-	eventChan          chan *entities.ToolCallEvent // Channel for receiving tool call events
-	lineNumbersEnabled bool                         // Track whether line numbers are enabled
-	toolCallStatus     map[string]bool              // Track completion status of tool calls (toolCallID -> completed)
+	previousAgentID    string             // Track previous agent ID to detect changes
+	tempMessages       []entities.Message // Temporary messages for real-time tool events
+	eventCancel        func()             // Event subscription cancel function
+	eventChan          chan interface{}   // Channel for receiving events (ToolCallEvent or MessageHistoryEvent)
+	lineNumbersEnabled bool               // Track whether line numbers are enabled
+	toolCallStatus     map[string]bool    // Track completion status of tool calls (toolCallID -> completed)
 }
 
 func NewChatView(chatService services.ChatService, agentService services.AgentService, activeChat *entities.Chat) ChatView {
@@ -448,9 +448,11 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	}
 	cv.updateEditorContent()
 
-	// Set up event channel and subscription for real-time tool call updates
-	cv.eventChan = make(chan *entities.ToolCallEvent, 10) // Buffered channel
-	cv.eventCancel = events.SubscribeToToolCallEvents(func(data events.ToolCallEventData) {
+	// Set up event channel and subscriptions for real-time updates
+	cv.eventChan = make(chan interface{}, 50) // Buffered channel - increased buffer to prevent event drops
+
+	// Subscribe to tool call events
+	toolCancel := events.SubscribeToToolCallEvents(func(data events.ToolCallEventData) {
 		// Send event to channel (non-blocking)
 		select {
 		case cv.eventChan <- data.Event:
@@ -458,6 +460,22 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 			// Channel full, drop event to avoid blocking
 		}
 	})
+
+	// Subscribe to message history events
+	messageCancel := events.SubscribeToMessageHistoryEvents(func(data events.MessageHistoryEventData) {
+		// Send event to channel (non-blocking)
+		select {
+		case cv.eventChan <- data:
+		default:
+			// Channel full, drop event to avoid blocking
+		}
+	})
+
+	// Combine cancel functions
+	cv.eventCancel = func() {
+		toolCancel()
+		messageCancel()
+	}
 
 	return cv
 }
@@ -624,11 +642,18 @@ func (c ChatView) Init() tea.Cmd {
 	return tea.Batch(textarea.Blink, c.listenForEvents())
 }
 
-// listenForEvents returns a command that listens for tool call events
+// listenForEvents returns a command that listens for events
 func (c *ChatView) listenForEvents() tea.Cmd {
 	return func() tea.Msg {
 		event := <-c.eventChan
-		return toolCallEventMsg(event)
+		switch e := event.(type) {
+		case *entities.ToolCallEvent:
+			return toolCallEventMsg(e)
+		case events.MessageHistoryEventData:
+			return messageHistoryEventMsg(e)
+		default:
+			return nil
+		}
 	}
 }
 
@@ -772,6 +797,24 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			}
 			c.tempMessages = append(c.tempMessages, tempMsg)
 			// Update editor content with new tool event
+			c.updateEditorContent()
+		}
+		// Continue listening for more events
+		return c, c.listenForEvents()
+
+	case messageHistoryEventMsg:
+		// Handle message history change event
+		if c.isProcessing && c.activeChat != nil && m.ChatID == c.activeChat.ID {
+			// Only clear temp messages if this is the final message (no tool calls pending)
+			// This prevents tool call results from disappearing during live updates
+			if len(m.Messages) > 0 {
+				lastMsg := m.Messages[len(m.Messages)-1]
+				if lastMsg.Role == "assistant" && len(lastMsg.ToolCalls) == 0 {
+					// This is the final assistant response, clear temp messages
+					c.tempMessages = nil
+				}
+			}
+			// Refresh the editor content with updated message history
 			c.updateEditorContent()
 		}
 		// Continue listening for more events

@@ -1,13 +1,17 @@
 package tui
 
-import "github.com/drujensen/aiagent/internal/domain/entities"
+import (
+	"github.com/drujensen/aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/domain/events"
+)
 
 type (
-	updatedChatMsg        *entities.Chat
-	startCreateChatMsg    string
-	canceledCreateChatMsg struct{}
-	cancelSpinnerMsg      struct{}
-	toolCallEventMsg      *entities.ToolCallEvent
+	updatedChatMsg         *entities.Chat
+	startCreateChatMsg     string
+	canceledCreateChatMsg  struct{}
+	cancelSpinnerMsg       struct{}
+	toolCallEventMsg       *entities.ToolCallEvent
+	messageHistoryEventMsg events.MessageHistoryEventData
 )
 
 type (

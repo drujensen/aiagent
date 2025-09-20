@@ -107,8 +107,8 @@ func convertToAnthropicMessages(messages []*entities.Message) []map[string]any {
 	return apiMessages
 }
 
-// GenerateResponse generates a response from the Anthropic API
-func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]any) ([]*entities.Message, error) {
+// GenerateResponse generates a response from the Anthropic API with incremental saving
+func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]any, callback interfaces.MessageCallback) ([]*entities.Message, error) {
 	// Prepare tool definitions for Anthropic
 	tools := make([]map[string]any, len(toolList))
 	for i, tool := range toolList {
@@ -320,6 +320,14 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 				Timestamp: time.Now(),
 			}
 			newMessages = append(newMessages, finalMessage)
+
+			// Save incrementally if callback is provided
+			if callback != nil {
+				if err := callback([]*entities.Message{finalMessage}); err != nil {
+					m.logger.Error("Failed to save final message incrementally", zap.Error(err))
+				}
+			}
+
 			break
 		} else {
 			toolCallMessage := &entities.Message{
@@ -330,6 +338,13 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 				Timestamp: time.Now(),
 			}
 			newMessages = append(newMessages, toolCallMessage)
+
+			// Save incrementally if callback is provided
+			if callback != nil {
+				if err := callback([]*entities.Message{toolCallMessage}); err != nil {
+					m.logger.Error("Failed to save tool call message incrementally", zap.Error(err))
+				}
+			}
 
 			for _, toolCall := range toolCalls {
 				// Check for cancellation before executing tool
@@ -387,6 +402,13 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 					Timestamp:      time.Now(),
 				}
 				newMessages = append(newMessages, toolResponseMessage)
+
+				// Save incrementally if callback is provided
+				if callback != nil {
+					if err := callback([]*entities.Message{toolResponseMessage}); err != nil {
+						m.logger.Error("Failed to save tool response message incrementally", zap.Error(err))
+					}
+				}
 
 				// Append tool result to apiMessages for next iteration
 				if toolCall.ID != "" {

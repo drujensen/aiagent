@@ -8,6 +8,7 @@ import (
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	errors "github.com/drujensen/aiagent/internal/domain/errs"
+	"github.com/drujensen/aiagent/internal/domain/events"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
 	"github.com/drujensen/aiagent/internal/impl/config"
 	"github.com/drujensen/aiagent/internal/impl/integrations"
@@ -26,6 +27,7 @@ type ChatService interface {
 	UpdateChat(ctx context.Context, id, agentID, name string) (*entities.Chat, error)
 	DeleteChat(ctx context.Context, id string) error
 	SendMessage(ctx context.Context, id string, message *entities.Message) (*entities.Message, error)
+	SaveMessagesIncrementally(ctx context.Context, chatID string, messages []*entities.Message) error
 }
 
 type chatService struct {
@@ -187,6 +189,41 @@ func (s *chatService) DeleteChat(ctx context.Context, id string) error {
 	return nil
 }
 
+func (s *chatService) SaveMessagesIncrementally(ctx context.Context, chatID string, messages []*entities.Message) error {
+	if chatID == "" {
+		return errors.ValidationErrorf("chat ID is required")
+	}
+	if len(messages) == 0 {
+		return nil
+	}
+
+	chat, err := s.chatRepo.GetChat(ctx, chatID)
+	if err != nil {
+		return err
+	}
+
+	// Append new messages to chat
+	for _, msg := range messages {
+		if msg.Content == "" {
+			msg.Content = "Unknown Error: No response generated"
+		}
+		chat.Messages = append(chat.Messages, *msg)
+	}
+
+	// Update chat usage totals
+	chat.UpdateUsage()
+	chat.UpdatedAt = time.Now()
+
+	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
+		return err
+	}
+
+	// Publish message history change event for live updates
+	events.PublishMessageHistoryEvent(chatID, messages)
+
+	return nil
+}
+
 func (s *chatService) SendMessage(ctx context.Context, id string, message *entities.Message) (*entities.Message, error) {
 	if id == "" {
 		return nil, errors.ValidationErrorf("chat ID is required")
@@ -343,7 +380,13 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		options["reasoning_effort"] = agent.ReasoningEffort
 	}
 
-	newMessages, err := aiModel.GenerateResponse(ctx, messagesToSend, tools, options)
+	// Create a callback function for incremental message saving
+	messageCallback := func(messages []*entities.Message) error {
+		return s.SaveMessagesIncrementally(ctx, chat.ID, messages)
+	}
+
+	// Use the callback method for incremental saving
+	newMessages, err := aiModel.GenerateResponse(ctx, messagesToSend, tools, options, messageCallback)
 	if err != nil {
 		if strings.Contains(err.Error(), "canceled") {
 			return nil, errors.CanceledErrorf("message processing was canceled")
@@ -386,22 +429,6 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 
 	// Validate that all tool calls have responses
 	newMessages = s.ensureToolCallResponses(newMessages)
-
-	// Append all new messages to the chat's message history
-	for _, msg := range newMessages {
-		if msg.Content == "" {
-			msg.Content = "Unknown Error: No response generated"
-		}
-		chat.Messages = append(chat.Messages, *msg)
-	}
-
-	// Update chat usage totals
-	chat.UpdateUsage()
-	chat.UpdatedAt = time.Now()
-
-	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
-		return nil, err
-	}
 
 	// Return the last message (final assistant response)
 	if len(newMessages) > 0 {
@@ -536,7 +563,7 @@ func (s *chatService) compressMessages(
 		return nil, false, errors.CanceledErrorf("message summarization was canceled")
 	}
 
-	summaryResponse, err := aiModel.GenerateResponse(ctx, historyMsgs, nil, options)
+	summaryResponse, err := aiModel.GenerateResponse(ctx, historyMsgs, nil, options, nil)
 	if err != nil {
 		if strings.Contains(err.Error(), "canceled") {
 			return nil, false, errors.CanceledErrorf("message summarization was canceled")
