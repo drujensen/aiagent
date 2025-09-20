@@ -47,6 +47,7 @@ func (c *ChatController) RegisterRoutes(e *echo.Echo) {
 	e.POST("/chats/:id/messages", c.SendMessageHandler)
 	e.POST("/chats/:id/cancel", c.CancelMessageHandler)
 	e.GET("/chat-cost", c.ChatCostHandler)
+	e.GET("/chats/:id/messages", c.GetMessagesHandler)
 }
 
 func (c *ChatController) ChatHandler(eCtx echo.Context) error {
@@ -334,4 +335,28 @@ func (c *ChatController) CancelMessageHandler(eCtx echo.Context) error {
 
 	c.logger.Error("Invalid cancellation function", zap.String("chatID", chatID))
 	return eCtx.String(http.StatusInternalServerError, "Failed to cancel request")
+}
+
+// GetMessagesHandler returns the latest messages for a chat
+func (c *ChatController) GetMessagesHandler(eCtx echo.Context) error {
+	chatID := eCtx.Param("id")
+	if chatID == "" {
+		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": "Chat ID is required"})
+	}
+
+	chat, err := c.chatService.GetChat(eCtx.Request().Context(), chatID)
+	if err != nil {
+		switch err.(type) {
+		case *errors.NotFoundError:
+			return eCtx.JSON(http.StatusNotFound, map[string]string{"error": "Chat not found"})
+		default:
+			c.logger.Error("Failed to get chat", zap.Error(err))
+			return eCtx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to load chat"})
+		}
+	}
+
+	return eCtx.JSON(http.StatusOK, map[string]interface{}{
+		"chat_id":  chatID,
+		"messages": chat.Messages,
+	})
 }

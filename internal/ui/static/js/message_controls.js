@@ -77,8 +77,8 @@ function connectWebSocket() {
 
     ws.onmessage = function(event) {
         const data = JSON.parse(event.data);
-        if (data.type === 'message_history_update') {
-            handleMessageHistoryUpdate(data);
+        if (data.type === 'message_history_refresh') {
+            handleMessageHistoryRefresh(data);
         } else if (data.type === 'tool_call_update') {
             handleToolCallUpdate(data);
         }
@@ -94,14 +94,201 @@ function connectWebSocket() {
     };
 }
 
-function handleMessageHistoryUpdate(data) {
+function handleMessageHistoryRefresh(data) {
     const chatId = document.getElementById('messages-container').getAttribute('data-chat-id');
     if (data.chat_id !== chatId) {
         return; // Not for this chat
     }
 
-    // Update the message list with new messages
-    updateMessageList(data.messages);
+    // Fetch the latest messages from the server
+    fetchLatestMessages(chatId);
+}
+
+async function fetchLatestMessages(chatId) {
+    try {
+        const response = await fetch(`/chats/${chatId}/messages`);
+        if (!response.ok) {
+            console.error('Failed to fetch messages:', response.statusText);
+            return;
+        }
+
+        const data = await response.json();
+        if (data.messages) {
+            // Clear any temporary tool results before updating with server data
+            const thinkingMessage = document.getElementById('thinking-message');
+            if (thinkingMessage) {
+                const toolContainer = thinkingMessage.querySelector('.tool-results');
+                if (toolContainer) {
+                    toolContainer.innerHTML = '';
+                }
+            }
+
+            updateMessageList(data.messages);
+        }
+    } catch (error) {
+        console.error('Error fetching messages:', error);
+    }
+}
+
+// formatToolResult formats tool execution results for display (similar to TUI)
+function formatToolResult(toolName, result, diff, error) {
+    if (error) {
+        return `<div class="tool-error">Error: ${error}</div>`;
+    }
+
+    switch (toolName) {
+        case "FileWrite":
+            return formatFileWriteResult(result, diff);
+        case "FileSearch":
+            return formatFileSearchResult(result);
+        case "Memory":
+            return formatMemoryResult(result);
+        default:
+            // Try to extract summary from JSON responses
+            try {
+                const jsonResponse = JSON.parse(result);
+                if (jsonResponse.summary) {
+                    return jsonResponse.summary;
+                }
+            } catch (e) {
+                // Not JSON or no summary, return as-is
+            }
+            return result;
+    }
+}
+
+// formatFileWriteResult formats FileWrite tool results
+function formatFileWriteResult(result, diff) {
+    try {
+        const resultData = JSON.parse(result);
+        let output = '';
+
+        // Use the summary from the JSON response
+        if (resultData.summary) {
+            output += resultData.summary;
+        } else {
+            output += 'File modified successfully';
+        }
+
+        // Add the diff if available
+        if (diff) {
+            output += '\n\n' + formatDiff(diff);
+        } else if (resultData.diff) {
+            output += '\n\n' + formatDiff(resultData.diff);
+        }
+
+        return output;
+    } catch (e) {
+        // If parsing fails, try to extract summary
+        try {
+            const jsonResponse = JSON.parse(result);
+            if (jsonResponse.summary) {
+                return jsonResponse.summary;
+            }
+        } catch (e2) {
+            // Return raw result if parsing fails
+        }
+        return result;
+    }
+}
+
+// formatFileSearchResult formats FileSearch tool results
+function formatFileSearchResult(result) {
+    try {
+        const response = JSON.parse(result);
+        if (response.summary) {
+            return response.summary;
+        }
+    } catch (e) {
+        // If parsing fails, return the original result
+    }
+    return result;
+}
+
+// formatMemoryResult formats Memory tool results
+function formatMemoryResult(result) {
+    try {
+        const data = JSON.parse(result);
+        let output = '';
+
+        // Try parsing as entities array
+        if (Array.isArray(data) && data.length > 0) {
+            const firstItem = data[0];
+            if (firstItem.name && firstItem.type) {
+                // This looks like entities
+                output += `<div class="memory-entities">Memory Entities (${data.length} created):<ul>`;
+                const maxEntities = 5;
+                for (let i = 0; i < Math.min(data.length, maxEntities); i++) {
+                    const entity = data[i];
+                    output += `<li>${entity.name} (${entity.type})</li>`;
+                }
+                if (data.length > maxEntities) {
+                    output += `<li>... and ${data.length - maxEntities} more entities</li>`;
+                }
+                output += '</ul></div>';
+            } else if (firstItem.source && firstItem.type && firstItem.target) {
+                // This looks like relations
+                output += `<div class="memory-relations">Memory Relations (${data.length} created):<ul>`;
+                const maxRelations = 5;
+                for (let i = 0; i < Math.min(data.length, maxRelations); i++) {
+                    const relation = data[i];
+                    output += `<li>${relation.source} --${relation.type}--> ${relation.target}</li>`;
+                }
+                if (data.length > maxRelations) {
+                    output += `<li>... and ${data.length - maxRelations} more relations</li>`;
+                }
+                output += '</ul></div>';
+            } else {
+                // Unknown array format
+                output += `Memory operation completed (${data.length} items)`;
+            }
+        } else {
+            // Try to extract summary
+            if (data.summary) {
+                output += data.summary;
+            } else {
+                output += 'Memory operation completed';
+            }
+        }
+
+        return output;
+    } catch (e) {
+        return result;
+    }
+}
+
+// formatDiff formats diff content for display
+function formatDiff(diff) {
+    if (!diff) return '';
+
+    let diffContent = diff;
+
+    // Extract diff content from markdown code block if present
+    if (diff.includes('```diff')) {
+        const start = diff.indexOf('```diff\n');
+        if (start !== -1) {
+            const startPos = start + 8; // Length of "```diff\n"
+            const end = diff.indexOf('\n```', startPos);
+            if (end !== -1) {
+                diffContent = diff.substring(startPos, end);
+            } else {
+                diffContent = diff.substring(startPos);
+            }
+        }
+    }
+
+    // Check if this looks like a unified diff
+    const hasDiffMarkers = diffContent.includes('---') ||
+                          diffContent.includes('+++') ||
+                          diffContent.includes('@@');
+
+    if (!hasDiffMarkers) {
+        // If it doesn't look like a diff, just return the content
+        return diffContent;
+    }
+
+    // Format as a diff with syntax highlighting
+    return `<div class="diff-content">${diffContent}</div>`;
 }
 
 function handleToolCallUpdate(data) {
@@ -123,13 +310,15 @@ function handleToolCallUpdate(data) {
         thinkingMessage.appendChild(toolContainer);
     }
 
+    // Format the tool result using the same logic as TUI
+    const formattedResult = formatToolResult(data.tool_name, data.result, data.diff, data.error);
+
     // Add the tool result
     const toolResult = document.createElement('div');
-    toolResult.className = 'tool-result';
+    toolResult.className = `tool-result ${data.error ? 'error' : 'success'}`;
     toolResult.innerHTML = `
-        <div class="tool-name">↳ ${data.tool_name}</div>
-        <div class="tool-output">${data.result || data.error || 'Tool executed'}</div>
-        ${data.diff ? `<div class="tool-diff"><pre>${data.diff}</pre></div>` : ''}
+        <div class="tool-name">${data.tool_name}</div>
+        <div class="tool-output">${formattedResult}</div>
     `;
 
     toolContainer.appendChild(toolResult);

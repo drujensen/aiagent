@@ -86,15 +86,14 @@ func (u *UI) startWebSocketBroadcaster() {
 	select {}
 }
 
-// broadcastMessageHistoryEvent sends message history events to all connected WebSocket clients
+// broadcastMessageHistoryEvent sends message history refresh events to all connected WebSocket clients
 func (u *UI) broadcastMessageHistoryEvent(data events.MessageHistoryEventData) {
 	u.wsClientsMutex.RLock()
 	defer u.wsClientsMutex.RUnlock()
 
 	eventData := map[string]interface{}{
-		"type":     "message_history_update",
-		"chat_id":  data.ChatID,
-		"messages": data.Messages,
+		"type":    "message_history_refresh",
+		"chat_id": data.ChatID,
 	}
 
 	message, err := json.Marshal(eventData)
