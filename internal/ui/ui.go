@@ -73,13 +73,8 @@ func (u *UI) startWebSocketBroadcaster() {
 		u.broadcastMessageHistoryEvent(data)
 	})
 
-	toolCancel := events.SubscribeToToolCallEvents(func(data events.ToolCallEventData) {
-		u.broadcastToolCallEvent(data)
-	})
-
 	defer func() {
 		messageCancel()
-		toolCancel()
 	}()
 
 	// Keep the broadcaster running
@@ -89,7 +84,11 @@ func (u *UI) startWebSocketBroadcaster() {
 // broadcastMessageHistoryEvent sends message history refresh events to all connected WebSocket clients
 func (u *UI) broadcastMessageHistoryEvent(data events.MessageHistoryEventData) {
 	u.wsClientsMutex.RLock()
-	defer u.wsClientsMutex.RUnlock()
+	clients := make(map[*websocket.Conn]bool)
+	for client := range u.wsClients {
+		clients[client] = true
+	}
+	u.wsClientsMutex.RUnlock()
 
 	eventData := map[string]interface{}{
 		"type":    "message_history_refresh",
@@ -102,40 +101,14 @@ func (u *UI) broadcastMessageHistoryEvent(data events.MessageHistoryEventData) {
 		return
 	}
 
-	for client := range u.wsClients {
+	// Send to clients outside of the lock to avoid holding it during network operations
+	for client := range clients {
 		if err := client.WriteMessage(websocket.TextMessage, message); err != nil {
-			u.logger.Error("Failed to send WebSocket message", zap.Error(err))
-			client.Close()
+			u.logger.Warn("Failed to send WebSocket message to client, removing from clients", zap.Error(err))
+			u.wsClientsMutex.Lock()
 			delete(u.wsClients, client)
-		}
-	}
-}
-
-// broadcastToolCallEvent sends tool call events to all connected WebSocket clients
-func (u *UI) broadcastToolCallEvent(data events.ToolCallEventData) {
-	u.wsClientsMutex.RLock()
-	defer u.wsClientsMutex.RUnlock()
-
-	eventData := map[string]interface{}{
-		"type":         "tool_call_update",
-		"tool_call_id": data.Event.ID,
-		"tool_name":    data.Event.ToolName,
-		"result":       data.Event.Result,
-		"error":        data.Event.Error,
-		"diff":         data.Event.Diff,
-	}
-
-	message, err := json.Marshal(eventData)
-	if err != nil {
-		u.logger.Error("Failed to marshal tool call WebSocket message", zap.Error(err))
-		return
-	}
-
-	for client := range u.wsClients {
-		if err := client.WriteMessage(websocket.TextMessage, message); err != nil {
-			u.logger.Error("Failed to send tool call WebSocket message", zap.Error(err))
+			u.wsClientsMutex.Unlock()
 			client.Close()
-			delete(u.wsClients, client)
 		}
 	}
 }
@@ -177,7 +150,8 @@ func (u *UI) handleWebSocket(c echo.Context) error {
 
 func (u *UI) Run() error {
 	funcMap := template.FuncMap{
-		"renderMarkdown": renderMarkdown,
+		"renderMarkdown":   renderMarkdown,
+		"formatToolResult": formatToolResult,
 		"inArray": func(value string, array []string) bool {
 			return slices.Contains(array, value)
 		},

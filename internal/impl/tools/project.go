@@ -501,27 +501,7 @@ func (t *ProjectTool) executeGetSource(workspace, language string, customFilters
 
 	// Create TUI-friendly summary
 	var summary strings.Builder
-	summary.WriteString(fmt.Sprintf("📁 Project Source (%d files, %d with content)\n\n", len(files), len(fileContents)))
-
-	// Show first 5 files in the summary
-	previewCount := 5
-	if len(files) < previewCount {
-		previewCount = len(files)
-	}
-
-	for i := 0; i < previewCount; i++ {
-		file := files[i]
-		contentPreview := file.Content
-		if len(contentPreview) > 100 {
-			contentPreview = contentPreview[:100] + "..."
-		}
-		summary.WriteString(fmt.Sprintf("📄 %s\n", file.Path))
-		summary.WriteString(fmt.Sprintf("   Preview: %s\n\n", strings.ReplaceAll(contentPreview, "\n", " ")))
-	}
-
-	if len(files) > 5 {
-		summary.WriteString(fmt.Sprintf("... and %d more files\n", len(files)-5))
-	}
+	summary.WriteString(fmt.Sprintf("📁 Reading %d files", len(files)))
 
 	// Create JSON response with summary for TUI and full data for AI
 	response := struct {

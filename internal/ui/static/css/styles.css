@@ -363,6 +363,155 @@ a:active, button:active, .message-content:active {
     white-space: pre;
 }
 
+/* New diff container styling */
+.diff-container {
+    margin-top: 10px;
+    border: 1px solid #444;
+    border-radius: 6px;
+    overflow: hidden;
+    background-color: #1a1a1a;
+}
+
+.diff-header {
+    background-color: #2c2c2c;
+    padding: 8px 12px;
+    font-weight: bold;
+    color: #e6e6e6;
+    border-bottom: 1px solid #444;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+}
+
+.diff-content {
+    background-color: #1a1a1a;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    line-height: 1.4;
+    overflow-x: auto;
+}
+
+.diff-line {
+    display: block;
+    padding: 2px 12px;
+    white-space: pre;
+    border-left: 3px solid transparent;
+    margin: 0;
+    min-height: 1.4em;
+}
+
+.diff-line.diff-add {
+    background-color: rgba(40, 167, 69, 0.15);
+    border-left-color: #28a745;
+    color: #d4edda;
+}
+
+.diff-line.diff-del {
+    background-color: rgba(220, 53, 69, 0.15);
+    border-left-color: #dc3545;
+    color: #f8d7da;
+}
+
+.diff-line.diff-hunk {
+    background-color: #2c2c2c;
+    border-left-color: #6c757d;
+    color: #6c757d;
+    font-weight: bold;
+}
+
+.diff-line.diff-context {
+    background-color: #1a1a1a;
+    color: #adb5bd;
+}
+
+.diff-line.diff-file {
+    background-color: #2c2c2c;
+    border-left-color: #464EB8;
+    color: #7B83EB;
+    font-weight: bold;
+}
+
+/* Tool summary styling */
+.tool-summary {
+    font-weight: bold;
+    color: #7B83EB;
+    margin-bottom: 8px;
+    padding: 4px 0;
+}
+
+/* File content styling */
+.file-content {
+    margin-top: 8px;
+}
+
+.file-content pre {
+    background-color: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 8px;
+    margin: 0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    color: #e6e6e6;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.content-info {
+    font-size: 0.8em;
+    color: #888;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+/* Memory list styling */
+.memory-list {
+    margin: 8px 0;
+    padding-left: 16px;
+}
+
+.memory-list li {
+    margin-bottom: 4px;
+    color: #ccc;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+}
+
+/* Tool result JSON styling */
+.tool-result-json {
+    background-color: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 8px;
+    margin-top: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    color: #e6e6e6;
+}
+
+.tool-result-json div {
+    margin-bottom: 4px;
+}
+
+.tool-result-json strong {
+    color: #7B83EB;
+}
+
+/* Truncated result styling */
+.tool-result-truncated pre {
+    background-color: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 8px;
+    margin: 0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    color: #e6e6e6;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
 /* Memory result styling */
 .tool-result .memory-entities,
 .tool-result .memory-relations {

@@ -76,6 +76,22 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 		}
 	}
 
+	// Filter out tool execution notification messages from the chat messages
+	filteredMessages := make([]entities.Message, 0, len(chat.Messages))
+	for _, msg := range chat.Messages {
+		if msg.Role == "assistant" {
+			content := msg.Content
+			// Skip messages that are just tool execution notifications
+			if strings.Contains(content, " tool with parameters:") && strings.HasPrefix(content, "Executing ") {
+				continue // Skip this notification message
+			}
+			if strings.HasPrefix(content, "Executing tool call.") {
+				continue // Skip generic tool execution messages
+			}
+		}
+		filteredMessages = append(filteredMessages, msg)
+	}
+
 	data := map[string]any{
 		"Title":           "AI Agents - Chat",
 		"ContentTemplate": "chat_content",
@@ -84,7 +100,7 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 		"AgentName":       agent.Name,
 		"ChatCost":        chat.Usage.TotalCost,
 		"TotalTokens":     chat.Usage.TotalTokens,
-		"Messages":        chat.Messages,
+		"Messages":        filteredMessages,
 	}
 
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)
@@ -259,7 +275,21 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 	// Extract all responses after the user message (AI assistant + tool messages)
 	var aiMessages []entities.Message
 	if userMessageIndex >= 0 && userMessageIndex < len(chat.Messages)-1 {
-		aiMessages = chat.Messages[userMessageIndex+1:]
+		rawMessages := chat.Messages[userMessageIndex+1:]
+		// Filter out tool execution notification messages
+		for _, msg := range rawMessages {
+			if msg.Role == "assistant" {
+				content := msg.Content
+				// Skip messages that are just tool execution notifications
+				if strings.Contains(content, " tool with parameters:") && strings.HasPrefix(content, "Executing ") {
+					continue // Skip this notification message
+				}
+				if strings.HasPrefix(content, "Executing tool call.") {
+					continue // Skip generic tool execution messages
+				}
+			}
+			aiMessages = append(aiMessages, msg)
+		}
 	} else if aiMessage != nil {
 		// Fallback to just the direct AI response if we can't find all messages
 		aiMessages = []entities.Message{*aiMessage}
@@ -355,8 +385,24 @@ func (c *ChatController) GetMessagesHandler(eCtx echo.Context) error {
 		}
 	}
 
+	// Filter out tool execution notification messages
+	filteredMessages := make([]entities.Message, 0, len(chat.Messages))
+	for _, msg := range chat.Messages {
+		if msg.Role == "assistant" {
+			content := msg.Content
+			// Skip messages that are just tool execution notifications
+			if strings.Contains(content, " tool with parameters:") && strings.HasPrefix(content, "Executing ") {
+				continue // Skip this notification message
+			}
+			if strings.HasPrefix(content, "Executing tool call.") {
+				continue // Skip generic tool execution messages
+			}
+		}
+		filteredMessages = append(filteredMessages, msg)
+	}
+
 	return eCtx.JSON(http.StatusOK, map[string]interface{}{
 		"chat_id":  chatID,
-		"messages": chat.Messages,
+		"messages": filteredMessages,
 	})
 }

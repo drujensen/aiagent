@@ -418,7 +418,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			// Create tool call event with summary for TUI
 			toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, summaryContent, toolError, diff, nil)
 
-			// Publish real-time event for TUI updates
+			// Publish real-time event for TUI updates (Web UI uses message history refresh)
 			events.PublishToolCallEvent(toolEvent)
 
 			var content string

@@ -10,24 +10,18 @@
     <div class="message agent-message">
       <div class="message-content">{{renderMarkdown .Content}}</div>
     </div>
-   {{else if eq .Role "tool"}}
-     <div class="message tool-message">
-       <div class="message-content">{{renderMarkdown .Content}}</div>
-       {{range .ToolCallEvents}}
-         <div class="tool-event">
-           <div class="tool-name">{{.ToolName}}</div>
-           <div class="tool-result">{{.Result}}</div>
-           {{if .Diff}}
-             <div class="tool-diff">
-               <pre>{{.Diff}}</pre>
-             </div>
-           {{end}}
-           {{if .Error}}
-             <div class="tool-error">{{.Error}}</div>
-           {{end}}
-         </div>
-       {{end}}
-     </div>
+     {{else if eq .Role "tool"}}
+       <div class="message tool-message">
+         {{range .ToolCallEvents}}
+           <div class="tool-event">
+             <div class="tool-name">{{.ToolName}}</div>
+             <div class="tool-result">{{formatToolResult .ToolName .Result .Diff}}</div>
+             {{if .Error}}
+               <div class="tool-error">{{.Error}}</div>
+             {{end}}
+           </div>
+         {{end}}
+       </div>
    {{end}}
 {{end}}
 {{end}}
