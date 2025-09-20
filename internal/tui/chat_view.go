@@ -537,7 +537,7 @@ func (c *ChatView) updateEditorContent() {
 	var sb strings.Builder
 	for _, message := range c.activeChat.Messages {
 		if message.Role == "user" {
-			sb.WriteString("\n" + c.userStyle.Render("┃ User: ") + message.Content + "\n\n")
+			sb.WriteString("\n" + c.userStyle.Render("User: ") + message.Content + "\n\n")
 		} else if message.Role == "assistant" {
 			// Skip displaying tool execution announcements in TUI
 			if len(message.ToolCalls) == 0 {
