@@ -326,6 +326,12 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				Content:   finalContent,
 				Timestamp: time.Now(),
 			}
+
+			// Add usage information to the final assistant message
+			if m.lastUsage != nil && (m.lastUsage.PromptTokens > 0 || m.lastUsage.CompletionTokens > 0) {
+				finalMessage.AddUsage(m.lastUsage.PromptTokens, m.lastUsage.CompletionTokens, 0, 0) // Cost will be calculated later by chat service
+			}
+
 			newMessages = append(newMessages, finalMessage)
 
 			// Save incrementally if callback is provided
@@ -355,6 +361,12 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			ToolCalls: toolCalls,
 			Timestamp: time.Now(),
 		}
+
+		// Add usage information to the tool call message
+		if m.lastUsage != nil && (m.lastUsage.PromptTokens > 0 || m.lastUsage.CompletionTokens > 0) {
+			toolCallMessage.AddUsage(m.lastUsage.PromptTokens, m.lastUsage.CompletionTokens, 0, 0) // Cost will be calculated later by chat service
+		}
+
 		newMessages = append(newMessages, toolCallMessage)
 
 		// Save incrementally if callback is provided
