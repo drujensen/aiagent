@@ -24,13 +24,13 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-       - name: Install xvfb
-         run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
 
-       - name: Build binaries
-         env:
+      - name: Build binaries
+        env:
            VERSION: ${{ steps.get_version.outputs.VERSION }}
-         run: |
+        run: |
            LDFLAGS="-X 'main.version=$VERSION'"
            xvfb-run -a go build -ldflags="$LDFLAGS" -o aiagent-linux-x86_64 main.go
            GOOS=linux GOARCH=arm64 go build -ldflags="$LDFLAGS" -o aiagent-linux-arm64 main.go
