@@ -43,7 +43,7 @@ func InitConfig() (*Config, error) {
 		// Read MONGO_URI from environment variables
 		mongoURI := os.Getenv("MONGO_URI")
 		if mongoURI == "" {
-			logger.Warn("MONGO_URI not set in environment variables")
+			logger.Info("MONGO_URI not set in environment variables")
 		}
 
 		configInstance = &Config{

@@ -661,6 +661,74 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch m := msg.(type) {
+	case tea.MouseMsg:
+		// Handle mouse events for focus switching and editor interaction
+		// Calculate approximate textarea position (bottom of screen)
+		textareaHeight := c.textarea.Height() + 2 + 1 // height + borders + footer line
+		editorBottom := c.height - textareaHeight
+
+		if m.Y < editorBottom {
+			// Mouse event in editor area - always pass to vimtea editor
+			if c.focused != "editor" {
+				c.focused = "editor"
+				c.textarea.Blur()
+				if c.editor != nil {
+					c.editor.SetMode(vimtea.ModeNormal)
+					c.editor.SetFocus(true)
+				}
+			}
+
+			// Handle mouse wheel events for scrolling the editor
+			switch m.Type {
+			case tea.MouseWheelUp:
+				// Send mouse wheel up to vimtea (moves cursor up)
+				mouseMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}
+				newModel, _ := c.editor.Update(mouseMsg)
+				if editor, ok := newModel.(vimtea.Editor); ok {
+					c.editor = editor
+				}
+			case tea.MouseWheelDown:
+				// Send mouse wheel down to vimtea (moves cursor down)
+				mouseMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
+				newModel, _ := c.editor.Update(mouseMsg)
+				if editor, ok := newModel.(vimtea.Editor); ok {
+					c.editor = editor
+				}
+			default:
+				// Adjust mouse coordinates for borders before passing to vimtea
+				adjustedMsg := m
+				if m.X > 0 {
+					adjustedMsg.X = m.X - 1 // Adjust for left border
+				}
+				if m.Y > 0 {
+					adjustedMsg.Y = m.Y - 1 // Adjust for top border
+				}
+
+				// Pass adjusted mouse event to vimtea editor
+				if c.editor != nil {
+					newModel, cmd := c.editor.Update(adjustedMsg)
+					if editor, ok := newModel.(vimtea.Editor); ok {
+						c.editor = editor
+					}
+					if cmd != nil {
+						cmds = append(cmds, cmd)
+					}
+				}
+			}
+			return c, tea.Batch(cmds...)
+		} else {
+			// Mouse event in textarea area
+			if c.focused != "textarea" {
+				c.focused = "textarea"
+				c.textarea.Focus()
+				if c.editor != nil {
+					c.editor.SetFocus(false)
+				}
+				cmds = append(cmds, textarea.Blink)
+			}
+		}
+		return c, tea.Batch(cmds...)
+
 	case tea.KeyMsg:
 		if c.isProcessing {
 			if m.Type == tea.KeyEsc {
@@ -891,29 +959,6 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 
 		if c.activeChat != nil {
 			c.updateEditorContent()
-		}
-		return c, nil
-	case tea.MouseMsg:
-		editorYStart := 1
-		editorBlockHeight := c.height - 4 + 2
-		editorYEnd := editorYStart + editorBlockHeight
-		if m.Y >= editorYStart && m.Y < editorYEnd {
-			switch m.Type {
-			case tea.MouseWheelUp:
-				// Send mouse wheel up to vimtea
-				mouseMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}
-				newModel, _ := c.editor.Update(mouseMsg)
-				if editor, ok := newModel.(vimtea.Editor); ok {
-					c.editor = editor
-				}
-			case tea.MouseWheelDown:
-				// Send mouse wheel down to vimtea
-				mouseMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
-				newModel, _ := c.editor.Update(mouseMsg)
-				if editor, ok := newModel.(vimtea.Editor); ok {
-					c.editor = editor
-				}
-			}
 		}
 		return c, nil
 	}
