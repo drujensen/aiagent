@@ -93,14 +93,14 @@ func convertToBaseMessages(messages []*entities.Message) []map[string]any {
 }
 
 func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]any, callback interfaces.MessageCallback) ([]*entities.Message, error) {
-	if ctx.Err() == context.Canceled {
+	if ctx.Err() != nil {
 		// Return empty results for early cancellation (no work done yet)
 		return []*entities.Message{}, nil
 	}
 
 	tools := make([]map[string]any, len(toolList))
 	for i, tool := range toolList {
-		if ctx.Err() == context.Canceled {
+		if ctx.Err() != nil {
 			// Return empty results for early cancellation (no work done yet)
 			return []*entities.Message{}, nil
 		}
@@ -283,40 +283,24 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		case "tool_calls":
 			m.logger.Info("AI requested tool calls - continuing processing",
 				zap.Int("toolCallsCount", len(toolCalls)))
+			shouldBreak = false
 		case "stop":
-			if len(toolCalls) == 0 {
-				m.logger.Info("AI finished with stop - ending processing")
-				finalContent = content
-				shouldBreak = true
-			} else {
-				m.logger.Info("AI finished with stop but has tool calls - continuing processing",
-					zap.Int("toolCallsCount", len(toolCalls)))
-			}
+			m.logger.Info("AI finished with stop - ending processing")
+			finalContent = content
+			shouldBreak = true
 		case "length":
-			if len(toolCalls) == 0 {
-				m.logger.Warn("AI finished due to length limit - ending processing")
-				finalContent = content + "\n\n[Response truncated due to length limit]"
-				shouldBreak = true
-			} else {
-				m.logger.Warn("AI finished due to length limit but has tool calls - continuing processing",
-					zap.Int("toolCallsCount", len(toolCalls)))
-			}
+			m.logger.Warn("AI finished due to length limit - ending processing")
+			finalContent = content + "\n\n[Response truncated due to length limit]"
+			shouldBreak = true
 		case "content_filter":
-			if len(toolCalls) == 0 {
-				m.logger.Warn("AI finished due to content filter - ending processing")
-				finalContent = content + "\n\n[Response filtered by content policy]"
-				shouldBreak = true
-			} else {
-				m.logger.Warn("AI finished due to content filter but has tool calls - continuing processing",
-					zap.Int("toolCallsCount", len(toolCalls)))
-			}
+			m.logger.Warn("AI finished due to content filter - ending processing")
+			finalContent = content + "\n\n[Response filtered by content policy]"
+			shouldBreak = true
 		default:
 			m.logger.Warn("Unknown finish_reason - treating as completion",
 				zap.String("finishReason", finishReason))
-			if len(toolCalls) == 0 {
-				finalContent = content
-				shouldBreak = true
-			}
+			finalContent = content
+			shouldBreak = true
 		}
 
 		if shouldBreak {

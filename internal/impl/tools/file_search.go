@@ -335,8 +335,8 @@ func (t *FileSearchTool) search(filePath, pattern string, caseSensitive bool) ([
 	}
 
 	if len(results) == 0 {
-		t.logger.Warn("No matches found during file search", zap.String("pattern", pattern), zap.String("path", filePath))
-		return nil, fmt.Errorf("no matches found for pattern '%s' in file '%s'", pattern, filePath)
+		t.logger.Info("No matches found during file search", zap.String("pattern", pattern), zap.String("path", filePath))
+		return []LineResult{}, nil
 	}
 	t.logger.Info("File searched successfully", zap.String("path", filePath), zap.Int("matches", len(results)))
 	return results, nil
@@ -377,8 +377,8 @@ func (t *FileSearchTool) searchMultipleFiles(dirPath, pattern, filePattern strin
 		return nil, fmt.Errorf("error walking directory: %v", err)
 	}
 	if len(results) == 0 {
-		t.logger.Warn("No matches found in directory", zap.String("pattern", pattern), zap.String("path", dirPath))
-		return nil, fmt.Errorf("no matches found for pattern '%s' in directory '%s'", pattern, dirPath)
+		t.logger.Info("No matches found in directory", zap.String("pattern", pattern), zap.String("path", dirPath))
+		return make(map[string][]LineResult), nil
 	}
 	t.logger.Info("Multiple files searched successfully", zap.String("path", dirPath), zap.Int("files_with_matches", len(results)))
 	return results, nil

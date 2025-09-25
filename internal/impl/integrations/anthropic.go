@@ -113,7 +113,7 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 	tools := make([]map[string]any, len(toolList))
 	for i, tool := range toolList {
 		// Check for cancellation
-		if ctx.Err() == context.Canceled {
+		if ctx.Err() != nil {
 			return nil, fmt.Errorf("operation canceled by user")
 		}
 
@@ -310,26 +310,8 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 			m.logger.Info("No tool calls generated")
 		}
 
-		// Break if no tool calls OR if stop_reason indicates completion
-		// Continue processing if there are tool calls OR if stop_reason is "tool_use"
-		if len(toolCalls) == 0 && (responseBody.StopReason == "end_turn" || responseBody.StopReason == "max_tokens" || responseBody.StopReason == "stop_sequence") {
-			finalMessage := &entities.Message{
-				ID:        uuid.New().String(),
-				Role:      "assistant",
-				Content:   textContent,
-				Timestamp: time.Now(),
-			}
-			newMessages = append(newMessages, finalMessage)
-
-			// Save incrementally if callback is provided
-			if callback != nil {
-				if err := callback([]*entities.Message{finalMessage}); err != nil {
-					m.logger.Error("Failed to save final message incrementally", zap.Error(err))
-				}
-			}
-
-			break
-		} else {
+		// Only continue if stop_reason indicates tool use
+		if responseBody.StopReason == "tool_use" {
 			toolCallMessage := &entities.Message{
 				ID:        uuid.New().String(),
 				Role:      "assistant",
@@ -437,6 +419,24 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 			}
 
 			reqBody["messages"] = apiMessages
+		} else {
+			// Any other stop_reason is treated as final
+			finalMessage := &entities.Message{
+				ID:        uuid.New().String(),
+				Role:      "assistant",
+				Content:   textContent,
+				Timestamp: time.Now(),
+			}
+			newMessages = append(newMessages, finalMessage)
+
+			// Save incrementally if callback is provided
+			if callback != nil {
+				if err := callback([]*entities.Message{finalMessage}); err != nil {
+					m.logger.Error("Failed to save final message incrementally", zap.Error(err))
+				}
+			}
+
+			break
 		}
 	}
 

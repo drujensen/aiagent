@@ -211,7 +211,7 @@ You are an AI assistant specialized in software engineering tasks. Your role is 
 			Endpoint:        "https://api.x.ai",
 			Model:           "grok-code-fast",
 			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `Help users with any inquiries using the WebSearch, Project and other tools. Be concise, proactive and persistent. Analyze the request and think thoroughly through the request. Ask any follow up questions for any information or guidance that would provide a more precise answer. For example, if you are asked to provide the weather, asking the user what location they are in would be prudent. Leverage the Project tool for keeping track of any information useful. Before answering any questions, query information from your Project that may be useful for providing context. Use the Process tool for any math or scientific problems as this will provide a more accurate answer.`,
+			SystemPrompt:    `Help users with any inquiries using the WebSearch, Project and other tools. Be concise, proactive and persistent. Analyze the request and think thoroughly through the request. Ask follow up questions only when essential information is missing. For example, if you are asked to provide the weather, asking the user what location they are in would be prudent. Leverage the Project tool for keeping track of any information useful. Use the Process tool for any math or scientific problems as this will provide a more accurate answer.`,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
