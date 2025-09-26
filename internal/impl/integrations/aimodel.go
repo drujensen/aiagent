@@ -43,7 +43,7 @@ func NewAIModelIntegration(baseURL, apiKey, model string, toolRepo interfaces.To
 	return &AIModelIntegration{
 		baseURL:    baseURL,
 		apiKey:     apiKey,
-		httpClient: &http.Client{Timeout: 300 * time.Second},
+		httpClient: &http.Client{Timeout: 30 * time.Minute},
 		model:      model,
 		toolRepo:   toolRepo,
 		logger:     logger,
@@ -534,7 +534,11 @@ func (m *AIModelIntegration) extractDiffFromResult(result string) string {
 // extractToolContent extracts full content for AI and summary for TUI from tool results
 func (m *AIModelIntegration) extractToolContent(toolName, result, toolError string) (fullContent, summaryContent string) {
 	if toolError != "" {
-		fullContent = fmt.Sprintf("Tool %s failed with error: %s", toolName, toolError)
+		// Sanitize error message to prevent model confusion from XML-like tags
+		sanitizedError := strings.ReplaceAll(toolError, "<xai:function_call>", "")
+		sanitizedError = strings.ReplaceAll(sanitizedError, "</xai:function_call", "")
+		sanitizedError = strings.ReplaceAll(sanitizedError, `{"content">`, "")
+		fullContent = fmt.Sprintf("Tool %s failed with error: %s", toolName, sanitizedError)
 		summaryContent = fullContent
 		return
 	}

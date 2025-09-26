@@ -42,7 +42,7 @@ func NewAnthropicIntegration(baseURL, apiKey, model string, toolRepo interfaces.
 	return &AnthropicIntegration{
 		baseURL:    baseURL,
 		apiKey:     apiKey,
-		httpClient: &http.Client{Timeout: 600 * time.Second},
+		httpClient: &http.Client{Timeout: 30 * time.Minute},
 		model:      model,
 		toolRepo:   toolRepo,
 		logger:     logger,
