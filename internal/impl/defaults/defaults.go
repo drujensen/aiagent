@@ -232,6 +232,7 @@ Stop assisting when:
 - Essential clarification has been provided
 
 ### Tool Usage
+- Use Todo tool to create structured task plans for complex multi-step tasks
 - Use WebSearch for external information
 - Use Project tool for context and tracking
 - Use Process tool for calculations and commands
@@ -245,7 +246,7 @@ Stop assisting when:
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Image", "Vision"},
+			Tools:           []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Image", "Vision", "Todo"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -278,6 +279,7 @@ Stop researching when:
 - Findings are conclusive and well-supported
 
 ### Tool Usage
+- Use Todo tool for complex research tasks requiring multiple steps
 - Use WebSearch for external information and trends
 - Use local tools (FileRead, Project) for codebase research
 - Stop after providing the requested information - do not continue endlessly
@@ -290,7 +292,7 @@ Stop researching when:
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process"},
+			Tools:           []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -323,6 +325,7 @@ Stop designing when:
 - The solution meets the specified needs
 
 ### Tool Usage
+- Use Todo tool for complex design tasks requiring structured planning
 - Use Project and FileRead to understand existing codebase
 - Use WebSearch for technology research when needed
 - Stop after delivering the design - do not iterate endlessly
@@ -335,7 +338,7 @@ Stop designing when:
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"WebSearch", "Project", "FileRead", "FileSearch", "Directory", "Process"},
+			Tools:           []string{"WebSearch", "Project", "FileRead", "FileSearch", "Directory", "Process", "Todo"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -368,6 +371,7 @@ Stop planning when:
 - No further planning details are requested
 
 ### Tool Usage
+- Use Todo tool to create and manage structured task lists
 - Use Project and FileRead to understand existing work
 - Stop after delivering the plan - do not expand endlessly
 
@@ -379,7 +383,7 @@ Stop planning when:
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"WebSearch", "Project", "FileRead", "FileSearch", "Directory"},
+			Tools:           []string{"WebSearch", "Project", "FileRead", "FileSearch", "Directory", "Todo"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -607,6 +611,15 @@ func DefaultTools() []*entities.ToolData {
 			Name:          "Vision",
 			Description:   "This tool image descriptions using AI providers like XAI or OpenAI.",
 			Configuration: map[string]string{"provider": "xai"},
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+		{
+			ID:            "TODO1234-5678-9ABC-DEF0-123456789ABC",
+			ToolType:      "Todo",
+			Name:          "Todo",
+			Description:   "This tool manages a structured task list for complex tasks.",
+			Configuration: map[string]string{},
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		},

@@ -132,6 +132,14 @@ func NewToolFactory() (*ToolFactory, error) {
 			}
 		},
 	}
+	toolFactory.toolFactories["Todo"] = &ToolFactoryEntry{
+		Name:        "Todo",
+		Description: "This tool manages a structured task list for complex tasks, allowing creation, reading, and status updates of todos.",
+		ConfigKeys:  []string{"workspace"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewTodoTool(name, description, configuration, logger)
+		},
+	}
 	return toolFactory, nil
 }
 
