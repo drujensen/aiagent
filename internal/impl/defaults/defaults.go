@@ -615,7 +615,7 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     now,
 		},
 		{
-			ID:            "TODO1234-5678-9ABC-DEF0-123456789ABC",
+			ID:            "48394E6B-ABB6-4A57-8419-FADE0235D214",
 			ToolType:      "Todo",
 			Name:          "Todo",
 			Description:   "This tool manages a structured task list for complex tasks.",
