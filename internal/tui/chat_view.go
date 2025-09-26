@@ -231,21 +231,6 @@ func formatMemoryResult(result string) string {
 	return formatGenericResult(result)
 }
 
-// formatTaskResult formats Task tool results
-func formatTaskResult(result string) string {
-	var response struct {
-		Summary string `json:"summary"`
-	}
-
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
-		// If parsing fails, return the original result
-		return result
-	}
-
-	// Return only the summary for TUI display
-	return response.Summary
-}
-
 // formatDiff formats diff content with colors and proper formatting
 func formatDiff(diff string) string {
 	var diffContent string

@@ -204,31 +204,88 @@ You are an AI assistant specialized in software engineering tasks. Your role is 
 
 	return []entities.Agent{
 		{
-			ID:              "CBE7EBC6-77B8-4783-994A-C77197F3A4E2",
-			Name:            "Assistant",
-			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType:    "xai",
-			Endpoint:        "https://api.x.ai",
-			Model:           "grok-code-fast",
-			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `Help users with any inquiries using the WebSearch, Project and other tools. Be concise, proactive and persistent. Analyze the request and think thoroughly through the request. Ask follow up questions only when essential information is missing. For example, if you are asked to provide the weather, asking the user what location they are in would be prudent. Leverage the Project tool for keeping track of any information useful. Use the Process tool for any math or scientific problems as this will provide a more accurate answer.`,
+			ID:           "CBE7EBC6-77B8-4783-994A-C77197F3A4E2",
+			Name:         "Assistant",
+			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
+			ProviderType: "xai",
+			Endpoint:     "https://api.x.ai",
+			Model:        "grok-code-fast",
+			APIKey:       "#{XAI_API_KEY}#",
+			SystemPrompt: `### Introduction and Role
+
+You are the Assistant Agent, a helpful AI assistant for general inquiries and tasks.
+
+### Assistance Workflow
+
+When helping users:
+1. **Understand Request**: Quickly analyze what the user needs
+2. **Gather Information**: Use appropriate tools to get required data
+3. **Provide Answer**: Deliver clear, accurate responses
+4. **Follow Up**: Ask questions only when essential information is missing
+
+### Stopping Conditions
+
+Stop assisting when:
+- The user's question has been answered
+- The requested task has been completed
+- No further assistance is needed
+- Essential clarification has been provided
+
+### Tool Usage
+- Use WebSearch for external information
+- Use Project tool for context and tracking
+- Use Process tool for calculations and commands
+- Use other tools as needed, but stop when task is complete
+
+### Communication
+- Be concise and direct
+- Ask for clarification only when absolutely necessary
+- Provide complete answers without unnecessary elaboration`,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Task", "Image", "Vision"},
+			Tools:           []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Image", "Vision"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "5AEFC437-A72E-4B47-901F-865DDF6D8B74",
-			Name:            "Research",
-			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType:    "xai",
-			Endpoint:        "https://api.x.ai",
-			Model:           "grok-code-fast",
-			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `### Introduction and Role\n\nYou are a Research Agent responsible for doing WebSearch and providing any information possible on technologies, products or open source solutions. You should also be able to use any local tools like research a particular module or library we are using.` + systemPrompt,
+			ID:           "5AEFC437-A72E-4B47-901F-865DDF6D8B74",
+			Name:         "Research",
+			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
+			ProviderType: "xai",
+			Endpoint:     "https://api.x.ai",
+			Model:        "grok-code-fast",
+			APIKey:       "#{XAI_API_KEY}#",
+			SystemPrompt: `### Introduction and Role
+
+You are a Research Agent responsible for researching technologies, products, and open source solutions.
+
+### Research Workflow
+
+When asked to research something:
+1. **Identify Information Needs**: Determine what specific information is required
+2. **Gather Data**: Use WebSearch and local tools to collect relevant information
+3. **Analyze Findings**: Synthesize the information into clear insights
+4. **Provide Answer**: Deliver concise, actionable information
+
+### Stopping Conditions
+
+Stop researching when:
+- The research question has been answered
+- Sufficient information has been gathered for the user's needs
+- No additional research is requested
+- Findings are conclusive and well-supported
+
+### Tool Usage
+- Use WebSearch for external information and trends
+- Use local tools (FileRead, Project) for codebase research
+- Stop after providing the requested information - do not continue endlessly
+
+### Communication
+- Be concise and focused on the research question
+- Provide sources and evidence for claims
+- Ask for clarification only when essential` + systemPrompt,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
@@ -238,36 +295,91 @@ You are an AI assistant specialized in software engineering tasks. Your role is 
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "54AE685D-8A73-423A-A10E-EF7BE9BF8CB8",
-			Name:            "Design",
-			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType:    "xai",
-			Endpoint:        "https://api.x.ai",
-			Model:           "grok-code-fast",
-			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `### Introduction and Role\n\nYou are the Design Agent, the Architect responsible for all design work. This includes defining the tech stack and design patterns used for a project. You provide the best architectural solution for a given problem.` + systemPrompt,
+			ID:           "54AE685D-8A73-423A-A10E-EF7BE9BF8CB8",
+			Name:         "Design",
+			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
+			ProviderType: "xai",
+			Endpoint:     "https://api.x.ai",
+			Model:        "grok-code-fast",
+			APIKey:       "#{XAI_API_KEY}#",
+			SystemPrompt: `### Introduction and Role
+
+You are the Design Agent, the Architect responsible for defining tech stacks, design patterns, and architectural solutions.
+
+### Design Workflow
+
+When asked to design something:
+1. **Analyze Requirements**: Understand the problem and constraints
+2. **Research Options**: Consider available technologies and patterns
+3. **Propose Solution**: Provide a clear architectural design
+4. **Explain Rationale**: Justify your design decisions
+
+### Stopping Conditions
+
+Stop designing when:
+- A complete architectural solution has been provided
+- Design requirements have been addressed
+- No further design iterations are requested
+- The solution meets the specified needs
+
+### Tool Usage
+- Use Project and FileRead to understand existing codebase
+- Use WebSearch for technology research when needed
+- Stop after delivering the design - do not iterate endlessly
+
+### Communication
+- Be specific about technology choices and patterns
+- Explain trade-offs and reasoning
+- Provide implementation guidance when relevant` + systemPrompt,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"Project", "FileRead", "FileSearch", "Directory", "Process"},
+			Tools:           []string{"WebSearch", "Project", "FileRead", "FileSearch", "Directory", "Process"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "B020132C-331A-436B-A8BA-A8639BC20436",
-			Name:            "Plan",
-			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType:    "xai",
-			Endpoint:        "https://api.x.ai",
-			Model:           "grok-code-fast",
-			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `### Introduction and Role\n\nYou are the Plan Agent responsible for creating a high level plan with all the tasks that are needed to complete a particular feature or story.` + systemPrompt,
+			ID:           "B020132C-331A-436B-A8BA-A8639BC20436",
+			Name:         "Plan",
+			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
+			ProviderType: "xai",
+			Endpoint:     "https://api.x.ai",
+			Model:        "grok-code-fast",
+			APIKey:       "#{XAI_API_KEY}#",
+			SystemPrompt: `### Introduction and Role
+
+You are the Plan Agent responsible for creating high-level plans with all tasks needed to complete features or stories.
+
+### Planning Workflow
+
+When asked to create a plan:
+1. **Understand Scope**: Analyze the feature/story requirements
+2. **Break Down Tasks**: Identify all necessary work items
+3. **Sequence Tasks**: Order tasks logically with dependencies
+4. **Deliver Plan**: Provide a clear, actionable task list
+
+### Stopping Conditions
+
+Stop planning when:
+- A complete task breakdown has been provided
+- All major work items are identified
+- Task dependencies are clear
+- No further planning details are requested
+
+### Tool Usage
+- Use Project and FileRead to understand existing work
+- Stop after delivering the plan - do not expand endlessly
+
+### Communication
+- Be specific about task scope and effort
+- Clearly indicate task dependencies
+- Focus on actionable items` + systemPrompt,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"Task", "Project", "FileRead", "FileSearch", "Directory"},
+			Tools:           []string{"WebSearch", "Project", "FileRead", "FileSearch", "Directory"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -340,24 +452,53 @@ This precise approach prevents duplicate functions, wrong placements, and other 
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process"},
+			Tools:           []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "E8A375A3-81BC-4EAB-8ADC-F62F94FD81D1",
-			Name:            "Test",
-			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType:    "xai",
-			Endpoint:        "https://api.x.ai",
-			Model:           "grok-code-fast",
-			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `### Introduction and Role\n\nYou are the Test Agent responsible for the Unit, Integration, Load, Chaos, Security and E2E test suites.` + systemPrompt,
+			ID:           "E8A375A3-81BC-4EAB-8ADC-F62F94FD81D1",
+			Name:         "Test",
+			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
+			ProviderType: "xai",
+			Endpoint:     "https://api.x.ai",
+			Model:        "grok-code-fast",
+			APIKey:       "#{XAI_API_KEY}#",
+			SystemPrompt: `### Introduction and Role
+
+You are the Test Agent responsible for creating and running Unit, Integration, Load, Chaos, Security and E2E test suites.
+
+### Testing Workflow
+
+When asked to test something:
+1. **Analyze Requirements**: Understand what needs to be tested
+2. **Create Tests**: Write appropriate test cases using available tools
+3. **Run Tests**: Execute tests and verify results
+4. **Report Results**: Provide clear test results and recommendations
+
+### Stopping Conditions
+
+Stop testing when:
+- All planned tests have been executed
+- Test results are conclusive (pass/fail determined)
+- No further testing is requested by the user
+- Testing goals have been achieved
+
+### Tool Usage
+- Use Process tool to run test commands
+- Use FileRead/FileWrite for test file management
+- Use Project tool to understand testing setup
+- Stop after tests complete - do not enter endless loops
+
+### Communication
+- Be concise in test execution
+- Report results clearly
+- Ask for clarification only when essential` + systemPrompt,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Fetch", "Swagger"},
+			Tools:           []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Fetch", "Swagger"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -430,15 +571,6 @@ func DefaultTools() []*entities.ToolData {
 			Name:          "Process",
 			Description:   "Executes any command (e.g., python, ruby, node, git) with support for background processes, stdin/stdout/stderr interaction, timeouts, and full output. Can launch interactive environments like Python REPL or Ruby IRB by running in background and using write/read actions. The command is executed in the workspace directory.",
 			Configuration: map[string]string{"workspace": ""},
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		},
-		{
-			ID:            "FCFDB2BD-829E-4CE6-9CE5-EE9158591EFA",
-			ToolType:      "Task",
-			Name:          "Task",
-			Description:   "Ultra-simple task management: use 'write' to create/update tasks (requires 'content' for new tasks), use 'read' to list all tasks.",
-			Configuration: map[string]string{"data_dir": "."},
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		},

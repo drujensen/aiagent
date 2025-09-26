@@ -571,8 +571,6 @@ func (m *AIModelIntegration) extractToolContent(toolName, result, toolError stri
 		fullContent = m.formatFileWriteForAI(jsonData)
 	case "Project":
 		fullContent = m.formatProjectForAI(jsonData)
-	case "Task":
-		fullContent = m.formatTaskForAI(jsonData)
 	default:
 		// For unknown tools, include all data
 		fullContent = fmt.Sprintf("Tool %s succeeded with result: %s", toolName, result)
@@ -689,37 +687,6 @@ func (m *AIModelIntegration) formatProjectForAI(data map[string]interface{}) str
 		for path, content := range fileContents {
 			if contentStr, ok := content.(string); ok {
 				result.WriteString(fmt.Sprintf("\n--- %s ---\n%s\n", path, contentStr))
-			}
-		}
-	}
-
-	return result.String()
-}
-
-func (m *AIModelIntegration) formatTaskForAI(data map[string]interface{}) string {
-	var result strings.Builder
-	result.WriteString("Task management results:\n")
-
-	if total, ok := data["total"].(float64); ok {
-		result.WriteString(fmt.Sprintf("Total tasks: %d\n", int(total)))
-	}
-	if fullTasks, ok := data["full_tasks"].([]interface{}); ok {
-		result.WriteString("\nComplete task list:\n")
-		for _, task := range fullTasks {
-			if taskData, ok := task.(map[string]interface{}); ok {
-				if id, ok := taskData["id"].(string); ok {
-					result.WriteString(fmt.Sprintf("ID: %s\n", id))
-				}
-				if content, ok := taskData["content"].(string); ok {
-					result.WriteString(fmt.Sprintf("Content: %s\n", content))
-				}
-				if status, ok := taskData["status"].(string); ok {
-					result.WriteString(fmt.Sprintf("Status: %s\n", status))
-				}
-				if createdAt, ok := taskData["created_at"].(string); ok {
-					result.WriteString(fmt.Sprintf("Created: %s\n", createdAt))
-				}
-				result.WriteString("\n")
 			}
 		}
 	}

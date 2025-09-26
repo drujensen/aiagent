@@ -132,22 +132,6 @@ func NewToolFactory() (*ToolFactory, error) {
 			}
 		},
 	}
-	toolFactory.toolFactories["MCP"] = &ToolFactoryEntry{
-		Name:        "MCP",
-		Description: `This tool provides a command line interface for the MCP (Multi-Cloud Provider) API, allowing users to interact with various cloud services and perform operations such as creating, updating, and deleting resources across multiple cloud providers.`,
-		ConfigKeys:  []string{"workspace", "command", "args"},
-		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
-			return NewMCPTool(name, description, configuration, logger)
-		},
-	}
-	toolFactory.toolFactories["Task"] = &ToolFactoryEntry{
-		Name:        "Task",
-		Description: `Simple task management for Build and Plan agents. Use 'write' to create/update tasks and 'read' to list all tasks.`,
-		ConfigKeys:  []string{"data_dir"},
-		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
-			return NewTaskTool(name, description, configuration, logger)
-		},
-	}
 	return toolFactory, nil
 }
 
