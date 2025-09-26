@@ -48,29 +48,7 @@ func (t *FileWriteTool) UpdateConfiguration(config map[string]string) {
 }
 
 func (t *FileWriteTool) FullDescription() string {
-	var b strings.Builder
-	b.WriteString(t.Description())
-	b.WriteString("\n\n")
-	b.WriteString("## Usage Instructions\n")
-	b.WriteString("This tool provides PRECISE file editing using exact string matching. **Critical**: Always read the file first to get the exact content.\n")
-	b.WriteString("1. Use FileReadTool to get the current file content and exact strings to replace\n")
-	b.WriteString("2. Provide the EXACT old_string including whitespace, indentation, and line breaks\n")
-	b.WriteString("3. The replacement will ONLY occur if old_string matches exactly\n")
-	b.WriteString("4. Use replace_all=true to replace all occurrences, false for first occurrence only\n")
-	b.WriteString("5. If you get 'old_string not found', re-read the file to get the exact content\n\n")
-	b.WriteString("- **write**: Overwrites or creates a file with new content\n")
-	b.WriteString("- **edit**: Replace exact string matches in a file (RECOMMENDED)\n")
-	b.WriteString("  - Requires: path, old_string, new_string\n")
-	b.WriteString("  - Optional: replace_all (defaults to false)\n")
-	b.WriteString("- **Safety**: Only replaces when strings match exactly\n")
-	b.WriteString("- **Precision**: No line number drift or positioning errors\n")
-	b.WriteString("\n## Configuration\n")
-	b.WriteString("| Key           | Value         |\n")
-	b.WriteString("|---------------|---------------|\n")
-	for key, value := range t.Configuration() {
-		b.WriteString(fmt.Sprintf("| %-13s | %-13s |\n", key, value))
-	}
-	return b.String()
+	return fmt.Sprintf("%s\n\nParameters:\n- operation: 'write' or 'edit'\n- path: file path\n- content: file content (for write)\n- old_string, new_string: exact strings to replace (for edit)\n- replace_all: boolean (optional)", t.Description())
 }
 
 func (t *FileWriteTool) Parameters() []entities.Parameter {

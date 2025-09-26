@@ -46,26 +46,7 @@ func (t *FileSearchTool) UpdateConfiguration(config map[string]string) {
 }
 
 func (t *FileSearchTool) FullDescription() string {
-	var b strings.Builder
-	b.WriteString(t.Description())
-	b.WriteString("\n\n")
-	b.WriteString("## Usage Instructions\n")
-	b.WriteString("This tool searches for text in files or directories. Returns a JSON array with line numbers and matching lines. Limited to 1000 lines or 10MB per file.\n")
-	b.WriteString("\n## Simplified Usage\n")
-	b.WriteString("- **Directory search**: When searching directories (like '.'), `all_files` is automatically enabled\n")
-	b.WriteString("- **File search**: For single files, just specify the file path\n")
-	b.WriteString("\n## Examples\n")
-	b.WriteString("  - Search current directory: `path='.', pattern='function'` (all_files automatically enabled)\n")
-	b.WriteString("  - Search single file: `path='file.txt', pattern='text'`\n")
-	b.WriteString("  - Search Go files only: `path='.', pattern='func', file_pattern='*.go'`\n")
-	b.WriteString("  - Case-sensitive search: `path='file.txt', pattern='Text', case_sensitive=true`\n")
-	b.WriteString("\n## Configuration\n")
-	b.WriteString("| Key           | Value         |\n")
-	b.WriteString("|---------------|---------------|\n")
-	for key, value := range t.Configuration() {
-		b.WriteString(fmt.Sprintf("| %-13s | %-13s |\n", key, value))
-	}
-	return b.String()
+	return fmt.Sprintf("%s\n\nParameters:\n- path: file or directory path\n- pattern: regex pattern to search for\n- file_pattern: file pattern filter (optional)\n- case_sensitive: boolean (optional)\n- all_files: search all files in directory (optional)", t.Description())
 }
 
 func (t *FileSearchTool) Parameters() []entities.Parameter {

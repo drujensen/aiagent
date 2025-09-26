@@ -61,23 +61,7 @@ func (t *ProcessTool) UpdateConfiguration(config map[string]string) {
 }
 
 func (t *ProcessTool) FullDescription() string {
-	var b strings.Builder
-
-	// Add description
-	b.WriteString(t.Description())
-	b.WriteString("\nNote: Output is limited to 4096 tokens (~16,384 characters).\n\n")
-
-	// Add configuration header
-	b.WriteString("Configuration for this tool:\n")
-	b.WriteString("| Key           | Value         |\n")
-	b.WriteString("|---|---|\n")
-
-	// Loop through configuration and add key-value pairs to the table
-	for key, value := range t.Configuration() {
-		b.WriteString(fmt.Sprintf("| %-13s | %-13s |\n", key, value))
-	}
-
-	return b.String()
+	return fmt.Sprintf("%s\n\nParameters:\n- command: shell command to execute\n- shell: run in shell (optional, default false)\n- timeout: timeout in seconds (optional)\n\nNote: Output limited to 4096 tokens.", t.Description())
 }
 
 func (t *ProcessTool) Parameters() []entities.Parameter {

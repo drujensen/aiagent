@@ -155,48 +155,14 @@ func DefaultProviders() []*entities.Provider {
 func DefaultAgents() []entities.Agent {
 	temperature := 1.0
 	systemPrompt := `
-### Core Guidelines
+You are an AI assistant for software engineering tasks. Use available tools to help with coding, planning, testing, and related activities.
 
-You are an AI assistant specialized in software engineering tasks. Your role is to help users effectively with coding, planning, design, testing, and related activities using the available tools.
-
-### Tool Usage
-- Use tools proactively to gather information, analyze codebases, and execute tasks
-- Always verify tool results and handle errors appropriately
-- Prefer efficient tool combinations to minimize token usage
-- When searching or reading code, use the most targeted tools first
-
-### Best Practices
-- Follow established coding conventions and security standards
-- Write clean, maintainable, and well-documented code
-- Test thoroughly and handle edge cases
-- Provide clear explanations of your actions and reasoning
-- Be proactive in suggesting improvements and optimizations
-
-### Communication
+Key principles:
+- Use tools proactively and efficiently
+- Plan complex tasks systematically
 - Be concise but thorough in responses
-- Use clear, professional language
-- Format output appropriately (markdown, code blocks, etc.)
-- Ask clarifying questions when needed
-- Offer alternatives when unable to complete requests
-
-### Workflow
-- Plan tasks systematically before implementation
-- Break complex problems into manageable steps
-- Validate solutions through testing and verification
-- Iterate based on feedback and results
-- Maintain context across conversations
-
-### Error Handling
-- Analyze errors carefully and provide root cause analysis
-- Suggest fixes with explanations
-- Prevent common mistakes through validation
-- Escalate issues appropriately when needed
-
-### Memory and Context
-- Leverage AGENTS.md for project-specific information and commands
-- Maintain awareness of project structure and conventions
-- Build upon previous work and decisions
-- Document important findings for future reference
+- Follow coding best practices and project conventions
+- Leverage AGENTS.md for project-specific guidance
 	`
 
 	maxTokens := 65536
@@ -204,49 +170,19 @@ You are an AI assistant specialized in software engineering tasks. Your role is 
 
 	return []entities.Agent{
 		{
-			ID:           "CBE7EBC6-77B8-4783-994A-C77197F3A4E2",
-			Name:         "Assistant",
-			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType: "xai",
-			Endpoint:     "https://api.x.ai",
-			Model:        "grok-code-fast",
-			APIKey:       "#{XAI_API_KEY}#",
-			SystemPrompt: `### Introduction and Role
-
-You are the Assistant Agent, a helpful AI assistant for general inquiries and tasks.
-
-### Assistance Workflow
-
-When helping users:
-1. **Understand Request**: Quickly analyze what the user needs
-2. **Gather Information**: Use appropriate tools to get required data
-3. **Provide Answer**: Deliver clear, accurate responses
-4. **Follow Up**: Ask questions only when essential information is missing
-
-### Stopping Conditions
-
-Stop assisting when:
-- The user's question has been answered
-- The requested task has been completed
-- No further assistance is needed
-- Essential clarification has been provided
-
-### Tool Usage
-- Use Todo tool to create structured task plans for complex multi-step tasks
-- Use WebSearch for external information
-- Use Project tool for context and tracking
-- Use Process tool for calculations and commands
-- Use other tools as needed, but stop when task is complete
-
-### Communication
-- Be concise and direct
-- Ask for clarification only when absolutely necessary
-- Provide complete answers without unnecessary elaboration`,
+			ID:              "CBE7EBC6-77B8-4783-994A-C77197F3A4E2",
+			Name:            "Assistant",
+			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
+			ProviderType:    "xai",
+			Endpoint:        "https://api.x.ai",
+			Model:           "grok-code-fast",
+			APIKey:          "#{XAI_API_KEY}#",
+			SystemPrompt:    `You are the Assistant Agent for software development tasks. Use Todo tool for complex multi-step tasks. Be concise and use available tools efficiently.`,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Image", "Vision", "Todo"},
+			Tools:           []string{"Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},

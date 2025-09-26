@@ -46,19 +46,7 @@ func (t *FileReadTool) UpdateConfiguration(config map[string]string) {
 }
 
 func (t *FileReadTool) FullDescription() string {
-	var b strings.Builder
-	b.WriteString(t.Description())
-	b.WriteString("\n\n")
-	b.WriteString("## Usage Instructions\n")
-	b.WriteString("This tool reads content from a text file. Use `offset` (0-based) and `limit` to specify a range of lines to read. Limited to 2000 lines or 10MB per file.\n")
-	b.WriteString("The tool returns a JSON array with line numbers and text.\n")
-	b.WriteString("\n## Configuration\n")
-	b.WriteString("| Key           | Value         |\n")
-	b.WriteString("|---------------|---------------|\n")
-	for key, value := range t.Configuration() {
-		b.WriteString(fmt.Sprintf("| %-13s | %-13s |\n", key, value))
-	}
-	return b.String()
+	return fmt.Sprintf("%s\n\nParameters:\n- filePath: absolute path to file\n- offset: starting line number (0-based, optional)\n- limit: max lines to read (optional, default 2000)", t.Description())
 }
 
 func (t *FileReadTool) Parameters() []entities.Parameter {

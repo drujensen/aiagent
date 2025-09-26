@@ -47,37 +47,7 @@ func (t *ProjectTool) UpdateConfiguration(config map[string]string) {
 }
 
 func (t *ProjectTool) FullDescription() string {
-	var b strings.Builder
-	b.WriteString(t.Description())
-	b.WriteString("\n\n")
-	b.WriteString("## Usage Instructions\n")
-	b.WriteString("This tool provides project details and source code in JSON format.\n")
-	b.WriteString("- 'read': Reads the project markdown file.\n")
-	b.WriteString("- 'get_source': Provides file map (directory tree) and full file contents for relevant files.\n")
-	b.WriteString("  - Language is auto-detected from project files (go.mod, package.json, etc.) if not specified.\n")
-	b.WriteString("  - Use 'language' to override auto-detection (e.g., 'go', 'python', 'javascript').\n")
-	b.WriteString("  - Override with 'filters' array for custom file patterns.\n")
-	b.WriteString("  - Use 'max_file_size' to limit individual file parsing (in bytes).\n")
-	b.WriteString("\n## Supported Languages and Default Filters\n")
-	b.WriteString("- c: **/*.c, **/*.h, Makefile\n")
-	b.WriteString("- cpp: **/*.cpp, **/*.hpp, **/*.h, CMakeLists.txt\n")
-	b.WriteString("- go: **/*.go, go.mod\n")
-	b.WriteString("- csharp: **/*.cs, **/*.csproj, *.sln\n")
-	b.WriteString("- java: **/*.java, **/*.xml\n")
-	b.WriteString("- kotlin: **/*.kt, **/*.kts, build.gradle.kts\n")
-	b.WriteString("- javascript: **/*.js, **/*.ts, package.json\n")
-	b.WriteString("- typescript: **/*.ts, **/*.tsx, package.json\n")
-	b.WriteString("- python: **/*.py, requirements.txt, setup.py\n")
-	b.WriteString("- ruby: **/*.rb, Gemfile\n")
-	b.WriteString("- rust: **/*.rs, Cargo.toml\n")
-	b.WriteString("- swift: **/*.swift, Package.swift\n")
-	b.WriteString("\n## Configuration\n")
-	b.WriteString("| Key           | Value         |\n")
-	b.WriteString("|---------------|---------------|\n")
-	for key, value := range t.Configuration() {
-		b.WriteString(fmt.Sprintf("| %-13s | %-13s |\n", key, value))
-	}
-	return b.String()
+	return fmt.Sprintf("%s\n\nParameters:\n- operation: 'read' or 'get_source'\n- language: programming language (optional, auto-detected)\n- filters: custom file patterns (optional)\n- max_file_size: file size limit in bytes (optional)", t.Description())
 }
 
 func (t *ProjectTool) Parameters() []entities.Parameter {

@@ -52,23 +52,7 @@ func (t *DirectoryTool) UpdateConfiguration(config map[string]string) {
 }
 
 func (t *DirectoryTool) FullDescription() string {
-	var b strings.Builder
-	b.WriteString(t.Description())
-	b.WriteString("\n\n")
-	b.WriteString("## Usage Instructions\n")
-	b.WriteString("This tool supports directory management operations:\n")
-	b.WriteString("- **create_directory**: Creates a new directory at the specified path.\n")
-	b.WriteString("- **list_directory**: Lists files and directories in the specified path.\n")
-	b.WriteString("- **directory_tree**: Builds a hierarchical tree of the directory structure.\n")
-	b.WriteString("- **move**: Moves a file or directory to a new location.\n")
-	b.WriteString("- **delete**: Deletes a file or directory (requires confirm=true).\n")
-	b.WriteString("\n## Configuration\n")
-	b.WriteString("| Key           | Value         |\n")
-	b.WriteString("|---------------|---------------|\n")
-	for key, value := range t.Configuration() {
-		b.WriteString(fmt.Sprintf("| %-13s | %-13s |\n", key, value))
-	}
-	return b.String()
+	return fmt.Sprintf("%s\n\nParameters:\n- operation: create_directory, list_directory, directory_tree, move, delete\n- path: directory path\n- destination: destination path (for move)\n- confirm: boolean (required for delete)", t.Description())
 }
 
 func (t *DirectoryTool) Parameters() []entities.Parameter {

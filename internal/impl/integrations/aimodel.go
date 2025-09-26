@@ -389,6 +389,16 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				toolResult = fmt.Sprintf("Tool %s not found: %v", toolName, err)
 				toolError = err.Error()
 			} else if tool != nil {
+				// Validate tool arguments length to prevent excessive token usage
+				const maxArgLength = 10000 // 10KB limit
+				if len(toolCall.Function.Arguments) > maxArgLength {
+					m.logger.Warn("Tool arguments too long, truncating",
+						zap.String("toolName", toolName),
+						zap.Int("originalLength", len(toolCall.Function.Arguments)),
+						zap.Int("maxLength", maxArgLength))
+					toolCall.Function.Arguments = toolCall.Function.Arguments[:maxArgLength] + "...[truncated]"
+				}
+
 				m.logger.Info("Executing tool", zap.String("toolName", toolName))
 				result, err := (*tool).Execute(toolCall.Function.Arguments)
 				if err != nil {
