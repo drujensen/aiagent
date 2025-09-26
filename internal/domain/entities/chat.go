@@ -43,21 +43,20 @@ func (c *Chat) UpdateUsage() {
 		c.Usage = &ChatUsage{}
 	}
 
-	var totalPromptTokens, totalCompletionTokens, totalTokens int
+	var totalPromptTokens, totalCompletionTokens int
 	var totalCost float64
 
 	for _, msg := range c.Messages {
 		if msg.Usage != nil {
 			totalPromptTokens += msg.Usage.PromptTokens
 			totalCompletionTokens += msg.Usage.CompletionTokens
-			totalTokens += msg.Usage.TotalTokens
 			totalCost += msg.Usage.Cost
 		}
 	}
 
 	c.Usage.TotalPromptTokens = totalPromptTokens
 	c.Usage.TotalCompletionTokens = totalCompletionTokens
-	c.Usage.TotalTokens = totalTokens
+	c.Usage.TotalTokens = totalPromptTokens + totalCompletionTokens
 	c.Usage.TotalCost = totalCost
 }
 
