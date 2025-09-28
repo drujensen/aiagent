@@ -208,7 +208,47 @@ func (t *TodoTool) writeTodos(todos []struct {
 		return "", err
 	}
 
-	return fmt.Sprintf("Added %d todos to the list", len(todos)), nil
+	// Build the response with action message and full task plan
+	var result strings.Builder
+	result.WriteString(fmt.Sprintf("Added %d todos to the list\n\n", len(todos)))
+
+	// Add the full task plan
+	if len(todoList.Todos) > 0 {
+		result.WriteString("📋 Task Plan:\n\n")
+		for _, todo := range todoList.Todos {
+			checkbox := ""
+			switch todo.Status {
+			case "pending":
+				checkbox = "- [ ]"
+			case "in_progress":
+				checkbox = "- [🔄]"
+			case "completed":
+				checkbox = "- [x]"
+			case "cancelled":
+				checkbox = "- [❌]"
+			}
+
+			priorityIcon := ""
+			switch todo.Priority {
+			case "high":
+				priorityIcon = "🔴"
+			case "medium":
+				priorityIcon = "🟡"
+			case "low":
+				priorityIcon = "🟢"
+			}
+
+			result.WriteString(fmt.Sprintf("%s %s %s\n", checkbox, priorityIcon, todo.Content))
+		}
+	}
+
+	// Return JSON with summary and todos
+	jsonResult, _ := json.Marshal(map[string]interface{}{
+		"summary": result.String(),
+		"todos":   todoList.Todos,
+	})
+
+	return string(jsonResult), nil
 }
 
 func (t *TodoTool) readTodos() (string, error) {
@@ -218,7 +258,11 @@ func (t *TodoTool) readTodos() (string, error) {
 	}
 
 	if len(todoList.Todos) == 0 {
-		return "No todos found", nil
+		jsonResult, _ := json.Marshal(map[string]interface{}{
+			"summary": "No todos found",
+			"todos":   []TodoItem{},
+		})
+		return string(jsonResult), nil
 	}
 
 	var result strings.Builder
@@ -283,7 +327,47 @@ func (t *TodoTool) updateStatus(id, status string) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("Updated todo %s to status %s", id, status), nil
+	// Build the response with action message and full task plan
+	var result strings.Builder
+	result.WriteString(fmt.Sprintf("Updated todo %s to status %s\n\n", id, status))
+
+	// Add the full task plan
+	if len(todoList.Todos) > 0 {
+		result.WriteString("📋 Task Plan:\n\n")
+		for _, todo := range todoList.Todos {
+			checkbox := ""
+			switch todo.Status {
+			case "pending":
+				checkbox = "- [ ]"
+			case "in_progress":
+				checkbox = "- [🔄]"
+			case "completed":
+				checkbox = "- [x]"
+			case "cancelled":
+				checkbox = "- [❌]"
+			}
+
+			priorityIcon := ""
+			switch todo.Priority {
+			case "high":
+				priorityIcon = "🔴"
+			case "medium":
+				priorityIcon = "🟡"
+			case "low":
+				priorityIcon = "🟢"
+			}
+
+			result.WriteString(fmt.Sprintf("%s %s %s\n", checkbox, priorityIcon, todo.Content))
+		}
+	}
+
+	// Return JSON with summary and todos
+	jsonResult, _ := json.Marshal(map[string]interface{}{
+		"summary": result.String(),
+		"todos":   todoList.Todos,
+	})
+
+	return string(jsonResult), nil
 }
 
 var _ entities.Tool = (*TodoTool)(nil)
