@@ -160,10 +160,18 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 
 	var newMessages []*entities.Message
 	iterationCount := 0
+	const maxIterations = 100
+	var lastAssistantContents []string
 
 	for {
 		iterationCount++
 		m.logger.Info("Starting AI processing iteration", zap.Int("iteration", iterationCount))
+
+		// Prevent infinite loops by limiting iterations
+		if iterationCount > maxIterations {
+			m.logger.Warn("Maximum iterations reached, breaking loop", zap.Int("maxIterations", maxIterations))
+			break
+		}
 
 		if ctx.Err() == context.Canceled {
 			m.logger.Info("Processing canceled by user", zap.Int("iteration", iterationCount))
@@ -267,6 +275,16 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			// Clear tool calls since they're malformed
 			toolCalls = nil
 			finishReason = "stop"
+		}
+
+		// Check for repetitive responses to prevent infinite loops
+		lastAssistantContents = append(lastAssistantContents, content)
+		if len(lastAssistantContents) > 3 {
+			lastAssistantContents = lastAssistantContents[1:] // keep last 3
+		}
+		if len(lastAssistantContents) == 3 && lastAssistantContents[0] == lastAssistantContents[1] && lastAssistantContents[1] == lastAssistantContents[2] {
+			m.logger.Warn("Detected repetitive AI responses, breaking loop to prevent infinite loop")
+			break
 		}
 
 		m.logger.Info("AI response analysis",
