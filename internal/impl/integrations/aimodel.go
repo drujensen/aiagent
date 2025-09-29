@@ -162,6 +162,8 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 	iterationCount := 0
 	const maxIterations = 25 // Reasonable limit for most tasks
 	var lastAssistantContents []string
+	consecutiveFailures := 0
+	const maxConsecutiveFailures = 3 // Stop after 3 consecutive tool failures
 
 	for {
 		iterationCount++
@@ -278,13 +280,14 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		finishReason := responseBody.Choices[0].FinishReason
 
 		// Validate content for malformed tool call syntax
-		if strings.Contains(content, "<xai:function_call>") || strings.Contains(content, `{"content">`) {
-			m.logger.Warn("Detected malformed tool call syntax in AI response, treating as content only",
+		if strings.Contains(content, "<xai:function_call>") || strings.Contains(content, `{"content">`) ||
+			strings.Contains(content, "<parameter") || strings.Contains(content, "</parameter") ||
+			strings.Contains(content, "\u003c/") || strings.Contains(content, "\u003e") {
+			m.logger.Warn("Detected malformed tool call syntax in AI response, sanitizing",
 				zap.String("content", content))
-			// Remove malformed syntax and treat as regular content
-			content = strings.ReplaceAll(content, "<xai:function_call>", "")
-			content = strings.ReplaceAll(content, `{"content">`, "")
-			// Clear tool calls since they're malformed
+			// Remove specific malformed patterns to prevent model confusion
+			content = sanitizeMalformedContent(content)
+			// Clear tool calls since content was malformed
 			toolCalls = nil
 			finishReason = "stop"
 		}
@@ -452,6 +455,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 						zap.Error(err))
 					toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
 					toolError = err.Error()
+					consecutiveFailures++
 				} else {
 					m.logger.Info("Tool executed successfully",
 						zap.String("toolName", toolName),
@@ -461,6 +465,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 					if toolName == "FileWrite" {
 						diff = m.extractDiffFromResult(result)
 					}
+					consecutiveFailures = 0 // Reset on success
 				}
 			}
 			// Extract full data for AI and summary for TUI
@@ -502,6 +507,26 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				"tool_call_id": toolCall.ID,
 			}
 			apiMessages = append(apiMessages, toolResponseMsg)
+		}
+
+		// Check for too many consecutive tool failures
+		if consecutiveFailures >= maxConsecutiveFailures {
+			m.logger.Warn("Too many consecutive tool failures, ending processing",
+				zap.Int("consecutiveFailures", consecutiveFailures),
+				zap.Int("maxConsecutiveFailures", maxConsecutiveFailures))
+			finalMessage := &entities.Message{
+				ID:        uuid.New().String(),
+				Role:      "assistant",
+				Content:   fmt.Sprintf("Processing stopped due to %d consecutive tool failures. The tools may be malfunctioning or the task may be impossible to complete. Try breaking down the task into smaller steps.", consecutiveFailures),
+				Timestamp: time.Now(),
+			}
+			newMessages = append(newMessages, finalMessage)
+			if callback != nil {
+				if err := callback([]*entities.Message{finalMessage}); err != nil {
+					m.logger.Error("Failed to save consecutive failure message incrementally", zap.Error(err))
+				}
+			}
+			break
 		}
 
 		reqBody["messages"] = apiMessages
@@ -591,13 +616,25 @@ func (m *AIModelIntegration) GetUsage() (*entities.Usage, error) {
 	return m.lastUsage, nil
 }
 
+// sanitizeMalformedContent removes specific malformed tool call patterns that confuse the AI
+func sanitizeMalformedContent(content string) string {
+	// Remove specific malformed patterns seen in AI responses
+	content = strings.ReplaceAll(content, "<xai:function_call>", "")
+	content = strings.ReplaceAll(content, "</xai:function_call", "")
+	content = strings.ReplaceAll(content, "<parameter", "")
+	content = strings.ReplaceAll(content, "</parameter", "")
+	content = strings.ReplaceAll(content, `{"content">`, "")
+	// Remove common malformed tag patterns
+	content = strings.ReplaceAll(content, "\u003c/", "") // </
+	content = strings.ReplaceAll(content, "\u003e", "")  // >
+	return content
+}
+
 // extractToolContent extracts full content for AI and summary for TUI from tool results
 func (m *AIModelIntegration) extractToolContent(toolName, result, toolError string) (fullContent, summaryContent string) {
 	if toolError != "" {
-		// Sanitize error message to prevent model confusion from XML-like tags
-		sanitizedError := strings.ReplaceAll(toolError, "<xai:function_call>", "")
-		sanitizedError = strings.ReplaceAll(sanitizedError, "</xai:function_call", "")
-		sanitizedError = strings.ReplaceAll(sanitizedError, `{"content">`, "")
+		// Sanitize error message to prevent model confusion from malformed patterns
+		sanitizedError := sanitizeMalformedContent(toolError)
 		fullContent = fmt.Sprintf("ERROR: Tool %s failed with error: %s", toolName, sanitizedError)
 		summaryContent = fullContent
 		return
