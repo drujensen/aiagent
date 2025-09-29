@@ -227,6 +227,12 @@ func (t *FileWriteTool) Execute(arguments string) (string, error) {
 			}
 		}
 
+		// Truncate diff if too long to prevent token bloat
+		const maxDiffLength = 10000 // 10KB limit for diff
+		if len(diffStr) > maxDiffLength {
+			diffStr = diffStr[:maxDiffLength] + "\n\n[Diff truncated due to length]"
+		}
+
 		// Create JSON response with summary for TUI and full data for AI
 		response := map[string]interface{}{
 			"summary":   summary.String(),
@@ -395,6 +401,12 @@ func (t *FileWriteTool) applyPreciseEdit(filePath, oldString, newString string, 
 				previewLines++
 			}
 		}
+	}
+
+	// Truncate diff if too long to prevent token bloat
+	const maxDiffLength = 10000 // 10KB limit for diff
+	if len(diffStr) > maxDiffLength {
+		diffStr = diffStr[:maxDiffLength] + "\n\n[Diff truncated due to length]"
 	}
 
 	// Create JSON response with summary for TUI and full data for AI
