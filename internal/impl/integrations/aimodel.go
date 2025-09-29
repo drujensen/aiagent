@@ -289,7 +289,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			content = sanitizeMalformedContent(content)
 			// Clear tool calls since content was malformed
 			toolCalls = nil
-			finishReason = "stop"
+			// Don't set finishReason to "stop" - let the AI continue with sanitized content
 		}
 
 		// Check for repetitive responses to prevent infinite loops
