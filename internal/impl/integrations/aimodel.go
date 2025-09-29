@@ -453,7 +453,19 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 					m.logger.Error("Tool execution failed",
 						zap.String("toolName", toolName),
 						zap.Error(err))
-					toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
+					// Return JSON error response for consistency
+					errorResponse := map[string]interface{}{
+						"summary": fmt.Sprintf("❌ Tool %s failed: %s", toolName, err.Error()),
+						"success": false,
+						"error":   err.Error(),
+					}
+					errorJson, jsonErr := json.Marshal(errorResponse)
+					if jsonErr != nil {
+						// Fallback to plain text if JSON marshaling fails
+						toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
+					} else {
+						toolResult = string(errorJson)
+					}
 					toolError = err.Error()
 					consecutiveFailures++
 				} else {
@@ -632,20 +644,19 @@ func sanitizeMalformedContent(content string) string {
 
 // extractToolContent extracts full content for AI and summary for TUI from tool results
 func (m *AIModelIntegration) extractToolContent(toolName, result, toolError string) (fullContent, summaryContent string) {
-	if toolError != "" {
-		// Sanitize error message to prevent model confusion from malformed patterns
-		sanitizedError := sanitizeMalformedContent(toolError)
-		fullContent = fmt.Sprintf("ERROR: Tool %s failed with error: %s", toolName, sanitizedError)
-		summaryContent = fullContent
-		return
-	}
-
-	// Try to parse as JSON with summary and full data
+	// Try to parse as JSON (both success and error responses are now JSON)
 	var jsonData map[string]interface{}
 	if err := json.Unmarshal([]byte(result), &jsonData); err != nil {
-		// Not JSON, use result as-is for both AI and TUI
-		fullContent = fmt.Sprintf("SUCCESS: Tool %s completed: %s", toolName, result)
-		summaryContent = result
+		// Fallback: not JSON, use result as-is (shouldn't happen with updated tools)
+		if toolError != "" {
+			// Sanitize error message to prevent model confusion from malformed patterns
+			sanitizedError := sanitizeMalformedContent(toolError)
+			fullContent = fmt.Sprintf("ERROR: Tool %s failed with error: %s", toolName, sanitizedError)
+			summaryContent = fullContent
+		} else {
+			fullContent = fmt.Sprintf("SUCCESS: Tool %s completed: %s", toolName, result)
+			summaryContent = result
+		}
 		return
 	}
 

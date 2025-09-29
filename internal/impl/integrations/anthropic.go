@@ -453,22 +453,21 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 
 // extractToolContent extracts full content for AI and summary for TUI from tool results
 func (m *AnthropicIntegration) extractToolContent(toolName, result, toolError string) (fullContent, summaryContent string) {
-	if toolError != "" {
-		// Sanitize error message to prevent model confusion from XML-like tags
-		sanitizedError := strings.ReplaceAll(toolError, "<xai:function_call>", "")
-		sanitizedError = strings.ReplaceAll(sanitizedError, "</xai:function_call", "")
-		sanitizedError = strings.ReplaceAll(sanitizedError, `{"content">`, "")
-		fullContent = fmt.Sprintf("Tool %s failed with error: %s", toolName, sanitizedError)
-		summaryContent = fullContent
-		return
-	}
-
-	// Try to parse as JSON with summary and full data
+	// Try to parse as JSON (both success and error responses are now JSON)
 	var jsonData map[string]interface{}
 	if err := json.Unmarshal([]byte(result), &jsonData); err != nil {
-		// Not JSON, use result as-is for both AI and TUI
-		fullContent = fmt.Sprintf("Tool %s succeeded: %s", toolName, result)
-		summaryContent = result
+		// Fallback: not JSON, use result as-is (shouldn't happen with updated tools)
+		if toolError != "" {
+			// Sanitize error message to prevent model confusion from malformed patterns
+			sanitizedError := strings.ReplaceAll(toolError, "<xai:function_call>", "")
+			sanitizedError = strings.ReplaceAll(sanitizedError, "</xai:function_call", "")
+			sanitizedError = strings.ReplaceAll(sanitizedError, `{"content">`, "")
+			fullContent = fmt.Sprintf("Tool %s failed with error: %s", toolName, sanitizedError)
+			summaryContent = fullContent
+		} else {
+			fullContent = fmt.Sprintf("Tool %s succeeded: %s", toolName, result)
+			summaryContent = result
+		}
 		return
 	}
 
