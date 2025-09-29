@@ -48,8 +48,8 @@ func TestNewAgent(t *testing.T) {
 
 func TestAgent_FilterValue(t *testing.T) {
 	agent := &Agent{
-		Name:        "TestAgent",
-		Model:       "gpt-4",
+		Name:         "TestAgent",
+		Model:        "gpt-4",
 		ProviderType: ProviderOpenAI,
 	}
 
@@ -429,12 +429,12 @@ func TestToolItem_Description(t *testing.T) {
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
 		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-		 func() bool {
-			 for i := 0; i <= len(s)-len(substr); i++ {
-				 if s[i:i+len(substr)] == substr {
-					 return true
-				 }
-			 }
-			 return false
-		 }()))
+			func() bool {
+				for i := 0; i <= len(s)-len(substr); i++ {
+					if s[i:i+len(substr)] == substr {
+						return true
+					}
+				}
+				return false
+			}()))
 }

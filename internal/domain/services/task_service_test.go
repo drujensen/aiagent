@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
-	"github.com/drujensen/aiagent/internal/domain/errs"
+	errors "github.com/drujensen/aiagent/internal/domain/errs"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -86,7 +86,7 @@ func TestTaskService_GetTask(t *testing.T) {
 		result, err := service.GetTask(ctx, "")
 
 		assert.Error(t, err)
-		assert.IsType(t, &errs.ValidationError{}, err)
+		assert.IsType(t, &errors.ValidationError{}, err)
 		assert.Nil(t, result)
 	})
 }
@@ -114,14 +114,14 @@ func TestTaskService_CreateTask(t *testing.T) {
 		invalidTask := &entities.Task{Name: "Test"}
 		err := service.CreateTask(ctx, invalidTask)
 		assert.Error(t, err)
-		assert.IsType(t, &errs.ValidationError{}, err)
+		assert.IsType(t, &errors.ValidationError{}, err)
 	})
 
 	t.Run("missing name", func(t *testing.T) {
 		invalidTask := &entities.Task{ID: "test-id"}
 		err := service.CreateTask(ctx, invalidTask)
 		assert.Error(t, err)
-		assert.IsType(t, &errs.ValidationError{}, err)
+		assert.IsType(t, &errors.ValidationError{}, err)
 	})
 }
 
@@ -151,14 +151,14 @@ func TestTaskService_UpdateTask(t *testing.T) {
 		invalidTask := &entities.Task{Name: "Test"}
 		err := service.UpdateTask(ctx, invalidTask)
 		assert.Error(t, err)
-		assert.IsType(t, &errs.ValidationError{}, err)
+		assert.IsType(t, &errors.ValidationError{}, err)
 	})
 
 	t.Run("task not found", func(t *testing.T) {
-		mockRepo.On("GetTask", ctx, task.ID).Return(nil, &errs.NotFoundError{}).Once()
+		mockRepo.On("GetTask", ctx, task.ID).Return(nil, &errors.NotFoundError{}).Once()
 		err := service.UpdateTask(ctx, task)
 		assert.Error(t, err)
-		assert.IsType(t, &errs.NotFoundError{}, err)
+		assert.IsType(t, &errors.NotFoundError{}, err)
 	})
 }
 
@@ -183,13 +183,13 @@ func TestTaskService_DeleteTask(t *testing.T) {
 	t.Run("empty id", func(t *testing.T) {
 		err := service.DeleteTask(ctx, "")
 		assert.Error(t, err)
-		assert.IsType(t, &errs.ValidationError{}, err)
+		assert.IsType(t, &errors.ValidationError{}, err)
 	})
 
 	t.Run("task not found", func(t *testing.T) {
-		mockRepo.On("GetTask", ctx, "not-found").Return(nil, &errs.NotFoundError{}).Once()
+		mockRepo.On("GetTask", ctx, "not-found").Return(nil, &errors.NotFoundError{}).Once()
 		err := service.DeleteTask(ctx, "not-found")
 		assert.Error(t, err)
-		assert.IsType(t, &errs.NotFoundError{}, err)
+		assert.IsType(t, &errors.NotFoundError{}, err)
 	})
 }

@@ -160,7 +160,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 
 	var newMessages []*entities.Message
 	iterationCount := 0
-	const maxIterations = 100
+	const maxIterations = 25 // Reasonable limit for most tasks
 	var lastAssistantContents []string
 
 	for {
@@ -169,7 +169,19 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 
 		// Prevent infinite loops by limiting iterations
 		if iterationCount > maxIterations {
-			m.logger.Warn("Maximum iterations reached, breaking loop", zap.Int("maxIterations", maxIterations))
+			m.logger.Warn("Maximum iterations reached, ending processing", zap.Int("maxIterations", maxIterations))
+			finalMessage := &entities.Message{
+				ID:        uuid.New().String(),
+				Role:      "assistant",
+				Content:   fmt.Sprintf("Processing stopped after %d iterations to prevent infinite loops. This may indicate the task is too complex or the AI is stuck. Try breaking down the task into smaller steps.", maxIterations),
+				Timestamp: time.Now(),
+			}
+			newMessages = append(newMessages, finalMessage)
+			if callback != nil {
+				if err := callback([]*entities.Message{finalMessage}); err != nil {
+					m.logger.Error("Failed to save safeguard message incrementally", zap.Error(err))
+				}
+			}
 			break
 		}
 
@@ -278,13 +290,28 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		}
 
 		// Check for repetitive responses to prevent infinite loops
-		lastAssistantContents = append(lastAssistantContents, content)
-		if len(lastAssistantContents) > 3 {
-			lastAssistantContents = lastAssistantContents[1:] // keep last 3
-		}
-		if len(lastAssistantContents) == 3 && lastAssistantContents[0] == lastAssistantContents[1] && lastAssistantContents[1] == lastAssistantContents[2] {
-			m.logger.Warn("Detected repetitive AI responses, breaking loop to prevent infinite loop")
-			break
+		// Only check non-empty content, as empty content with tool calls is legitimate exploration
+		if strings.TrimSpace(content) != "" {
+			lastAssistantContents = append(lastAssistantContents, content)
+			if len(lastAssistantContents) > 5 {
+				lastAssistantContents = lastAssistantContents[1:] // keep last 5
+			}
+			if len(lastAssistantContents) == 5 && lastAssistantContents[0] == lastAssistantContents[1] && lastAssistantContents[1] == lastAssistantContents[2] && lastAssistantContents[2] == lastAssistantContents[3] && lastAssistantContents[3] == lastAssistantContents[4] {
+				m.logger.Warn("Detected repetitive AI responses, ending processing to prevent infinite loop")
+				finalMessage := &entities.Message{
+					ID:        uuid.New().String(),
+					Role:      "assistant",
+					Content:   "Processing stopped due to repetitive AI responses. The AI appears to be stuck in a loop. Try rephrasing your request or breaking it into smaller steps.",
+					Timestamp: time.Now(),
+				}
+				newMessages = append(newMessages, finalMessage)
+				if callback != nil {
+					if err := callback([]*entities.Message{finalMessage}); err != nil {
+						m.logger.Error("Failed to save safeguard message incrementally", zap.Error(err))
+					}
+				}
+				break
+			}
 		}
 
 		m.logger.Info("AI response analysis",
@@ -571,7 +598,7 @@ func (m *AIModelIntegration) extractToolContent(toolName, result, toolError stri
 		sanitizedError := strings.ReplaceAll(toolError, "<xai:function_call>", "")
 		sanitizedError = strings.ReplaceAll(sanitizedError, "</xai:function_call", "")
 		sanitizedError = strings.ReplaceAll(sanitizedError, `{"content">`, "")
-		fullContent = fmt.Sprintf("Tool %s failed with error: %s", toolName, sanitizedError)
+		fullContent = fmt.Sprintf("ERROR: Tool %s failed with error: %s", toolName, sanitizedError)
 		summaryContent = fullContent
 		return
 	}
@@ -580,7 +607,7 @@ func (m *AIModelIntegration) extractToolContent(toolName, result, toolError stri
 	var jsonData map[string]interface{}
 	if err := json.Unmarshal([]byte(result), &jsonData); err != nil {
 		// Not JSON, use result as-is for both AI and TUI
-		fullContent = fmt.Sprintf("Tool %s succeeded: %s", toolName, result)
+		fullContent = fmt.Sprintf("SUCCESS: Tool %s completed: %s", toolName, result)
 		summaryContent = result
 		return
 	}

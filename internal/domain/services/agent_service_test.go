@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
-	"github.com/drujensen/aiagent/internal/domain/errs"
+	errors "github.com/drujensen/aiagent/internal/domain/errs"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -88,7 +88,7 @@ func TestAgentService_GetAgent(t *testing.T) {
 		result, err := service.GetAgent(ctx, "")
 
 		assert.Error(t, err)
-		assert.IsType(t, &errs.ValidationError{}, err)
+		assert.IsType(t, &errors.ValidationError{}, err)
 		assert.Nil(t, result)
 	})
 }
@@ -115,28 +115,28 @@ func TestAgentService_CreateAgent(t *testing.T) {
 		invalidAgent := &entities.Agent{Name: "Test"}
 		err := service.CreateAgent(ctx, invalidAgent)
 		assert.Error(t, err)
-		assert.IsType(t, &errs.ValidationError{}, err)
+		assert.IsType(t, &errors.ValidationError{}, err)
 	})
 
 	t.Run("missing name", func(t *testing.T) {
 		invalidAgent := &entities.Agent{ID: "test-id"}
 		err := service.CreateAgent(ctx, invalidAgent)
 		assert.Error(t, err)
-		assert.IsType(t, &errs.ValidationError{}, err)
+		assert.IsType(t, &errors.ValidationError{}, err)
 	})
 
 	t.Run("missing prompt", func(t *testing.T) {
 		invalidAgent := &entities.Agent{ID: "test-id", Name: "Test"}
 		err := service.CreateAgent(ctx, invalidAgent)
 		assert.Error(t, err)
-		assert.IsType(t, &errs.ValidationError{}, err)
+		assert.IsType(t, &errors.ValidationError{}, err)
 	})
 
 	t.Run("missing model or api key", func(t *testing.T) {
 		invalidAgent := &entities.Agent{ID: "test-id", Name: "Test", SystemPrompt: "prompt"}
 		err := service.CreateAgent(ctx, invalidAgent)
 		assert.Error(t, err)
-		assert.IsType(t, &errs.ValidationError{}, err)
+		assert.IsType(t, &errors.ValidationError{}, err)
 	})
 }
 
@@ -165,14 +165,14 @@ func TestAgentService_UpdateAgent(t *testing.T) {
 		invalidAgent := &entities.Agent{Name: "Test"}
 		err := service.UpdateAgent(ctx, invalidAgent)
 		assert.Error(t, err)
-		assert.IsType(t, &errs.ValidationError{}, err)
+		assert.IsType(t, &errors.ValidationError{}, err)
 	})
 
 	t.Run("agent not found", func(t *testing.T) {
-		mockRepo.On("GetAgent", ctx, agent.ID).Return(nil, &errs.NotFoundError{}).Once()
+		mockRepo.On("GetAgent", ctx, agent.ID).Return(nil, &errors.NotFoundError{}).Once()
 		err := service.UpdateAgent(ctx, agent)
 		assert.Error(t, err)
-		assert.IsType(t, &errs.NotFoundError{}, err)
+		assert.IsType(t, &errors.NotFoundError{}, err)
 	})
 }
 
@@ -196,13 +196,13 @@ func TestAgentService_DeleteAgent(t *testing.T) {
 	t.Run("empty id", func(t *testing.T) {
 		err := service.DeleteAgent(ctx, "")
 		assert.Error(t, err)
-		assert.IsType(t, &errs.ValidationError{}, err)
+		assert.IsType(t, &errors.ValidationError{}, err)
 	})
 
 	t.Run("agent not found", func(t *testing.T) {
-		mockRepo.On("GetAgent", ctx, "not-found").Return(nil, &errs.NotFoundError{}).Once()
+		mockRepo.On("GetAgent", ctx, "not-found").Return(nil, &errors.NotFoundError{}).Once()
 		err := service.DeleteAgent(ctx, "not-found")
 		assert.Error(t, err)
-		assert.IsType(t, &errs.NotFoundError{}, err)
+		assert.IsType(t, &errors.NotFoundError{}, err)
 	})
 }
