@@ -1014,35 +1014,44 @@ func sendMessageCmd(cs services.ChatService, chatID string, msg *entities.Messag
 
 		_, err := cs.SendMessage(cmdCtx, chatID, msg)
 		if err != nil {
-			// Check if this is a timeout/cancellation error
-			if strings.Contains(err.Error(), "canceled") || strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "deadline exceeded") {
-				// This was a timeout - try to get any partial results
+			if cmdCtx.Err() == context.Canceled {
+				// User cancelled - try to get partial results
 				getChatCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()
 				updatedChat, getChatErr := cs.GetChat(getChatCtx, chatID)
 				if getChatErr == nil && len(updatedChat.Messages) > 0 {
-					// Return the partial results with a timeout notice
-					timeoutMsg := &entities.Message{
+					noticeMsg := &entities.Message{
+						Content: "⚠️  Operation cancelled by user. Showing partial results.",
+						Role:    "system",
+					}
+					updatedChat.Messages = append(updatedChat.Messages, *noticeMsg)
+					return updatedChatMsg(updatedChat)
+				}
+				return errMsg(fmt.Errorf("operation cancelled by user - no results available"))
+			} else if cmdCtx.Err() == context.DeadlineExceeded {
+				// Timeout - try to get partial results
+				getChatCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				updatedChat, getChatErr := cs.GetChat(getChatCtx, chatID)
+				if getChatErr == nil && len(updatedChat.Messages) > 0 {
+					noticeMsg := &entities.Message{
 						Content: "⚠️  Operation timed out after 1 hour. Showing partial results.",
 						Role:    "system",
 					}
-					updatedChat.Messages = append(updatedChat.Messages, *timeoutMsg)
+					updatedChat.Messages = append(updatedChat.Messages, *noticeMsg)
 					return updatedChatMsg(updatedChat)
 				}
-				// No partial results available
 				return errMsg(fmt.Errorf("operation timed out after 1 hour - no results available"))
+			} else {
+				// Other error - try to get updated chat state
+				getChatCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				updatedChat, getChatErr := cs.GetChat(getChatCtx, chatID)
+				if getChatErr == nil && len(updatedChat.Messages) > 0 {
+					return updatedChatMsg(updatedChat)
+				}
+				return errMsg(err)
 			}
-
-			// For other errors, try to get the updated chat state
-			getChatCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			updatedChat, getChatErr := cs.GetChat(getChatCtx, chatID)
-			if getChatErr == nil && len(updatedChat.Messages) > 0 {
-				// Return the updated chat with the user's message
-				return updatedChatMsg(updatedChat)
-			}
-			// If we can't get the updated chat, return the original error
-			return errMsg(err)
 		}
 		// Use a new context for GetChat in case the original context was cancelled
 		getChatCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

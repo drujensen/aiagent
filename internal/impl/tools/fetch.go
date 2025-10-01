@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
 
@@ -31,7 +32,7 @@ func NewFetchTool(name, description string, configuration map[string]string, log
 		description:   description,
 		configuration: configuration,
 		logger:        logger,
-		client:        &http.Client{},
+		client:        &http.Client{Timeout: 30 * time.Second},
 	}
 }
 

@@ -547,23 +547,35 @@ func (t *ProcessTool) formatRunOutput(jsonOutput string) (string, error) {
 		if totalLines > 5 {
 			summary.WriteString(fmt.Sprintf("   ... and %d more lines\n", totalLines-5))
 		}
+
+		// Add guidance for failed commands
+		if resp.Status == "failed" {
+			summary.WriteString("\n💡 Command failed. Common next steps:\n")
+			summary.WriteString("   - Analyze the error messages above\n")
+			summary.WriteString("   - Check command syntax and arguments\n")
+			summary.WriteString("   - Verify file paths and permissions exist\n")
+			summary.WriteString("   - Fix any issues in source code or configuration\n")
+			summary.WriteString("   - Try running the command again after addressing errors\n")
+		}
 	}
 
 	// Create JSON response with summary for TUI and full data for AI
 	response := struct {
-		Summary string `json:"summary"`
-		Command string `json:"command"`
-		Stdout  string `json:"stdout"`
-		Stderr  string `json:"stderr"`
-		PID     int    `json:"pid,omitempty"`
-		Status  string `json:"status"`
+		Summary     string `json:"summary"`
+		Command     string `json:"command"`
+		Stdout      string `json:"stdout"`
+		Stderr      string `json:"stderr"`
+		PID         int    `json:"pid,omitempty"`
+		Status      string `json:"status"`
+		Recoverable bool   `json:"recoverable,omitempty"` // Indicates if failed commands can be retried after fixing
 	}{
-		Summary: summary.String(),
-		Command: resp.Command,
-		Stdout:  resp.Stdout,
-		Stderr:  resp.Stderr,
-		PID:     resp.PID,
-		Status:  resp.Status,
+		Summary:     summary.String(),
+		Command:     resp.Command,
+		Stdout:      resp.Stdout,
+		Stderr:      resp.Stderr,
+		PID:         resp.PID,
+		Status:      resp.Status,
+		Recoverable: resp.Status == "failed", // Failed commands are typically recoverable by fixing issues
 	}
 
 	jsonResult, err := json.Marshal(response)

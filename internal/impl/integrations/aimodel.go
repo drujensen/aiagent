@@ -295,25 +295,41 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		// Check for repetitive responses to prevent infinite loops
 		// Only check non-empty content, as empty content with tool calls is legitimate exploration
 		if strings.TrimSpace(content) != "" {
-			lastAssistantContents = append(lastAssistantContents, content)
+			// Normalize content for comparison (trim whitespace, convert to lowercase)
+			normalizedContent := strings.ToLower(strings.TrimSpace(content))
+			lastAssistantContents = append(lastAssistantContents, normalizedContent)
 			if len(lastAssistantContents) > 5 {
 				lastAssistantContents = lastAssistantContents[1:] // keep last 5
 			}
-			if len(lastAssistantContents) == 5 && lastAssistantContents[0] == lastAssistantContents[1] && lastAssistantContents[1] == lastAssistantContents[2] && lastAssistantContents[2] == lastAssistantContents[3] && lastAssistantContents[3] == lastAssistantContents[4] {
-				m.logger.Warn("Detected repetitive AI responses, ending processing to prevent infinite loop")
-				finalMessage := &entities.Message{
-					ID:        uuid.New().String(),
-					Role:      "assistant",
-					Content:   "Processing stopped due to repetitive AI responses. The AI appears to be stuck in a loop. Try rephrasing your request or breaking it into smaller steps.",
-					Timestamp: time.Now(),
-				}
-				newMessages = append(newMessages, finalMessage)
-				if callback != nil {
-					if err := callback([]*entities.Message{finalMessage}); err != nil {
-						m.logger.Error("Failed to save safeguard message incrementally", zap.Error(err))
+			if len(lastAssistantContents) == 5 {
+				// Check for exact matches
+				allIdentical := lastAssistantContents[0] == lastAssistantContents[1] &&
+					lastAssistantContents[1] == lastAssistantContents[2] &&
+					lastAssistantContents[2] == lastAssistantContents[3] &&
+					lastAssistantContents[3] == lastAssistantContents[4]
+
+				// Also check for very short repetitive responses (like "Yes." loops)
+				shortResponse := len(normalizedContent) <= 10 // Very short responses
+				shortRepetitive := shortResponse && allIdentical
+
+				if allIdentical || shortRepetitive {
+					m.logger.Warn("Detected repetitive AI responses, ending processing to prevent infinite loop",
+						zap.String("content", normalizedContent),
+						zap.Bool("shortRepetitive", shortRepetitive))
+					finalMessage := &entities.Message{
+						ID:        uuid.New().String(),
+						Role:      "assistant",
+						Content:   "Processing stopped due to repetitive AI responses. The AI appears to be stuck in a loop. Try rephrasing your request or breaking it into smaller steps.",
+						Timestamp: time.Now(),
 					}
+					newMessages = append(newMessages, finalMessage)
+					if callback != nil {
+						if err := callback([]*entities.Message{finalMessage}); err != nil {
+							m.logger.Error("Failed to save safeguard message incrementally", zap.Error(err))
+						}
+					}
+					break
 				}
-				break
 			}
 		}
 
@@ -489,12 +505,8 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			// Publish real-time event for TUI updates (Web UI uses message history refresh)
 			events.PublishToolCallEvent(toolEvent)
 
-			var content string
-			if toolError != "" {
-				content = fmt.Sprintf("Tool %s failed with error: %s", toolName, toolError)
-			} else {
-				content = fullContent // Full data for AI reasoning
-			}
+			// Always provide structured JSON content to AI for consistent parsing
+			content := fullContent
 
 			var newMessage = &entities.Message{
 				ID:             uuid.New().String(),

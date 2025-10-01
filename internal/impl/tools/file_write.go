@@ -272,7 +272,7 @@ func (t *FileWriteTool) applyPreciseEdit(filePath, oldString, newString string, 
 		t.logger.Error("Failed to read file", zap.String("path", filePath), zap.Error(err))
 		// Provide helpful guidance for file not found errors
 		if os.IsNotExist(err) {
-			return "", fmt.Errorf("file does not exist: %s. For creating new files, use operation='write' instead of operation='edit'", filePath)
+			return "", fmt.Errorf("file does not exist: %s", filePath)
 		}
 		return "", fmt.Errorf("failed to read file: %v", err)
 	}
@@ -298,7 +298,7 @@ func (t *FileWriteTool) applyPreciseEdit(filePath, oldString, newString string, 
 	// Check if old_string exists
 	if !strings.Contains(fileContent, oldString) {
 		t.logger.Error("old_string not found in file", zap.String("path", filePath))
-		return "", fmt.Errorf("old_string not found in file - ensure exact match including whitespace and indentation. Use FileReadTool to get the exact content")
+		return "", fmt.Errorf("old_string not found in file")
 	}
 
 	// Count occurrences
