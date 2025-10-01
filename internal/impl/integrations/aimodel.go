@@ -163,7 +163,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 	const maxIterations = 25 // Reasonable limit for most tasks
 	var lastAssistantContents []string
 	consecutiveFailures := 0
-	const maxConsecutiveFailures = 3 // Stop after 3 consecutive tool failures
+	const maxConsecutiveFailures = 10 // Stop after 10 consecutive tool failures
 
 	for {
 		iterationCount++
