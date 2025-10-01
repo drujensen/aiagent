@@ -43,7 +43,7 @@ func NewAIModelIntegration(baseURL, apiKey, model string, toolRepo interfaces.To
 	return &AIModelIntegration{
 		baseURL:    baseURL,
 		apiKey:     apiKey,
-		httpClient: &http.Client{Timeout: 30 * time.Minute},
+		httpClient: &http.Client{Timeout: 5 * time.Minute},
 		model:      model,
 		toolRepo:   toolRepo,
 		logger:     logger,
@@ -232,7 +232,36 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			if resp.StatusCode != http.StatusOK {
 				body, _ := io.ReadAll(resp.Body)
 				m.logger.Error("Unexpected status code", zap.Int("status", resp.StatusCode), zap.String("body", string(body)))
-				return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+
+				// Provide user-friendly error messages for common HTTP status codes
+				var errMsg string
+				switch resp.StatusCode {
+				case http.StatusBadRequest:
+					errMsg = "Bad request - the request was malformed or invalid"
+				case http.StatusUnauthorized:
+					errMsg = "Authentication failed - please check your API key"
+				case http.StatusForbidden:
+					errMsg = "Access forbidden - you may not have permission to use this model"
+				case http.StatusNotFound:
+					errMsg = "Model or endpoint not found - please check your configuration"
+				case http.StatusTooManyRequests:
+					errMsg = "Rate limit exceeded - please wait before trying again"
+				case http.StatusInternalServerError:
+					errMsg = "AI provider server error - please try again later"
+				case http.StatusBadGateway:
+					errMsg = "AI provider is experiencing issues - please try again later"
+				case http.StatusServiceUnavailable:
+					errMsg = "AI provider service is temporarily unavailable - please try again later"
+				case http.StatusGatewayTimeout:
+					errMsg = "Request timed out - the AI provider took too long to respond"
+				default:
+					if resp.StatusCode >= 500 {
+						errMsg = "AI provider server error - please try again later"
+					} else {
+						errMsg = fmt.Sprintf("HTTP %d error: %s", resp.StatusCode, string(body))
+					}
+				}
+				return nil, fmt.Errorf("%s", errMsg)
 			}
 			break
 		}
