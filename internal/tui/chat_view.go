@@ -575,13 +575,14 @@ func (c *ChatView) updateEditorContent() {
 		}
 	}
 
-	// Add error as persistent system message if present
+	// Add error as temporary system message if present
 	if c.err != nil {
 		if sb.Len() > 0 {
 			sb.WriteString("\n")
 		}
 		sb.WriteString(c.systemStyle.Render("System: Error - "+c.err.Error()) + "\n\n")
-		// Keep error visible until user sends a new message
+		// Clear the error after displaying it once
+		c.err = nil
 	}
 
 	content := sb.String()
