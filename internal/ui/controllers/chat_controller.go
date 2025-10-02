@@ -335,6 +335,9 @@ func (c *ChatController) ChatCostHandler(eCtx echo.Context) error {
 		return eCtx.HTML(http.StatusInternalServerError, "<div class=\"chat-cost\">Tokens: 0 Cost: $0.00</div>")
 	}
 
+	// Recalculate usage to ensure it's up to date
+	chat.UpdateUsage()
+
 	data := map[string]any{
 		"TotalTokens": chat.Usage.TotalTokens,
 		"ChatCost":    chat.Usage.TotalCost,

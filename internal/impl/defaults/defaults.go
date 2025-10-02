@@ -170,19 +170,27 @@ Key principles:
 
 	return []entities.Agent{
 		{
-			ID:              "CBE7EBC6-77B8-4783-994A-C77197F3A4E2",
-			Name:            "Assistant",
-			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType:    "xai",
-			Endpoint:        "https://api.x.ai",
-			Model:           "grok-code-fast",
-			APIKey:          "#{XAI_API_KEY}#",
-			SystemPrompt:    `You are the Assistant Agent for software development tasks. Use Todo tool for complex multi-step tasks. Be concise and use available tools efficiently.`,
+			ID:           "CBE7EBC6-77B8-4783-994A-C77197F3A4E2",
+			Name:         "Assistant",
+			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
+			ProviderType: "xai",
+			Endpoint:     "https://api.x.ai",
+			Model:        "grok-code-fast",
+			APIKey:       "#{XAI_API_KEY}#",
+			SystemPrompt: `You are the Assistant Agent, a helpful AI assistant for various tasks including software development, research, and general inquiries. Use available tools to gather accurate information and complete tasks efficiently.
+
+Key principles:
+- Use tools proactively and efficiently to gather information
+- Never fabricate or make up information - stick to verified sources and tool results
+- If information is incomplete, clearly state what you know and what you don't
+- Provide sources and evidence for claims when possible
+- Use Todo tool for complex multi-step tasks
+- Be concise but thorough in responses`,
 			Temperature:     &temperature,
 			MaxTokens:       &maxTokens,
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
-			Tools:           []string{"Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo"},
+			Tools:           []string{"Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo", "WebSearch", "Image", "Vision"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
@@ -222,6 +230,8 @@ Stop researching when:
 
 ### Communication
 - Be concise and focused on the research question
+- Never fabricate or make up information - stick to verified sources and tool results
+- If information is incomplete, clearly state what you know and what you don't
 - Provide sources and evidence for claims
 - Ask for clarification only when essential` + systemPrompt,
 			Temperature:     &temperature,
