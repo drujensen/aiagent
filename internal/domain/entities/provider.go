@@ -1,5 +1,7 @@
 package entities
 
+import "strings"
+
 type ProviderType string
 
 const (
@@ -47,8 +49,9 @@ func NewProvider(id, name string, providerType ProviderType, baseURL, apiKeyName
 
 // GetModelPricing returns pricing information for a specific model
 func (p *Provider) GetModelPricing(modelName string) *ModelPricing {
+	modelName = strings.TrimSpace(modelName)
 	for _, model := range p.Models {
-		if model.Name == modelName {
+		if strings.EqualFold(model.Name, modelName) {
 			return &model
 		}
 	}

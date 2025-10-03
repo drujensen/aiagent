@@ -17,6 +17,9 @@ type AIModelIntegration interface {
 	// GetUsage returns token usage information for billing/reporting
 	GetUsage() (*entities.Usage, error)
 
+	// GetLastUsage returns the usage from the last API call
+	GetLastUsage() (*entities.Usage, error)
+
 	// ModelName returns the name of the model being used
 	ModelName() string
 

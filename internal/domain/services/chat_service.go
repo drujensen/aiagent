@@ -395,9 +395,13 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 	}
 
 	// Get usage information for billing
-	usage, err := aiModel.GetUsage()
+	totalUsage, err := aiModel.GetUsage()
 	if err != nil {
-		s.logger.Warn("Failed to get usage info", zap.Error(err))
+		s.logger.Warn("Failed to get total usage info", zap.Error(err))
+	}
+	lastUsage, err := aiModel.GetLastUsage()
+	if err != nil {
+		s.logger.Warn("Failed to get last usage info", zap.Error(err))
 	}
 
 	// Get pricing for this model
@@ -406,12 +410,21 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 	if modelPricing != nil {
 		inputPricePerMille = modelPricing.InputPricePerMille
 		outputPricePerMille = modelPricing.OutputPricePerMille
+	} else {
+		s.logger.Warn("No pricing found for model", zap.String("model", agent.Model), zap.String("provider", provider.Name))
+	}
+
+	// Calculate total cost
+	var totalCost float64
+	if totalUsage != nil {
+		totalCost = (float64(totalUsage.PromptTokens)*inputPricePerMille + float64(totalUsage.CompletionTokens)*outputPricePerMille) / 1000.0
 	}
 
 	// Add usage information to the last message
-	if len(newMessages) > 0 && usage != nil {
+	if len(newMessages) > 0 && lastUsage != nil {
 		lastMsg := newMessages[len(newMessages)-1]
-		lastMsg.AddUsage(usage.PromptTokens, usage.CompletionTokens, inputPricePerMille, outputPricePerMille)
+		lastMsg.AddUsage(lastUsage.PromptTokens, lastUsage.CompletionTokens, inputPricePerMille, outputPricePerMille)
+		lastMsg.Usage.Cost = totalCost
 	}
 
 	// Check if this is a partial response due to cancellation

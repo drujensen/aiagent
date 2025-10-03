@@ -540,5 +540,10 @@ func (m *AnthropicIntegration) GetUsage() (*entities.Usage, error) {
 	return m.lastUsage, nil
 }
 
+// GetLastUsage returns the usage from the last API call
+func (m *AnthropicIntegration) GetLastUsage() (*entities.Usage, error) {
+	return m.lastUsage, nil
+}
+
 // Ensure AnthropicIntegration implements AIModelIntegration
 var _ interfaces.AIModelIntegration = (*AnthropicIntegration)(nil)

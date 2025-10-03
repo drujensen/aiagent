@@ -20,13 +20,15 @@ import (
 
 // AIModelIntegration implements the Base API
 type AIModelIntegration struct {
-	baseURL    string
-	apiKey     string
-	httpClient *http.Client
-	model      string
-	toolRepo   interfaces.ToolRepository
-	logger     *zap.Logger
-	lastUsage  *entities.Usage
+	baseURL               string
+	apiKey                string
+	httpClient            *http.Client
+	model                 string
+	toolRepo              interfaces.ToolRepository
+	logger                *zap.Logger
+	lastUsage             *entities.Usage
+	totalPromptTokens     int
+	totalCompletionTokens int
 }
 
 // NewAIModelIntegration creates a new Base integration
@@ -41,13 +43,15 @@ func NewAIModelIntegration(baseURL, apiKey, model string, toolRepo interfaces.To
 		return nil, fmt.Errorf("model cannot be empty")
 	}
 	return &AIModelIntegration{
-		baseURL:    baseURL,
-		apiKey:     apiKey,
-		httpClient: &http.Client{Timeout: 30 * time.Minute},
-		model:      model,
-		toolRepo:   toolRepo,
-		logger:     logger,
-		lastUsage:  &entities.Usage{},
+		baseURL:               baseURL,
+		apiKey:                apiKey,
+		httpClient:            &http.Client{Timeout: 30 * time.Minute},
+		model:                 model,
+		toolRepo:              toolRepo,
+		logger:                logger,
+		lastUsage:             &entities.Usage{},
+		totalPromptTokens:     0,
+		totalCompletionTokens: 0,
 	}, nil
 }
 
@@ -273,6 +277,8 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		toolCalls = responseBody.Choices[0].Message.ToolCalls
 
 		// Store usage data
+		m.totalPromptTokens += responseBody.Usage.PromptTokens
+		m.totalCompletionTokens += responseBody.Usage.CompletionTokens
 		m.lastUsage.PromptTokens = responseBody.Usage.PromptTokens
 		m.lastUsage.CompletionTokens = responseBody.Usage.CompletionTokens
 		m.lastUsage.TotalTokens = responseBody.Usage.TotalTokens
@@ -635,8 +641,17 @@ func (m *AIModelIntegration) extractDiffFromResult(result string) string {
 	return ""
 }
 
-// GetUsage returns the token usage statistics
+// GetUsage returns the total token usage statistics
 func (m *AIModelIntegration) GetUsage() (*entities.Usage, error) {
+	return &entities.Usage{
+		PromptTokens:     m.totalPromptTokens,
+		CompletionTokens: m.totalCompletionTokens,
+		TotalTokens:      m.totalPromptTokens + m.totalCompletionTokens,
+	}, nil
+}
+
+// GetLastUsage returns the usage from the last API call
+func (m *AIModelIntegration) GetLastUsage() (*entities.Usage, error) {
 	return m.lastUsage, nil
 }
 

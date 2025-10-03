@@ -338,6 +338,8 @@ func (c *ChatController) ChatCostHandler(eCtx echo.Context) error {
 	// Recalculate usage to ensure it's up to date
 	chat.UpdateUsage()
 
+	c.logger.Info("Chat cost update", zap.String("chatID", chatID), zap.Int("totalTokens", chat.Usage.TotalTokens), zap.Float64("totalCost", chat.Usage.TotalCost))
+
 	data := map[string]any{
 		"TotalTokens": chat.Usage.TotalTokens,
 		"ChatCost":    chat.Usage.TotalCost,
