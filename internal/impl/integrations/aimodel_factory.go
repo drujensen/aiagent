@@ -51,6 +51,8 @@ func (f *AIModelFactory) CreateModelIntegration(agent *entities.Agent, provider 
 		return NewMistralIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
 	case entities.ProviderOllama:
 		return NewOllamaIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
+	case entities.ProviderDrujensen:
+		return NewDrujensenIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
 	case entities.ProviderGeneric:
 		// For generic providers, use the OpenAI-compatible API
 		return NewGenericIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)

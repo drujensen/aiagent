@@ -141,6 +141,18 @@ func DefaultProviders() []*entities.Provider {
 			},
 		},
 		{
+			ID:         "11981868-d638-43e6-b20d-c629e72da56f",
+			Name:       "Drujensen",
+			Type:       "drujensen",
+			BaseURL:    "https://ai.drujensen.com",
+			APIKeyName: "DRUJENSEN_API_KEY",
+			Models: []entities.ModelPricing{
+				{Name: "llama3.1:70b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000},
+				{Name: "devstral:24b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000},
+				{Name: "qwen3-coder:30b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000},
+			},
+		},
+		{
 			ID:         "DDFED2A0-8C12-4852-895A-10BD7F7F2588",
 			Name:       "Custom Provider",
 			Type:       "generic",
@@ -172,11 +184,11 @@ Key principles:
 		{
 			ID:           "CBE7EBC6-77B8-4783-994A-C77197F3A4E2",
 			Name:         "Assistant",
-			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType: "xai",
-			Endpoint:     "https://api.x.ai",
-			Model:        "grok-code-fast",
-			APIKey:       "#{XAI_API_KEY}#",
+			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
+			ProviderType: "drujensen",
+			Endpoint:     "https://ai.drujensen.com",
+			Model:        "llama3.1:70b",
+			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `You are the Assistant Agent, a helpful AI assistant for various tasks including software development, research, and general inquiries. Use available tools to gather accurate information and complete tasks efficiently.
 
 Accuracy:
@@ -200,11 +212,11 @@ Key principles:
 		{
 			ID:           "5AEFC437-A72E-4B47-901F-865DDF6D8B74",
 			Name:         "Research",
-			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType: "xai",
-			Endpoint:     "https://api.x.ai",
-			Model:        "grok-code-fast",
-			APIKey:       "#{XAI_API_KEY}#",
+			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
+			ProviderType: "drujensen",
+			Endpoint:     "https://ai.drujensen.com",
+			Model:        "llama3.1:70b",
+			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
 You are a Research Agent responsible for researching technologies, products, and open source solutions.
@@ -248,11 +260,11 @@ Stop researching when:
 		{
 			ID:           "54AE685D-8A73-423A-A10E-EF7BE9BF8CB8",
 			Name:         "Design",
-			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType: "xai",
-			Endpoint:     "https://api.x.ai",
-			Model:        "grok-code-fast",
-			APIKey:       "#{XAI_API_KEY}#",
+			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
+			ProviderType: "drujensen",
+			Endpoint:     "https://ai.drujensen.com",
+			Model:        "llama3.1:70b",
+			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
 You are the Design Agent, the Architect responsible for defining tech stacks, design patterns, and architectural solutions.
@@ -294,11 +306,11 @@ Stop designing when:
 		{
 			ID:           "B020132C-331A-436B-A8BA-A8639BC20436",
 			Name:         "Plan",
-			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType: "xai",
-			Endpoint:     "https://api.x.ai",
-			Model:        "grok-code-fast",
-			APIKey:       "#{XAI_API_KEY}#",
+			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
+			ProviderType: "drujensen",
+			Endpoint:     "https://ai.drujensen.com",
+			Model:        "llama3.1:70b",
+			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
 You are the Plan Agent responsible for creating high-level plans with all tasks needed to complete features or stories.
@@ -339,11 +351,11 @@ Stop planning when:
 		{
 			ID:           "6B0866FA-F10B-496C-93D5-7263B0F936B3",
 			Name:         "Build",
-			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType: "xai",
-			Endpoint:     "https://api.x.ai",
-			Model:        "grok-code-fast",
-			APIKey:       "#{XAI_API_KEY}#",
+			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
+			ProviderType: "drujensen",
+			Endpoint:     "https://ai.drujensen.com",
+			Model:        "devstral:24b",
+			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
 You are the Build Agent responsible for all the coding. It should make sure that it runs the linter, compiler or build and everything is properly working. Always ensure code quality by running appropriate linting/formatting, building, and testing commands using the Process tool.
@@ -412,11 +424,11 @@ This precise approach prevents duplicate functions, wrong placements, and other 
 		{
 			ID:           "E8A375A3-81BC-4EAB-8ADC-F62F94FD81D1",
 			Name:         "Test",
-			ProviderID:   "820FE148-851B-4995-81E5-C6DB2E5E5270",
-			ProviderType: "xai",
-			Endpoint:     "https://api.x.ai",
-			Model:        "grok-code-fast",
-			APIKey:       "#{XAI_API_KEY}#",
+			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
+			ProviderType: "drujensen",
+			Endpoint:     "https://ai.drujensen.com",
+			Model:        "qwen3-coder:30b",
+			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
 You are the Test Agent responsible for creating and running Unit, Integration, Load, Chaos, Security and E2E test suites.
