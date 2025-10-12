@@ -2,16 +2,14 @@ package uicontrollers
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"html/template"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
-	"github.com/drujensen/aiagent/internal/domain/errs"
+	errors "github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/services"
 
 	"github.com/google/uuid"
@@ -38,13 +36,14 @@ func NewAgentController(logger *zap.Logger, tmpl *template.Template, agentServic
 }
 
 func (c *AgentController) RegisterRoutes(e *echo.Echo) {
-	e.GET("/agents/new", c.AgentFormHandler)
-	e.POST("/agents", c.CreateAgentHandler)
-	e.GET("/agents/:id/edit", c.AgentFormHandler)
-	e.PUT("/agents/:id", c.UpdateAgentHandler)
-	e.DELETE("/agents/:id", c.DeleteAgentHandler)
+	// Temporarily disabled due to agent structure changes
+	// e.GET("/agents/new", c.AgentFormHandler)
+	// e.POST("/agents", c.CreateAgentHandler)
+	// e.GET("/agents/:id/edit", c.AgentFormHandler)
+	// e.PUT("/agents/:id", c.UpdateAgentHandler)
+	// e.DELETE("/agents/:id", c.DeleteAgentHandler)
 
-	e.GET("/agents/provider-models", c.GetProviderModelsHandler)
+	// e.GET("/agents/provider-models", c.GetProviderModelsHandler)
 }
 
 func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
@@ -90,49 +89,35 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 				return eCtx.String(http.StatusInternalServerError, "Failed to load agent")
 			}
 		}
-
-		if agent.ProviderID != "" {
-			selectedProvider, err = c.providerService.GetProvider(eCtx.Request().Context(), agent.ProviderID)
-			if err != nil {
-				switch err.(type) {
-				case *errors.NotFoundError:
-					break
-				default:
-					return eCtx.String(http.StatusInternalServerError, "Failed to load agent")
-				}
-			}
-		}
 	}
 
 	agentData := struct {
 		ID              string
 		Name            string
-		ProviderID      string
-		ProviderType    entities.ProviderType
-		Endpoint        string
-		Model           string
-		APIKey          string
+		DefaultModelID  string
 		SystemPrompt    string
 		Temperature     *float64
-		MaxTokens       *int
-		ContextWindow   *int
 		ReasoningEffort string
 		Tools           []string
+		IsEdit          bool
+		ToolNames       []string
 	}{
-		Tools: []string{},
+		ID:              agent.ID,
+		Name:            agent.Name,
+		DefaultModelID:  agent.DefaultModelID,
+		SystemPrompt:    agent.SystemPrompt,
+		Temperature:     agent.Temperature,
+		ReasoningEffort: agent.ReasoningEffort,
+		Tools:           agent.Tools,
+		IsEdit:          isEdit,
+		ToolNames:       toolNames,
 	}
 	if agent != nil {
 		agentData.ID = agent.ID
 		agentData.Name = agent.Name
-		agentData.ProviderID = agent.ProviderID
-		agentData.ProviderType = agent.ProviderType
-		agentData.Endpoint = agent.Endpoint
-		agentData.Model = agent.Model
-		agentData.APIKey = agent.APIKey
+		agentData.DefaultModelID = agent.DefaultModelID
 		agentData.SystemPrompt = agent.SystemPrompt
 		agentData.Temperature = agent.Temperature
-		agentData.MaxTokens = agent.MaxTokens
-		agentData.ContextWindow = agent.ContextWindow
 		agentData.ReasoningEffort = agent.ReasoningEffort
 		for _, tool := range agent.Tools {
 			agentData.Tools = append(agentData.Tools, tool)
@@ -162,13 +147,13 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)
 }
 
+// Temporarily disabled due to agent structure changes
+/*
 func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 	agent := &entities.Agent{
 		ID:              eCtx.FormValue("id"),
 		Name:            eCtx.FormValue("name"),
-		Endpoint:        eCtx.FormValue("endpoint"),
-		Model:           eCtx.FormValue("model"),
-		APIKey:          eCtx.FormValue("api_key"),
+		DefaultModelID:  eCtx.FormValue("default_model_id"),
 		SystemPrompt:    eCtx.FormValue("system_prompt"),
 		ReasoningEffort: eCtx.FormValue("reasoning_effort"),
 	}
@@ -176,23 +161,7 @@ func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 	c.logger.Info("Creating agent",
 		zap.String("id", agent.ID),
 		zap.String("name", agent.Name),
-		zap.String("endpoint", agent.Endpoint),
-		zap.String("model", agent.Model),
-		zap.String("api_key_length", fmt.Sprintf("%d chars", len(agent.APIKey))))
-
-	providerId := eCtx.FormValue("provider_id")
-	if providerId != "" {
-		agent.ProviderID = providerId
-
-		provider, err := c.providerService.GetProvider(eCtx.Request().Context(), providerId)
-		if err == nil && provider != nil {
-			agent.ProviderType = provider.Type
-		} else {
-			c.logger.Warn("Failed to get provider for setting provider type",
-				zap.String("provider_id", providerId),
-				zap.Error(err))
-		}
-	}
+		zap.String("default_model_id", agent.DefaultModelID))
 
 	if tempStr := eCtx.FormValue("temperature"); tempStr != "" {
 		if temp, err := strconv.ParseFloat(tempStr, 64); err == nil {
@@ -200,38 +169,10 @@ func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 		}
 	}
 
-	if maxTokensStr := eCtx.FormValue("max_tokens"); maxTokensStr != "" {
-		if maxTokens, err := strconv.Atoi(maxTokensStr); err == nil {
-			agent.MaxTokens = &maxTokens
-		}
-	} else {
-		agent.MaxTokens = nil
-	}
-
-	if contextWindowStr := eCtx.FormValue("context_window"); contextWindowStr != "" {
-		if contextWindow, err := strconv.Atoi(contextWindowStr); err == nil {
-			agent.ContextWindow = &contextWindow
-		}
-	}
-
 	tools := eCtx.Request().Form["tools"]
 	agent.Tools = make([]string, 0, len(tools))
 	for _, tool := range tools {
 		agent.Tools = append(agent.Tools, tool)
-	}
-
-	if agent.ProviderID != "" {
-		provider, err := c.providerService.GetProvider(eCtx.Request().Context(), agent.ProviderID)
-		if err != nil {
-			c.logger.Error("Failed to get provider",
-				zap.String("provider_id", agent.ProviderID),
-				zap.Error(err))
-			return eCtx.String(http.StatusBadRequest, "Failed to get provider: "+err.Error())
-		} else {
-			c.logger.Info("Provider verified",
-				zap.String("provider_id", provider.ID), // ID is string
-				zap.String("provider_name", provider.Name))
-		}
 	}
 
 	if err := c.agentService.CreateAgent(context.Background(), agent); err != nil {
@@ -242,7 +183,10 @@ func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 	eCtx.Response().Header().Set("HX-Trigger", `{"refreshAgents": true}`)
 	return eCtx.String(http.StatusOK, "Agent created successfully")
 }
+*/
 
+// Temporarily disabled
+/*
 func (c *AgentController) UpdateAgentHandler(eCtx echo.Context) error {
 	id := eCtx.Param("id")
 	if id == "" {
@@ -325,6 +269,7 @@ func (c *AgentController) UpdateAgentHandler(eCtx echo.Context) error {
 	eCtx.Response().Header().Set("HX-Trigger", `{"refreshAgents": true}`)
 	return eCtx.String(http.StatusOK, "Agent updated successfully")
 }
+*/
 
 func (c *AgentController) DeleteAgentHandler(eCtx echo.Context) error {
 	id := eCtx.Param("id")

@@ -24,7 +24,9 @@ type ChatService interface {
 	GetActiveChat(ctx context.Context) (*entities.Chat, error)
 	SetActiveChat(ctx context.Context, chatID string) error
 	CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error)
+	CreateChatWithModel(ctx context.Context, agentID, modelID, name string) (*entities.Chat, error)
 	UpdateChat(ctx context.Context, id, agentID, name string) (*entities.Chat, error)
+	UpdateChatModel(ctx context.Context, id, modelID string) (*entities.Chat, error)
 	DeleteChat(ctx context.Context, id string) error
 	SendMessage(ctx context.Context, id string, message *entities.Message) (*entities.Message, error)
 	SaveMessagesIncrementally(ctx context.Context, chatID string, messages []*entities.Message) error
@@ -34,6 +36,7 @@ type chatService struct {
 	chatRepo     interfaces.ChatRepository
 	agentRepo    interfaces.AgentRepository
 	providerRepo interfaces.ProviderRepository
+	modelRepo    interfaces.ModelRepository
 	toolRepo     interfaces.ToolRepository
 	config       *config.Config
 	logger       *zap.Logger
@@ -43,6 +46,7 @@ func NewChatService(
 	chatRepo interfaces.ChatRepository,
 	agentRepo interfaces.AgentRepository,
 	providerRepo interfaces.ProviderRepository,
+	modelRepo interfaces.ModelRepository,
 	toolRepo interfaces.ToolRepository,
 	cfg *config.Config,
 	logger *zap.Logger,
@@ -51,6 +55,7 @@ func NewChatService(
 		chatRepo:     chatRepo,
 		agentRepo:    agentRepo,
 		providerRepo: providerRepo,
+		modelRepo:    modelRepo,
 		toolRepo:     toolRepo,
 		config:       cfg,
 		logger:       logger,
@@ -79,33 +84,6 @@ func (s *chatService) GetChat(ctx context.Context, id string) (*entities.Chat, e
 	return chat, nil
 }
 
-func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error) {
-	if agentID == "" {
-		return nil, errors.ValidationErrorf("agent ID is required")
-	}
-
-	chat := entities.NewChat(agentID, name)
-	if err := s.chatRepo.CreateChat(ctx, chat); err != nil {
-		return nil, err
-	}
-
-	// Set the other chat sessions to inactive
-	chats, err := s.chatRepo.ListChats(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for _, c := range chats {
-		if c.ID != chat.ID {
-			c.Active = false
-			if err := s.chatRepo.UpdateChat(ctx, c); err != nil {
-				s.logger.Error("Failed to update chat status", zap.String("chat_id", c.ID), zap.Error(err))
-			}
-		}
-	}
-
-	return chat, nil
-}
-
 func (s *chatService) GetActiveChat(ctx context.Context) (*entities.Chat, error) {
 	chats, err := s.chatRepo.ListChats(ctx)
 	if err != nil {
@@ -118,34 +96,60 @@ func (s *chatService) GetActiveChat(ctx context.Context) (*entities.Chat, error)
 		}
 	}
 
-	return nil, errors.NotFoundErrorf("no active chat found")
+	return nil, nil // No active chat
 }
 
 func (s *chatService) SetActiveChat(ctx context.Context, chatID string) error {
 	if chatID == "" {
 		return errors.ValidationErrorf("chat ID is required")
 	}
-	chat, err := s.chatRepo.GetChat(ctx, chatID)
+
+	chats, err := s.chatRepo.ListChats(ctx)
 	if err != nil {
 		return err
 	}
+
+	for _, chat := range chats {
+		chat.Active = (chat.ID == chatID)
+		if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error) {
+	if agentID == "" {
+		return nil, errors.ValidationErrorf("agent ID is required")
+	}
+
+	// Get the agent to get the default model
+	agent, err := s.agentRepo.GetAgent(ctx, agentID)
+	if err != nil {
+		return nil, err
+	}
+
+	chat := entities.NewChat(agentID, agent.DefaultModelID, name)
+	if err := s.chatRepo.CreateChat(ctx, chat); err != nil {
+		return nil, err
+	}
+
 	// Set the other chat sessions to inactive
 	chats, err := s.chatRepo.ListChats(ctx)
 	if err != nil {
-		for _, c := range chats {
-			if c.ID != chat.ID {
-				c.Active = false
-				if err := s.chatRepo.UpdateChat(ctx, c); err != nil {
-					s.logger.Error("Failed to update chat status", zap.String("chat_id", c.ID), zap.Error(err))
-				}
+		return nil, err
+	}
+	for _, c := range chats {
+		if c.ID != chat.ID && c.Active {
+			c.Active = false
+			if err := s.chatRepo.UpdateChat(ctx, c); err != nil {
+				return nil, err
 			}
 		}
 	}
-	chat.Active = true
-	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
-		s.logger.Error("Failed to update chat status", zap.String("chat_id", chat.ID), zap.Error(err))
-	}
-	return nil
+
+	return chat, nil
 }
 
 func (s *chatService) UpdateChat(ctx context.Context, id, agentID, name string) (*entities.Chat, error) {
@@ -153,28 +157,73 @@ func (s *chatService) UpdateChat(ctx context.Context, id, agentID, name string) 
 		return nil, errors.ValidationErrorf("chat ID is required")
 	}
 
-	if agentID == "" {
-		return nil, errors.ValidationErrorf("agent ID is required")
-	}
-
-	if name == "" {
-		return nil, errors.ValidationErrorf("chat name is required")
-	}
-
-	existingChat, err := s.chatRepo.GetChat(ctx, id)
+	chat, err := s.chatRepo.GetChat(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	existingChat.Name = name
-	existingChat.AgentID = agentID
-	existingChat.UpdatedAt = time.Now()
+	chat.AgentID = agentID
+	chat.Name = name
+	chat.UpdatedAt = time.Now()
 
-	if err := s.chatRepo.UpdateChat(ctx, existingChat); err != nil {
+	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
 		return nil, err
 	}
 
-	return existingChat, nil
+	return chat, nil
+}
+
+func (s *chatService) CreateChatWithModel(ctx context.Context, agentID, modelID, name string) (*entities.Chat, error) {
+	if agentID == "" {
+		return nil, errors.ValidationErrorf("agent ID is required")
+	}
+	if modelID == "" {
+		return nil, errors.ValidationErrorf("model ID is required")
+	}
+
+	chat := entities.NewChat(agentID, modelID, name)
+	if err := s.chatRepo.CreateChat(ctx, chat); err != nil {
+		return nil, err
+	}
+
+	// Set the other chat sessions to inactive
+	chats, err := s.chatRepo.ListChats(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range chats {
+		if c.ID != chat.ID && c.Active {
+			c.Active = false
+			if err := s.chatRepo.UpdateChat(ctx, c); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return chat, nil
+}
+
+func (s *chatService) UpdateChatModel(ctx context.Context, id, modelID string) (*entities.Chat, error) {
+	if id == "" {
+		return nil, errors.ValidationErrorf("chat ID is required")
+	}
+	if modelID == "" {
+		return nil, errors.ValidationErrorf("model ID is required")
+	}
+
+	chat, err := s.chatRepo.GetChat(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	chat.ModelID = modelID
+	chat.UpdatedAt = time.Now()
+
+	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
+		return nil, err
+	}
+
+	return chat, nil
 }
 
 func (s *chatService) DeleteChat(ctx context.Context, id string) error {
@@ -257,18 +306,32 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		return nil, err
 	}
 
-	// Get the provider using agent's ProviderID (ObjectID)
-	provider, err := s.providerRepo.GetProvider(ctx, agent.ProviderID)
+	// Get the model using chat's ModelID or agent's DefaultModelID
+	modelID := chat.ModelID
+	if modelID == "" {
+		modelID = agent.DefaultModelID
+	}
+	model, err := s.modelRepo.GetModel(ctx, modelID)
+	if err != nil {
+		s.logger.Warn("failed to get model by ID",
+			zap.String("agent_id", agent.ID),
+			zap.String("model_id", modelID),
+			zap.Error(err))
+		return nil, errors.InternalErrorf("failed to get model for agent %s: %v", agent.ID, err)
+	}
+
+	// Get the provider using model's ProviderID
+	provider, err := s.providerRepo.GetProvider(ctx, model.ProviderID)
 	if err != nil {
 		s.logger.Warn("failed to get provider by ID",
 			zap.String("agent_id", agent.ID),
-			zap.String("provider_id", agent.ProviderID),
-			zap.String("provider_type", string(agent.ProviderType)),
+			zap.String("provider_id", model.ProviderID),
+			zap.String("provider_type", string(model.ProviderType)),
 			zap.Error(err))
 		return nil, errors.InternalErrorf("failed to get provider for agent %s: %v", agent.ID, err)
 	}
 
-	resolvedAPIKey, err := s.config.ResolveEnvironmentVariable(agent.APIKey)
+	resolvedAPIKey, err := s.config.ResolveEnvironmentVariable("#{" + provider.APIKeyName + "}#")
 	if err != nil {
 		s.logger.Error("Failed to resolve API key", zap.String("agent_id", agent.ID), zap.Error(err))
 		return nil, errors.InternalErrorf("failed to resolve API key for agent %s: %v", agent.ID, err)
@@ -291,17 +354,13 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 
 	// Create AI model integration based on provider type
 	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
-	aiModel, err := aiModelFactory.CreateModelIntegration(agent, provider, resolvedAPIKey)
+	aiModel, err := aiModelFactory.CreateModelIntegration(model, provider, resolvedAPIKey)
 	if err != nil {
 		s.logger.Error("Failed to create AI model integration", zap.String("agent_id", agent.ID), zap.Error(err))
 		return nil, errors.InternalErrorf("failed to initialize AI model: %v", err)
 	}
 
-	contextLength := 128000
-	if agent.ContextWindow != nil {
-		contextLength = *agent.ContextWindow
-	}
-
+	contextLength := model.ContextWindow
 	tokenLimit := contextLength
 
 	// Create system message
@@ -335,7 +394,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 	s.logger.Debug("Total message tokens: ", zap.Float64("total_message_tokens", float64(totalMessageTokens)), zap.Float64("compression_threshold", compressionThreshold))
 	if float64(totalMessageTokens) > compressionThreshold && len(chat.Messages) > 0 {
 		// Compress messages
-		compressedMessages, originalMessagesReplaced, err := s.compressMessages(ctx, chat, agent, provider, resolvedAPIKey, tokenLimit)
+		compressedMessages, originalMessagesReplaced, err := s.compressMessages(ctx, chat, model, provider, resolvedAPIKey, tokenLimit)
 		if err != nil {
 			s.logger.Warn("Failed to compress messages", zap.Error(err))
 			var tempMessages []*entities.Message
@@ -373,9 +432,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 	if agent.Temperature != nil {
 		options["temperature"] = *agent.Temperature
 	}
-	if agent.MaxTokens != nil {
-		options["max_tokens"] = *agent.MaxTokens
-	}
+
 	if agent.ReasoningEffort != "none" && agent.ReasoningEffort != "" {
 		options["reasoning_effort"] = agent.ReasoningEffort
 	}
@@ -406,12 +463,9 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 
 	// Get pricing for this model
 	var inputPricePerMille, outputPricePerMille float64
-	modelPricing := provider.GetModelPricing(agent.Model)
-	if modelPricing != nil {
-		inputPricePerMille = modelPricing.InputPricePerMille
-		outputPricePerMille = modelPricing.OutputPricePerMille
-	} else {
-		s.logger.Warn("No pricing found for model", zap.String("model", agent.Model), zap.String("provider", provider.Name))
+	modelPricing := provider.GetModelPricing(model.Name)
+	if modelPricing == nil {
+		s.logger.Warn("No pricing found for model", zap.String("model", model.Name), zap.String("provider", provider.Name))
 	}
 
 	// Calculate total cost
@@ -508,7 +562,7 @@ func isSafeSplit(messages []entities.Message, split int) bool {
 func (s *chatService) compressMessages(
 	ctx context.Context,
 	chat *entities.Chat,
-	agent *entities.Agent,
+	model *entities.Model,
 	provider *entities.Provider,
 	apiKey string,
 	tokenLimit int,
@@ -544,7 +598,7 @@ func (s *chatService) compressMessages(
 
 	// Create AI model for summarization
 	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
-	aiModel, err := aiModelFactory.CreateModelIntegration(agent, provider, apiKey)
+	aiModel, err := aiModelFactory.CreateModelIntegration(model, provider, apiKey)
 	if err != nil {
 		return nil, false, errors.InternalErrorf("failed to initialize AI model for summarization: %v", err)
 	}

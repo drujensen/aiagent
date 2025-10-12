@@ -1,0 +1,13 @@
+{{define "sidebar_models"}}
+<ul class="model-list">
+    {{range .Models}}
+      <li class="model-item">
+          <a href="#" onclick="selectModel('{{.ID}}')" class="model-link">
+              <i class="fas fa-brain"></i> {{.Name}} ({{.ProviderType}})
+          </a>
+      </li>
+    {{else}}
+      <li>No models available</li>
+    {{end}}
+</ul>
+{{end}}

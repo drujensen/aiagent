@@ -20,23 +20,34 @@ var (
 )
 
 type ChatForm struct {
-	chatService services.ChatService
-	nameField   textinput.Model
-	agentsList  list.Model
-	agents      []*entities.Agent
-	chatName    string
-	focused     string // "name" or "list"
-	err         error
-	width       int
-	height      int
+	chatService   services.ChatService
+	modelService  services.ModelService
+	nameField     textinput.Model
+	agentsList    list.Model
+	modelsList    list.Model
+	agents        []*entities.Agent
+	models        []*entities.Model
+	chatName      string
+	selectedAgent *entities.Agent
+	selectedModel *entities.Model
+	focused       string // "name", "agents", "models"
+	err           error
+	width         int
+	height        int
 }
 
-func NewChatForm(chatService services.ChatService, agentService services.AgentService) ChatForm {
+func NewChatForm(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService) ChatForm {
 	ctx := context.Background()
 	agents, err := agentService.ListAgents(ctx)
 	if err != nil {
 		fmt.Printf("Error listing agents: %v\n", err)
 		agents = []*entities.Agent{}
+	}
+
+	models, err := modelService.ListModels(ctx)
+	if err != nil {
+		fmt.Printf("Error listing models: %v\n", err)
+		models = []*entities.Model{}
 	}
 
 	// Initialize name field with wider width and explicit placeholder styling
@@ -63,12 +74,26 @@ func NewChatForm(chatService services.ChatService, agentService services.AgentSe
 	agentsList.SetFilteringEnabled(true)
 	agentsList.SetShowPagination(false)
 
+	// Initialize model list
+	modelItems := make([]list.Item, len(models))
+	for i, model := range models {
+		modelItems[i] = model
+	}
+	modelsList := list.New(modelItems, delegate, 100, 10)
+	modelsList.Title = "Select a Model"
+	modelsList.SetShowStatusBar(false)
+	modelsList.SetFilteringEnabled(true)
+	modelsList.SetShowPagination(false)
+
 	return ChatForm{
-		chatService: chatService,
-		nameField:   nameField,
-		agentsList:  agentsList,
-		agents:      agents,
-		focused:     "name",
+		chatService:  chatService,
+		modelService: modelService,
+		nameField:    nameField,
+		agentsList:   agentsList,
+		modelsList:   modelsList,
+		agents:       agents,
+		models:       models,
+		focused:      "name",
 	}
 }
 
@@ -99,22 +124,44 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 		c.width = m.Width
 		c.height = m.Height
 		c.nameField.Width = c.width - 6
-		c.agentsList.SetSize(c.width-6, c.height-10)
+		c.agentsList.SetSize(c.width-6, c.height/3)
+		c.modelsList.SetSize(c.width-6, c.height/3)
 		return c, nil
 
 	case tea.KeyMsg:
 		switch m.String() {
 		case "esc":
 			return c, func() tea.Msg { return canceledCreateChatMsg{} }
-		case "tab", "shift+tab":
-			if c.focused == "name" {
-				c.focused = "list"
+		case "tab":
+			switch c.focused {
+			case "name":
+				c.focused = "agents"
 				c.nameField.Blur()
 				c.agentsList.SetShowStatusBar(true)
-			} else {
-				c.focused = "name"
-				c.nameField.Focus()
+			case "agents":
+				c.focused = "models"
 				c.agentsList.SetShowStatusBar(false)
+				c.modelsList.SetShowStatusBar(true)
+			case "models":
+				c.focused = "name"
+				c.modelsList.SetShowStatusBar(false)
+				c.nameField.Focus()
+			}
+			return c, nil
+		case "shift+tab":
+			switch c.focused {
+			case "name":
+				c.focused = "models"
+				c.nameField.Blur()
+				c.modelsList.SetShowStatusBar(true)
+			case "agents":
+				c.focused = "name"
+				c.agentsList.SetShowStatusBar(false)
+				c.nameField.Focus()
+			case "models":
+				c.focused = "agents"
+				c.modelsList.SetShowStatusBar(false)
+				c.agentsList.SetShowStatusBar(true)
 			}
 			return c, nil
 		case "enter":
@@ -127,19 +174,32 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 				return c, nil
 			}
 			selectedAgent := c.agentsList.SelectedItem().(*entities.Agent)
-			return c, createChatCmd(c.chatService, c.nameField.Value(), selectedAgent.ID)
+			selectedModel := selectedAgent.DefaultModelID // Default to agent's model
+			if c.modelsList.SelectedItem() != nil {
+				if model, ok := c.modelsList.SelectedItem().(*entities.Model); ok {
+					selectedModel = model.ID
+				}
+			}
+			return c, createChatCmd(c.chatService, c.nameField.Value(), selectedAgent.ID, selectedModel)
 		}
 	}
 
-	if c.focused == "name" {
+	switch c.focused {
+	case "name":
 		var cmd tea.Cmd
 		c.nameField, cmd = c.nameField.Update(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
-	} else {
+	case "agents":
 		var cmd tea.Cmd
 		c.agentsList, cmd = c.agentsList.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	case "models":
+		var cmd tea.Cmd
+		c.modelsList, cmd = c.modelsList.Update(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -185,15 +245,25 @@ func (c ChatForm) View() string {
 	}
 
 	// Render the agents list with border
-	listStyle := unfocusedBorder.Width(c.width - 4).Height(c.agentsList.Height())
-	if c.focused == "list" {
-		listStyle = focusedBorder.Width(c.width - 4).Height(c.agentsList.Height())
+	agentsStyle := unfocusedBorder.Width(c.width - 4).Height(c.agentsList.Height())
+	if c.focused == "agents" {
+		agentsStyle = focusedBorder.Width(c.width - 4).Height(c.agentsList.Height())
 	}
-	sb.WriteString(listStyle.Render(c.agentsList.View()))
+	sb.WriteString("\nAgents:\n")
+	sb.WriteString(agentsStyle.Render(c.agentsList.View()))
+	sb.WriteString("\n")
+
+	// Render the models list with border
+	modelsStyle := unfocusedBorder.Width(c.width - 4).Height(c.modelsList.Height())
+	if c.focused == "models" {
+		modelsStyle = focusedBorder.Width(c.width - 4).Height(c.modelsList.Height())
+	}
+	sb.WriteString("Models:\n")
+	sb.WriteString(modelsStyle.Render(c.modelsList.View()))
 	sb.WriteString("\n")
 
 	// Render instructions
-	instructions := "Press Enter to create chat, Tab to switch focus, Esc to cancel"
+	instructions := "Press Enter to create chat, Tab/Shift+Tab to switch focus, Esc to cancel"
 	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions + "\n"))
 
 	// Render error if any
@@ -205,10 +275,10 @@ func (c ChatForm) View() string {
 	return outerStyle.Render(sb.String())
 }
 
-func createChatCmd(cs services.ChatService, name, agentID string) tea.Cmd {
+func createChatCmd(cs services.ChatService, name, agentID, modelID string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		newChat, err := cs.CreateChat(ctx, agentID, name)
+		newChat, err := cs.CreateChatWithModel(ctx, agentID, modelID, name)
 		if err != nil {
 			return errMsg(err)
 		}

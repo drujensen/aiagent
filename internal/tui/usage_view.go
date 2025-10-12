@@ -13,16 +13,18 @@ import (
 type UsageView struct {
 	chatService  services.ChatService
 	agentService services.AgentService
+	modelService services.ModelService
 	width        int
 	height       int
 	usageInfo    string // Pre-formatted usage string
 	err          error
 }
 
-func NewUsageView(chatService services.ChatService, agentService services.AgentService) UsageView {
+func NewUsageView(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService) UsageView {
 	return UsageView{
 		chatService:  chatService,
 		agentService: agentService,
+		modelService: modelService,
 	}
 }
 
@@ -101,18 +103,28 @@ func (u UsageView) fetchUsageCmd() tea.Cmd {
 		if err != nil {
 			return errMsg(err)
 		}
-		agent, err := u.agentService.GetAgent(ctx, activeChat.AgentID)
-		if err != nil {
-			return errMsg(err)
-		}
 
 		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("Provider: %s\n", agent.ProviderType))
-		sb.WriteString(fmt.Sprintf("Model: %s\n", agent.Model))
-		sb.WriteString(fmt.Sprintf("Prompt Tokens: %d\n", activeChat.Usage.TotalPromptTokens))
-		sb.WriteString(fmt.Sprintf("Completion Tokens: %d\n", activeChat.Usage.TotalCompletionTokens))
-		sb.WriteString(fmt.Sprintf("Total Tokens: %d\n", activeChat.Usage.TotalTokens))
-		sb.WriteString(fmt.Sprintf("Total Cost: $%.2f\n", activeChat.Usage.TotalCost))
+		if activeChat == nil {
+			sb.WriteString("No active chat\n")
+			sb.WriteString("Create a chat to see usage information\n")
+		} else {
+			// Get model info
+			modelName := "Unknown"
+			providerName := "Unknown"
+			if activeChat.ModelID != "" {
+				if model, err := u.modelService.GetModel(ctx, activeChat.ModelID); err == nil {
+					modelName = model.Name
+					providerName = string(model.ProviderType)
+				}
+			}
+			sb.WriteString(fmt.Sprintf("Provider: %s\n", providerName))
+			sb.WriteString(fmt.Sprintf("Model: %s\n", modelName))
+			sb.WriteString(fmt.Sprintf("Prompt Tokens: %d\n", activeChat.Usage.TotalPromptTokens))
+			sb.WriteString(fmt.Sprintf("Completion Tokens: %d\n", activeChat.Usage.TotalCompletionTokens))
+			sb.WriteString(fmt.Sprintf("Total Tokens: %d\n", activeChat.Usage.TotalTokens))
+			sb.WriteString(fmt.Sprintf("Total Cost: $%.2f\n", activeChat.Usage.TotalCost))
+		}
 
 		return updatedUsageMsg{info: sb.String()}
 	}

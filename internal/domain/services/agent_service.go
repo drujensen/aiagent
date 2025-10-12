@@ -63,8 +63,8 @@ func (s *agentService) CreateAgent(ctx context.Context, agent *entities.Agent) e
 	if agent.SystemPrompt == "" {
 		return errors.ValidationErrorf("agent prompt is required")
 	}
-	if agent.Model == "" || agent.APIKey == "" {
-		return errors.ValidationErrorf("agent endpoint, model, and API key are required")
+	if agent.DefaultModelID == "" {
+		return errors.ValidationErrorf("agent default model is required")
 	}
 
 	agent.CreatedAt = time.Now()
@@ -93,8 +93,8 @@ func (s *agentService) UpdateAgent(ctx context.Context, agent *entities.Agent) e
 	if agent.SystemPrompt == "" {
 		return errors.ValidationErrorf("agent prompt is required")
 	}
-	if agent.Model == "" || agent.APIKey == "" {
-		return errors.ValidationErrorf("agent endpoint, model, and API key are required")
+	if agent.DefaultModelID == "" {
+		return errors.ValidationErrorf("agent default model is required")
 	}
 
 	agent.CreatedAt = existing.CreatedAt

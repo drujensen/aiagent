@@ -70,7 +70,7 @@ func (v AgentView) Update(msg tea.Msg) (AgentView, tea.Cmd) {
 			items[i] = agent
 		}
 		if len(items) == 0 {
-			items = append(items, list.Item(&entities.Agent{Name: "No agents available", Model: ""}))
+			items = append(items, list.Item(&entities.Agent{Name: "No agents available"}))
 		}
 		v.list.SetItems(items)
 		v.err = nil

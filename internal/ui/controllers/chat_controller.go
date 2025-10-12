@@ -23,15 +23,17 @@ type ChatController struct {
 	tmpl            *template.Template
 	chatService     services.ChatService
 	agentService    services.AgentService
+	modelService    services.ModelService
 	activeCancelers sync.Map // Maps chatID to context cancelFunc
 }
 
-func NewChatController(logger *zap.Logger, tmpl *template.Template, chatService services.ChatService, agentService services.AgentService) *ChatController {
+func NewChatController(logger *zap.Logger, tmpl *template.Template, chatService services.ChatService, agentService services.AgentService, modelService services.ModelService) *ChatController {
 	return &ChatController{
 		logger:          logger,
 		tmpl:            tmpl,
 		chatService:     chatService,
 		agentService:    agentService,
+		modelService:    modelService,
 		activeCancelers: sync.Map{},
 	}
 }
@@ -48,6 +50,11 @@ func (c *ChatController) RegisterRoutes(e *echo.Echo) {
 	e.POST("/chats/:id/cancel", c.CancelMessageHandler)
 	e.GET("/chat-cost", c.ChatCostHandler)
 	e.GET("/chats/:id/messages", c.GetMessagesHandler)
+
+	// Agent and model switching
+	e.POST("/chats/:id/agent", c.UpdateChatAgentHandler)
+	e.POST("/chats/:id/model", c.UpdateChatModelHandler)
+	e.GET("/sidebar/models", c.SidebarModelsHandler)
 }
 
 func (c *ChatController) ChatHandler(eCtx echo.Context) error {
@@ -76,6 +83,17 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 		}
 	}
 
+	// Get current model
+	modelID := chat.ModelID
+	if modelID == "" {
+		modelID = agent.DefaultModelID
+	}
+	model, err := c.modelService.GetModel(eCtx.Request().Context(), modelID)
+	if err != nil {
+		// If model not found, use a default display
+		model = &entities.Model{Name: "Unknown Model", ProviderType: "unknown"}
+	}
+
 	// Filter out tool execution notification messages from the chat messages
 	filteredMessages := make([]entities.Message, 0, len(chat.Messages))
 	for _, msg := range chat.Messages {
@@ -98,12 +116,85 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 		"ChatID":          chatID,
 		"ChatName":        chat.Name,
 		"AgentName":       agent.Name,
+		"ModelName":       model.Name,
+		"ProviderType":    string(model.ProviderType),
 		"ChatCost":        chat.Usage.TotalCost,
 		"TotalTokens":     chat.Usage.TotalTokens,
 		"Messages":        filteredMessages,
 	}
 
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)
+}
+
+func (c *ChatController) UpdateChatAgentHandler(eCtx echo.Context) error {
+	chatID := eCtx.Param("id")
+	if chatID == "" {
+		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": "Chat ID is required"})
+	}
+
+	agentID := eCtx.FormValue("agent_id")
+	if agentID == "" {
+		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": "Agent ID is required"})
+	}
+
+	// Get the agent to verify it exists and get default model
+	agent, err := c.agentService.GetAgent(eCtx.Request().Context(), agentID)
+	if err != nil {
+		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid agent"})
+	}
+
+	// Update chat agent and reset model to agent's default
+	_, err = c.chatService.UpdateChat(eCtx.Request().Context(), chatID, agentID, "")
+	if err != nil {
+		return eCtx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to update chat agent"})
+	}
+
+	// Update model to agent's default
+	_, err = c.chatService.UpdateChatModel(eCtx.Request().Context(), chatID, agent.DefaultModelID)
+	if err != nil {
+		return eCtx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to update chat model"})
+	}
+
+	return eCtx.JSON(http.StatusOK, map[string]string{"status": "success"})
+}
+
+func (c *ChatController) UpdateChatModelHandler(eCtx echo.Context) error {
+	chatID := eCtx.Param("id")
+	if chatID == "" {
+		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": "Chat ID is required"})
+	}
+
+	modelID := eCtx.FormValue("model_id")
+	if modelID == "" {
+		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": "Model ID is required"})
+	}
+
+	// Verify model exists
+	_, err := c.modelService.GetModel(eCtx.Request().Context(), modelID)
+	if err != nil {
+		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid model"})
+	}
+
+	_, err = c.chatService.UpdateChatModel(eCtx.Request().Context(), chatID, modelID)
+	if err != nil {
+		return eCtx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to update chat model"})
+	}
+
+	return eCtx.JSON(http.StatusOK, map[string]string{"status": "success"})
+}
+
+func (c *ChatController) SidebarModelsHandler(eCtx echo.Context) error {
+	models, err := c.modelService.ListModels(eCtx.Request().Context())
+	if err != nil {
+		c.logger.Error("Failed to list models", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to load models")
+	}
+
+	data := map[string]any{
+		"Models": models,
+	}
+
+	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_models", data)
 }
 
 func (c *ChatController) ChatFormHandler(eCtx echo.Context) error {

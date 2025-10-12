@@ -28,14 +28,26 @@
              <i class="fas fa-robot"></i><div class="logo-title">AI Agents</div>
            </a>
        </div>
-       {{if eq .ContentTemplate "chat_content"}}
-           <div class="chat-title">
-               {{.ChatName}} with {{.AgentName}}
-           </div>
-           <div class="chat-cost" hx-get="/chat-cost?chat_id={{.ChatID}}" hx-trigger="refreshChatCost from:body" hx-swap="innerHTML">
-           {{template "chat_cost_partial" .}}
-           </div>
-       {{end}}
+        {{if eq .ContentTemplate "chat_content"}}
+            <div class="chat-info">
+                <div class="chat-title">
+                    {{.ChatName}}
+                </div>
+                <div class="chat-agent-model">
+                    <span class="agent-info">{{.AgentName}}</span>
+                    <span class="model-info">{{.ModelName}} ({{.ProviderType}})</span>
+                    <button class="switch-btn" onclick="showAgentSelector('{{.ChatID}}')" title="Switch Agent">
+                        <i class="fas fa-user"></i>
+                    </button>
+                    <button class="switch-btn" onclick="showModelSelector('{{.ChatID}}')" title="Switch Model">
+                        <i class="fas fa-brain"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="chat-cost" hx-get="/chat-cost?chat_id={{.ChatID}}" hx-trigger="refreshChatCost from:body" hx-swap="innerHTML">
+            {{template "chat_cost_partial" .}}
+            </div>
+        {{end}}
        <button class="hamburger" aria-label="Toggle Sidebar" hx-toggle-class="active" hx-target=".sidebar" hx-on::after-request="updateSidebarTransform()">
            <i class="fas fa-bars"></i>
        </button>
@@ -72,9 +84,101 @@
            </aside>
        </div>
    </div>
-   <script src="/static/js/sidebar.js"></script>
-   <script src="/static/js/copy_button.js"></script>
-   <script src="/static/js/message_controls.js"></script>
+    <script src="/static/js/sidebar.js"></script>
+    <script src="/static/js/copy_button.js"></script>
+    <script src="/static/js/message_controls.js"></script>
+
+    <!-- Agent Selector Modal -->
+    <div id="agent-selector-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Select Agent</h3>
+                <button class="modal-close" onclick="hideAgentSelector()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="agent-list" hx-get="/sidebar/agents" hx-trigger="load" hx-swap="innerHTML"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Model Selector Modal -->
+    <div id="model-selector-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Select Model</h3>
+                <button class="modal-close" onclick="hideModelSelector()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="model-list" hx-get="/sidebar/models" hx-trigger="load" hx-swap="innerHTML"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentChatId = '';
+
+        function showAgentSelector(chatId) {
+            currentChatId = chatId;
+            document.getElementById('agent-selector-modal').style.display = 'block';
+        }
+
+        function hideAgentSelector() {
+            document.getElementById('agent-selector-modal').style.display = 'none';
+        }
+
+        function showModelSelector(chatId) {
+            currentChatId = chatId;
+            document.getElementById('model-selector-modal').style.display = 'block';
+        }
+
+        function hideModelSelector() {
+            document.getElementById('model-selector-modal').style.display = 'none';
+        }
+
+        function selectAgent(agentId) {
+            fetch('/chats/' + currentChatId + '/agent', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'agent_id=' + encodeURIComponent(agentId)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Error switching agent: ' + error);
+            });
+            hideAgentSelector();
+        }
+
+        function selectModel(modelId) {
+            fetch('/chats/' + currentChatId + '/model', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'model_id=' + encodeURIComponent(modelId)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Error switching model: ' + error);
+            });
+            hideModelSelector();
+        }
+    </script>
 </body>
 </html>
 {{end}}

@@ -38,6 +38,7 @@ var embeddedFiles embed.FS
 type UI struct {
 	chatService     services.ChatService
 	agentService    services.AgentService
+	modelService    services.ModelService
 	toolService     services.ToolService
 	providerService services.ProviderService
 	logger          *zap.Logger
@@ -46,10 +47,11 @@ type UI struct {
 	wsClientsMutex  sync.RWMutex
 }
 
-func NewUI(chatService services.ChatService, agentService services.AgentService, toolService services.ToolService, providerService services.ProviderService, logger *zap.Logger) *UI {
+func NewUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService, providerService services.ProviderService, logger *zap.Logger) *UI {
 	ui := &UI{
 		chatService:     chatService,
 		agentService:    agentService,
+		modelService:    modelService,
 		toolService:     toolService,
 		providerService: providerService,
 		logger:          logger,
@@ -180,7 +182,7 @@ func (u *UI) Run() error {
 
 	homeController := uiapicontrollers.NewHomeController(u.logger, tmpl, u.chatService, u.agentService, u.toolService)
 	agentController := uiapicontrollers.NewAgentController(u.logger, tmpl, u.agentService, u.toolService, u.providerService)
-	chatController := uiapicontrollers.NewChatController(u.logger, tmpl, u.chatService, u.agentService)
+	chatController := uiapicontrollers.NewChatController(u.logger, tmpl, u.chatService, u.agentService, u.modelService)
 	toolFactory, err := tools.NewToolFactory()
 	if err != nil {
 		u.logger.Fatal("Failed to initialize tool factory", zap.Error(err))

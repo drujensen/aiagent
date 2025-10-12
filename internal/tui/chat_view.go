@@ -352,6 +352,7 @@ func formatGenericResult(result string) string {
 type ChatView struct {
 	chatService        services.ChatService
 	agentService       services.AgentService
+	modelService       services.ModelService
 	activeChat         *entities.Chat
 	editor             vimtea.Editor
 	textarea           textarea.Model
@@ -375,7 +376,7 @@ type ChatView struct {
 	toolCallStatus     map[string]bool    // Track completion status of tool calls (toolCallID -> completed)
 }
 
-func NewChatView(chatService services.ChatService, agentService services.AgentService, activeChat *entities.Chat) ChatView {
+func NewChatView(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, activeChat *entities.Chat) ChatView {
 	ta := textarea.New()
 	ta.Placeholder = "Type your message..."
 	ta.Focus()
@@ -397,6 +398,7 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	cv := ChatView{
 		chatService:        chatService,
 		agentService:       agentService,
+		modelService:       modelService,
 		activeChat:         activeChat,
 		textarea:           ta,
 		spinner:            s,
@@ -744,6 +746,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			}
 		case "ctrl+a":
 			return c, func() tea.Msg { return startAgentSwitchMsg{} }
+		case "ctrl+k":
+			return c, func() tea.Msg { return startModelSwitchMsg{} }
 		case "ctrl+n":
 			return c, func() tea.Msg { return startCreateChatMsg("") }
 		case "ctrl+l":
@@ -993,7 +997,20 @@ func (c ChatView) View() string {
 
 	agentInfo := "No agent selected"
 	if c.currentAgent != nil {
-		agentInfo = fmt.Sprintf("%s (%s: %s)", c.currentAgent.Name, c.currentAgent.ProviderType, c.currentAgent.Model)
+		agentInfo = fmt.Sprintf("Agent: %s", c.currentAgent.Name)
+		// Get current model
+		modelID := c.activeChat.ModelID
+		if modelID == "" && c.currentAgent != nil {
+			modelID = c.currentAgent.DefaultModelID
+		}
+		if modelID != "" {
+			if model, err := c.modelService.GetModel(context.Background(), modelID); err == nil {
+				agentInfo += fmt.Sprintf(" | Model: %s (%s)", model.Name, model.ProviderType)
+			} else {
+				// If model lookup fails, show the model ID
+				agentInfo += fmt.Sprintf(" | Model: %s", modelID[:8]+"...")
+			}
+		}
 	}
 
 	footerStyle := lipgloss.NewStyle().Width(c.width - 4)

@@ -63,3 +63,9 @@ type (
 	startAgentSwitchMsg struct{}
 	agentSelectedMsg    struct{ agentID string }
 )
+
+type (
+	startModelSwitchMsg struct{}
+	modelSelectedMsg    struct{ modelID string }
+	modelsCancelledMsg  struct{}
+)

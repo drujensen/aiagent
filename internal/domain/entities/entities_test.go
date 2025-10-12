@@ -7,31 +7,17 @@ import (
 
 func TestNewAgent(t *testing.T) {
 	name := "TestAgent"
-	role := "test-role"
-	providerID := "test-provider"
-	providerType := ProviderOpenAI
-	endpoint := "https://api.openai.com"
-	model := "gpt-4"
-	apiKey := "test-key"
+	defaultModelID := "test-model-id"
 	systemPrompt := "You are a test agent."
 	tools := []string{"FileRead", "FileWrite"}
 
-	agent := NewAgent(name, role, providerID, providerType, endpoint, model, apiKey, systemPrompt, tools)
+	agent := NewAgent(name, defaultModelID, systemPrompt, tools)
 
 	if agent.Name != name {
 		t.Errorf("Expected name %s, got %s", name, agent.Name)
 	}
-	if agent.ProviderID != providerID {
-		t.Errorf("Expected provider ID %s, got %s", providerID, agent.ProviderID)
-	}
-	if agent.ProviderType != providerType {
-		t.Errorf("Expected provider type %v, got %v", providerType, agent.ProviderType)
-	}
-	if agent.Model != model {
-		t.Errorf("Expected model %s, got %s", model, agent.Model)
-	}
-	if agent.APIKey != apiKey {
-		t.Errorf("Expected API key %s, got %s", apiKey, agent.APIKey)
+	if agent.DefaultModelID != defaultModelID {
+		t.Errorf("Expected default model ID %s, got %s", defaultModelID, agent.DefaultModelID)
 	}
 	if agent.SystemPrompt != systemPrompt {
 		t.Errorf("Expected system prompt %s, got %s", systemPrompt, agent.SystemPrompt)
@@ -47,13 +33,9 @@ func TestNewAgent(t *testing.T) {
 }
 
 func TestAgent_FilterValue(t *testing.T) {
-	agent := &Agent{
-		Name:         "TestAgent",
-		Model:        "gpt-4",
-		ProviderType: ProviderOpenAI,
-	}
+	agent := &Agent{Name: "TestAgent"}
 
-	expected := "TestAgent - gpt-4"
+	expected := "TestAgent"
 	result := agent.FilterValue()
 
 	if result != expected {
@@ -70,12 +52,9 @@ func TestAgent_Title(t *testing.T) {
 }
 
 func TestAgent_Description(t *testing.T) {
-	agent := &Agent{
-		Model:        "gpt-4",
-		ProviderType: ProviderOpenAI,
-	}
+	agent := &Agent{Name: "TestAgent"}
 
-	expected := "Model: gpt-4 | Provider: openai"
+	expected := "Agent"
 	result := agent.Description()
 
 	if result != expected {
@@ -163,7 +142,7 @@ func TestNewChat(t *testing.T) {
 	agentID := "test-agent-id"
 	name := "Test Chat"
 
-	chat := NewChat(agentID, name)
+	chat := NewChat(agentID, "model-id", name)
 
 	if chat.AgentID != agentID {
 		t.Errorf("Expected agent ID %s, got %s", agentID, chat.AgentID)
@@ -183,7 +162,7 @@ func TestNewChat(t *testing.T) {
 }
 
 func TestChat_UpdateUsage(t *testing.T) {
-	chat := NewChat("test-agent", "Test Chat")
+	chat := NewChat("test-agent", "model-id", "Test Chat")
 
 	// Add messages with usage
 	msg1 := &Message{
@@ -366,6 +345,78 @@ func TestMessage_AddUsage(t *testing.T) {
 	}
 	if message.Usage.Cost != expectedTotalCost {
 		t.Errorf("Expected cost %f, got %f", expectedTotalCost, message.Usage.Cost)
+	}
+}
+
+func TestNewModel(t *testing.T) {
+	name := "gpt-4"
+	providerID := "test-provider"
+	providerType := ProviderOpenAI
+	contextWindow := 128000
+	capabilities := ModelCapabilities{
+		SupportsTools:  true,
+		SupportsImages: false,
+		SupportsVision: true,
+	}
+
+	model := NewModel(name, providerID, providerType, contextWindow, capabilities)
+
+	if model.Name != name {
+		t.Errorf("Expected name %s, got %s", name, model.Name)
+	}
+	if model.ProviderID != providerID {
+		t.Errorf("Expected provider ID %s, got %s", providerID, model.ProviderID)
+	}
+	if model.ProviderType != providerType {
+		t.Errorf("Expected provider type %v, got %v", providerType, model.ProviderType)
+	}
+	if model.ContextWindow != contextWindow {
+		t.Errorf("Expected context window %d, got %d", contextWindow, model.ContextWindow)
+	}
+	if model.Capabilities.SupportsTools != capabilities.SupportsTools {
+		t.Errorf("Expected supports tools %v, got %v", capabilities.SupportsTools, model.Capabilities.SupportsTools)
+	}
+	if model.Capabilities.SupportsImages != capabilities.SupportsImages {
+		t.Errorf("Expected supports images %v, got %v", capabilities.SupportsImages, model.Capabilities.SupportsImages)
+	}
+	if model.Capabilities.SupportsVision != capabilities.SupportsVision {
+		t.Errorf("Expected supports vision %v, got %v", capabilities.SupportsVision, model.Capabilities.SupportsVision)
+	}
+}
+
+func TestModel_FilterValue(t *testing.T) {
+	model := &Model{
+		Name:         "gpt-4",
+		ProviderType: ProviderOpenAI,
+	}
+
+	expected := "gpt-4 - openai"
+	result := model.FilterValue()
+
+	if result != expected {
+		t.Errorf("Expected filter value %s, got %s", expected, result)
+	}
+}
+
+func TestModel_Title(t *testing.T) {
+	model := &Model{Name: "gpt-4"}
+
+	if model.Title() != "gpt-4" {
+		t.Errorf("Expected title 'gpt-4', got %s", model.Title())
+	}
+}
+
+func TestModel_Description(t *testing.T) {
+	model := &Model{
+		ProviderType:  ProviderOpenAI,
+		ContextWindow: 128000,
+	}
+
+	expected := "Provider: openai | Context: 128000 tokens"
+	result := model.Description()
+
+	if result != expected {
+		t.Errorf("Expected description %s, got %s", expected, result)
 	}
 }
 
