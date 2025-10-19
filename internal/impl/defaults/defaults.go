@@ -147,9 +147,8 @@ func DefaultProviders() []*entities.Provider {
 			BaseURL:    "https://ai.drujensen.com",
 			APIKeyName: "DRUJENSEN_API_KEY",
 			Models: []entities.ModelPricing{
-				{Name: "llama3.1:70b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000},
-				{Name: "devstral:24b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000},
-				{Name: "qwen3-coder:30b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000},
+				{Name: "devstral:24b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 64000},
+				{Name: "qwen3-coder:30b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 64000},
 			},
 		},
 		{
