@@ -46,7 +46,7 @@ func (t *FileReadTool) UpdateConfiguration(config map[string]string) {
 }
 
 func (t *FileReadTool) FullDescription() string {
-	return fmt.Sprintf("%s\n\nParameters:\n- filePath: absolute path to file\n- offset: starting line number (0-based, optional)\n- limit: max lines to read (optional, default 2000)", t.Description())
+	return fmt.Sprintf("%s\n\nParameters:\n- filePath: relative path to file from workspace root\n- offset: starting line number (0-based, optional)\n- limit: max lines to read (optional, default 2000)", t.Description())
 }
 
 func (t *FileReadTool) Parameters() []entities.Parameter {
@@ -54,7 +54,7 @@ func (t *FileReadTool) Parameters() []entities.Parameter {
 		{
 			Name:        "filePath",
 			Type:        "string",
-			Description: "The absolute path to the file to read",
+			Description: "The relative path to the file to read from workspace root",
 			Required:    true,
 		},
 		{
