@@ -143,6 +143,15 @@ func (t *FileSearchTool) Execute(arguments string) (string, error) {
 		return "", err
 	}
 
+	workspace := t.configuration["workspace"]
+	if workspace == "" {
+		workspace, _ = os.Getwd()
+	}
+	relPath, err := filepath.Rel(workspace, fullPath)
+	if err != nil {
+		relPath = args.Path // fallback
+	}
+
 	// Check if path is a directory and automatically set all_files=true if not specified
 	info, err := os.Stat(fullPath)
 	if err != nil {
@@ -172,7 +181,7 @@ func (t *FileSearchTool) Execute(arguments string) (string, error) {
 
 		// Create TUI-friendly summary
 		summary.WriteString(fmt.Sprintf("🔍 File Search: %s\n", args.Pattern))
-		summary.WriteString(fmt.Sprintf("📂 Directory: %s\n", filepath.Base(fullPath)))
+		summary.WriteString(fmt.Sprintf("📂 Directory: %s\n", relPath))
 		if args.FilePattern != "" {
 			summary.WriteString(fmt.Sprintf("📄 File Pattern: %s\n", args.FilePattern))
 		}
@@ -219,7 +228,7 @@ func (t *FileSearchTool) Execute(arguments string) (string, error) {
 
 		// Create TUI-friendly summary
 		summary.WriteString(fmt.Sprintf("🔍 File Search: %s\n", args.Pattern))
-		summary.WriteString(fmt.Sprintf("📄 File: %s\n", filepath.Base(fullPath)))
+		summary.WriteString(fmt.Sprintf("📄 File: %s\n", relPath))
 		summary.WriteString(fmt.Sprintf("📊 Results: %d matches\n\n", totalMatches))
 
 		// Show first 5 matches
@@ -253,7 +262,7 @@ func (t *FileSearchTool) Execute(arguments string) (string, error) {
 	}{
 		Summary:       summary.String(),
 		Pattern:       args.Pattern,
-		Path:          fullPath,
+		Path:          relPath,
 		AllFiles:      args.AllFiles,
 		FilePattern:   args.FilePattern,
 		CaseSensitive: args.CaseSensitive,

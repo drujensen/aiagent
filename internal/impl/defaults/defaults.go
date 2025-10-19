@@ -178,7 +178,7 @@ Key principles:
 	`
 
 	maxTokens := 65536
-	bigContextWindow := 256000
+	bigContextWindow := 64000
 
 	return []entities.Agent{
 		{
@@ -187,7 +187,7 @@ Key principles:
 			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
 			ProviderType: "drujensen",
 			Endpoint:     "https://ai.drujensen.com",
-			Model:        "llama3.1:70b",
+			Model:        "qwen3-coder:30b",
 			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `You are the Assistant Agent, a helpful AI assistant for various tasks including software development, research, and general inquiries. Use available tools to gather accurate information and complete tasks efficiently.
 
@@ -215,7 +215,7 @@ Key principles:
 			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
 			ProviderType: "drujensen",
 			Endpoint:     "https://ai.drujensen.com",
-			Model:        "llama3.1:70b",
+			Model:        "qwen3-coder:30b",
 			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
@@ -263,7 +263,7 @@ Stop researching when:
 			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
 			ProviderType: "drujensen",
 			Endpoint:     "https://ai.drujensen.com",
-			Model:        "llama3.1:70b",
+			Model:        "qwen3-coder:30b",
 			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
@@ -309,7 +309,7 @@ Stop designing when:
 			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
 			ProviderType: "drujensen",
 			Endpoint:     "https://ai.drujensen.com",
-			Model:        "llama3.1:70b",
+			Model:        "qwen3-coder:30b",
 			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
@@ -354,7 +354,7 @@ Stop planning when:
 			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
 			ProviderType: "drujensen",
 			Endpoint:     "https://ai.drujensen.com",
-			Model:        "devstral:24b",
+			Model:        "qwen3-coder:30b",
 			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
