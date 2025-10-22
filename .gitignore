@@ -2,3 +2,4 @@
 .env*
 .aiagent/
 output.log
+aiagent
