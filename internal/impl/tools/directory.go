@@ -52,7 +52,7 @@ func (t *DirectoryTool) UpdateConfiguration(config map[string]string) {
 }
 
 func (t *DirectoryTool) FullDescription() string {
-	return fmt.Sprintf("%s\n\nParameters:\n- operation: create_directory, list_directory, directory_tree, move, delete\n- path: directory path\n- destination: destination path (for move)\n- confirm: boolean (required for delete)", t.Description())
+	return fmt.Sprintf("%s\n\nParameters:\n- operation: create_directory, list_directory, directory_tree, move, delete\n- path: directory path (required for create_directory, move, delete; optional for list_directory, directory_tree - defaults to current directory)\n- destination: destination path (for move)\n- confirm: boolean (required for delete)", t.Description())
 }
 
 func (t *DirectoryTool) Parameters() []entities.Parameter {
@@ -68,7 +68,7 @@ func (t *DirectoryTool) Parameters() []entities.Parameter {
 			Name:        "path",
 			Type:        "string",
 			Description: "The directory or file path",
-			Required:    true,
+			Required:    false,
 		},
 		{
 			Name:        "destination",
@@ -127,26 +127,12 @@ func (t *DirectoryTool) Execute(arguments string) (string, error) {
 		t.logger.Error("Operation is required")
 		return "", fmt.Errorf("operation is required")
 	}
-	if args.Path == "" {
-		t.logger.Error("Path is required")
-		return "", fmt.Errorf("path is required")
-	}
 
 	switch args.Operation {
-	case "create_directory":
-		fullPath, err := t.validatePath(args.Path)
-		if err != nil {
-			return "", fmt.Errorf("invalid path: %v", err)
-		}
-		err = os.MkdirAll(fullPath, 0755)
-		if err != nil {
-			t.logger.Error("Failed to create directory", zap.String("path", fullPath), zap.Error(err))
-			return "", fmt.Errorf("failed to create directory: %v", err)
-		}
-		t.logger.Info("Directory created successfully", zap.String("path", fullPath))
-		return "Directory created successfully", nil
-
 	case "list_directory":
+		if args.Path == "" {
+			args.Path = "."
+		}
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
 			return "", fmt.Errorf("invalid path: %v", err)
@@ -217,6 +203,9 @@ func (t *DirectoryTool) Execute(arguments string) (string, error) {
 		return string(jsonResult), nil
 
 	case "directory_tree":
+		if args.Path == "" {
+			args.Path = "."
+		}
 		fullPath, err := t.validatePath(args.Path)
 		if err != nil {
 			return "", fmt.Errorf("invalid path: %v", err)
@@ -266,7 +255,26 @@ func (t *DirectoryTool) Execute(arguments string) (string, error) {
 		t.logger.Info("Directory tree built successfully", zap.String("path", fullPath))
 		return string(jsonResult), nil
 
+	case "create_directory":
+		if args.Path == "" {
+			return "", fmt.Errorf("path is required for create_directory")
+		}
+		fullPath, err := t.validatePath(args.Path)
+		if err != nil {
+			return "", fmt.Errorf("invalid path: %v", err)
+		}
+		err = os.MkdirAll(fullPath, 0755)
+		if err != nil {
+			t.logger.Error("Failed to create directory", zap.String("path", fullPath), zap.Error(err))
+			return "", fmt.Errorf("failed to create directory: %v", err)
+		}
+		t.logger.Info("Directory created successfully", zap.String("path", fullPath))
+		return "Directory created successfully", nil
+
 	case "move":
+		if args.Path == "" {
+			return "", fmt.Errorf("path is required for move")
+		}
 		if args.Destination == "" {
 			t.logger.Error("Destination is required for move operation")
 			return "", fmt.Errorf("destination is required")
@@ -287,6 +295,9 @@ func (t *DirectoryTool) Execute(arguments string) (string, error) {
 		t.logger.Info("File moved successfully", zap.String("source", srcPath), zap.String("dest", dstPath))
 		return "File moved successfully", nil
 	case "delete":
+		if args.Path == "" {
+			return "", fmt.Errorf("path is required for delete")
+		}
 		if !args.Confirm {
 			t.logger.Warn("Deletion requires confirmation", zap.String("path", args.Path))
 			return "", fmt.Errorf("deletion requires confirm=true")
