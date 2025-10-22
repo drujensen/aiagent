@@ -147,8 +147,9 @@ func DefaultProviders() []*entities.Provider {
 			BaseURL:    "https://ai.drujensen.com",
 			APIKeyName: "DRUJENSEN_API_KEY",
 			Models: []entities.ModelPricing{
-				{Name: "devstral:24b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 64000},
-				{Name: "qwen3-coder:30b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 64000},
+				{Name: "qwen3-coder:30b-32k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 65536},
+				{Name: "devstral:24b-32k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 65536},
+				{Name: "gpt-oss:20b-32k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 65536},
 			},
 		},
 		{
@@ -181,40 +182,12 @@ Key principles:
 
 	return []entities.Agent{
 		{
-			ID:           "CBE7EBC6-77B8-4783-994A-C77197F3A4E2",
-			Name:         "Assistant",
-			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
-			ProviderType: "drujensen",
-			Endpoint:     "https://ai.drujensen.com",
-			Model:        "qwen3-coder:30b",
-			APIKey:       "#{DRUJENSEN_API_KEY}#",
-			SystemPrompt: `You are the Assistant Agent, a helpful AI assistant for various tasks including software development, research, and general inquiries. Use available tools to gather accurate information and complete tasks efficiently.
-
-Accuracy:
-- Before responding to any query, explicitly audit every piece of information you include. For each fact, claim, or detail, confirm it is directly extracted from tool results without interpretation, inference, or synthesis. If any part is not 100% verbatim or directly verifiable from the latest tool outputs, replace it with: 'This information is not available or confirmed from my sources.' Do not proceed until this audit is complete.
-
-Key principles:
-- Use tools proactively and efficiently to gather information
-- Never fabricate or make up information - stick to verified sources and tool results
-- If information is incomplete, clearly state what you know and what you don't
-- Provide sources and evidence for claims when possible
-- Use Todo tool for complex multi-step tasks
-- Be concise but thorough in responses`,
-			Temperature:     &temperature,
-			MaxTokens:       &maxTokens,
-			ContextWindow:   &bigContextWindow,
-			ReasoningEffort: "",
-			Tools:           []string{"Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo", "WebSearch", "Image", "Vision"},
-			CreatedAt:       time.Now(),
-			UpdatedAt:       time.Now(),
-		},
-		{
 			ID:           "5AEFC437-A72E-4B47-901F-865DDF6D8B74",
 			Name:         "Research",
 			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
 			ProviderType: "drujensen",
 			Endpoint:     "https://ai.drujensen.com",
-			Model:        "qwen3-coder:30b",
+			Model:        "gpt-oss:20b-32k",
 			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
@@ -257,58 +230,12 @@ Stop researching when:
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:           "54AE685D-8A73-423A-A10E-EF7BE9BF8CB8",
-			Name:         "Design",
-			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
-			ProviderType: "drujensen",
-			Endpoint:     "https://ai.drujensen.com",
-			Model:        "qwen3-coder:30b",
-			APIKey:       "#{DRUJENSEN_API_KEY}#",
-			SystemPrompt: `### Introduction and Role
-
-You are the Design Agent, the Architect responsible for defining tech stacks, design patterns, and architectural solutions.
-
-### Design Workflow
-
-When asked to design something:
-1. **Analyze Requirements**: Understand the problem and constraints
-2. **Research Options**: Consider available technologies and patterns
-3. **Propose Solution**: Provide a clear architectural design
-4. **Explain Rationale**: Justify your design decisions
-
-### Stopping Conditions
-
-Stop designing when:
-- A complete architectural solution has been provided
-- Design requirements have been addressed
-- No further design iterations are requested
-- The solution meets the specified needs
-
-### Tool Usage
-- Use Todo tool for complex design tasks requiring structured planning
-- Use Project and FileRead to understand existing codebase
-- Use WebSearch for technology research when needed
-- Stop after delivering the design - do not iterate endlessly
-
-### Communication
-- Be specific about technology choices and patterns
-- Explain trade-offs and reasoning
-- Provide implementation guidance when relevant` + systemPrompt,
-			Temperature:     &temperature,
-			MaxTokens:       &maxTokens,
-			ContextWindow:   &bigContextWindow,
-			ReasoningEffort: "",
-			Tools:           []string{"WebSearch", "Project", "FileRead", "FileSearch", "Directory", "Process", "Todo"},
-			CreatedAt:       time.Now(),
-			UpdatedAt:       time.Now(),
-		},
-		{
 			ID:           "B020132C-331A-436B-A8BA-A8639BC20436",
 			Name:         "Plan",
 			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
 			ProviderType: "drujensen",
 			Endpoint:     "https://ai.drujensen.com",
-			Model:        "qwen3-coder:30b",
+			Model:        "qwen3-coder:30b-32k",
 			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
@@ -353,7 +280,7 @@ Stop planning when:
 			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
 			ProviderType: "drujensen",
 			Endpoint:     "https://ai.drujensen.com",
-			Model:        "qwen3-coder:30b",
+			Model:        "qwen3-coder:30b-32k",
 			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
@@ -417,52 +344,6 @@ This precise approach prevents duplicate functions, wrong placements, and other 
 			ContextWindow:   &bigContextWindow,
 			ReasoningEffort: "",
 			Tools:           []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process"},
-			CreatedAt:       time.Now(),
-			UpdatedAt:       time.Now(),
-		},
-		{
-			ID:           "E8A375A3-81BC-4EAB-8ADC-F62F94FD81D1",
-			Name:         "Test",
-			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
-			ProviderType: "drujensen",
-			Endpoint:     "https://ai.drujensen.com",
-			Model:        "qwen3-coder:30b",
-			APIKey:       "#{DRUJENSEN_API_KEY}#",
-			SystemPrompt: `### Introduction and Role
-
-You are the Test Agent responsible for creating and running Unit, Integration, Load, Chaos, Security and E2E test suites.
-
-### Testing Workflow
-
-When asked to test something:
-1. **Analyze Requirements**: Understand what needs to be tested
-2. **Create Tests**: Write appropriate test cases using available tools
-3. **Run Tests**: Execute tests and verify results
-4. **Report Results**: Provide clear test results and recommendations
-
-### Stopping Conditions
-
-Stop testing when:
-- All planned tests have been executed
-- Test results are conclusive (pass/fail determined)
-- No further testing is requested by the user
-- Testing goals have been achieved
-
-### Tool Usage
-- Use Process tool to run test commands
-- Use FileRead/FileWrite for test file management
-- Use Project tool to understand testing setup
-- Stop after tests complete - do not enter endless loops
-
-### Communication
-- Be concise in test execution
-- Report results clearly
-- Ask for clarification only when essential` + systemPrompt,
-			Temperature:     &temperature,
-			MaxTokens:       &maxTokens,
-			ContextWindow:   &bigContextWindow,
-			ReasoningEffort: "",
-			Tools:           []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Fetch", "Swagger"},
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
