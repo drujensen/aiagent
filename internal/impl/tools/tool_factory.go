@@ -57,7 +57,7 @@ func NewToolFactory() (*ToolFactory, error) {
 	}
 	toolFactory.toolFactories["FileWrite"] = &ToolFactoryEntry{
 		Name:        "FileWrite",
-		Description: `This tool provides file writing and modification operations, including overwriting, editing, inserting, and deleting content in files. The workspace directory is prepended to any file paths specified.`,
+		Description: `This tool provides file writing and modification operations, including overwriting, editing, inserting, and deleting content in files. The workspace directory is prepended to relative file paths specified. Absolute paths are used as-is.`,
 		ConfigKeys:  []string{"workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewFileWriteTool(name, description, configuration, logger)

@@ -48,7 +48,7 @@ func (t *FileWriteTool) UpdateConfiguration(config map[string]string) {
 }
 
 func (t *FileWriteTool) FullDescription() string {
-	return fmt.Sprintf("%s\n\nParameters:\n- operation: 'write' or 'edit'\n- path: file path\n- content: file content (for write)\n- old_string, new_string: exact strings to replace (for edit)\n- replace_all: boolean (optional)", t.Description())
+	return fmt.Sprintf("%s\n\nParameters:\n- operation: 'write' or 'edit'\n- path: file path (absolute or relative to workspace)\n- content: file content (for write)\n- old_string, new_string: exact strings to replace (for edit)\n- replace_all: boolean (optional)", t.Description())
 }
 
 func (t *FileWriteTool) Parameters() []entities.Parameter {
@@ -102,7 +102,14 @@ func (t *FileWriteTool) validatePath(path string) (string, error) {
 			return "", fmt.Errorf("could not get current directory: %v", err)
 		}
 	}
-	fullPath := filepath.Join(workspace, path)
+
+	var fullPath string
+	if filepath.IsAbs(path) {
+		fullPath = path
+	} else {
+		fullPath = filepath.Join(workspace, path)
+	}
+
 	rel, err := filepath.Rel(workspace, fullPath)
 	if err != nil || strings.HasPrefix(rel, "..") {
 		t.logger.Error("Path is outside workspace", zap.String("path", path))
