@@ -147,9 +147,9 @@ func DefaultProviders() []*entities.Provider {
 			BaseURL:    "https://ai.drujensen.com",
 			APIKeyName: "DRUJENSEN_API_KEY",
 			Models: []entities.ModelPricing{
-				{Name: "qwen3-coder:30b-32k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 65536},
-				{Name: "devstral:24b-32k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 65536},
-				{Name: "gpt-oss:20b-32k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 65536},
+				{Name: "qwen3-coder:30b-32k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 32000},
+				{Name: "deepseek:8b-32k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 32000},
+				{Name: "gpt-oss:20b-32k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 32000},
 			},
 		},
 		{
@@ -177,8 +177,8 @@ Key principles:
 - Leverage AGENTS.md for project-specific guidance
 	`
 
-	maxTokens := 65536
-	bigContextWindow := 64000
+	maxTokens := 8000
+	bigContextWindow := 32000
 
 	return []entities.Agent{
 		{
