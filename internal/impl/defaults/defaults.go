@@ -147,7 +147,7 @@ func DefaultProviders() []*entities.Provider {
 			BaseURL:    "https://ai.drujensen.com",
 			APIKeyName: "DRUJENSEN_API_KEY",
 			Models: []entities.ModelPricing{
-				{Name: "qwen3-coder:30b-32k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 32000},
+				{Name: "qwen3-coder:30b-64k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 32000},
 				{Name: "deepseek:8b-32k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 32000},
 				{Name: "gpt-oss:20b-32k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 32000},
 			},
@@ -178,7 +178,7 @@ Key principles:
 	`
 
 	maxTokens := 8000
-	bigContextWindow := 32000
+	bigContextWindow := 64000
 
 	return []entities.Agent{
 		{
@@ -187,7 +187,7 @@ Key principles:
 			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
 			ProviderType: "drujensen",
 			Endpoint:     "https://ai.drujensen.com",
-			Model:        "gpt-oss:20b-32k",
+			Model:        "qwen3-coder:30b-64k",
 			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
@@ -235,7 +235,7 @@ Stop researching when:
 			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
 			ProviderType: "drujensen",
 			Endpoint:     "https://ai.drujensen.com",
-			Model:        "qwen3-coder:30b-32k",
+			Model:        "qwen3-coder:30b-64k",
 			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
@@ -280,7 +280,7 @@ Stop planning when:
 			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
 			ProviderType: "drujensen",
 			Endpoint:     "https://ai.drujensen.com",
-			Model:        "qwen3-coder:30b-32k",
+			Model:        "qwen3-coder:30b-64k",
 			APIKey:       "#{DRUJENSEN_API_KEY}#",
 			SystemPrompt: `### Introduction and Role
 
