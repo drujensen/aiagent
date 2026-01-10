@@ -507,10 +507,10 @@ func (c *ChatView) updateEditorContent() {
 		)
 		// Ensure editor is not focused initially
 		c.editor.SetFocus(false)
-		// Set editor size - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
+		// Set editor size to fit screen minus textarea, footer, and separators
 		if c.width > 0 && c.height > 0 {
-			editorWidth := c.width - 4
-			editorHeight := c.height - 10
+			editorWidth := c.width
+			editorHeight := c.height - c.textarea.Height() - 3 // textarea 3, footer 1, separators 2
 			if editorHeight < 1 {
 				editorHeight = 1
 			}
@@ -598,15 +598,22 @@ func (c *ChatView) updateEditorContent() {
 	// Ensure editor maintains current focus state
 	c.editor.SetFocus(c.focused == "editor")
 
-	// Set editor size - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
+	// Set editor size: textarea (3) + footer (1) + separators (2) = 6 total
 	if c.width > 0 && c.height > 0 {
-		editorWidth := c.width - 4
-		editorHeight := c.height - 10
+		editorWidth := c.width
+		editorHeight := c.height - 6
 		if editorHeight < 1 {
 			editorHeight = 1
 		}
 		c.editor.SetSize(editorWidth, editorHeight)
 	}
+
+	// Ensure editor is in normal mode and scroll to bottom to show latest messages
+	c.editor.SetMode(vimtea.ModeNormal)
+	c.editor.SetFocus(true)
+	_, _ = c.editor.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	c.editor.SetFocus(false)
+
 }
 
 func (c ChatView) Init() tea.Cmd {
@@ -913,7 +920,6 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 	case errMsg:
 		c.isProcessing = false
 		c.cancel = nil
-		c.err = m
 		// Don't remove user's message if the error is due to cancellation
 		// The server should have saved the user's message and any partial results
 		if len(c.activeChat.Messages) > 0 && !strings.Contains(m.Error(), "canceled") {
@@ -922,6 +928,14 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				c.activeChat.Messages = c.activeChat.Messages[:lastIdx]
 			}
 		}
+		// Add error message to chat history
+		errorMsg := &entities.Message{
+			Content: "Error: " + m.Error(),
+			Role:    "system",
+		}
+		c.activeChat.Messages = append(c.activeChat.Messages, *errorMsg)
+		// Set error for immediate display
+		c.err = m
 		// Clear temporary messages and tool call status on error
 		c.tempMessages = nil
 		c.toolCallStatus = make(map[string]bool)
@@ -932,15 +946,15 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		c.width = m.Width
 		c.height = m.Height
 
-		// Set editor size - outer border (2) + footer (1) + textarea (2) + inner borders (4) + text wrapping adjustment = 10 total
-		editorWidth := c.width - 4
-		editorHeight := c.height - 10
+		// Set editor size to fit screen minus textarea, footer, and separators
+		editorWidth := c.width
+		editorHeight := c.height - c.textarea.Height() - 3 // textarea, footer 1, separators 2
 		if editorHeight < 1 {
 			editorHeight = 1
 		}
 		c.editor.SetSize(editorWidth, editorHeight)
 
-		c.textarea.SetWidth(c.width - 4)
+		c.textarea.SetWidth(c.width)
 
 		if c.activeChat != nil {
 			c.updateEditorContent()
@@ -952,38 +966,18 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 }
 
 func (c ChatView) View() string {
-	// Define border styles
-	focusedBorder := lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("6")) // Bright cyan for focused
+	// Define styles
+	style := lipgloss.NewStyle().Width(c.width)
 
-	unfocusedBorder := lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("8")) // Dim gray for unfocused
+	// Separator
+	separator := lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true).Render(strings.Repeat("═", c.width))
 
-	// Outer container style (Vim-like overall border)
-	outerStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.ThickBorder()).
-		BorderForeground(lipgloss.Color("4")). // Blue for outer border
-		Width(c.width - 2).
-		Height(c.height - 2)
+	// Editor
+	editorPart := style.Render(c.editor.View())
 
-	var sb strings.Builder
-
-	// Style editor - let outer container limit height to handle text wrapping
-	editorStyle := unfocusedBorder.Width(c.width - 4)
-	if c.focused == "editor" {
-		editorStyle = focusedBorder.Width(c.width - 4)
-	}
-
-	sb.WriteString(editorStyle.Render(c.editor.View()))
-
-	// Style textarea
-	taStyle := unfocusedBorder.Width(c.width - 4).Height(c.textarea.Height())
-	if c.focused == "textarea" {
-		taStyle = focusedBorder.Width(c.width - 4).Height(c.textarea.Height())
-	}
-	sb.WriteString(taStyle.Render(c.textarea.View()))
+	// Textarea
+	taStyle := style.Height(c.textarea.Height())
+	textareaPart := taStyle.Render(c.textarea.View())
 
 	instructions := "Ctrl+P: menu | Tab: focus | Ctrl+C: exit"
 	if c.isProcessing {
@@ -996,14 +990,12 @@ func (c ChatView) View() string {
 		agentInfo = fmt.Sprintf("%s (%s: %s)", c.currentAgent.Name, c.currentAgent.ProviderType, c.currentAgent.Model)
 	}
 
-	footerStyle := lipgloss.NewStyle().Width(c.width - 4)
+	footerStyle := lipgloss.NewStyle().Width(c.width)
 	leftStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Inline(true)
-	rightStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Align(lipgloss.Right).Inline(true).Width(c.width - 4 - lipgloss.Width(instructions))
-	footer := footerStyle.Render(lipgloss.JoinHorizontal(lipgloss.Top, leftStyle.Render(instructions), rightStyle.Render(agentInfo)))
-	sb.WriteString("\n" + footer)
+	rightStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Align(lipgloss.Right).Inline(true).Width(c.width - lipgloss.Width(instructions))
+	footerPart := footerStyle.Render(lipgloss.JoinHorizontal(lipgloss.Top, leftStyle.Render(instructions), rightStyle.Render(agentInfo)))
 
-	// Wrap everything in the outer border
-	return outerStyle.Render(sb.String())
+	return lipgloss.JoinVertical(lipgloss.Top, editorPart, separator, textareaPart, separator, footerPart)
 }
 
 func sendMessageCmd(cs services.ChatService, chatID string, msg *entities.Message, ctx context.Context) tea.Cmd {
@@ -1043,11 +1035,17 @@ func sendMessageCmd(cs services.ChatService, chatID string, msg *entities.Messag
 				}
 				return errMsg(fmt.Errorf("operation timed out after 1 hour - no results available"))
 			} else {
-				// Other error - try to get updated chat state
+				// Other error - get updated chat state and add error message
 				getChatCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 				updatedChat, getChatErr := cs.GetChat(getChatCtx, chatID)
-				if getChatErr == nil && len(updatedChat.Messages) > 0 {
+				if getChatErr == nil {
+					// Add error message to chat
+					errorMsg := &entities.Message{
+						Content: "Error: " + err.Error(),
+						Role:    "system",
+					}
+					updatedChat.Messages = append(updatedChat.Messages, *errorMsg)
 					return updatedChatMsg(updatedChat)
 				}
 				return errMsg(err)
