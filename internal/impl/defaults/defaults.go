@@ -10,7 +10,7 @@ import (
 func DefaultProviders() []*entities.Provider {
 	return []*entities.Provider{
 		{
-			ID:         "820FE148-851B-4995-81E5-C6DB2E5E5270",
+			ID:         "FD3C37A7-C9C0-4AA9-A4B7-C43D52806A98",
 			Name:       "X.AI",
 			Type:       "xai",
 			BaseURL:    "https://api.x.ai",
@@ -23,7 +23,7 @@ func DefaultProviders() []*entities.Provider {
 			},
 		},
 		{
-			ID:         "D2BB79D4-C11C-407A-AF9D-9713524BB3BF",
+			ID:         "1E4697B3-233F-4004-B513-692E5F6EABE6",
 			Name:       "OpenAI",
 			Type:       "openai",
 			BaseURL:    "https://api.openai.com",
@@ -38,7 +38,7 @@ func DefaultProviders() []*entities.Provider {
 			},
 		},
 		{
-			ID:         "28451B8D-1937-422A-BA93-9795204EC5A5",
+			ID:         "B978105A-802B-480B-BF79-D50EB8FB21B0",
 			Name:       "Anthropic",
 			Type:       "anthropic",
 			BaseURL:    "https://api.anthropic.com",
@@ -51,7 +51,7 @@ func DefaultProviders() []*entities.Provider {
 			},
 		},
 		{
-			ID:         "2BD2B8A5-5A2A-439B-8D02-C6BE34705011",
+			ID:         "E384327C-337D-4EA5-88D5-B1FC4147CD6D",
 			Name:       "Google",
 			Type:       "google",
 			BaseURL:    "https://generativelanguage.googleapis.com",
@@ -64,7 +64,7 @@ func DefaultProviders() []*entities.Provider {
 			},
 		},
 		{
-			ID:         "276F9470-664F-4402-98E0-755C342ADFC4",
+			ID:         "ADEAC984-EBB4-491F-B041-38966A15DE83",
 			Name:       "DeepSeek",
 			Type:       "deepseek",
 			BaseURL:    "https://api.deepseek.com",
@@ -75,7 +75,7 @@ func DefaultProviders() []*entities.Provider {
 			},
 		},
 		{
-			ID:         "8F2CC161-E463-43B1-9656-8E484A0D7709",
+			ID:         "8A4F16CB-1E30-49B5-A213-4FC4014B9E32",
 			Name:       "Together",
 			Type:       "together",
 			BaseURL:    "https://api.together.xyz",
@@ -87,7 +87,7 @@ func DefaultProviders() []*entities.Provider {
 			},
 		},
 		{
-			ID:         "CFA9E279-2CD3-4929-A92E-EC4584DC5089",
+			ID:         "76EFB2E1-AAD9-43CC-8719-1B166F1404F1",
 			Name:       "Groq",
 			Type:       "groq",
 			BaseURL:    "https://api.groq.com",
@@ -100,7 +100,7 @@ func DefaultProviders() []*entities.Provider {
 			},
 		},
 		{
-			ID:         "B0A5D2E7-DC94-4028-9EAB-BD0F3FE3CD66",
+			ID:         "875102A8-F3B3-40EE-BDA4-19201C5CFEF8",
 			Name:       "Mistral",
 			Type:       "mistral",
 			BaseURL:    "https://api.mistral.ai",
@@ -114,34 +114,7 @@ func DefaultProviders() []*entities.Provider {
 			},
 		},
 		{
-			ID:         "3B369D62-BB4E-4B4F-8C75-219796E9521A",
-			Name:       "Ollama",
-			Type:       "ollama",
-			BaseURL:    "http://localhost:11434",
-			APIKeyName: "LOCAL_API_KEY",
-			Models: []entities.ModelPricing{
-				{Name: "gpt-oss", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000},
-				{Name: "deepseek-r1", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000},
-				{Name: "llama4", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-				{Name: "llama3.3", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-				{Name: "llama3.2", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-				{Name: "llama3.1", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-				{Name: "qwen3", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-				{Name: "qwen2.5-coder", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-				{Name: "mistral", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-				{Name: "mistral-nemo", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-				{Name: "devstral", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-				{Name: "mixtral", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-				{Name: "nemotron", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-				{Name: "cogito", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-				{Name: "granite3.3", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-				{Name: "command-r", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-				{Name: "hermes3", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-				{Name: "phi4-mini", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 8192},
-			},
-		},
-		{
-			ID:         "11981868-d638-43e6-b20d-c629e72da56f",
+			ID:         "659D1EAD-AA0A-45CD-BE28-5472F419B0DB",
 			Name:       "Drujensen",
 			Type:       "drujensen",
 			BaseURL:    "https://ai.drujensen.com",
@@ -153,7 +126,7 @@ func DefaultProviders() []*entities.Provider {
 			},
 		},
 		{
-			ID:         "DDFED2A0-8C12-4852-895A-10BD7F7F2588",
+			ID:         "41A83584-ABEB-4490-921A-D778A296862D",
 			Name:       "Custom Provider",
 			Type:       "generic",
 			BaseURL:    "",
@@ -451,9 +424,9 @@ func DefaultModels() []*entities.Model {
 	return []*entities.Model{
 		// OpenAI Models
 		{
-			ID:              "550e8400-e29b-41d4-a716-446655440000",
+			ID:              "A69AFBC4-1BB0-4D16-8FC6-3CB8E6603A68",
 			Name:            "GPT-4.1 Standard",
-			ProviderID:      "D2BB79D4-C11C-407A-AF9D-9713524BB3BF", // OpenAI
+			ProviderID:      "1E4697B3-233F-4004-B513-692E5F6EABE6", // OpenAI
 			ProviderType:    entities.ProviderOpenAI,
 			ModelName:       "gpt-4.1",
 			APIKey:          "#{OPENAI_API_KEY}#",
@@ -465,9 +438,9 @@ func DefaultModels() []*entities.Model {
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "550e8400-e29b-41d4-a716-446655440001",
+			ID:              "3CA94BFA-5CD5-44FD-9EBC-3F780105B821",
 			Name:            "GPT-4.1 Mini Fast",
-			ProviderID:      "D2BB79D4-C11C-407A-AF9D-9713524BB3BF", // OpenAI
+			ProviderID:      "1E4697B3-233F-4004-B513-692E5F6EABE6", // OpenAI
 			ProviderType:    entities.ProviderOpenAI,
 			ModelName:       "gpt-4.1-mini",
 			APIKey:          "#{OPENAI_API_KEY}#",
@@ -481,9 +454,9 @@ func DefaultModels() []*entities.Model {
 
 		// Anthropic Models
 		{
-			ID:              "550e8400-e29b-41d4-a716-446655440010",
+			ID:              "5632519A-1495-46CA-BCF9-274307477894",
 			Name:            "Claude Sonnet Balanced",
-			ProviderID:      "28451B8D-1937-422A-BA93-9795204EC5A5", // Anthropic
+			ProviderID:      "B978105A-802B-480B-BF79-D50EB8FB21B0", // Anthropic
 			ProviderType:    entities.ProviderAnthropic,
 			ModelName:       "claude-3-7-sonnet-latest",
 			APIKey:          "#{ANTHROPIC_API_KEY}#",
@@ -495,9 +468,9 @@ func DefaultModels() []*entities.Model {
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "550e8400-e29b-41d4-a716-446655440011",
+			ID:              "17403C9E-A943-4CF1-AC39-7DCF5B513135",
 			Name:            "Claude Haiku Fast",
-			ProviderID:      "28451B8D-1937-422A-BA93-9795204EC5A5", // Anthropic
+			ProviderID:      "B978105A-802B-480B-BF79-D50EB8FB21B0", // Anthropic
 			ProviderType:    entities.ProviderAnthropic,
 			ModelName:       "claude-3-5-haiku-latest",
 			APIKey:          "#{ANTHROPIC_API_KEY}#",
@@ -511,9 +484,9 @@ func DefaultModels() []*entities.Model {
 
 		// Google Models
 		{
-			ID:              "550e8400-e29b-41d4-a716-446655440020",
+			ID:              "FA6C6ED3-D14D-450D-9487-D10632215D1E",
 			Name:            "Gemini Pro Balanced",
-			ProviderID:      "2BD2B8A5-5A2A-439B-8D02-C6BE34705011", // Google
+			ProviderID:      "E384327C-337D-4EA5-88D5-B1FC4147CD6D", // Google
 			ProviderType:    entities.ProviderGoogle,
 			ModelName:       "gemini-2.5-pro-preview-03-25",
 			APIKey:          "#{GEMINI_API_KEY}#",
@@ -525,9 +498,9 @@ func DefaultModels() []*entities.Model {
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "550e8400-e29b-41d4-a716-446655440021",
+			ID:              "2EEEFC70-E455-4B64-8951-038564AB9B46",
 			Name:            "Gemini Flash Fast",
-			ProviderID:      "2BD2B8A5-5A2A-439B-8D02-C6BE34705011", // Google
+			ProviderID:      "E384327C-337D-4EA5-88D5-B1FC4147CD6D", // Google
 			ProviderType:    entities.ProviderGoogle,
 			ModelName:       "gemini-2.0-flash",
 			APIKey:          "#{GEMINI_API_KEY}#",
@@ -541,9 +514,9 @@ func DefaultModels() []*entities.Model {
 
 		// X.AI Models
 		{
-			ID:              "550e8400-e29b-41d4-a716-446655440030",
+			ID:              "4C1054B1-A3EA-45DC-9BE1-09073D74CC09",
 			Name:            "Grok Standard",
-			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270", // X.AI
+			ProviderID:      "FD3C37A7-C9C0-4AA9-A4B7-C43D52806A98", // X.AI
 			ProviderType:    entities.ProviderXAI,
 			ModelName:       "grok-4",
 			APIKey:          "#{XAI_API_KEY}#",
@@ -555,9 +528,9 @@ func DefaultModels() []*entities.Model {
 			UpdatedAt:       time.Now(),
 		},
 		{
-			ID:              "550e8400-e29b-41d4-a716-446655440031",
+			ID:              "659D1EAD-AA0A-45CD-BE28-5472F419B0DB",
 			Name:            "Grok Fast",
-			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270", // X.AI
+			ProviderID:      "FD3C37A7-C9C0-4AA9-A4B7-C43D52806A98", // X.AI
 			ProviderType:    entities.ProviderXAI,
 			ModelName:       "grok-code-fast",
 			APIKey:          "#{XAI_API_KEY}#",
