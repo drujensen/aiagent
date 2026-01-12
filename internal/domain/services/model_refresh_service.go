@@ -91,7 +91,7 @@ func (s *modelRefreshService) refreshProvider(ctx context.Context, provider *ent
 		Models:     make([]entities.ModelPricing, 0),
 	}
 
-	for _, modelData := range fetched.Providers[provider.ID].Models {
+	for _, modelData := range (*fetched)[string(provider.Type)].Models {
 		pricing := entities.ModelPricing{
 			Name:                modelData.Name,
 			InputPricePerMille:  modelData.Cost.Input,
@@ -109,6 +109,7 @@ func (s *modelRefreshService) refreshProvider(ctx context.Context, provider *ent
 
 	s.logger.Info("Updated provider with models.dev data",
 		zap.String("provider_id", provider.ID),
+		zap.String("provider_type", string(provider.Type)),
 		zap.Int("models_count", len(providerToUpdate.Models)))
 	return nil
 }

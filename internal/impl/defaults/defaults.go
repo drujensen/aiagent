@@ -15,12 +15,7 @@ func DefaultProviders() []*entities.Provider {
 			Type:       "xai",
 			BaseURL:    "https://api.x.ai",
 			APIKeyName: "XAI_API_KEY",
-			Models: []entities.ModelPricing{
-				{Name: "grok-4", InputPricePerMille: 3.00, OutputPricePerMille: 15.00, ContextWindow: 256000},
-				{Name: "grok-code-fast", InputPricePerMille: 0.20, OutputPricePerMille: 1.50, ContextWindow: 256000},
-				{Name: "grok-3", InputPricePerMille: 3.00, OutputPricePerMille: 15.00, ContextWindow: 131072},
-				{Name: "grok-3-mini", InputPricePerMille: 0.30, OutputPricePerMille: 0.50, ContextWindow: 131072},
-			},
+			Models:     []entities.ModelPricing{},
 		},
 		{
 			ID:         "1E4697B3-233F-4004-B513-692E5F6EABE6",
@@ -28,14 +23,7 @@ func DefaultProviders() []*entities.Provider {
 			Type:       "openai",
 			BaseURL:    "https://api.openai.com",
 			APIKeyName: "OPENAI_API_KEY",
-			Models: []entities.ModelPricing{
-				{Name: "gpt-4.1", InputPricePerMille: 2.50, OutputPricePerMille: 8.00, ContextWindow: 1000000},
-				{Name: "gpt-4.1-mini", InputPricePerMille: 0.40, OutputPricePerMille: 1.60, ContextWindow: 1000000},
-				{Name: "gpt-4.1-nano", InputPricePerMille: 0.10, OutputPricePerMille: 0.40, ContextWindow: 1000000},
-				{Name: "o4-mini", InputPricePerMille: 1.10, OutputPricePerMille: 4.40, ContextWindow: 200000},
-				{Name: "o3", InputPricePerMille: 2.50, OutputPricePerMille: 40.00, ContextWindow: 200000},
-				{Name: "o3-mini", InputPricePerMille: 1.10, OutputPricePerMille: 4.40, ContextWindow: 200000},
-			},
+			Models:     []entities.ModelPricing{},
 		},
 		{
 			ID:         "B978105A-802B-480B-BF79-D50EB8FB21B0",
@@ -43,12 +31,7 @@ func DefaultProviders() []*entities.Provider {
 			Type:       "anthropic",
 			BaseURL:    "https://api.anthropic.com",
 			APIKeyName: "ANTHROPIC_API_KEY",
-			Models: []entities.ModelPricing{
-				{Name: "claude-4-opus-latest", InputPricePerMille: 15.00, OutputPricePerMille: 75.00, ContextWindow: 200000},
-				{Name: "claude-4-sonnet-latest", InputPricePerMille: 3.00, OutputPricePerMille: 15.00, ContextWindow: 200000},
-				{Name: "claude-3-7-sonnet-latest", InputPricePerMille: 3.00, OutputPricePerMille: 15.00, ContextWindow: 200000},
-				{Name: "claude-3-5-haiku-latest", InputPricePerMille: 0.80, OutputPricePerMille: 4.00, ContextWindow: 200000},
-			},
+			Models:     []entities.ModelPricing{},
 		},
 		{
 			ID:         "E384327C-337D-4EA5-88D5-B1FC4147CD6D",
@@ -56,12 +39,7 @@ func DefaultProviders() []*entities.Provider {
 			Type:       "google",
 			BaseURL:    "https://generativelanguage.googleapis.com",
 			APIKeyName: "GEMINI_API_KEY",
-			Models: []entities.ModelPricing{
-				{Name: "gemini-2.5-pro-preview-03-25", InputPricePerMille: 2.50, OutputPricePerMille: 15.00, ContextWindow: 1000000},
-				{Name: "gemini-2.5-flash-preview-04-17", InputPricePerMille: 0.15, OutputPricePerMille: 3.50, ContextWindow: 1000000},
-				{Name: "gemini-2.0-flash", InputPricePerMille: 0.10, OutputPricePerMille: 0.40, ContextWindow: 1000000},
-				{Name: "gemini-2.0-flash-lite", InputPricePerMille: 0.075, OutputPricePerMille: 0.30, ContextWindow: 1000000},
-			},
+			Models:     []entities.ModelPricing{},
 		},
 		{
 			ID:         "ADEAC984-EBB4-491F-B041-38966A15DE83",
@@ -69,10 +47,7 @@ func DefaultProviders() []*entities.Provider {
 			Type:       "deepseek",
 			BaseURL:    "https://api.deepseek.com",
 			APIKeyName: "DEEPSEEK_API_KEY",
-			Models: []entities.ModelPricing{
-				{Name: "deepseek-reasoner", InputPricePerMille: 0.55, OutputPricePerMille: 2.19, ContextWindow: 64000},
-				{Name: "deepseek-chat", InputPricePerMille: 0.07, OutputPricePerMille: 1.10, ContextWindow: 64000},
-			},
+			Models:     []entities.ModelPricing{},
 		},
 		{
 			ID:         "8A4F16CB-1E30-49B5-A213-4FC4014B9E32",
@@ -80,11 +55,7 @@ func DefaultProviders() []*entities.Provider {
 			Type:       "together",
 			BaseURL:    "https://api.together.xyz",
 			APIKeyName: "TOGETHER_API_KEY",
-			Models: []entities.ModelPricing{
-				{Name: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8", InputPricePerMille: 0.27, OutputPricePerMille: 0.85, ContextWindow: 131072},
-				{Name: "meta-llama/Llama-4-Scout-17B-16E-Instruct", InputPricePerMille: 0.18, OutputPricePerMille: 0.59, ContextWindow: 131072},
-				{Name: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", InputPricePerMille: 0.75, OutputPricePerMille: 0.99, ContextWindow: 131072},
-			},
+			Models:     []entities.ModelPricing{},
 		},
 		{
 			ID:         "76EFB2E1-AAD9-43CC-8719-1B166F1404F1",
@@ -92,12 +63,7 @@ func DefaultProviders() []*entities.Provider {
 			Type:       "groq",
 			BaseURL:    "https://api.groq.com",
 			APIKeyName: "GROQ_API_KEY",
-			Models: []entities.ModelPricing{
-				{Name: "llama-3.3-70b-versatile", InputPricePerMille: 0.59, OutputPricePerMille: 0.79, ContextWindow: 128000},
-				{Name: "meta-llama/llama-4-maverick-17b-128e-instruct", InputPricePerMille: 0.27, OutputPricePerMille: 0.85, ContextWindow: 131072},
-				{Name: "meta-llama/llama-4-scout-17b-16e-instruct", InputPricePerMille: 0.11, OutputPricePerMille: 0.34, ContextWindow: 131072},
-				{Name: "deepseek-r1-distill-llama-70b", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000},
-			},
+			Models:     []entities.ModelPricing{},
 		},
 		{
 			ID:         "875102A8-F3B3-40EE-BDA4-19201C5CFEF8",
@@ -105,13 +71,7 @@ func DefaultProviders() []*entities.Provider {
 			Type:       "mistral",
 			BaseURL:    "https://api.mistral.ai",
 			APIKeyName: "MISTRAL_API_KEY",
-			Models: []entities.ModelPricing{
-				{Name: "mistral-large-latest", InputPricePerMille: 2.00, OutputPricePerMille: 6.00, ContextWindow: 128000},
-				{Name: "mistral-medium-latest", InputPricePerMille: 0.40, OutputPricePerMille: 2.00, ContextWindow: 128000},
-				{Name: "mistral-small-latest", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 128000},
-				{Name: "codestral-latest", InputPricePerMille: 0.20, OutputPricePerMille: 0.60, ContextWindow: 256000},
-				{Name: "devstral-small-latest", InputPricePerMille: 0.10, OutputPricePerMille: 0.30, ContextWindow: 128000},
-			},
+			Models:     []entities.ModelPricing{},
 		},
 		{
 			ID:         "659D1EAD-AA0A-45CD-BE28-5472F419B0DB",
@@ -119,11 +79,7 @@ func DefaultProviders() []*entities.Provider {
 			Type:       "drujensen",
 			BaseURL:    "https://ai.drujensen.com",
 			APIKeyName: "DRUJENSEN_API_KEY",
-			Models: []entities.ModelPricing{
-				{Name: "qwen3-coder:30b-64k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 32000},
-				{Name: "deepseek:8b-32k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 32000},
-				{Name: "gpt-oss:20b-32k", InputPricePerMille: 0.00, OutputPricePerMille: 0.00, ContextWindow: 32000},
-			},
+			Models:     []entities.ModelPricing{},
 		},
 		{
 			ID:         "41A83584-ABEB-4490-921A-D778A296862D",
@@ -151,7 +107,7 @@ Key principles:
 
 	return []entities.Agent{
 		{
-			ID:   "5AEFC437-A72E-4B47-901F-865DDF6D8B74",
+			ID:   "1B2F3DCE-03C5-4376-964F-73649450AC30",
 			Name: "Research",
 			SystemPrompt: `### Introduction and Role
 
@@ -190,7 +146,7 @@ Stop researching when:
 			UpdatedAt: time.Now(),
 		},
 		{
-			ID:   "B020132C-331A-436B-A8BA-A8639BC20436",
+			ID:   "39FDB435-37F4-4A4D-9DE6-C36243ECEE8B",
 			Name: "Plan",
 			SystemPrompt: `### Introduction and Role
 
@@ -226,7 +182,7 @@ Stop planning when:
 			UpdatedAt: time.Now(),
 		},
 		{
-			ID:   "6B0866FA-F10B-496C-93D5-7263B0F936B3",
+			ID:   "830EF402-4F03-40BA-B403-25A9D732D82F",
 			Name: "Build",
 			SystemPrompt: `### Introduction and Role
 
@@ -298,7 +254,7 @@ func DefaultTools() []*entities.ToolData {
 
 	return []*entities.ToolData{
 		{
-			ID:            "501A9EC8-633A-4BD2-91BF-8744B7DC34EC",
+			ID:            "A121CC4A-A5CE-4054-AB8D-8486863DC7EA",
 			ToolType:      "WebSearch",
 			Name:          "WebSearch",
 			Description:   "This tool searches the web using the Tavily API.",
@@ -307,7 +263,7 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     now,
 		},
 		{
-			ID:            "8C2DBDF3-790C-472D-A8EB-F679EB0F887B",
+			ID:            "575B620F-8E41-4294-ADF7-B04B8ACB8F0D",
 			ToolType:      "Project",
 			Name:          "Project",
 			Description:   "This tool reads project details from a project file to provide context for the agent.",
@@ -316,7 +272,7 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     now,
 		},
 		{
-			ID:            "18F69909-AAEB-4DF7-9FF4-BB0A3A748412",
+			ID:            "7A6E93D7-7A8A-4AAE-8EFF-E87976B52C27",
 			ToolType:      "FileRead",
 			Name:          "FileRead",
 			Description:   "This tool reads lines from a file.",
@@ -325,7 +281,7 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     now,
 		},
 		{
-			ID:            "BD3F77F8-1284-408B-8489-729C4B2D2FB5",
+			ID:            "1A0CC8D3-69C0-4F2D-9BCD-B678BC412DD5",
 			ToolType:      "FileWrite",
 			Name:          "FileWrite",
 			Description:   "This tool writes lines to a file.",
@@ -334,7 +290,7 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     now,
 		},
 		{
-			ID:            "E29341C7-ADC3-424E-A49A-829409CB7082",
+			ID:            "2FA32039-1596-4FD1-AAFF-46F2F17FBD61",
 			ToolType:      "FileSearch",
 			Name:          "FileSearch",
 			Description:   "This tool searches for content in a file.",
@@ -343,7 +299,7 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     now,
 		},
 		{
-			ID:            "4bbe0558-0cf8-4b71-81b7-e17b832aed33",
+			ID:            "996F432D-7505-4519-A18D-02BD4E7DCC7F",
 			ToolType:      "Directory",
 			Name:          "Directory",
 			Description:   "This tool supports directory management",
@@ -353,7 +309,7 @@ func DefaultTools() []*entities.ToolData {
 		},
 
 		{
-			ID:            "AE3E4944-253D-4188-BEB0-F370A6F9DC6F",
+			ID:            "ED25354E-F10A-4D6F-979F-339E1CC74B55",
 			ToolType:      "Process",
 			Name:          "Process",
 			Description:   "Executes any command (e.g., python, ruby, node, git) with support for background processes, stdin/stdout/stderr interaction, timeouts, and full output. Can launch interactive environments like Python REPL or Ruby IRB by running in background and using write/read actions. The command is executed in the workspace directory.",
@@ -362,7 +318,7 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     now,
 		},
 		{
-			ID:            "69216685-CE00-496B-A464-1767233B0440",
+			ID:            "7E29B4E6-3147-4826-939A-ABA82562A27B",
 			ToolType:      "Fetch",
 			Name:          "Fetch",
 			Description:   "This tool performs HTTP requests to fetch data from web APIs and endpoints.",
@@ -371,7 +327,7 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     now,
 		},
 		{
-			ID:            "FE4663FE-B3B2-4270-93E3-6834B429C903",
+			ID:            "44BF67C9-45DC-4A0C-947E-58604D1F37B9",
 			ToolType:      "Swagger",
 			Name:          "Swagger",
 			Description:   "This tool parses and analyzes Swagger/OpenAPI specifications for API documentation and testing.",
@@ -380,7 +336,7 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     now,
 		},
 		{
-			ID:            "AD652226-1726-412D-98C7-67AFB0A31E7C",
+			ID:            "C30A3419-5F10-4169-AAEB-6D606FE492C8",
 			ToolType:      "Image",
 			Name:          "Image",
 			Description:   "This tool generates images from text prompts using AI providers like XAI or OpenAI.",
@@ -389,7 +345,7 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     now,
 		},
 		{
-			ID:            "00272215-DB30-4CE2-B36F-B9D1B9C54332",
+			ID:            "4DD0A108-710E-4878-8F1F-389DBDEA978F",
 			ToolType:      "Vision",
 			Name:          "Vision",
 			Description:   "This tool image descriptions using AI providers like XAI or OpenAI.",
@@ -398,17 +354,7 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     now,
 		},
 		{
-			ID:            "69216685-CE00-496B-A464-1767233B0440",
-			ToolType:      "Fetch",
-			Name:          "Fetch",
-			Description:   "This tool performs HTTP requests to fetch data from web APIs and endpoints.",
-			Configuration: map[string]string{},
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		},
-
-		{
-			ID:            "6A8A2B8F-3C4D-4E5F-9G6H-7I8J9K0L1M2N",
+			ID:            "2B6CE553-B7A9-4A05-A7AF-A2EC34AA9490",
 			ToolType:      "Todo",
 			Name:          "Todo",
 			Description:   "This tool manages a structured task list for complex tasks.",
@@ -423,10 +369,11 @@ func DefaultTools() []*entities.ToolData {
 func DefaultModels() []*entities.Model {
 	return []*entities.Model{
 		// OpenAI Models
+		// OpenAI Models
 		{
 			ID:              "A69AFBC4-1BB0-4D16-8FC6-3CB8E6603A68",
 			Name:            "GPT-4.1 Standard",
-			ProviderID:      "1E4697B3-233F-4004-B513-692E5F6EABE6", // OpenAI
+			ProviderID:      "1E4697B3-233F-4004-B513-692E5F6EABE6",
 			ProviderType:    entities.ProviderOpenAI,
 			ModelName:       "gpt-4.1",
 			APIKey:          "#{OPENAI_API_KEY}#",
@@ -440,7 +387,7 @@ func DefaultModels() []*entities.Model {
 		{
 			ID:              "3CA94BFA-5CD5-44FD-9EBC-3F780105B821",
 			Name:            "GPT-4.1 Mini Fast",
-			ProviderID:      "1E4697B3-233F-4004-B513-692E5F6EABE6", // OpenAI
+			ProviderID:      "1E4697B3-233F-4004-B513-692E5F6EABE6",
 			ProviderType:    entities.ProviderOpenAI,
 			ModelName:       "gpt-4.1-mini",
 			APIKey:          "#{OPENAI_API_KEY}#",
@@ -456,7 +403,7 @@ func DefaultModels() []*entities.Model {
 		{
 			ID:              "5632519A-1495-46CA-BCF9-274307477894",
 			Name:            "Claude Sonnet Balanced",
-			ProviderID:      "B978105A-802B-480B-BF79-D50EB8FB21B0", // Anthropic
+			ProviderID:      "B978105A-802B-480B-BF79-D50EB8FB21B0",
 			ProviderType:    entities.ProviderAnthropic,
 			ModelName:       "claude-3-7-sonnet-latest",
 			APIKey:          "#{ANTHROPIC_API_KEY}#",
@@ -470,7 +417,7 @@ func DefaultModels() []*entities.Model {
 		{
 			ID:              "17403C9E-A943-4CF1-AC39-7DCF5B513135",
 			Name:            "Claude Haiku Fast",
-			ProviderID:      "B978105A-802B-480B-BF79-D50EB8FB21B0", // Anthropic
+			ProviderID:      "B978105A-802B-480B-BF79-D50EB8FB21B0",
 			ProviderType:    entities.ProviderAnthropic,
 			ModelName:       "claude-3-5-haiku-latest",
 			APIKey:          "#{ANTHROPIC_API_KEY}#",
@@ -486,7 +433,7 @@ func DefaultModels() []*entities.Model {
 		{
 			ID:              "FA6C6ED3-D14D-450D-9487-D10632215D1E",
 			Name:            "Gemini Pro Balanced",
-			ProviderID:      "E384327C-337D-4EA5-88D5-B1FC4147CD6D", // Google
+			ProviderID:      "E384327C-337D-4EA5-88D5-B1FC4147CD6D",
 			ProviderType:    entities.ProviderGoogle,
 			ModelName:       "gemini-2.5-pro-preview-03-25",
 			APIKey:          "#{GEMINI_API_KEY}#",
@@ -500,7 +447,7 @@ func DefaultModels() []*entities.Model {
 		{
 			ID:              "2EEEFC70-E455-4B64-8951-038564AB9B46",
 			Name:            "Gemini Flash Fast",
-			ProviderID:      "E384327C-337D-4EA5-88D5-B1FC4147CD6D", // Google
+			ProviderID:      "E384327C-337D-4EA5-88D5-B1FC4147CD6D",
 			ProviderType:    entities.ProviderGoogle,
 			ModelName:       "gemini-2.0-flash",
 			APIKey:          "#{GEMINI_API_KEY}#",
@@ -516,7 +463,7 @@ func DefaultModels() []*entities.Model {
 		{
 			ID:              "4C1054B1-A3EA-45DC-9BE1-09073D74CC09",
 			Name:            "Grok Standard",
-			ProviderID:      "FD3C37A7-C9C0-4AA9-A4B7-C43D52806A98", // X.AI
+			ProviderID:      "FD3C37A7-C9C0-4AA9-A4B7-C43D52806A98",
 			ProviderType:    entities.ProviderXAI,
 			ModelName:       "grok-4",
 			APIKey:          "#{XAI_API_KEY}#",
@@ -530,7 +477,7 @@ func DefaultModels() []*entities.Model {
 		{
 			ID:              "659D1EAD-AA0A-45CD-BE28-5472F419B0DB",
 			Name:            "Grok Fast",
-			ProviderID:      "FD3C37A7-C9C0-4AA9-A4B7-C43D52806A98", // X.AI
+			ProviderID:      "FD3C37A7-C9C0-4AA9-A4B7-C43D52806A98",
 			ProviderType:    entities.ProviderXAI,
 			ModelName:       "grok-code-fast",
 			APIKey:          "#{XAI_API_KEY}#",

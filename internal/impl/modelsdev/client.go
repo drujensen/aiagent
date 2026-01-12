@@ -3,6 +3,7 @@ package modelsdev
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,9 +18,7 @@ type ModelsDevClient struct {
 	client    *http.Client
 }
 
-type ModelsDevResponse struct {
-	Providers map[string]ProviderData `json:"providers"`
-}
+type ModelsDevResponse map[string]ProviderData
 
 type ProviderData struct {
 	ID      string               `json:"id"`
@@ -84,15 +83,38 @@ func (c *ModelsDevClient) Fetch() (*ModelsDevResponse, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		c.logger.Error("models.dev API request failed",
+			zap.Int("status_code", resp.StatusCode),
+			zap.String("response_body", string(body)))
 		return nil, fmt.Errorf("models.dev API request failed with status: %d", resp.StatusCode)
 	}
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	c.logger.Debug("Raw models.dev response", zap.String("body", string(body)))
+
 	var result ModelsDevResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to decode models.dev response: %w", err)
 	}
 
-	c.logger.Info("Successfully fetched models.dev data", zap.Int("providers", len(result.Providers)))
+	c.logger.Info("Successfully fetched models.dev data", zap.Int("providers", len(result)))
+
+	// Debug: log provider keys
+	if len(result) == 0 {
+		c.logger.Warn("No providers found in models.dev response")
+	} else {
+		keys := make([]string, 0, len(result))
+		for k := range result {
+			keys = append(keys, k)
+		}
+		c.logger.Info("Available provider keys from models.dev", zap.Strings("keys", keys))
+	}
+
 	return &result, nil
 }
 
@@ -116,7 +138,8 @@ func (c *ModelsDevClient) GetCached() (*ModelsDevResponse, error) {
 	}
 
 	c.logger.Debug("Loaded cache", zap.Int("providers", len(cache.Providers)))
-	return &ModelsDevResponse{Providers: cache.Providers}, nil
+	result := ModelsDevResponse(cache.Providers)
+	return &result, nil
 }
 
 func (c *ModelsDevClient) Refresh() error {
@@ -126,7 +149,7 @@ func (c *ModelsDevClient) Refresh() error {
 	}
 
 	cacheData := ModelsDevCache{
-		Providers:   fetched.Providers,
+		Providers:   *fetched,
 		LastRefresh: time.Now(),
 	}
 
@@ -143,7 +166,7 @@ func (c *ModelsDevClient) Refresh() error {
 		return fmt.Errorf("failed to write cache file: %w", err)
 	}
 
-	c.logger.Info("Successfully refreshed provider cache", zap.Int("providers", len(fetched.Providers)))
+	c.logger.Info("Successfully refreshed provider cache", zap.Int("providers", len(*fetched)))
 	return nil
 }
 
