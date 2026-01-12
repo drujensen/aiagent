@@ -131,13 +131,6 @@ func TestAgentService_CreateAgent(t *testing.T) {
 		assert.Error(t, err)
 		assert.IsType(t, &errors.ValidationError{}, err)
 	})
-
-	t.Run("missing model or api key", func(t *testing.T) {
-		invalidAgent := &entities.Agent{ID: "test-id", Name: "Test", SystemPrompt: "prompt"}
-		err := service.CreateAgent(ctx, invalidAgent)
-		assert.Error(t, err)
-		assert.IsType(t, &errors.ValidationError{}, err)
-	})
 }
 
 func TestAgentService_UpdateAgent(t *testing.T) {

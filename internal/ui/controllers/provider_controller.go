@@ -12,21 +12,24 @@ import (
 )
 
 type ProviderController struct {
-	logger          *zap.Logger
-	tmpl            *template.Template
-	providerService services.ProviderService
+	logger              *zap.Logger
+	tmpl                *template.Template
+	providerService     services.ProviderService
+	modelRefreshService services.ModelRefreshService
 }
 
-func NewProviderController(logger *zap.Logger, tmpl *template.Template, providerService services.ProviderService) *ProviderController {
+func NewProviderController(logger *zap.Logger, tmpl *template.Template, providerService services.ProviderService, modelRefreshService services.ModelRefreshService) *ProviderController {
 	return &ProviderController{
-		logger:          logger,
-		tmpl:            tmpl,
-		providerService: providerService,
+		logger:              logger,
+		tmpl:                tmpl,
+		providerService:     providerService,
+		modelRefreshService: modelRefreshService,
 	}
 }
 
 func (c *ProviderController) RegisterRoutes(e *echo.Echo) {
 	e.GET("/providers", c.ListProvidersHandler)
+	e.POST("/providers/refresh", c.RefreshProvidersHandler)
 	e.GET("/api/providers/:id", c.GetProviderHandler)
 }
 
@@ -63,4 +66,17 @@ func (c *ProviderController) GetProviderHandler(eCtx echo.Context) error {
 	}
 
 	return eCtx.JSON(http.StatusOK, provider)
+}
+
+func (c *ProviderController) RefreshProvidersHandler(eCtx echo.Context) error {
+	c.logger.Info("Starting provider refresh from models.dev")
+
+	if err := c.modelRefreshService.RefreshAllProviders(eCtx.Request().Context()); err != nil {
+		c.logger.Error("Failed to refresh providers", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to refresh providers: "+err.Error())
+	}
+
+	c.logger.Info("Provider refresh completed successfully")
+	eCtx.Response().Header().Set("HX-Trigger", `{"refreshProviders": true}`)
+	return eCtx.String(http.StatusOK, "Providers refreshed successfully from models.dev!")
 }

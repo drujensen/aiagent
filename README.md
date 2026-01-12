@@ -20,6 +20,44 @@ AIAgent is an open-source framework for building and interacting with AI agents.
 - **Docker Support**: Run the entire application with Docker Compose for easy deployment.
 - **Testing and Best Practices**: Comprehensive unit tests, error handling, and code style guidelines following Go best practices.
 
+## Architecture: Agent-Model Separation
+
+AIAgent implements a clean separation between **Agents** and **Models** for maximum flexibility:
+
+### Agents (Behavior)
+Agents define **what** your AI assistant does:
+- **System Prompt**: The personality and behavior instructions
+- **Tools**: Available capabilities (web search, file operations, bash execution, etc.)
+- **Name**: Human-readable identifier
+
+Agents are **reusable** across different AI models and can be switched mid-conversation.
+
+### Models (Inference)
+Models define **how** your AI assistant thinks:
+- **Provider**: OpenAI, Anthropic, Google, xAI, etc.
+- **Model Name**: GPT-4, Claude-3, Gemini, Grok, etc.
+- **Parameters**: Temperature, max tokens, context window
+- **API Keys**: Authentication for the provider
+
+Models can be **switched seamlessly** during conversations, with full chat history preservation.
+
+### Key Benefits
+- **Flexibility**: Mix any agent with any model
+- **Cost Optimization**: Switch to cheaper/faster models for different tasks
+- **Experimentation**: Test the same prompt across different models
+- **Seamless Switching**: Change models mid-conversation without losing context
+
+### Example Usage
+```bash
+# Create an agent with coding expertise
+Agent: "Code Assistant" with tools for file operations and bash
+
+# Use with different models based on needs:
+# - GPT-4 for complex reasoning
+# - Claude-3 for creative coding
+# - Fast models for simple tasks
+```
+
 ## Installation
 
 ### Using Go Install
@@ -81,9 +119,17 @@ Access at `http://localhost:8080` for a browser-based experience, including the 
 
 ### Examples
 
-- **Create an Agent**: Use the TUI or web UI to configure an agent with a specific AI model and tools.
-- **Start a Chat**: Initiate a new chat session and interact with your AI agent.
-- **Use Tools**: In a chat, invoke tools like web search or file read to enhance interactions.
+- **Create an Agent**: Define agent behavior with prompts and tools (no model dependency)
+- **Create a Model**: Configure AI models with providers, parameters, and API keys
+- **Start a Chat**: Combine any agent + any model for a conversation
+- **Switch Mid-Chat**: Change models or agents seamlessly while preserving history
+- **Use Tools**: Agents can invoke tools like web search, file operations, and bash execution
+
+#### Quick Start Workflow
+1. **Setup**: Create agents for different roles (Coder, Researcher, Planner)
+2. **Configure**: Add models from your preferred providers (OpenAI, Anthropic, etc.)
+3. **Chat**: Pick agent + model combinations for different tasks
+4. **Switch**: Change models during conversation for cost/speed optimization
 
 For detailed examples, check the [documentation](AIAGENT.md).
 

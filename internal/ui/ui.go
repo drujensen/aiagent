@@ -17,15 +17,12 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/services"
 	"github.com/drujensen/aiagent/internal/impl/tools"
 
-	_ "github.com/drujensen/aiagent/internal/api"
-	apicontrollers "github.com/drujensen/aiagent/internal/api/controllers"
 	uiapicontrollers "github.com/drujensen/aiagent/internal/ui/controllers"
 
 	"github.com/dustin/go-humanize"
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	echoSwagger "github.com/swaggo/echo-swagger"
 	"github.com/yuin/goldmark"
 	gfmext "github.com/yuin/goldmark/extension"
 
@@ -36,25 +33,27 @@ import (
 var embeddedFiles embed.FS
 
 type UI struct {
-	chatService     services.ChatService
-	agentService    services.AgentService
-	modelService    services.ModelService
-	toolService     services.ToolService
-	providerService services.ProviderService
-	logger          *zap.Logger
-	wsUpgrader      websocket.Upgrader
-	wsClients       map[*websocket.Conn]bool
-	wsClientsMutex  sync.RWMutex
+	chatService         services.ChatService
+	agentService        services.AgentService
+	modelService        services.ModelService
+	toolService         services.ToolService
+	providerService     services.ProviderService
+	modelRefreshService services.ModelRefreshService
+	logger              *zap.Logger
+	wsUpgrader          websocket.Upgrader
+	wsClients           map[*websocket.Conn]bool
+	wsClientsMutex      sync.RWMutex
 }
 
-func NewUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService, providerService services.ProviderService, logger *zap.Logger) *UI {
+func NewUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService, providerService services.ProviderService, modelRefreshService services.ModelRefreshService, logger *zap.Logger) *UI {
 	ui := &UI{
-		chatService:     chatService,
-		agentService:    agentService,
-		modelService:    modelService,
-		toolService:     toolService,
-		providerService: providerService,
-		logger:          logger,
+		chatService:         chatService,
+		agentService:        agentService,
+		modelService:        modelService,
+		toolService:         toolService,
+		providerService:     providerService,
+		modelRefreshService: modelRefreshService,
+		logger:              logger,
 		wsUpgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				return true // Allow connections from any origin for development
@@ -189,10 +188,7 @@ func (u *UI) Run() error {
 		u.logger.Fatal("Failed to initialize tool factory", zap.Error(err))
 	}
 	toolController := uiapicontrollers.NewToolController(u.logger, tmpl, u.toolService, toolFactory)
-	providerController := uiapicontrollers.NewProviderController(u.logger, tmpl, u.providerService)
-
-	apiAgentController := apicontrollers.NewAgentController(u.logger, u.agentService)
-	apiChatController := apicontrollers.NewChatController(u.logger, u.chatService)
+	providerController := uiapicontrollers.NewProviderController(u.logger, tmpl, u.providerService, u.modelRefreshService)
 
 	e := echo.New()
 	e.Use(middleware.Logger())
@@ -250,12 +246,6 @@ func (u *UI) Run() error {
 
 	// WebSocket endpoint for real-time updates
 	e.GET("/ws", u.handleWebSocket)
-
-	api := e.Group("/api")
-	apiAgentController.RegisterRoutes(api)
-	apiChatController.RegisterRoutes(api)
-
-	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	u.logger.Info("Starting HTTP server on :8080")
 	if err := e.Start(":8080"); err != nil {

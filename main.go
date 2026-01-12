@@ -13,6 +13,7 @@ import (
 	"github.com/drujensen/aiagent/internal/impl/config"
 	"github.com/drujensen/aiagent/internal/impl/database"
 	"github.com/drujensen/aiagent/internal/impl/defaults"
+	"github.com/drujensen/aiagent/internal/impl/modelsdev"
 	repositoriesJson "github.com/drujensen/aiagent/internal/impl/repositories/json"
 	repositoriesMongo "github.com/drujensen/aiagent/internal/impl/repositories/mongo"
 	"github.com/drujensen/aiagent/internal/impl/tools"
@@ -35,7 +36,7 @@ func main() {
 	}
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: aiagent [serve] [--storage=type]\n")
+		fmt.Fprintf(os.Stderr, "Usage: aiagent [serve|tui|refresh] [--storage=type]\n")
 		flag.PrintDefaults()
 	}
 
@@ -55,6 +56,11 @@ func main() {
 
 	if len(os.Args) > 1 && os.Args[1] == "tui" {
 		modeStr = "tui"
+		os.Args = slices.Delete(os.Args, 0, 1)
+	}
+
+	if len(os.Args) > 1 && os.Args[1] == "refresh" {
+		modeStr = "refresh"
 		os.Args = slices.Delete(os.Args, 0, 1)
 	}
 
@@ -166,8 +172,25 @@ func main() {
 	toolService := services.NewToolService(toolRepo, logger)
 	chatService := services.NewChatService(chatRepo, agentRepo, modelRepo, providerRepo, toolRepo, cfg, logger)
 
+	// Create ModelRefreshService for refresh functionality
+	modelsDevClient := modelsdev.NewModelsDevClient(logger)
+	modelRefreshService := services.NewModelRefreshService(providerRepo, modelsDevClient, logger)
+
+	if modeStr == "refresh" {
+		// Create the ModelRefreshService
+		modelsDevClient := modelsdev.NewModelsDevClient(logger)
+		refreshService := services.NewModelRefreshService(providerRepo, modelsDevClient, logger)
+
+		fmt.Println("Refreshing providers from models.dev...")
+		if err := refreshService.RefreshAllProviders(context.Background()); err != nil {
+			logger.Fatal("Failed to refresh providers", zap.Error(err))
+		}
+		fmt.Println("Provider refresh completed successfully!")
+		return
+	}
+
 	if modeStr == "serve" {
-		uiApp := ui.NewUI(chatService, agentService, modelService, toolService, providerService, logger)
+		uiApp := ui.NewUI(chatService, agentService, modelService, toolService, providerService, modelRefreshService, logger)
 		if err := uiApp.Run(); err != nil {
 			logger.Fatal("UI failed", zap.Error(err))
 		}

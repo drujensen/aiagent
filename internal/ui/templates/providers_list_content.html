@@ -5,6 +5,12 @@
 
     <div class="mb-4">
         <a href="/providers/new" class="btn-primary"><i class="fas fa-plus"></i> Add New Provider</a>
+        <button class="btn-secondary ml-2"
+                hx-post="/providers/refresh"
+                hx-target="#response-message"
+                hx-swap="innerHTML">
+            <i class="fas fa-sync"></i> Refresh from models.dev
+        </button>
     </div>
 
     <div class="provider-list">
