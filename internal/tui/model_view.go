@@ -11,8 +11,8 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/services"
 )
 
-type AgentView struct {
-	agentService services.AgentService
+type ModelView struct {
+	modelService services.ModelService
 	list         list.Model
 	width        int
 	height       int
@@ -20,30 +20,30 @@ type AgentView struct {
 	mode         string // "view" or "switch"
 }
 
-func NewAgentView(agentService services.AgentService) AgentView {
+func NewModelView(modelService services.ModelService) ModelView {
 	delegate := list.NewDefaultDelegate()
 	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("6")).Bold(true)
 	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("7"))
 	delegate.SetHeight(2)
 
 	l := list.New([]list.Item{}, delegate, 100, 10)
-	l.Title = "Available Agents"
+	l.Title = "Available Models"
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(true)
 	l.SetShowPagination(true)
 
-	return AgentView{
-		agentService: agentService,
+	return ModelView{
+		modelService: modelService,
 		list:         l,
 		mode:         "view",
 	}
 }
 
-func (v AgentView) Init() tea.Cmd {
-	return v.fetchAgentsCmd()
+func (v ModelView) Init() tea.Cmd {
+	return v.fetchModelsCmd()
 }
 
-func (v AgentView) Update(msg tea.Msg) (AgentView, tea.Cmd) {
+func (v ModelView) Update(msg tea.Msg) (ModelView, tea.Cmd) {
 	switch m := msg.(type) {
 	case tea.WindowSizeMsg:
 		v.width = m.Width
@@ -54,23 +54,23 @@ func (v AgentView) Update(msg tea.Msg) (AgentView, tea.Cmd) {
 	case tea.KeyMsg:
 		switch m.String() {
 		case "esc":
-			return v, func() tea.Msg { return agentsCancelledMsg{} }
+			return v, func() tea.Msg { return modelsCancelledMsg{} }
 		case "enter":
 			if v.mode != "switch" {
 				return v, nil
 			}
-			if selected, ok := v.list.SelectedItem().(*entities.Agent); ok {
-				return v, func() tea.Msg { return agentSelectedMsg{agentID: selected.ID} }
+			if selected, ok := v.list.SelectedItem().(*entities.Model); ok {
+				return v, func() tea.Msg { return modelSelectedMsg{modelID: selected.ID} }
 			}
 		}
 
-	case agentsFetchedMsg:
-		items := make([]list.Item, len(m.agents))
-		for i, agent := range m.agents {
-			items[i] = agent
+	case modelsFetchedMsg:
+		items := make([]list.Item, len(m.models))
+		for i, model := range m.models {
+			items[i] = model
 		}
 		if len(items) == 0 {
-			items = append(items, list.Item(&entities.Agent{Name: "No agents available"}))
+			items = append(items, list.Item(&entities.Model{Name: "No models available", ModelName: ""}))
 		}
 		v.list.SetItems(items)
 		v.err = nil
@@ -86,7 +86,7 @@ func (v AgentView) Update(msg tea.Msg) (AgentView, tea.Cmd) {
 	return v, cmd
 }
 
-func (v AgentView) View() string {
+func (v ModelView) View() string {
 
 	if v.width == 0 || v.height == 0 {
 		return ""
@@ -109,7 +109,7 @@ func (v AgentView) View() string {
 	var sb strings.Builder
 	instructions := "Use arrows or j/k to navigate, Esc to return to chat"
 	if v.mode == "switch" {
-		instructions += ", Enter to switch agent"
+		instructions += ", Enter to switch model"
 	}
 	view := innerBorder.Render(v.list.View()) + "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions)
 	sb.WriteString(view)
@@ -122,14 +122,14 @@ func (v AgentView) View() string {
 	return outerStyle.Render(sb.String())
 }
 
-// fetchAgentsCmd fetches agents asynchronously
-func (v AgentView) fetchAgentsCmd() tea.Cmd {
+// fetchModelsCmd fetches models asynchronously
+func (v ModelView) fetchModelsCmd() tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		agents, err := v.agentService.ListAgents(ctx)
+		models, err := v.modelService.ListModels(ctx)
 		if err != nil {
 			return errMsg(err)
 		}
-		return agentsFetchedMsg{agents: agents}
+		return modelsFetchedMsg{models: models}
 	}
 }

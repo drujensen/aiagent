@@ -352,6 +352,7 @@ func formatGenericResult(result string) string {
 type ChatView struct {
 	chatService        services.ChatService
 	agentService       services.AgentService
+	modelService       services.ModelService
 	activeChat         *entities.Chat
 	editor             vimtea.Editor
 	textarea           textarea.Model
@@ -367,6 +368,7 @@ type ChatView struct {
 	width              int
 	height             int
 	currentAgent       *entities.Agent
+	currentModel       *entities.Model
 	previousAgentID    string             // Track previous agent ID to detect changes
 	tempMessages       []entities.Message // Temporary messages for real-time tool events
 	eventCancel        func()             // Event subscription cancel function
@@ -375,7 +377,7 @@ type ChatView struct {
 	toolCallStatus     map[string]bool    // Track completion status of tool calls (toolCallID -> completed)
 }
 
-func NewChatView(chatService services.ChatService, agentService services.AgentService, activeChat *entities.Chat) ChatView {
+func NewChatView(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, activeChat *entities.Chat) ChatView {
 	ta := textarea.New()
 	ta.Placeholder = "Type your message..."
 	ta.Focus()
@@ -397,6 +399,7 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	cv := ChatView{
 		chatService:        chatService,
 		agentService:       agentService,
+		modelService:       modelService,
 		activeChat:         activeChat,
 		textarea:           ta,
 		spinner:            s,
@@ -429,6 +432,13 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 			cv.currentAgent = nil
 		} else {
 			cv.currentAgent = agent
+		}
+		model, err := modelService.GetModel(ctx, activeChat.ModelID)
+		if err != nil {
+			cv.err = err
+			cv.currentModel = nil
+		} else {
+			cv.currentModel = model
 		}
 	}
 	cv.updateEditorContent()
@@ -481,6 +491,13 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 		c.currentAgent = nil
 	} else {
 		c.currentAgent = agent
+	}
+	model, err := c.modelService.GetModel(ctx, chat.ModelID)
+	if err != nil {
+		c.err = err
+		c.currentModel = nil
+	} else {
+		c.currentModel = model
 	}
 
 	// Add system message if agent changed
@@ -751,6 +768,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			}
 		case "ctrl+a":
 			return c, func() tea.Msg { return startAgentSwitchMsg{} }
+		case "ctrl+g":
+			return c, func() tea.Msg { return startModelSwitchMsg{} }
 		case "ctrl+n":
 			return c, func() tea.Msg { return startCreateChatMsg("") }
 		case "ctrl+l":
@@ -898,6 +917,13 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		} else {
 			c.currentAgent = agent
 		}
+		model, err := c.modelService.GetModel(ctx, m.ModelID)
+		if err != nil {
+			c.err = err
+			c.currentModel = nil
+		} else {
+			c.currentModel = model
+		}
 
 		// Add system message if agent changed
 		if agentChanged && c.activeChat != nil && len(c.activeChat.Messages) > 0 {
@@ -987,13 +1013,20 @@ func (c ChatView) View() string {
 
 	agentInfo := "No agent selected"
 	if c.currentAgent != nil {
-		agentInfo = fmt.Sprintf("%s (%s: %s)", c.currentAgent.Name, c.currentAgent.ProviderType, c.currentAgent.Model)
+		agentInfo = fmt.Sprintf("Agent: %s", c.currentAgent.Name)
 	}
+
+	modelInfo := "No model selected"
+	if c.currentModel != nil {
+		modelInfo = fmt.Sprintf("Model: %s", c.currentModel.Name)
+	}
+
+	footerInfo := agentInfo + " | " + modelInfo
 
 	footerStyle := lipgloss.NewStyle().Width(c.width)
 	leftStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Inline(true)
 	rightStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Align(lipgloss.Right).Inline(true).Width(c.width - lipgloss.Width(instructions))
-	footerPart := footerStyle.Render(lipgloss.JoinHorizontal(lipgloss.Top, leftStyle.Render(instructions), rightStyle.Render(agentInfo)))
+	footerPart := footerStyle.Render(lipgloss.JoinHorizontal(lipgloss.Top, leftStyle.Render(instructions), rightStyle.Render(footerInfo)))
 
 	return lipgloss.JoinVertical(lipgloss.Top, editorPart, separator, textareaPart, separator, footerPart)
 }

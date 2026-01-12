@@ -1,0 +1,213 @@
+{{define "model_form_content"}}
+<div class="model-form">
+    <h2>{{if .IsEdit}}Edit Model{{else}}Create Model{{end}}</h2>
+    <form
+        {{if .IsEdit}}hx-put="/models/{{.Model.ID}}"{{else}}hx-post="/models"{{end}}
+        hx-target="#response-message"
+        hx-swap="innerHTML">
+        <input type="hidden" name="id" value="{{.Model.ID}}">
+
+        <div class="form-group">
+            <label for="name">Model Name:</label>
+            <input type="text" id="name" name="name" class="form-control" value="{{.Model.Name}}" required placeholder="e.g., GPT-4 Fast, Claude Creative">
+            <small class="form-text">A friendly name for this model configuration</small>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="provider_type">Provider Type:</label>
+                <select id="provider_type" name="provider_type" class="form-control" required>
+                    <option value="">Select Provider</option>
+                    <option value="openai" {{if eq .Model.ProviderType "openai"}}selected{{end}}>OpenAI</option>
+                    <option value="anthropic" {{if eq .Model.ProviderType "anthropic"}}selected{{end}}>Anthropic</option>
+                    <option value="google" {{if eq .Model.ProviderType "google"}}selected{{end}}>Google</option>
+                    <option value="xai" {{if eq .Model.ProviderType "xai"}}selected{{end}}>X.AI</option>
+                    <option value="deepseek" {{if eq .Model.ProviderType "deepseek"}}selected{{end}}>DeepSeek</option>
+                    <option value="together" {{if eq .Model.ProviderType "together"}}selected{{end}}>Together</option>
+                    <option value="groq" {{if eq .Model.ProviderType "groq"}}selected{{end}}>Groq</option>
+                    <option value="mistral" {{if eq .Model.ProviderType "mistral"}}selected{{end}}>Mistral</option>
+                    <option value="ollama" {{if eq .Model.ProviderType "ollama"}}selected{{end}}>Ollama</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="model_name">Model Name:</label>
+                <input type="text" id="model_name" name="model_name" class="form-control" value="{{.Model.ModelName}}" required placeholder="e.g., gpt-4, claude-3-5-sonnet">
+                <small class="form-text">The actual model identifier from the provider</small>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="api_key">API Key:</label>
+            <input type="text" id="api_key" name="api_key" class="form-control" value="{{.Model.APIKey}}" required placeholder="#{OPENAI_API_KEY}#">
+            <small class="form-text">Use #{VAR_NAME}# to reference environment variables</small>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="temperature">Temperature:</label>
+                <input type="number" id="temperature" name="temperature" class="form-control" value="{{if .Model.Temperature}}{{printf "%.1f" .Model.Temperature}}{{end}}" step="0.1" min="0" max="2" placeholder="0.7">
+                <small class="form-text">Creativity level (0.0 = deterministic, 2.0 = very creative)</small>
+            </div>
+
+            <div class="form-group">
+                <label for="max_tokens">Max Tokens:</label>
+                <input type="number" id="max_tokens" name="max_tokens" class="form-control" value="{{if .Model.MaxTokens}}{{.Model.MaxTokens}}{{end}}" placeholder="4000">
+                <small class="form-text">Maximum response length in tokens</small>
+            </div>
+
+            <div class="form-group">
+                <label for="context_window">Context Window:</label>
+                <input type="number" id="context_window" name="context_window" class="form-control" value="{{if .Model.ContextWindow}}{{.Model.ContextWindow}}{{end}}" placeholder="128000">
+                <small class="form-text">Maximum context length in tokens</small>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="reasoning_effort">Reasoning Effort:</label>
+            <select id="reasoning_effort" name="reasoning_effort" class="form-control">
+                <option value="" {{if eq .Model.ReasoningEffort ""}}selected{{end}}>Default</option>
+                <option value="low" {{if eq .Model.ReasoningEffort "low"}}selected{{end}}>Low</option>
+                <option value="medium" {{if eq .Model.ReasoningEffort "medium"}}selected{{end}}>Medium</option>
+                <option value="high" {{if eq .Model.ReasoningEffort "high"}}selected{{end}}>High</option>
+            </select>
+            <small class="form-text">Reasoning effort level (for supported models)</small>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                {{if .IsEdit}}Update Model{{else}}Create Model{{end}}
+            </button>
+            <a href="/models" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<style>
+.model-form {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.model-form h2 {
+    color: #333;
+    margin-bottom: 30px;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 10px;
+}
+
+.form-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.form-row .form-group {
+    flex: 1;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #333;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+.form-text {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px;
+    color: #666;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+.btn {
+    display: inline-block;
+    padding: 10px 20px;
+    text-decoration: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #545b62;
+}
+</style>
+
+<script>
+// Auto-populate API key placeholder based on provider selection
+document.getElementById('provider_type').addEventListener('change', function() {
+    const provider = this.value;
+    const apiKeyInput = document.getElementById('api_key');
+
+    if (!apiKeyInput.value || apiKeyInput.value.startsWith('#{')) {
+        let placeholder = '#{API_KEY}#';
+        switch(provider) {
+            case 'openai':
+                placeholder = '#{OPENAI_API_KEY}#';
+                break;
+            case 'anthropic':
+                placeholder = '#{ANTHROPIC_API_KEY}#';
+                break;
+            case 'google':
+                placeholder = '#{GEMINI_API_KEY}#';
+                break;
+            case 'xai':
+                placeholder = '#{XAI_API_KEY}#';
+                break;
+            case 'deepseek':
+                placeholder = '#{DEEPSEEK_API_KEY}#';
+                break;
+        }
+        apiKeyInput.placeholder = placeholder;
+        if (!apiKeyInput.value) {
+            apiKeyInput.value = placeholder;
+        }
+    }
+});
+</script>
+{{end}}

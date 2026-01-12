@@ -95,6 +95,7 @@ func main() {
 	}
 
 	var agentRepo interfaces.AgentRepository
+	var modelRepo interfaces.ModelRepository
 	var chatRepo interfaces.ChatRepository
 	var providerRepo interfaces.ProviderRepository
 	var toolRepo interfaces.ToolRepository
@@ -121,6 +122,11 @@ func main() {
 		agentRepo = repositoriesMongo.NewMongoAgentRepository(db.Collection("agents"))
 		chatRepo = repositoriesMongo.NewMongoChatRepository(db.Collection("chats"))
 		providerRepo = repositoriesMongo.NewMongoProviderRepository(db.Collection("providers"))
+		// TODO: Implement MongoDB model repository
+		modelRepo, err = repositoriesJson.NewJSONModelRepository(dataDir)
+		if err != nil {
+			logger.Fatal("Failed to initialize model repository", zap.Error(err))
+		}
 		toolRepo, err = repositoriesMongo.NewToolRepository(db.Collection("tools"), toolFactory, logger)
 		if err != nil {
 			logger.Fatal("Failed to initialize tool repository", zap.Error(err))
@@ -139,6 +145,10 @@ func main() {
 		if err != nil {
 			logger.Fatal("Failed to initialize agent repository", zap.Error(err))
 		}
+		modelRepo, err = repositoriesJson.NewJSONModelRepository(dataDir)
+		if err != nil {
+			logger.Fatal("Failed to initialize model repository", zap.Error(err))
+		}
 		chatRepo, err = repositoriesJson.NewJSONChatRepository(dataDir)
 		if err != nil {
 			logger.Fatal("Failed to initialize chat repository", zap.Error(err))
@@ -146,22 +156,23 @@ func main() {
 	}
 
 	// Initialize default data
-	if err := initializeDefaults(context.Background(), providerRepo, agentRepo, toolRepo, logger); err != nil {
+	if err := initializeDefaults(context.Background(), providerRepo, agentRepo, modelRepo, toolRepo, logger); err != nil {
 		logger.Fatal("Failed to initialize defaults", zap.Error(err))
 	}
 
 	providerService := services.NewProviderService(providerRepo, logger)
 	agentService := services.NewAgentService(agentRepo, logger)
+	modelService := services.NewModelService(modelRepo, logger)
 	toolService := services.NewToolService(toolRepo, logger)
-	chatService := services.NewChatService(chatRepo, agentRepo, providerRepo, toolRepo, cfg, logger)
+	chatService := services.NewChatService(chatRepo, agentRepo, modelRepo, providerRepo, toolRepo, cfg, logger)
 
 	if modeStr == "serve" {
-		uiApp := ui.NewUI(chatService, agentService, toolService, providerService, logger)
+		uiApp := ui.NewUI(chatService, agentService, modelService, toolService, providerService, logger)
 		if err := uiApp.Run(); err != nil {
 			logger.Fatal("UI failed", zap.Error(err))
 		}
 	} else {
-		p := tea.NewProgram(tui.NewTUI(chatService, agentService, toolService), tea.WithAltScreen(), tea.WithMouseAllMotion())
+		p := tea.NewProgram(tui.NewTUI(chatService, agentService, modelService, toolService), tea.WithAltScreen(), tea.WithMouseAllMotion())
 
 		if _, err := p.Run(); err != nil {
 			log.Fatal(err)
@@ -170,7 +181,7 @@ func main() {
 }
 
 // initializeDefaults populates repositories with default data if they are empty.
-func initializeDefaults(ctx context.Context, providerRepo interfaces.ProviderRepository, agentRepo interfaces.AgentRepository, toolRepo interfaces.ToolRepository, logger *zap.Logger) error {
+func initializeDefaults(ctx context.Context, providerRepo interfaces.ProviderRepository, agentRepo interfaces.AgentRepository, modelRepo interfaces.ModelRepository, toolRepo interfaces.ToolRepository, logger *zap.Logger) error {
 	// Check and populate providers
 	providers, err := providerRepo.ListProviders(ctx)
 	if err != nil {
@@ -217,6 +228,22 @@ func initializeDefaults(ctx context.Context, providerRepo interfaces.ProviderRep
 			}
 		}
 		logger.Info("Initialized tools with default data")
+	}
+
+	// Check and populate models
+	models, err := modelRepo.ListModels(ctx)
+	if err != nil {
+		logger.Error("Failed to list models", zap.Error(err))
+		return err
+	}
+	if len(models) == 0 {
+		for _, model := range defaults.DefaultModels() {
+			if err := modelRepo.CreateModel(ctx, model); err != nil {
+				logger.Error("Failed to create default model", zap.String("model", model.Name), zap.Error(err))
+				return err
+			}
+		}
+		logger.Info("Initialized models with default data")
 	}
 
 	return nil

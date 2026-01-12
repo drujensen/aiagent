@@ -23,15 +23,17 @@ type ChatController struct {
 	tmpl            *template.Template
 	chatService     services.ChatService
 	agentService    services.AgentService
+	modelService    services.ModelService
 	activeCancelers sync.Map // Maps chatID to context cancelFunc
 }
 
-func NewChatController(logger *zap.Logger, tmpl *template.Template, chatService services.ChatService, agentService services.AgentService) *ChatController {
+func NewChatController(logger *zap.Logger, tmpl *template.Template, chatService services.ChatService, agentService services.AgentService, modelService services.ModelService) *ChatController {
 	return &ChatController{
 		logger:          logger,
 		tmpl:            tmpl,
 		chatService:     chatService,
 		agentService:    agentService,
+		modelService:    modelService,
 		activeCancelers: sync.Map{},
 	}
 }
@@ -42,6 +44,8 @@ func (c *ChatController) RegisterRoutes(e *echo.Echo) {
 	e.GET("/chats/:id", c.ChatHandler)
 	e.GET("/chats/:id/edit", c.ChatFormHandler)
 	e.PUT("/chats/:id", c.UpdateChatHandler)
+	e.PUT("/chats/:id/agent", c.SwitchAgentHandler)
+	e.PUT("/chats/:id/model", c.SwitchModelHandler)
 	e.DELETE("/chats/:id", c.DeleteChatHandler)
 
 	e.POST("/chats/:id/messages", c.SendMessageHandler)
@@ -68,12 +72,22 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 
 	agent, err := c.agentService.GetAgent(eCtx.Request().Context(), chat.AgentID)
 	if err != nil {
-		switch err.(type) {
-		case *errors.NotFoundError:
-			return eCtx.String(http.StatusNotFound, "Agent not found")
-		default:
-			return eCtx.String(http.StatusInternalServerError, "Failed to load agent")
-		}
+		return eCtx.String(http.StatusInternalServerError, "Failed to get agent")
+	}
+
+	model, err := c.modelService.GetModel(eCtx.Request().Context(), chat.ModelID)
+	if err != nil {
+		return eCtx.String(http.StatusInternalServerError, "Failed to get model")
+	}
+
+	availableAgents, err := c.agentService.ListAgents(eCtx.Request().Context())
+	if err != nil {
+		return eCtx.String(http.StatusInternalServerError, "Failed to list agents")
+	}
+
+	availableModels, err := c.modelService.ListModels(eCtx.Request().Context())
+	if err != nil {
+		return eCtx.String(http.StatusInternalServerError, "Failed to list models")
 	}
 
 	// Filter out tool execution notification messages from the chat messages
@@ -92,12 +106,22 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 		filteredMessages = append(filteredMessages, msg)
 	}
 
+	title := "Chat"
+	if chat.Name != "" {
+		title = chat.Name
+	}
+
 	data := map[string]any{
-		"Title":           "AI Agents - Chat",
+		"Title":           title,
 		"ContentTemplate": "chat_content",
 		"ChatID":          chatID,
 		"ChatName":        chat.Name,
 		"AgentName":       agent.Name,
+		"ModelName":       model.Name,
+		"CurrentAgentID":  agent.ID,
+		"CurrentModelID":  model.ID,
+		"AvailableAgents": availableAgents,
+		"AvailableModels": availableModels,
 		"ChatCost":        chat.Usage.TotalCost,
 		"TotalTokens":     chat.Usage.TotalTokens,
 		"Messages":        filteredMessages,
@@ -111,6 +135,12 @@ func (c *ChatController) ChatFormHandler(eCtx echo.Context) error {
 	if err != nil {
 		c.logger.Error("Failed to list agents", zap.Error(err))
 		return eCtx.String(http.StatusInternalServerError, "Failed to load agents")
+	}
+
+	models, err := c.modelService.ListModels(eCtx.Request().Context())
+	if err != nil {
+		c.logger.Error("Failed to list models", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to load models")
 	}
 
 	var chat *entities.Chat
@@ -136,12 +166,14 @@ func (c *ChatController) ChatFormHandler(eCtx echo.Context) error {
 		ID      string
 		Name    string
 		AgentID string
+		ModelID string
 	}{}
 
 	if chat != nil {
 		chatData.ID = chat.ID
 		chatData.Name = chat.Name
 		chatData.AgentID = chat.AgentID
+		chatData.ModelID = chat.ModelID
 	} else {
 		chatData.ID = uuid.New().String()
 	}
@@ -151,6 +183,7 @@ func (c *ChatController) ChatFormHandler(eCtx echo.Context) error {
 		"ContentTemplate": "chat_form_content",
 		"Chat":            chatData,
 		"Agents":          agents,
+		"Models":          models,
 		"IsEdit":          isEdit,
 	}
 
@@ -158,18 +191,74 @@ func (c *ChatController) ChatFormHandler(eCtx echo.Context) error {
 }
 
 func (c *ChatController) CreateChatHandler(eCtx echo.Context) error {
-	agentID := eCtx.FormValue("agent-select")
-	name := eCtx.FormValue("chat-name")
-	if agentID == "" || name == "" {
-		return eCtx.String(http.StatusBadRequest, "Agent and name are required")
+	// Check if this is JSON request (quick start) or form data (advanced)
+	contentType := eCtx.Request().Header.Get("Content-Type")
+
+	var agentID, modelID, name string
+
+	if strings.Contains(contentType, "application/json") {
+		// Quick start - use defaults
+		var input struct {
+			Name    string `json:"name"`
+			AgentID string `json:"agent_id"`
+			ModelID string `json:"model_id"`
+		}
+		if err := eCtx.Bind(&input); err != nil {
+			return eCtx.String(http.StatusBadRequest, "Invalid request")
+		}
+
+		name = input.Name
+
+		// Use defaults if not specified
+		if input.AgentID != "" {
+			agentID = input.AgentID
+		} else {
+			// Use first available agent as default
+			agents, err := c.agentService.ListAgents(eCtx.Request().Context())
+			if err != nil || len(agents) == 0 {
+				return eCtx.String(http.StatusInternalServerError, "No agents available")
+			}
+			agentID = agents[0].ID
+		}
+
+		if input.ModelID != "" {
+			modelID = input.ModelID
+		} else {
+			// Use first available model as default
+			models, err := c.modelService.ListModels(eCtx.Request().Context())
+			if err != nil || len(models) == 0 {
+				return eCtx.String(http.StatusInternalServerError, "No models available")
+			}
+			modelID = models[0].ID
+		}
+	} else {
+		// Advanced options - form data
+		agentID = eCtx.FormValue("agent-select")
+		modelID = eCtx.FormValue("model-select")
+		name = eCtx.FormValue("chat-name")
+
+		if agentID == "" {
+			return eCtx.String(http.StatusBadRequest, "Agent selection is required")
+		}
+		if modelID == "" {
+			return eCtx.String(http.StatusBadRequest, "Model selection is required")
+		}
 	}
 
-	chat, err := c.chatService.CreateChat(eCtx.Request().Context(), agentID, name)
+	chat, err := c.chatService.CreateChat(eCtx.Request().Context(), agentID, modelID, name)
 	if err != nil {
-		c.logger.Error("Failed to create chat", zap.Error(err))
 		return eCtx.String(http.StatusInternalServerError, "Failed to create chat")
 	}
 
+	// For JSON requests, return JSON response
+	if strings.Contains(contentType, "application/json") {
+		return eCtx.JSON(http.StatusCreated, map[string]string{
+			"id":   chat.ID,
+			"name": chat.Name,
+		})
+	}
+
+	// For form requests, redirect
 	eCtx.Response().Header().Set("HX-Redirect", "/chats/"+chat.ID)
 	return eCtx.String(http.StatusOK, "Chat created successfully")
 }
@@ -182,7 +271,13 @@ func (c *ChatController) UpdateChatHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusBadRequest, "Chat ID and name are required")
 	}
 
-	_, err := c.chatService.UpdateChat(eCtx.Request().Context(), chatID, agentID, name)
+	// Get existing chat to preserve model ID
+	existingChat, err := c.chatService.GetChat(eCtx.Request().Context(), chatID)
+	if err != nil {
+		return eCtx.String(http.StatusInternalServerError, "Failed to get chat")
+	}
+
+	_, err = c.chatService.UpdateChat(eCtx.Request().Context(), chatID, agentID, existingChat.ModelID, name)
 	if err != nil {
 		switch err.(type) {
 		case *errors.NotFoundError:
@@ -194,6 +289,76 @@ func (c *ChatController) UpdateChatHandler(eCtx echo.Context) error {
 
 	eCtx.Response().Header().Set("HX-Redirect", "/chats/"+chatID)
 	return eCtx.String(http.StatusOK, "Chat updated successfully")
+}
+
+func (c *ChatController) SwitchModelHandler(eCtx echo.Context) error {
+	chatID := eCtx.Param("id")
+	if chatID == "" {
+		return eCtx.String(http.StatusBadRequest, "Chat ID is required")
+	}
+
+	var input struct {
+		ModelID string `json:"model_id"`
+	}
+	if err := eCtx.Bind(&input); err != nil {
+		return eCtx.String(http.StatusBadRequest, "Invalid request body")
+	}
+
+	if input.ModelID == "" {
+		return eCtx.String(http.StatusBadRequest, "Model ID is required")
+	}
+
+	// Get existing chat to preserve agent
+	existingChat, err := c.chatService.GetChat(eCtx.Request().Context(), chatID)
+	if err != nil {
+		return eCtx.String(http.StatusInternalServerError, "Failed to get chat")
+	}
+
+	// Update chat with new model
+	updatedChat, err := c.chatService.UpdateChat(eCtx.Request().Context(), chatID, existingChat.AgentID, input.ModelID, existingChat.Name)
+	if err != nil {
+		return eCtx.String(http.StatusInternalServerError, "Failed to switch model")
+	}
+
+	return eCtx.JSON(http.StatusOK, map[string]interface{}{
+		"success": true,
+		"chat":    updatedChat,
+	})
+}
+
+func (c *ChatController) SwitchAgentHandler(eCtx echo.Context) error {
+	chatID := eCtx.Param("id")
+	if chatID == "" {
+		return eCtx.String(http.StatusBadRequest, "Chat ID is required")
+	}
+
+	var input struct {
+		AgentID string `json:"agent_id"`
+	}
+	if err := eCtx.Bind(&input); err != nil {
+		return eCtx.String(http.StatusBadRequest, "Invalid request body")
+	}
+
+	if input.AgentID == "" {
+		return eCtx.String(http.StatusBadRequest, "Agent ID is required")
+	}
+
+	// Get existing chat to preserve model
+	existingChat, err := c.chatService.GetChat(eCtx.Request().Context(), chatID)
+	if err != nil {
+		return eCtx.String(http.StatusInternalServerError, "Failed to get chat")
+	}
+
+	// Update chat with new agent
+	updatedChat, err := c.chatService.UpdateChat(eCtx.Request().Context(), chatID, input.AgentID, existingChat.ModelID, existingChat.Name)
+	if err != nil {
+		return eCtx.String(http.StatusInternalServerError, "Failed to switch agent")
+	}
+
+	return eCtx.JSON(http.StatusOK, map[string]interface{}{
+		"success": true,
+		"chat":    updatedChat,
+	})
 }
 
 func (c *ChatController) DeleteChatHandler(eCtx echo.Context) error {

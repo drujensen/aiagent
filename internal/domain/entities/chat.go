@@ -16,6 +16,7 @@ type ChatUsage struct {
 type Chat struct {
 	ID        string     `json:"id" bson:"_id"`
 	AgentID   string     `json:"agent_id" bson:"agent_id"`
+	ModelID   string     `json:"model_id" bson:"model_id"`
 	Name      string     `json:"name" bson:"name"`
 	Messages  []Message  `json:"messages" bson:"messages"`
 	Usage     *ChatUsage `json:"usage,omitempty" bson:"usage,omitempty"`
@@ -24,11 +25,12 @@ type Chat struct {
 	Active    bool       `json:"active" bson:"active"`
 }
 
-func NewChat(agentID string, name string) *Chat {
+func NewChat(agentID, modelID, name string) *Chat {
 	return &Chat{
 		ID:        uuid.New().String(),
 		AgentID:   agentID,
-		Name:      name, // Initialize with the provided name
+		ModelID:   modelID,
+		Name:      name,
 		Messages:  make([]Message, 0),
 		Usage:     &ChatUsage{},
 		CreatedAt: time.Now(),

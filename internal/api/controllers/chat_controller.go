@@ -92,15 +92,12 @@ func (c *ChatController) GetChat(ctx echo.Context) error {
 //	@Failure		500		{object}	map[string]any	"Internal server error"
 //	@Router			/api/chats [post]
 func (c *ChatController) CreateChat(ctx echo.Context) error {
-	var input struct {
-		AgentID string `json:"agent_id"`
-		Name    string `json:"name"`
-	}
+	var input CreateChatRequest
 	if err := ctx.Bind(&input); err != nil {
 		return c.handleError(ctx, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
 	}
 
-	chat, err := c.chatService.CreateChat(ctx.Request().Context(), input.AgentID, input.Name)
+	chat, err := c.chatService.CreateChat(ctx.Request().Context(), input.AgentID, input.ModelID, input.Name)
 	if err != nil {
 		return c.handleError(ctx, err, http.StatusInternalServerError)
 	}
@@ -173,6 +170,7 @@ func (c *ChatController) handleError(ctx echo.Context, err any, statusCode int) 
 // CreateChatRequest represents the request body for creating a new chat.
 type CreateChatRequest struct {
 	AgentID string `json:"agent_id" example:"60d0ddb0f0a4a729c0a8e9b1"`
+	ModelID string `json:"model_id" example:"60d0ddb0f0a4a729c0a8e9b2"`
 	Name    string `json:"name" example:"My Chat"`
 }
 

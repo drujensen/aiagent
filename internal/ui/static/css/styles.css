@@ -105,29 +105,29 @@
     position: relative;
 }
 
-.chat-list, .agent-list, .tool-list {
+.chat-list, .agent-list, .model-list, .tool-list {
     list-style: none;
     padding: 0;
 }
 
-.chat-list li, .agent-list li, .tool-list li {
+.chat-list li, .agent-list li, .model-list li, .tool-list li {
     padding: 10px;
     border-bottom: 1px solid #444;
     cursor: pointer;
 }
 
-.chat-list li:hover, .agent-list li:hover, .tool-list li:hover {
+.chat-list li:hover, .agent-list li:hover, .model-list li:hover, .tool-list li:hover {
     background-color: #3c3c3c;
 }
 
-.chat-list li a, .agent-list li a, .tool-list li a {
+.chat-list li a, .agent-list li a, .model-list li a, .tool-list li a {
     color: #fff;
     text-decoration: none;
     display: flex;
     align-items: center;
 }
 
-.chat-list li i, .agent-list li i, .tool-list li i {
+.chat-list li i, .agent-list li i, .model-list li i, .tool-list li i {
     margin-right: 8px;
     color: #464EB8;
 }
@@ -150,6 +150,7 @@
 
 .chat-item .edit-icon,
 .chat-item .delete-icon,
+.model-item .delete-icon,
 .tool-item .delete-icon,
 .agent-item .delete-icon {
     display: none;
@@ -157,6 +158,7 @@
 
 .chat-item:hover .edit-icon,
 .chat-item:hover .delete-icon,
+.model-item:hover .delete-icon,
 .tool-item:hover .delete-icon,
 .agent-item:hover .delete-icon {
     display: inline-block;

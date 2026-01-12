@@ -65,4 +65,13 @@ func (r *MongoProviderRepository) CreateProvider(ctx context.Context, provider *
 	return nil
 }
 
+func (r *MongoProviderRepository) UpdateProvider(ctx context.Context, provider *entities.Provider) error {
+	update := bson.M{"$set": provider}
+	_, err := r.collection.UpdateOne(ctx, bson.M{"_id": provider.ID}, update)
+	if err != nil {
+		return errors.InternalErrorf("failed to update provider: %v", err)
+	}
+	return nil
+}
+
 var _ interfaces.ProviderRepository = (*MongoProviderRepository)(nil)

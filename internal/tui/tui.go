@@ -12,6 +12,7 @@ import (
 type TUI struct {
 	chatService  services.ChatService
 	agentService services.AgentService
+	modelService services.ModelService
 	toolService  services.ToolService
 	activeChat   *entities.Chat
 
@@ -21,6 +22,7 @@ type TUI struct {
 	usageView   UsageView
 	helpView    HelpView
 	agentView   AgentView
+	modelView   ModelView
 	toolView    ToolView
 	commandMenu CommandMenu
 
@@ -28,7 +30,7 @@ type TUI struct {
 	err   error
 }
 
-func NewTUI(chatService services.ChatService, agentService services.AgentService, toolService services.ToolService) TUI {
+func NewTUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService) TUI {
 	ctx := context.Background()
 
 	activeChat, err := chatService.GetActiveChat(ctx)
@@ -44,15 +46,17 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 	return TUI{
 		chatService:  chatService,
 		agentService: agentService,
+		modelService: modelService,
 		toolService:  toolService,
 		activeChat:   activeChat,
 
-		chatView:    NewChatView(chatService, agentService, activeChat),
-		chatForm:    NewChatForm(chatService, agentService),
+		chatView:    NewChatView(chatService, agentService, modelService, activeChat),
+		chatForm:    NewChatForm(chatService, agentService, modelService),
 		historyView: NewHistoryView(chatService),
-		usageView:   NewUsageView(chatService, agentService),
+		usageView:   NewUsageView(chatService, agentService, modelService),
 		helpView:    NewHelpView(),
 		agentView:   NewAgentView(agentService),
+		modelView:   NewModelView(modelService),
 		toolView:    NewToolView(toolService),
 		commandMenu: NewCommandMenu(),
 
@@ -69,6 +73,7 @@ func (t TUI) Init() tea.Cmd {
 		t.usageView.Init(),
 		t.helpView.Init(),
 		t.agentView.Init(),
+		t.modelView.Init(),
 		t.toolView.Init(),
 		t.commandMenu.Init(),
 	)
@@ -173,7 +178,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t, t.agentView.Init()
 	case agentSelectedMsg:
 		ctx := context.Background()
-		updatedChat, err := t.chatService.UpdateChat(ctx, t.activeChat.ID, msg.agentID, t.activeChat.Name)
+		updatedChat, err := t.chatService.UpdateChat(ctx, t.activeChat.ID, msg.agentID, t.activeChat.ModelID, t.activeChat.Name)
 		if err != nil {
 			return t, func() tea.Msg { return errMsg(err) }
 		}
@@ -190,6 +195,37 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.chatView.updateEditorContent()
 		t.state = "chat/view"
 		return t, t.chatView.Init()
+
+	case startModelSwitchMsg:
+		if t.activeChat == nil {
+			return t, nil
+		}
+		t.state = "models/list"
+		t.modelView.mode = "switch"
+		return t, t.modelView.Init()
+	case modelSelectedMsg:
+		ctx := context.Background()
+		updatedChat, err := t.chatService.UpdateChat(ctx, t.activeChat.ID, t.activeChat.AgentID, msg.modelID, t.activeChat.Name)
+		if err != nil {
+			return t, func() tea.Msg { return errMsg(err) }
+		}
+		t.activeChat = updatedChat
+		t.chatView.activeChat = updatedChat
+		ctx2 := context.Background()
+		model, err := t.modelService.GetModel(ctx2, updatedChat.ModelID)
+		if err != nil {
+			t.chatView.err = err
+			t.chatView.currentModel = nil
+		} else {
+			t.chatView.currentModel = model
+		}
+		t.chatView.updateEditorContent()
+		t.state = "chat/view"
+		return t, t.chatView.Init()
+
+	case modelsCancelledMsg:
+		t.state = "chat/view"
+		return t, nil
 
 	// Handle tools view messages
 	case startToolsMsg:
@@ -302,6 +338,11 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 
+		t.modelView, cmd = t.modelView.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
 		t.toolView, cmd = t.toolView.Update(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -329,6 +370,8 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.helpView, cmd = t.helpView.Update(msg)
 	case "agents/list":
 		t.agentView, cmd = t.agentView.Update(msg)
+	case "models/list":
+		t.modelView, cmd = t.modelView.Update(msg)
 	case "tools/list":
 		t.toolView, cmd = t.toolView.Update(msg)
 	case "chat/commands":
@@ -351,6 +394,8 @@ func (t TUI) View() string {
 		return t.helpView.View()
 	case "agents/list":
 		return t.agentView.View()
+	case "models/list":
+		return t.modelView.View()
 	case "tools/list":
 		return t.toolView.View()
 	case "chat/commands":

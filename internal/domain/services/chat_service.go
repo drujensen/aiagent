@@ -23,8 +23,8 @@ type ChatService interface {
 	GetChat(ctx context.Context, id string) (*entities.Chat, error)
 	GetActiveChat(ctx context.Context) (*entities.Chat, error)
 	SetActiveChat(ctx context.Context, chatID string) error
-	CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error)
-	UpdateChat(ctx context.Context, id, agentID, name string) (*entities.Chat, error)
+	CreateChat(ctx context.Context, agentID, modelID, name string) (*entities.Chat, error)
+	UpdateChat(ctx context.Context, id, agentID, modelID, name string) (*entities.Chat, error)
 	DeleteChat(ctx context.Context, id string) error
 	SendMessage(ctx context.Context, id string, message *entities.Message) (*entities.Message, error)
 	SaveMessagesIncrementally(ctx context.Context, chatID string, messages []*entities.Message) error
@@ -33,6 +33,7 @@ type ChatService interface {
 type chatService struct {
 	chatRepo     interfaces.ChatRepository
 	agentRepo    interfaces.AgentRepository
+	modelRepo    interfaces.ModelRepository
 	providerRepo interfaces.ProviderRepository
 	toolRepo     interfaces.ToolRepository
 	config       *config.Config
@@ -42,6 +43,7 @@ type chatService struct {
 func NewChatService(
 	chatRepo interfaces.ChatRepository,
 	agentRepo interfaces.AgentRepository,
+	modelRepo interfaces.ModelRepository,
 	providerRepo interfaces.ProviderRepository,
 	toolRepo interfaces.ToolRepository,
 	cfg *config.Config,
@@ -50,6 +52,7 @@ func NewChatService(
 	return &chatService{
 		chatRepo:     chatRepo,
 		agentRepo:    agentRepo,
+		modelRepo:    modelRepo,
 		providerRepo: providerRepo,
 		toolRepo:     toolRepo,
 		config:       cfg,
@@ -79,31 +82,38 @@ func (s *chatService) GetChat(ctx context.Context, id string) (*entities.Chat, e
 	return chat, nil
 }
 
-func (s *chatService) CreateChat(ctx context.Context, agentID, name string) (*entities.Chat, error) {
+func (s *chatService) CreateChat(ctx context.Context, agentID, modelID, name string) (*entities.Chat, error) {
 	if agentID == "" {
 		return nil, errors.ValidationErrorf("agent ID is required")
 	}
+	if modelID == "" {
+		return nil, errors.ValidationErrorf("model ID is required")
+	}
 
-	chat := entities.NewChat(agentID, name)
+	chat := entities.NewChat(agentID, modelID, name)
 	if err := s.chatRepo.CreateChat(ctx, chat); err != nil {
 		return nil, err
 	}
 
-	// Set the other chat sessions to inactive
-	chats, err := s.chatRepo.ListChats(ctx)
+	setOtherChatsInactive(ctx, s.chatRepo, chat.ID)
+
+	return chat, nil
+}
+
+func setOtherChatsInactive(ctx context.Context, chatRepo interfaces.ChatRepository, activeChatID string) error {
+	chats, err := chatRepo.ListChats(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, c := range chats {
-		if c.ID != chat.ID {
+		if c.ID != activeChatID {
 			c.Active = false
-			if err := s.chatRepo.UpdateChat(ctx, c); err != nil {
-				s.logger.Error("Failed to update chat status", zap.String("chat_id", c.ID), zap.Error(err))
+			if err := chatRepo.UpdateChat(ctx, c); err != nil {
+				return err
 			}
 		}
 	}
-
-	return chat, nil
+	return nil
 }
 
 func (s *chatService) GetActiveChat(ctx context.Context) (*entities.Chat, error) {
@@ -125,21 +135,13 @@ func (s *chatService) SetActiveChat(ctx context.Context, chatID string) error {
 	if chatID == "" {
 		return errors.ValidationErrorf("chat ID is required")
 	}
+
 	chat, err := s.chatRepo.GetChat(ctx, chatID)
 	if err != nil {
 		return err
 	}
-	// Set the other chat sessions to inactive
-	chats, err := s.chatRepo.ListChats(ctx)
-	if err != nil {
-		for _, c := range chats {
-			if c.ID != chat.ID {
-				c.Active = false
-				if err := s.chatRepo.UpdateChat(ctx, c); err != nil {
-					s.logger.Error("Failed to update chat status", zap.String("chat_id", c.ID), zap.Error(err))
-				}
-			}
-		}
+	if err := setOtherChatsInactive(ctx, s.chatRepo, chat.ID); err != nil {
+		return err
 	}
 	chat.Active = true
 	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
@@ -148,13 +150,17 @@ func (s *chatService) SetActiveChat(ctx context.Context, chatID string) error {
 	return nil
 }
 
-func (s *chatService) UpdateChat(ctx context.Context, id, agentID, name string) (*entities.Chat, error) {
+func (s *chatService) UpdateChat(ctx context.Context, id, agentID, modelID, name string) (*entities.Chat, error) {
 	if id == "" {
 		return nil, errors.ValidationErrorf("chat ID is required")
 	}
 
 	if agentID == "" {
 		return nil, errors.ValidationErrorf("agent ID is required")
+	}
+
+	if modelID == "" {
+		return nil, errors.ValidationErrorf("model ID is required")
 	}
 
 	if name == "" {
@@ -168,6 +174,7 @@ func (s *chatService) UpdateChat(ctx context.Context, id, agentID, name string) 
 
 	existingChat.Name = name
 	existingChat.AgentID = agentID
+	existingChat.ModelID = modelID
 	existingChat.UpdatedAt = time.Now()
 
 	if err := s.chatRepo.UpdateChat(ctx, existingChat); err != nil {
@@ -251,60 +258,42 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		return nil, errors.CanceledErrorf("message processing was canceled")
 	}
 
-	// Generate AI response synchronously
+	// Get Model instead of Agent for inference settings
+	model, err := s.modelRepo.GetModel(ctx, chat.ModelID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get Agent for behavior settings (system prompt, tools)
 	agent, err := s.agentRepo.GetAgent(ctx, chat.AgentID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get the provider using agent's ProviderID (ObjectID)
-	provider, err := s.providerRepo.GetProvider(ctx, agent.ProviderID)
+	// Get provider using model's ProviderID
+	provider, err := s.providerRepo.GetProvider(ctx, model.ProviderID)
 	if err != nil {
 		s.logger.Warn("failed to get provider by ID",
-			zap.String("agent_id", agent.ID),
-			zap.String("provider_id", agent.ProviderID),
-			zap.String("provider_type", string(agent.ProviderType)),
+			zap.String("model_id", chat.ModelID),
+			zap.String("provider_id", model.ProviderID),
 			zap.Error(err))
-		return nil, errors.InternalErrorf("failed to get provider for agent %s: %v", agent.ID, err)
+		return nil, errors.InternalErrorf("failed to get provider for model %s: %v", chat.ModelID, err)
 	}
 
-	resolvedAPIKey, err := s.config.ResolveEnvironmentVariable(agent.APIKey)
+	// Resolve API key from model
+	resolvedAPIKey, err := s.config.ResolveEnvironmentVariable(model.APIKey)
 	if err != nil {
-		s.logger.Error("Failed to resolve API key", zap.String("agent_id", agent.ID), zap.Error(err))
-		return nil, errors.InternalErrorf("failed to resolve API key for agent %s: %v", agent.ID, err)
+		s.logger.Error("Failed to resolve API key", zap.String("model_id", model.ID), zap.Error(err))
+		return nil, errors.InternalErrorf("failed to resolve API key for model %s: %v", model.ID, err)
 	}
 
-	// Resolve tool configurations
-	tools := []*entities.Tool{}
-	for _, toolName := range agent.Tools {
-		tool, err := s.toolRepo.GetToolByName(toolName)
-		if err != nil {
-			return nil, errors.InternalErrorf("failed to get tool %s: %v", toolName, err)
-		}
-		resolvedConfig, err := s.config.ResolveConfiguration((*tool).Configuration())
-		if err != nil {
-			return nil, errors.InternalErrorf("failed to resolve configuration for tool %s: %v", toolName, err)
-		}
-		(*tool).UpdateConfiguration(resolvedConfig)
-		tools = append(tools, tool)
-	}
-
-	// Create AI model integration based on provider type
-	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
-	aiModel, err := aiModelFactory.CreateModelIntegration(agent, provider, resolvedAPIKey)
-	if err != nil {
-		s.logger.Error("Failed to create AI model integration", zap.String("agent_id", agent.ID), zap.Error(err))
-		return nil, errors.InternalErrorf("failed to initialize AI model: %v", err)
-	}
-
-	contextLength := 128000
-	if agent.ContextWindow != nil {
-		contextLength = *agent.ContextWindow
+	contextLength := 128000 // default
+	if model.ContextWindow != nil {
+		contextLength = *model.ContextWindow
 	}
 
 	tokenLimit := contextLength
 
-	// Create system message
 	systemMessage := &entities.Message{
 		Role:    "system",
 		Content: agent.FullSystemPrompt(),
@@ -335,7 +324,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 	s.logger.Debug("Total message tokens: ", zap.Float64("total_message_tokens", float64(totalMessageTokens)), zap.Float64("compression_threshold", compressionThreshold))
 	if float64(totalMessageTokens) > compressionThreshold && len(chat.Messages) > 0 {
 		// Compress messages
-		compressedMessages, originalMessagesReplaced, err := s.compressMessages(ctx, chat, agent, provider, resolvedAPIKey, tokenLimit)
+		compressedMessages, originalMessagesReplaced, err := s.compressMessages(ctx, chat, model, provider, resolvedAPIKey, tokenLimit)
 		if err != nil {
 			s.logger.Warn("Failed to compress messages", zap.Error(err))
 			var tempMessages []*entities.Message
@@ -370,14 +359,37 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		"temperature": 0.0,
 		"max_tokens":  4096,
 	}
-	if agent.Temperature != nil {
-		options["temperature"] = *agent.Temperature
+	if model.Temperature != nil {
+		options["temperature"] = *model.Temperature
 	}
-	if agent.MaxTokens != nil {
-		options["max_tokens"] = *agent.MaxTokens
+	if model.MaxTokens != nil {
+		options["max_tokens"] = *model.MaxTokens
 	}
-	if agent.ReasoningEffort != "none" && agent.ReasoningEffort != "" {
-		options["reasoning_effort"] = agent.ReasoningEffort
+	if model.ReasoningEffort != "none" && model.ReasoningEffort != "" {
+		options["reasoning_effort"] = model.ReasoningEffort
+	}
+
+	// Resolve tool configurations
+	tools := []*entities.Tool{}
+	for _, toolName := range agent.Tools {
+		tool, err := s.toolRepo.GetToolByName(toolName)
+		if err != nil {
+			return nil, errors.InternalErrorf("failed to get tool %s: %v", toolName, err)
+		}
+		resolvedConfig, err := s.config.ResolveConfiguration((*tool).Configuration())
+		if err != nil {
+			return nil, errors.InternalErrorf("failed to resolve configuration for tool %s: %v", toolName, err)
+		}
+		(*tool).UpdateConfiguration(resolvedConfig)
+		tools = append(tools, tool)
+	}
+
+	// Create AI model integration based on provider type
+	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
+	aiModel, err := aiModelFactory.CreateModelIntegration(model, provider, resolvedAPIKey)
+	if err != nil {
+		s.logger.Error("Failed to create AI model integration", zap.String("model_id", model.ID), zap.Error(err))
+		return nil, errors.InternalErrorf("failed to initialize AI model: %v", err)
 	}
 
 	// Create a callback function for incremental message saving
@@ -406,12 +418,12 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 
 	// Get pricing for this model
 	var inputPricePerMille, outputPricePerMille float64
-	modelPricing := provider.GetModelPricing(agent.Model)
+	modelPricing := provider.GetModelPricing(model.ModelName)
 	if modelPricing != nil {
 		inputPricePerMille = modelPricing.InputPricePerMille
 		outputPricePerMille = modelPricing.OutputPricePerMille
 	} else {
-		s.logger.Warn("No pricing found for model", zap.String("model", agent.Model), zap.String("provider", provider.Name))
+		s.logger.Warn("No pricing found for model", zap.String("model", model.ModelName), zap.String("provider", provider.Name))
 	}
 
 	// Calculate total cost
@@ -508,7 +520,7 @@ func isSafeSplit(messages []entities.Message, split int) bool {
 func (s *chatService) compressMessages(
 	ctx context.Context,
 	chat *entities.Chat,
-	agent *entities.Agent,
+	model *entities.Model,
 	provider *entities.Provider,
 	apiKey string,
 	tokenLimit int,
@@ -542,9 +554,9 @@ func (s *chatService) compressMessages(
 	messagesToSummarize := chat.Messages[:summarizeEndIdx]
 	recentMessagesToKeep := chat.Messages[summarizeEndIdx:]
 
-	// Create AI model for summarization
+	// Create AI model for summarization, using model for context window
 	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
-	aiModel, err := aiModelFactory.CreateModelIntegration(agent, provider, apiKey)
+	aiModel, err := aiModelFactory.CreateModelIntegration(model, provider, apiKey)
 	if err != nil {
 		return nil, false, errors.InternalErrorf("failed to initialize AI model for summarization: %v", err)
 	}

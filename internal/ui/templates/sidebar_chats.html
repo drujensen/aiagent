@@ -11,7 +11,7 @@
     <li class="chat-item">
         <div style="display: flex; align-items: center;">
             <a href="/chats/{{.ID}}" class="show-link">
-              <i class="fas fa-comment-dots"></i> {{.ChatName}} with {{.AgentName}}
+              <i class="fas fa-comment-dots"></i> {{if .ChatName}}{{.ChatName}}{{else}}Untitled Chat{{end}}
             </a>
             <a href="/chats/{{.ID}}/edit" class="edit-icon">
                 <i class="fas fa-edit"></i>

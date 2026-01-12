@@ -7,31 +7,13 @@ import (
 
 func TestNewAgent(t *testing.T) {
 	name := "TestAgent"
-	role := "test-role"
-	providerID := "test-provider"
-	providerType := ProviderOpenAI
-	endpoint := "https://api.openai.com"
-	model := "gpt-4"
-	apiKey := "test-key"
 	systemPrompt := "You are a test agent."
 	tools := []string{"FileRead", "FileWrite"}
 
-	agent := NewAgent(name, role, providerID, providerType, endpoint, model, apiKey, systemPrompt, tools)
+	agent := NewAgent(name, systemPrompt, tools)
 
 	if agent.Name != name {
 		t.Errorf("Expected name %s, got %s", name, agent.Name)
-	}
-	if agent.ProviderID != providerID {
-		t.Errorf("Expected provider ID %s, got %s", providerID, agent.ProviderID)
-	}
-	if agent.ProviderType != providerType {
-		t.Errorf("Expected provider type %v, got %v", providerType, agent.ProviderType)
-	}
-	if agent.Model != model {
-		t.Errorf("Expected model %s, got %s", model, agent.Model)
-	}
-	if agent.APIKey != apiKey {
-		t.Errorf("Expected API key %s, got %s", apiKey, agent.APIKey)
 	}
 	if agent.SystemPrompt != systemPrompt {
 		t.Errorf("Expected system prompt %s, got %s", systemPrompt, agent.SystemPrompt)
@@ -48,12 +30,10 @@ func TestNewAgent(t *testing.T) {
 
 func TestAgent_FilterValue(t *testing.T) {
 	agent := &Agent{
-		Name:         "TestAgent",
-		Model:        "gpt-4",
-		ProviderType: ProviderOpenAI,
+		Name: "TestAgent",
 	}
 
-	expected := "TestAgent - gpt-4"
+	expected := "TestAgent"
 	result := agent.FilterValue()
 
 	if result != expected {
@@ -71,11 +51,11 @@ func TestAgent_Title(t *testing.T) {
 
 func TestAgent_Description(t *testing.T) {
 	agent := &Agent{
-		Model:        "gpt-4",
-		ProviderType: ProviderOpenAI,
+		Name:  "TestAgent",
+		Tools: []string{"FileRead", "FileWrite", "WebSearch"},
 	}
 
-	expected := "Model: gpt-4 | Provider: openai"
+	expected := "Tools: 3"
 	result := agent.Description()
 
 	if result != expected {
@@ -161,12 +141,16 @@ func TestProvider_GetModelPricing(t *testing.T) {
 
 func TestNewChat(t *testing.T) {
 	agentID := "test-agent-id"
+	modelID := "test-model-id"
 	name := "Test Chat"
 
-	chat := NewChat(agentID, name)
+	chat := NewChat(agentID, modelID, name)
 
 	if chat.AgentID != agentID {
 		t.Errorf("Expected agent ID %s, got %s", agentID, chat.AgentID)
+	}
+	if chat.ModelID != modelID {
+		t.Errorf("Expected model ID %s, got %s", modelID, chat.ModelID)
 	}
 	if chat.Name != name {
 		t.Errorf("Expected name %s, got %s", name, chat.Name)
@@ -183,7 +167,7 @@ func TestNewChat(t *testing.T) {
 }
 
 func TestChat_UpdateUsage(t *testing.T) {
-	chat := NewChat("test-agent", "Test Chat")
+	chat := NewChat("test-agent", "test-model", "Test Chat")
 
 	// Add messages with usage
 	msg1 := &Message{

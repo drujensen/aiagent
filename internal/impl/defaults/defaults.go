@@ -165,7 +165,6 @@ func DefaultProviders() []*entities.Provider {
 
 // DefaultAgents returns the default list of agents.
 func DefaultAgents() []entities.Agent {
-	temperature := 1.0
 	systemPrompt := `
 You are an AI assistant for software engineering tasks. Use available tools to help with coding, planning, testing, and related activities.
 
@@ -177,18 +176,10 @@ Key principles:
 - Leverage AGENTS.md for project-specific guidance
 	`
 
-	maxTokens := 8000
-	bigContextWindow := 64000
-
 	return []entities.Agent{
 		{
-			ID:           "5AEFC437-A72E-4B47-901F-865DDF6D8B74",
-			Name:         "Research",
-			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
-			ProviderType: "drujensen",
-			Endpoint:     "https://ai.drujensen.com",
-			Model:        "qwen3-coder:30b-64k",
-			APIKey:       "#{DRUJENSEN_API_KEY}#",
+			ID:   "5AEFC437-A72E-4B47-901F-865DDF6D8B74",
+			Name: "Research",
 			SystemPrompt: `### Introduction and Role
 
 You are a Research Agent responsible for researching technologies, products, and open source solutions.
@@ -221,22 +212,13 @@ Stop researching when:
 - If information is incomplete, clearly state what you know and what you don't
 - Provide sources and evidence for claims
 - Ask for clarification only when essential` + systemPrompt,
-			Temperature:     &temperature,
-			MaxTokens:       &maxTokens,
-			ContextWindow:   &bigContextWindow,
-			ReasoningEffort: "",
-			Tools:           []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo"},
-			CreatedAt:       time.Now(),
-			UpdatedAt:       time.Now(),
+			Tools:     []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo"},
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
 		},
 		{
-			ID:           "B020132C-331A-436B-A8BA-A8639BC20436",
-			Name:         "Plan",
-			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
-			ProviderType: "drujensen",
-			Endpoint:     "https://ai.drujensen.com",
-			Model:        "qwen3-coder:30b-64k",
-			APIKey:       "#{DRUJENSEN_API_KEY}#",
+			ID:   "B020132C-331A-436B-A8BA-A8639BC20436",
+			Name: "Plan",
 			SystemPrompt: `### Introduction and Role
 
 You are the Plan Agent responsible for creating high-level plans with all tasks needed to complete features or stories.
@@ -266,22 +248,13 @@ Stop planning when:
 - Be specific about task scope and effort
 - Clearly indicate task dependencies
 - Focus on actionable items` + systemPrompt,
-			Temperature:     &temperature,
-			MaxTokens:       &maxTokens,
-			ContextWindow:   &bigContextWindow,
-			ReasoningEffort: "",
-			Tools:           []string{"WebSearch", "Project", "FileRead", "FileSearch", "Directory", "Todo"},
-			CreatedAt:       time.Now(),
-			UpdatedAt:       time.Now(),
+			Tools:     []string{"WebSearch", "Project", "FileRead", "FileSearch", "Directory", "Todo"},
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
 		},
 		{
-			ID:           "6B0866FA-F10B-496C-93D5-7263B0F936B3",
-			Name:         "Build",
-			ProviderID:   "11981868-d638-43e6-b20d-c629e72da56f",
-			ProviderType: "drujensen",
-			Endpoint:     "https://ai.drujensen.com",
-			Model:        "qwen3-coder:30b-64k",
-			APIKey:       "#{DRUJENSEN_API_KEY}#",
+			ID:   "6B0866FA-F10B-496C-93D5-7263B0F936B3",
+			Name: "Build",
 			SystemPrompt: `### Introduction and Role
 
 You are the Build Agent responsible for all the coding. It should make sure that it runs the linter, compiler or build and everything is properly working. Always ensure code quality by running appropriate linting/formatting, building, and testing commands using the Process tool.
@@ -339,13 +312,9 @@ When editing files, follow these CRITICAL steps to ensure accuracy:
 4. If error occurs, re-read and try again with exact match
 
 This precise approach prevents duplicate functions, wrong placements, and other editing errors.\`,
-			Temperature:     &temperature,
-			MaxTokens:       &maxTokens,
-			ContextWindow:   &bigContextWindow,
-			ReasoningEffort: "",
-			Tools:           []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process"},
-			CreatedAt:       time.Now(),
-			UpdatedAt:       time.Now(),
+			Tools:     []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process"},
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
 		},
 	}
 }
@@ -456,13 +425,148 @@ func DefaultTools() []*entities.ToolData {
 			UpdatedAt:     now,
 		},
 		{
-			ID:            "48394E6B-ABB6-4A57-8419-FADE0235D214",
+			ID:            "69216685-CE00-496B-A464-1767233B0440",
+			ToolType:      "Fetch",
+			Name:          "Fetch",
+			Description:   "This tool performs HTTP requests to fetch data from web APIs and endpoints.",
+			Configuration: map[string]string{},
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+
+		{
+			ID:            "6A8A2B8F-3C4D-4E5F-9G6H-7I8J9K0L1M2N",
 			ToolType:      "Todo",
 			Name:          "Todo",
 			Description:   "This tool manages a structured task list for complex tasks.",
 			Configuration: map[string]string{},
 			CreatedAt:     now,
 			UpdatedAt:     now,
+		},
+	}
+}
+
+// DefaultModels returns the default list of models.
+func DefaultModels() []*entities.Model {
+	return []*entities.Model{
+		// OpenAI Models
+		{
+			ID:              "550e8400-e29b-41d4-a716-446655440000",
+			Name:            "GPT-4.1 Standard",
+			ProviderID:      "D2BB79D4-C11C-407A-AF9D-9713524BB3BF", // OpenAI
+			ProviderType:    entities.ProviderOpenAI,
+			ModelName:       "gpt-4.1",
+			APIKey:          "#{OPENAI_API_KEY}#",
+			Temperature:     &[]float64{0.7}[0],
+			MaxTokens:       &[]int{4000}[0],
+			ContextWindow:   &[]int{1000000}[0],
+			ReasoningEffort: "",
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		},
+		{
+			ID:              "550e8400-e29b-41d4-a716-446655440001",
+			Name:            "GPT-4.1 Mini Fast",
+			ProviderID:      "D2BB79D4-C11C-407A-AF9D-9713524BB3BF", // OpenAI
+			ProviderType:    entities.ProviderOpenAI,
+			ModelName:       "gpt-4.1-mini",
+			APIKey:          "#{OPENAI_API_KEY}#",
+			Temperature:     &[]float64{0.3}[0],
+			MaxTokens:       &[]int{2000}[0],
+			ContextWindow:   &[]int{1000000}[0],
+			ReasoningEffort: "",
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		},
+
+		// Anthropic Models
+		{
+			ID:              "550e8400-e29b-41d4-a716-446655440010",
+			Name:            "Claude Sonnet Balanced",
+			ProviderID:      "28451B8D-1937-422A-BA93-9795204EC5A5", // Anthropic
+			ProviderType:    entities.ProviderAnthropic,
+			ModelName:       "claude-3-7-sonnet-latest",
+			APIKey:          "#{ANTHROPIC_API_KEY}#",
+			Temperature:     &[]float64{0.7}[0],
+			MaxTokens:       &[]int{4000}[0],
+			ContextWindow:   &[]int{200000}[0],
+			ReasoningEffort: "",
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		},
+		{
+			ID:              "550e8400-e29b-41d4-a716-446655440011",
+			Name:            "Claude Haiku Fast",
+			ProviderID:      "28451B8D-1937-422A-BA93-9795204EC5A5", // Anthropic
+			ProviderType:    entities.ProviderAnthropic,
+			ModelName:       "claude-3-5-haiku-latest",
+			APIKey:          "#{ANTHROPIC_API_KEY}#",
+			Temperature:     &[]float64{0.3}[0],
+			MaxTokens:       &[]int{2000}[0],
+			ContextWindow:   &[]int{200000}[0],
+			ReasoningEffort: "",
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		},
+
+		// Google Models
+		{
+			ID:              "550e8400-e29b-41d4-a716-446655440020",
+			Name:            "Gemini Pro Balanced",
+			ProviderID:      "2BD2B8A5-5A2A-439B-8D02-C6BE34705011", // Google
+			ProviderType:    entities.ProviderGoogle,
+			ModelName:       "gemini-2.5-pro-preview-03-25",
+			APIKey:          "#{GEMINI_API_KEY}#",
+			Temperature:     &[]float64{0.7}[0],
+			MaxTokens:       &[]int{4000}[0],
+			ContextWindow:   &[]int{1000000}[0],
+			ReasoningEffort: "",
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		},
+		{
+			ID:              "550e8400-e29b-41d4-a716-446655440021",
+			Name:            "Gemini Flash Fast",
+			ProviderID:      "2BD2B8A5-5A2A-439B-8D02-C6BE34705011", // Google
+			ProviderType:    entities.ProviderGoogle,
+			ModelName:       "gemini-2.0-flash",
+			APIKey:          "#{GEMINI_API_KEY}#",
+			Temperature:     &[]float64{0.5}[0],
+			MaxTokens:       &[]int{2000}[0],
+			ContextWindow:   &[]int{1000000}[0],
+			ReasoningEffort: "",
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		},
+
+		// X.AI Models
+		{
+			ID:              "550e8400-e29b-41d4-a716-446655440030",
+			Name:            "Grok Standard",
+			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270", // X.AI
+			ProviderType:    entities.ProviderXAI,
+			ModelName:       "grok-4",
+			APIKey:          "#{XAI_API_KEY}#",
+			Temperature:     &[]float64{0.7}[0],
+			MaxTokens:       &[]int{4000}[0],
+			ContextWindow:   &[]int{256000}[0],
+			ReasoningEffort: "",
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		},
+		{
+			ID:              "550e8400-e29b-41d4-a716-446655440031",
+			Name:            "Grok Fast",
+			ProviderID:      "820FE148-851B-4995-81E5-C6DB2E5E5270", // X.AI
+			ProviderType:    entities.ProviderXAI,
+			ModelName:       "grok-code-fast",
+			APIKey:          "#{XAI_API_KEY}#",
+			Temperature:     &[]float64{0.3}[0],
+			MaxTokens:       &[]int{2000}[0],
+			ContextWindow:   &[]int{256000}[0],
+			ReasoningEffort: "",
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
 		},
 	}
 }

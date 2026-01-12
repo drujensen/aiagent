@@ -38,6 +38,7 @@ var embeddedFiles embed.FS
 type UI struct {
 	chatService     services.ChatService
 	agentService    services.AgentService
+	modelService    services.ModelService
 	toolService     services.ToolService
 	providerService services.ProviderService
 	logger          *zap.Logger
@@ -46,10 +47,11 @@ type UI struct {
 	wsClientsMutex  sync.RWMutex
 }
 
-func NewUI(chatService services.ChatService, agentService services.AgentService, toolService services.ToolService, providerService services.ProviderService, logger *zap.Logger) *UI {
+func NewUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService, providerService services.ProviderService, logger *zap.Logger) *UI {
 	ui := &UI{
 		chatService:     chatService,
 		agentService:    agentService,
+		modelService:    modelService,
 		toolService:     toolService,
 		providerService: providerService,
 		logger:          logger,
@@ -178,9 +180,10 @@ func (u *UI) Run() error {
 		u.logger.Fatal("Failed to parse templates", zap.Error(err))
 	}
 
-	homeController := uiapicontrollers.NewHomeController(u.logger, tmpl, u.chatService, u.agentService, u.toolService)
+	homeController := uiapicontrollers.NewHomeController(u.logger, tmpl, u.chatService, u.agentService, u.modelService, u.toolService)
 	agentController := uiapicontrollers.NewAgentController(u.logger, tmpl, u.agentService, u.toolService, u.providerService)
-	chatController := uiapicontrollers.NewChatController(u.logger, tmpl, u.chatService, u.agentService)
+	modelController := uiapicontrollers.NewModelController(u.logger, tmpl, u.modelService)
+	chatController := uiapicontrollers.NewChatController(u.logger, tmpl, u.chatService, u.agentService, u.modelService)
 	toolFactory, err := tools.NewToolFactory()
 	if err != nil {
 		u.logger.Fatal("Failed to initialize tool factory", zap.Error(err))
@@ -240,6 +243,7 @@ func (u *UI) Run() error {
 
 	homeController.RegisterRoutes(e)
 	agentController.RegisterRoutes(e)
+	modelController.RegisterRoutes(e)
 	chatController.RegisterRoutes(e)
 	toolController.RegisterRoutes(e)
 	providerController.RegisterRoutes(e)

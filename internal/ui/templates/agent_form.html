@@ -6,92 +6,163 @@
         hx-target="#response-message"
         hx-swap="innerHTML">
         <input type="hidden" name="id" value="{{.Agent.ID}}">
+
         <div class="form-group">
             <label for="name">Agent Name:</label>
-            <input type="text" id="name" name="name" class="form-control" value="{{.Agent.Name}}" required>
+            <input type="text" id="name" name="name" class="form-control" value="{{.Agent.Name}}" required placeholder="e.g., Research Assistant, Code Reviewer">
+            <small class="form-text">A friendly name for this agent</small>
         </div>
-        <div class="form-group">
-            <label for="provider">Provider:</label>
-            <select id="provider" name="provider_id" class="form-control" hx-get="/agents/provider-models" hx-target="#model" hx-swap="innerHTML" hx-trigger="change" hx-indicator="#provider-loading" required>
-                <option value="">Select Provider</option>
-                {{range .Providers}}
-                <option value="{{.ID}}" {{if (eq .ID $.Agent.ProviderID)}}selected{{end}}>{{if eq .Type "generic"}}Custom Provider{{else}}{{.Name}} ({{.Type}}){{end}}</option>
-                {{end}}
-            </select>
-            <div id="provider-loading" class="htmx-indicator">Loading models...</div>
-            <div id="provider-error" style="color: red; display: none;"></div>
-        </div>
-        <div class="form-group">
-            <label for="endpoint">Endpoint:</label>
-            <input type="text" id="endpoint" name="endpoint" class="form-control" value="{{.Agent.Endpoint}}" placeholder="Provider API endpoint URL">
-            <small class="form-text">URL for the provider's API. Will be populated automatically when selecting a provider.</small>
-        </div>
-        <div class="form-group">
-            <label for="model">Model:</label>
-            <select id="model" name="model" class="form-control">
-                {{if .Agent.Model}}
-                <option value="{{.Agent.Model}}" selected>{{.Agent.Model}}</option>
-                {{else}}
-                <option value="">Select Provider First</option>
-                {{end}}
-                {{range .SelectedProviderModels}}
-                <option value="{{.Name}}" {{if eq .Name $.Agent.Model}}selected{{end}}>{{.Name}} (Input: ${{.InputPricePerMille}}/1M tokens, Output: ${{.OutputPricePerMille}}/1M tokens)</option>
-                {{end}}
-                <option value="custom">Custom Model (Enter name below)</option>
-            </select>
-        </div>
-        <div id="custom-model-container" class="form-group" style="display: {{if (and .Agent.Model (not (inArray .Agent.Model (collectModelNames .SelectedProviderModels))))}}block{{else}}none{{end}};">
-            <label for="custom_model_name">Model Name:</label>
-            <input type="text" id="custom_model_name" name="custom_model_name" class="form-control" placeholder="Enter model name" value="{{if .Agent.Model}}{{.Agent.Model}}{{end}}">
-            <small class="form-text">Will be populated when selecting a model, or enter a custom model name</small>
-        </div>
-        <div class="form-group">
-            <label for="api_key" id="api-key-label">{{if .SelectedProvider}}{{.SelectedProvider.APIKeyName}}{{else}}API Key{{end}}:</label>
-            <input type="text" id="api_key" name="api_key" class="form-control" value="{{.Agent.APIKey}}" required>
-            <small class="form-text">Use #{VAR_NAME}# to reference an environment variable.</small>
-        </div>
+
         <div class="form-group">
             <label for="system_prompt">System Prompt:</label>
-            <textarea id="system_prompt" name="system_prompt" class="form-control" rows="10" required>{{.Agent.SystemPrompt}}</textarea>
+            <textarea id="system_prompt" name="system_prompt" class="form-control" rows="10" required placeholder="Describe the agent's behavior, role, and instructions...">{{.Agent.SystemPrompt}}</textarea>
+            <small class="form-text">Instructions that define how this agent behaves and what it should do</small>
         </div>
-        <div class="form-group">
-            <label for="temperature">Temperature (optional):</label>
-            <input type="number" id="temperature" name="temperature" class="form-control" step="0.1" value="{{if .Agent.Temperature}}{{.Agent.Temperature}}{{end}}">
-        </div>
-        <div class="form-group">
-            <label for="max_tokens">Max Tokens (optional):</label>
-            <input type="number" id="max_tokens" name="max_tokens" class="form-control" value="{{if .Agent.MaxTokens}}{{.Agent.MaxTokens}}{{end}}">
-            <small class="form-text">Defaults to 4096</small>
-        </div>
-        <div class="form-group">
-            <label for="context_window">Context Window (optional):</label>
-            <input type="number" id="context_window" name="context_window" class="form-control" value="{{if .Agent.ContextWindow}}{{.Agent.ContextWindow}}{{end}}">
-            <small class="form-text">Will use model's default if not specified.</small>
-        </div>
-        <div class="form-group">
-            <label for="reasoning_effort">Reasoning Effort:</label>
-            <select id="reasoning_effort" name="reasoning_effort" class="form-control">
-                <option value="none" {{if (eq .Agent.ReasoningEffort "none")}}selected{{end}}>None</option>
-                <option value="low" {{if (eq .Agent.ReasoningEffort "low")}}selected{{end}}>Low</option>
-                <option value="medium" {{if (eq .Agent.ReasoningEffort "medium")}}selected{{end}}>Medium</option>
-                <option value="high" {{if (eq .Agent.ReasoningEffort "high")}}selected{{end}}>High</option>
-            </select>
-            <small class="form-text">Only certain models support reasoning effort.</small>
-        </div>
+
         <div class="form-group">
             <label for="tools">Tools (optional):</label>
             <div class="tools-container">
                 {{range .Tools}}
-                <label>
-                    <input type="checkbox" name="tools" value="{{.}}" id="tool-{{.}}" {{if (inArray . $.Agent.Tools)}}checked{{end}}> {{.}}
+                <label class="tool-checkbox">
+                    <input type="checkbox" name="tool_{{.}}" value="on" id="tool-{{.}}" {{if (inArray . $.Agent.Tools)}}checked{{end}}>
+                    {{.}}
                 </label>
                 {{end}}
             </div>
-            <small class="form-text">Check boxes to select tools</small>
+            <small class="form-text">Select tools this agent can use</small>
         </div>
-        <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Save Agent</button>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> {{if .IsEdit}}Update{{else}}Create{{end}} Agent
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="window.history.back()">
+                <i class="fas fa-times"></i> Cancel
+            </button>
+        </div>
     </form>
     <div id="response-message"></div>
 </div>
-<script src="/static/js/agent_form.js"></script>
+    </form>
+    <div id="response-message"></div>
+</div>
+<style>
+.agent-form {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.agent-form h2 {
+    color: #333;
+    margin-bottom: 30px;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 10px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #333;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+    font-family: monospace;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+.form-control[rows] {
+    resize: vertical;
+    min-height: 200px;
+}
+
+.form-text {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px;
+    color: #666;
+}
+
+.tools-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.tool-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #f8f9fa;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.tool-checkbox:hover {
+    background: #e9ecef;
+}
+
+.tool-checkbox input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+.btn {
+    display: inline-block;
+    padding: 10px 20px;
+    text-decoration: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+    text-align: center;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #545b62;
+}
+</style>
 {{end}}

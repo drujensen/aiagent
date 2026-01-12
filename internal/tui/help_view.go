@@ -45,18 +45,24 @@ func (h HelpView) View() string {
 
 	// Help content (concise)
 	helpText := `Commands:
-/new    - New chat
-/history - Chat history
-/agents  - Available agents
-/tools   - Available tools
-/usage   - Usage stats
-/help    - This help
-/exit    - Exit app
+	/new     - New chat
+	/history - Chat history
+	/agents   - Available agents
+	/tools    - Available tools
+	/usage    - Usage stats
+	/help     - This help
+	/exit     - Exit app
 
-Tips:
-• Type / to filter lists
-• Use arrows/j/k to navigate
-• Ctrl+C to quit`
+	Shortcuts:
+	Ctrl+A - Switch agent
+	Ctrl+G - Switch model
+	Ctrl+N - New chat
+	Ctrl+L - Toggle line numbers
+
+	Tips:
+	• Type / to filter lists
+	• Use arrows/j/k to navigate
+	• Ctrl+C to quit`
 
 	// Outer container style (Vim-like overall border)
 	outerStyle := lipgloss.NewStyle().

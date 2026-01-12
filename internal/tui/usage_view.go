@@ -13,16 +13,18 @@ import (
 type UsageView struct {
 	chatService  services.ChatService
 	agentService services.AgentService
+	modelService services.ModelService
 	width        int
 	height       int
 	usageInfo    string // Pre-formatted usage string
 	err          error
 }
 
-func NewUsageView(chatService services.ChatService, agentService services.AgentService) UsageView {
+func NewUsageView(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService) UsageView {
 	return UsageView{
 		chatService:  chatService,
 		agentService: agentService,
+		modelService: modelService,
 	}
 }
 
@@ -101,14 +103,14 @@ func (u UsageView) fetchUsageCmd() tea.Cmd {
 		if err != nil {
 			return errMsg(err)
 		}
-		agent, err := u.agentService.GetAgent(ctx, activeChat.AgentID)
+		model, err := u.modelService.GetModel(ctx, activeChat.ModelID)
 		if err != nil {
 			return errMsg(err)
 		}
 
 		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("Provider: %s\n", agent.ProviderType))
-		sb.WriteString(fmt.Sprintf("Model: %s\n", agent.Model))
+		sb.WriteString(fmt.Sprintf("Provider: %s\n", model.ProviderType))
+		sb.WriteString(fmt.Sprintf("Model: %s\n", model.ModelName))
 		sb.WriteString(fmt.Sprintf("Prompt Tokens: %d\n", activeChat.Usage.TotalPromptTokens))
 		sb.WriteString(fmt.Sprintf("Completion Tokens: %d\n", activeChat.Usage.TotalCompletionTokens))
 		sb.WriteString(fmt.Sprintf("Total Tokens: %d\n", activeChat.Usage.TotalTokens))

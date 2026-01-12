@@ -23,39 +23,36 @@ func NewAIModelFactory(toolRepo interfaces.ToolRepository, logger *zap.Logger) *
 	}
 }
 
-// CreateModelIntegration creates an AI model integration based on the agent configuration
-func (f *AIModelFactory) CreateModelIntegration(agent *entities.Agent, provider *entities.Provider, apiKey string) (interfaces.AIModelIntegration, error) {
-	// Get the endpoint from the provider if not explicitly defined in the agent
-	endpoint := agent.Endpoint
-	if endpoint == "" {
-		endpoint = provider.BaseURL
-	}
+// CreateModelIntegration creates an AI model integration based on the model configuration
+func (f *AIModelFactory) CreateModelIntegration(model *entities.Model, provider *entities.Provider, apiKey string) (interfaces.AIModelIntegration, error) {
+	// Use provider's base URL as endpoint
+	endpoint := provider.BaseURL
 
 	// Create provider-specific integration
 	switch provider.Type {
 	case entities.ProviderOpenAI:
-		return NewOpenAIIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
+		return NewOpenAIIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	case entities.ProviderAnthropic:
-		return NewAnthropicIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
+		return NewAnthropicIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	case entities.ProviderXAI:
-		return NewXAIIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
+		return NewXAIIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	case entities.ProviderGoogle:
-		return NewGoogleIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
+		return NewGoogleIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	case entities.ProviderDeepseek:
-		return NewDeepseekIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
+		return NewDeepseekIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	case entities.ProviderTogether:
-		return NewTogetherIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
+		return NewTogetherIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	case entities.ProviderGroq:
-		return NewGroqIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
+		return NewGroqIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	case entities.ProviderMistral:
-		return NewMistralIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
+		return NewMistralIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	case entities.ProviderOllama:
-		return NewOllamaIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
+		return NewOllamaIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	case entities.ProviderDrujensen:
-		return NewDrujensenIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
+		return NewDrujensenIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	case entities.ProviderGeneric:
 		// For generic providers, use the OpenAI-compatible API
-		return NewGenericIntegration(endpoint, apiKey, agent.Model, f.toolRepo, f.logger)
+		return NewGenericIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %s", provider.Type)
 	}

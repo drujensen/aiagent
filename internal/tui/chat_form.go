@@ -20,23 +20,32 @@ var (
 )
 
 type ChatForm struct {
-	chatService services.ChatService
-	nameField   textinput.Model
-	agentsList  list.Model
-	agents      []*entities.Agent
-	chatName    string
-	focused     string // "name" or "list"
-	err         error
-	width       int
-	height      int
+	chatService  services.ChatService
+	agentService services.AgentService
+	modelService services.ModelService
+	nameField    textinput.Model
+	agentsList   list.Model
+	modelsList   list.Model
+	agents       []*entities.Agent
+	models       []*entities.Model
+	chatName     string
+	focused      string // "name" or "list"
+	err          error
+	width        int
+	height       int
 }
 
-func NewChatForm(chatService services.ChatService, agentService services.AgentService) ChatForm {
+func NewChatForm(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService) ChatForm {
 	ctx := context.Background()
 	agents, err := agentService.ListAgents(ctx)
 	if err != nil {
 		fmt.Printf("Error listing agents: %v\n", err)
 		agents = []*entities.Agent{}
+	}
+	models, err := modelService.ListModels(ctx)
+	if err != nil {
+		fmt.Printf("Error listing models: %v\n", err)
+		models = []*entities.Model{}
 	}
 
 	// Initialize name field with wider width and explicit placeholder styling
@@ -63,12 +72,26 @@ func NewChatForm(chatService services.ChatService, agentService services.AgentSe
 	agentsList.SetFilteringEnabled(true)
 	agentsList.SetShowPagination(false)
 
+	modelItems := make([]list.Item, len(models))
+	for i, model := range models {
+		modelItems[i] = model
+	}
+	modelsList := list.New(modelItems, delegate, 100, 10)
+	modelsList.Title = "Select a Model"
+	modelsList.SetShowStatusBar(false)
+	modelsList.SetFilteringEnabled(true)
+	modelsList.SetShowPagination(false)
+
 	return ChatForm{
-		chatService: chatService,
-		nameField:   nameField,
-		agentsList:  agentsList,
-		agents:      agents,
-		focused:     "name",
+		chatService:  chatService,
+		agentService: agentService,
+		modelService: modelService,
+		nameField:    nameField,
+		agentsList:   agentsList,
+		modelsList:   modelsList,
+		agents:       agents,
+		models:       models,
+		focused:      "name",
 	}
 }
 
@@ -127,7 +150,7 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 				return c, nil
 			}
 			selectedAgent := c.agentsList.SelectedItem().(*entities.Agent)
-			return c, createChatCmd(c.chatService, c.nameField.Value(), selectedAgent.ID)
+			return c, createChatCmd(c.chatService, c.modelService, c.nameField.Value(), selectedAgent.ID)
 		}
 	}
 
@@ -205,10 +228,16 @@ func (c ChatForm) View() string {
 	return outerStyle.Render(sb.String())
 }
 
-func createChatCmd(cs services.ChatService, name, agentID string) tea.Cmd {
+func createChatCmd(cs services.ChatService, ms services.ModelService, name, agentID string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		newChat, err := cs.CreateChat(ctx, agentID, name)
+		// For now, use the first available model as default
+		models, err := ms.ListModels(ctx)
+		if err != nil || len(models) == 0 {
+			return errMsg(fmt.Errorf("no models available"))
+		}
+		modelID := models[0].ID
+		newChat, err := cs.CreateChat(ctx, agentID, modelID, name)
 		if err != nil {
 			return errMsg(err)
 		}

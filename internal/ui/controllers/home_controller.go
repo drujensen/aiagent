@@ -15,15 +15,17 @@ type HomeController struct {
 	tmpl         *template.Template
 	chatService  services.ChatService
 	agentService services.AgentService
+	modelService services.ModelService
 	toolService  services.ToolService
 }
 
-func NewHomeController(logger *zap.Logger, tmpl *template.Template, chatService services.ChatService, agentService services.AgentService, toolService services.ToolService) *HomeController {
+func NewHomeController(logger *zap.Logger, tmpl *template.Template, chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService) *HomeController {
 	return &HomeController{
 		logger:       logger,
 		tmpl:         tmpl,
 		chatService:  chatService,
 		agentService: agentService,
+		modelService: modelService,
 		toolService:  toolService,
 	}
 }
@@ -32,6 +34,7 @@ func (c *HomeController) RegisterRoutes(e *echo.Echo) {
 	e.GET("/", c.HomeHandler)
 	e.GET("/sidebar/chats", c.ChatsPartialHandler)
 	e.GET("/sidebar/agents", c.AgentsPartialHandler)
+	e.GET("/sidebar/models", c.ModelsPartialHandler)
 	e.GET("/sidebar/tools", c.ToolsPartialHandler)
 }
 
@@ -90,6 +93,18 @@ func (c *HomeController) AgentsPartialHandler(eCtx echo.Context) error {
 		"Agents": agents,
 	}
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_agents", data)
+}
+
+func (c *HomeController) ModelsPartialHandler(eCtx echo.Context) error {
+	models, err := c.modelService.ListModels(eCtx.Request().Context())
+	if err != nil {
+		c.logger.Error("Failed to list models", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to load models")
+	}
+	data := map[string]any{
+		"Models": models,
+	}
+	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_models", data)
 }
 
 func (c *HomeController) ToolsPartialHandler(eCtx echo.Context) error {

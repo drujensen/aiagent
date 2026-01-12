@@ -92,6 +92,8 @@ func (r *JsonProviderRepository) ListProviders(ctx context.Context) ([]*entities
 			BaseURL:    p.BaseURL,
 			APIKeyName: p.APIKeyName,
 			Models:     p.Models,
+			CreatedAt:  p.CreatedAt,
+			UpdatedAt:  p.UpdatedAt,
 		}
 	}
 	return providersCopy, nil
@@ -107,6 +109,8 @@ func (r *JsonProviderRepository) GetProvider(ctx context.Context, id string) (*e
 				BaseURL:    provider.BaseURL,
 				APIKeyName: provider.APIKeyName,
 				Models:     provider.Models,
+				CreatedAt:  provider.CreatedAt,
+				UpdatedAt:  provider.UpdatedAt,
 			}, nil
 		}
 	}
@@ -127,6 +131,16 @@ func (r *JsonProviderRepository) CreateProvider(ctx context.Context, provider *e
 
 	r.data = append(r.data, provider)
 	return r.save()
+}
+
+func (r *JsonProviderRepository) UpdateProvider(ctx context.Context, provider *entities.Provider) error {
+	for i, existing := range r.data {
+		if existing.ID == provider.ID {
+			r.data[i] = provider
+			return r.save()
+		}
+	}
+	return errors.NotFoundErrorf("provider not found: %s", provider.ID)
 }
 
 var _ interfaces.ProviderRepository = (*JsonProviderRepository)(nil)

@@ -1,5 +1,47 @@
 {{define "chat_content"}}
 <main class="content">
+    <section class="chat-header">
+        <div class="chat-info">
+            <div class="agent-info">
+                <i class="fas fa-robot"></i>
+                <span>Agent: {{.AgentName}}</span>
+                <button class="btn btn-sm btn-outline" onclick="showAgentSwitcher()">
+                    <i class="fas fa-exchange-alt"></i> Switch
+                </button>
+            </div>
+            <div class="model-info">
+                <i class="fas fa-brain"></i>
+                <span>Model: {{.ModelName}}</span>
+                <button class="btn btn-sm btn-outline" onclick="showModelSwitcher()">
+                    <i class="fas fa-exchange-alt"></i> Switch
+                </button>
+            </div>
+        </div>
+        <div id="agent-switcher" class="agent-switcher" style="display: none;">
+            <select id="agent-select" class="form-control form-control-sm">
+                <option value="">Select Agent</option>
+                {{range .AvailableAgents}}
+                <option value="{{.ID}}" {{if eq .ID $.CurrentAgentID}}selected{{end}}>{{.Name}}</option>
+                {{else}}
+                <option value="" disabled>No agents available</option>
+                {{end}}
+            </select>
+            <button class="btn btn-sm btn-primary" onclick="switchAgent()">Switch</button>
+            <button class="btn btn-sm btn-secondary" onclick="hideAgentSwitcher()">Cancel</button>
+        </div>
+        <div id="model-switcher" class="model-switcher" style="display: none;">
+            <select id="model-select" class="form-control form-control-sm">
+                <option value="">Select Model</option>
+                {{range .AvailableModels}}
+                <option value="{{.ID}}" {{if eq .ID $.CurrentModelID}}selected{{end}}>{{.Name}}</option>
+                {{else}}
+                <option value="" disabled>No models available</option>
+                {{end}}
+            </select>
+            <button class="btn btn-sm btn-primary" onclick="switchModel()">Switch</button>
+            <button class="btn btn-sm btn-secondary" onclick="hideModelSwitcher()">Cancel</button>
+        </div>
+    </section>
     <section class="message-history" id="message-history">
         <div id="messages-container" class="messages-container" data-chat-id="{{.ChatID}}">
             <div class="message-intro">
@@ -66,4 +108,165 @@
         {{template "message_controls" .}}
     </section>
 </main>
+
+<style>
+.chat-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #ddd;
+    background: #f8f9fa;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-info {
+    display: flex;
+    gap: 30px;
+    align-items: center;
+}
+
+.agent-info, .model-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #666;
+}
+
+.agent-info i, .model-info i {
+    color: #007bff;
+}
+
+.model-info {
+    position: relative;
+}
+
+.agent-switcher, .model-switcher {
+    margin-top: 10px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    min-width: 250px;
+}
+
+.model-switcher select {
+    margin-bottom: 8px;
+    width: 100%;
+}
+
+.btn {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-left: 4px;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #007bff;
+    border-color: #007bff;
+}
+
+.btn-outline:hover {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    border-color: #6c757d;
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 11px;
+}
+</style>
+
+<script>
+function showAgentSwitcher() {
+    document.getElementById('agent-switcher').style.display = 'block';
+}
+
+function hideAgentSwitcher() {
+    document.getElementById('agent-switcher').style.display = 'none';
+}
+
+function switchAgent() {
+    const agentId = document.getElementById('agent-select').value;
+    if (!agentId) {
+        alert('Please select an agent first');
+        return;
+    }
+
+    const chatId = document.querySelector('[data-chat-id]').getAttribute('data-chat-id');
+
+    fetch(`/chats/${chatId}/agent`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ agent_id: agentId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload(); // Refresh to show new agent
+        } else {
+            alert('Failed to switch agent: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Failed to switch agent: ' + error.message);
+    });
+}
+
+function showModelSwitcher() {
+    document.getElementById('model-switcher').style.display = 'block';
+}
+
+function hideModelSwitcher() {
+    document.getElementById('model-switcher').style.display = 'none';
+}
+
+function switchModel() {
+    const modelId = document.getElementById('model-select').value;
+    if (!modelId) {
+        alert('Please select a model first');
+        return;
+    }
+
+    const chatId = document.querySelector('[data-chat-id]').getAttribute('data-chat-id');
+
+    fetch(`/chats/${chatId}/model`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ model_id: modelId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload(); // Refresh to show new model
+        } else {
+            alert('Failed to switch model: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Failed to switch model: ' + error.message);
+    });
+}
+</script>
 {{end}}

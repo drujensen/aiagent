@@ -1,6 +1,9 @@
 package entities
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 type ProviderType string
 
@@ -34,10 +37,13 @@ type Provider struct {
 	BaseURL    string         `json:"base_url" bson:"base_url"`
 	APIKeyName string         `json:"api_key_name" bson:"api_key_name"` // Name to display for the API key field
 	Models     []ModelPricing `json:"models" bson:"models"`
+	CreatedAt  time.Time      `json:"created_at" bson:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at" bson:"updated_at"`
 }
 
 // NewProvider creates a new provider with the specified attributes
 func NewProvider(id, name string, providerType ProviderType, baseURL, apiKeyName string, models []ModelPricing) *Provider {
+	now := time.Now()
 	return &Provider{
 		ID:         id,
 		Name:       name,
@@ -45,6 +51,8 @@ func NewProvider(id, name string, providerType ProviderType, baseURL, apiKeyName
 		BaseURL:    baseURL,
 		APIKeyName: apiKeyName,
 		Models:     models,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 }
 

@@ -28,10 +28,10 @@
              <i class="fas fa-robot"></i><div class="logo-title">AI Agents</div>
            </a>
        </div>
-       {{if eq .ContentTemplate "chat_content"}}
-           <div class="chat-title">
-               {{.ChatName}} with {{.AgentName}}
-           </div>
+        {{if eq .ContentTemplate "chat_content"}}
+            <div class="chat-title">
+                {{if .ChatName}}{{.ChatName}}{{else}}Chat{{end}}
+            </div>
            <div class="chat-cost" hx-get="/chat-cost?chat_id={{.ChatID}}" hx-trigger="refreshChatCost from:body" hx-swap="innerHTML">
            {{template "chat_cost_partial" .}}
            </div>
@@ -45,27 +45,31 @@
            <div class="col col-3"></div>
               <main id="main-content" class="col col-6" hx-on::after-swap="initCopyButtons(); scrollToResponse();">
                {{if eq .ContentTemplate "home_content"}}
-                   {{template "home_content" .}}
-               {{else if eq .ContentTemplate "agent_form_content"}}
-                   {{template "agent_form_content" .}}
-               {{else if eq .ContentTemplate "tool_form_content"}}
-                   {{template "tool_form_content" .}}
-               {{else if eq .ContentTemplate "chat_form_content"}}
-                   {{template "chat_form_content" .}}
-               {{else if eq .ContentTemplate "chat_content"}}
-                   {{template "chat_content" .}}
-               {{end}}
+                    {{template "home_content" .}}
+                {{else if eq .ContentTemplate "agent_form_content"}}
+                    {{template "agent_form_content" .}}
+                {{else if eq .ContentTemplate "models_content"}}
+                    {{template "models_content" .}}
+                {{else if eq .ContentTemplate "model_form_content"}}
+                    {{template "model_form_content" .}}
+                {{else if eq .ContentTemplate "tool_form_content"}}
+                    {{template "tool_form_content" .}}
+                {{else if eq .ContentTemplate "chat_form_content"}}
+                    {{template "chat_form_content" .}}
+                {{else if eq .ContentTemplate "chat_content"}}
+                    {{template "chat_content" .}}
+                {{end}}
            </main>
            <aside class="sidebar col col-3">
                <div id="sidebar-chats" hx-get="/sidebar/chats" hx-trigger="load, refreshChats from:body" hx-swap="innerHTML">
                    <h2><i class="fas fa-comment"></i> Chats <span class="spinner"></span></h2>
                    <ul class="chat-list"><li>Loading...</li></ul>
                </div>
-               <div id="sidebar-agents" hx-get="/sidebar/agents" hx-trigger="load, refreshAgents from:body" hx-swap="innerHTML">
-                   <h2><i class="fas fa-robot"></i> AI Agents <span class="spinner"></span></h2>
-                   <ul class="agent-list"><li>Loading...</li></ul>
-               </div>
-               <div id="sidebar-tools" hx-get="/sidebar/tools" hx-trigger="load, refreshTools from:body" hx-swap="innerHTML">
+                <div id="sidebar-agents" hx-get="/sidebar/agents" hx-trigger="load, refreshAgents from:body" hx-swap="innerHTML">
+                </div>
+                <div id="sidebar-models" hx-get="/sidebar/models" hx-trigger="load, refreshModels from:body" hx-swap="innerHTML">
+                </div>
+                <div id="sidebar-tools" hx-get="/sidebar/tools" hx-trigger="load, refreshTools from:body" hx-swap="innerHTML">
                    <h2><i class="fas fa-tool"></i> Tools <span class="spinner"></span></h2>
                    <ul class="tool-list"><li>Loading...</li></ul>
                </div>

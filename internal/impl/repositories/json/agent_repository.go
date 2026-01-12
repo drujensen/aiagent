@@ -83,21 +83,12 @@ func (r *JsonAgentRepository) ListAgents(ctx context.Context) ([]*entities.Agent
 	agentsCopy := make([]*entities.Agent, len(r.data))
 	for i, a := range r.data {
 		agentsCopy[i] = &entities.Agent{
-			ID:              a.ID,
-			Name:            a.Name,
-			ProviderID:      a.ProviderID,
-			ProviderType:    a.ProviderType,
-			Endpoint:        a.Endpoint,
-			Model:           a.Model,
-			APIKey:          a.APIKey,
-			SystemPrompt:    a.SystemPrompt,
-			Temperature:     a.Temperature,
-			MaxTokens:       a.MaxTokens,
-			ContextWindow:   a.ContextWindow,
-			ReasoningEffort: a.ReasoningEffort,
-			Tools:           slices.Clone(a.Tools),
-			CreatedAt:       a.CreatedAt,
-			UpdatedAt:       a.UpdatedAt,
+			ID:           a.ID,
+			Name:         a.Name,
+			SystemPrompt: a.SystemPrompt,
+			Tools:        slices.Clone(a.Tools),
+			CreatedAt:    a.CreatedAt,
+			UpdatedAt:    a.UpdatedAt,
 		}
 	}
 	return agentsCopy, nil
@@ -107,21 +98,12 @@ func (r *JsonAgentRepository) GetAgent(ctx context.Context, id string) (*entitie
 	for _, agent := range r.data {
 		if agent.ID == id {
 			return &entities.Agent{
-				ID:              agent.ID,
-				Name:            agent.Name,
-				ProviderID:      agent.ProviderID,
-				ProviderType:    agent.ProviderType,
-				Endpoint:        agent.Endpoint,
-				Model:           agent.Model,
-				APIKey:          agent.APIKey,
-				SystemPrompt:    agent.SystemPrompt,
-				Temperature:     agent.Temperature,
-				MaxTokens:       agent.MaxTokens,
-				ContextWindow:   agent.ContextWindow,
-				ReasoningEffort: agent.ReasoningEffort,
-				Tools:           slices.Clone(agent.Tools),
-				CreatedAt:       agent.CreatedAt,
-				UpdatedAt:       agent.UpdatedAt,
+				ID:           agent.ID,
+				Name:         agent.Name,
+				SystemPrompt: agent.SystemPrompt,
+				Tools:        slices.Clone(agent.Tools),
+				CreatedAt:    agent.CreatedAt,
+				UpdatedAt:    agent.UpdatedAt,
 			}, nil
 		}
 	}

@@ -55,7 +55,7 @@ func TestAgentService_ListAgents(t *testing.T) {
 
 	ctx := context.Background()
 	expectedAgents := []*entities.Agent{
-		entities.NewAgent("TestAgent", "test", "prov1", entities.ProviderOpenAI, "url", "model", "key", "prompt", []string{"tool1"}),
+		entities.NewAgent("TestAgent", "prompt", []string{"tool1"}),
 	}
 
 	mockRepo.On("ListAgents", ctx).Return(expectedAgents, nil)
@@ -73,7 +73,7 @@ func TestAgentService_GetAgent(t *testing.T) {
 	service := NewAgentService(mockRepo, logger)
 
 	ctx := context.Background()
-	agent := entities.NewAgent("TestAgent", "test", "prov1", entities.ProviderOpenAI, "url", "model", "key", "prompt", []string{"tool1"})
+	agent := entities.NewAgent("TestAgent", "prompt", []string{"tool1"})
 
 	t.Run("valid agent", func(t *testing.T) {
 		mockRepo.On("GetAgent", ctx, "valid-id").Return(agent, nil).Once()
@@ -99,7 +99,7 @@ func TestAgentService_CreateAgent(t *testing.T) {
 	service := NewAgentService(mockRepo, logger)
 
 	ctx := context.Background()
-	agent := entities.NewAgent("TestAgent", "test", "prov1", entities.ProviderOpenAI, "url", "model", "key", "prompt", []string{"tool1"})
+	agent := entities.NewAgent("TestAgent", "prompt", []string{"tool1"})
 
 	t.Run("valid agent", func(t *testing.T) {
 		mockRepo.On("CreateAgent", ctx, agent).Return(nil).Once()
@@ -146,7 +146,7 @@ func TestAgentService_UpdateAgent(t *testing.T) {
 	service := NewAgentService(mockRepo, logger)
 
 	ctx := context.Background()
-	agent := entities.NewAgent("TestAgent", "test", "prov1", entities.ProviderOpenAI, "url", "model", "key", "prompt", []string{"tool1"})
+	agent := entities.NewAgent("TestAgent", "prompt", []string{"tool1"})
 	existing := *agent
 	existing.CreatedAt = time.Now().Add(-time.Hour)
 
@@ -184,7 +184,7 @@ func TestAgentService_DeleteAgent(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("valid delete", func(t *testing.T) {
-		agent := entities.NewAgent("TestAgent", "test", "prov1", entities.ProviderOpenAI, "url", "model", "key", "prompt", []string{"tool1"})
+		agent := entities.NewAgent("TestAgent", "prompt", []string{"tool1"})
 		mockRepo.On("GetAgent", ctx, agent.ID).Return(agent, nil).Once()
 		mockRepo.On("DeleteAgent", ctx, agent.ID).Return(nil).Once()
 
