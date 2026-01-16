@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -109,41 +110,13 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			return []*entities.Message{}, nil
 		}
 
-		requiredFields := make([]string, 0)
-		for _, param := range (*tool).Parameters() {
-			if param.Required {
-				requiredFields = append(requiredFields, param.Name)
-			}
-		}
-
-		properties := make(map[string]any)
-		for _, param := range (*tool).Parameters() {
-			property := map[string]any{
-				"type":        param.Type,
-				"description": param.Description,
-			}
-			if len(param.Enum) > 0 {
-				property["enum"] = param.Enum
-			}
-			if param.Type == "array" && len(param.Items) > 0 {
-				property["items"] = map[string]any{
-					"type": param.Items[0].Type,
-				}
-			}
-			properties[param.Name] = property
-		}
-
 		tools[i] = map[string]any{
 			"type": "function",
 			"function": map[string]any{
 				"name":        (*tool).Name(),
 				"description": (*tool).FullDescription(),
-				"parameters": map[string]any{
-					"type":       "object",
-					"properties": properties,
-					"required":   requiredFields,
-				},
-				"strict": true,
+				"parameters":  (*tool).Schema(),
+				"strict":      true,
 			},
 		}
 	}
@@ -296,6 +269,15 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			// Clear tool calls since content was malformed
 			toolCalls = nil
 			// Don't set finishReason to "stop" - let the AI continue with sanitized content
+		}
+
+		// For Grok models, check for XML tool calls in content if no JSON tool_calls found
+		if len(toolCalls) == 0 && strings.Contains(m.model, "grok") {
+			xmlToolCalls := parseXMLToolCalls(content)
+			if len(xmlToolCalls) > 0 {
+				toolCalls = xmlToolCalls
+				m.logger.Info("Parsed XML tool calls from Grok response", zap.Int("count", len(toolCalls)))
+			}
 		}
 
 		// Check for repetitive responses to prevent infinite loops
@@ -572,6 +554,52 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 	return newMessages, nil
 }
 
+// sanitizeMalformedContent removes malformed XML-like patterns from content
+func sanitizeMalformedContent(content string) string {
+	// Remove patterns like <xai:function_call> and similar
+	content = strings.ReplaceAll(content, "<xai:function_call>", "")
+	content = strings.ReplaceAll(content, "</xai:function_call", "")
+	content = strings.ReplaceAll(content, `{"content">`, "")
+	content = strings.ReplaceAll(content, "<parameter", "")
+	content = strings.ReplaceAll(content, "</parameter", "")
+	content = strings.ReplaceAll(content, "\u003c/", "")
+	content = strings.ReplaceAll(content, "\u003e", "")
+	return content
+}
+
+// parseXMLToolCalls parses XML-formatted tool calls from model response content
+func parseXMLToolCalls(content string) []entities.ToolCall {
+	var toolCalls []entities.ToolCall
+
+	// Regex to find <function_call name="..."> ... </function_call> blocks
+	re := regexp.MustCompile(`(?s)<function_call\s+name="([^"]+)">(.*?)</function_call>`)
+	matches := re.FindAllStringSubmatch(content, -1)
+
+	for _, match := range matches {
+		if len(match) < 3 {
+			continue
+		}
+		toolName := match[1]
+		// paramsBlock := match[2] // TODO: Implement proper XML parameter parsing
+
+		// For now, create a simple ToolCall with empty arguments
+		toolCall := entities.ToolCall{
+			ID:   uuid.New().String(),
+			Type: "function",
+			Function: struct {
+				Name      string `json:"name"`
+				Arguments string `json:"arguments"`
+			}{
+				Name:      toolName,
+				Arguments: "{}",
+			},
+		}
+		toolCalls = append(toolCalls, toolCall)
+	}
+
+	return toolCalls
+}
+
 // ensureToolCallResponses validates that every tool call has a corresponding response
 // and creates error responses for any orphaned tool calls
 func ensureToolCallResponses(messages []*entities.Message, logger *zap.Logger) []*entities.Message {
@@ -612,36 +640,7 @@ func ensureToolCallResponses(messages []*entities.Message, logger *zap.Logger) [
 	return messages
 }
 
-// extractDiffFromResult extracts diff from FileWrite tool result
-func (m *AIModelIntegration) extractDiffFromResult(result string) string {
-	// First, try to extract from top-level diff field
-	var resultData struct {
-		Diff string `json:"diff"`
-	}
-	if err := json.Unmarshal([]byte(result), &resultData); err == nil && resultData.Diff != "" {
-		return resultData.Diff
-	}
-
-	// If that fails, try to parse as a generic map and look for diff field
-	var genericData map[string]interface{}
-	if err := json.Unmarshal([]byte(result), &genericData); err == nil {
-		if diff, ok := genericData["diff"]; ok {
-			if diffStr, ok := diff.(string); ok && diffStr != "" {
-				return diffStr
-			}
-		}
-	}
-
-	// If still no diff found, check if the result contains diff-like content
-	// (unified diff format starts with --- or +++ or @@)
-	if strings.Contains(result, "---") || strings.Contains(result, "+++") || strings.Contains(result, "@@") {
-		return result
-	}
-
-	return ""
-}
-
-// GetUsage returns the total token usage statistics
+// GetUsage returns token usage information for billing/reporting
 func (m *AIModelIntegration) GetUsage() (*entities.Usage, error) {
 	return &entities.Usage{
 		PromptTokens:     m.totalPromptTokens,
@@ -650,54 +649,60 @@ func (m *AIModelIntegration) GetUsage() (*entities.Usage, error) {
 	}, nil
 }
 
+// extractDiffFromResult extracts diff from FileWrite tool result
+func (m *AIModelIntegration) extractDiffFromResult(result string) string {
+	var resultData struct {
+		Diff string `json:"diff"`
+	}
+	if err := json.Unmarshal([]byte(result), &resultData); err == nil && resultData.Diff != "" {
+		return resultData.Diff
+	}
+	return ""
+}
+
+// extractToolContent extracts tool content for AI processing
+func (m *AIModelIntegration) extractToolContent(toolName, result, toolError string) (fullContent, summaryContent string) {
+	if toolError != "" {
+		return fmt.Sprintf("Tool %s failed: %s", toolName, toolError), fmt.Sprintf("❌ %s failed", toolName)
+	}
+
+	switch toolName {
+	case "FileRead":
+		var data struct {
+			Summary     string   `json:"summary"`
+			FullContent []string `json:"full_content"`
+		}
+		if err := json.Unmarshal([]byte(result), &data); err == nil {
+			return strings.Join(data.FullContent, "\n"), data.Summary
+		}
+	case "FileWrite":
+		var data struct {
+			Summary string `json:"summary"`
+		}
+		if err := json.Unmarshal([]byte(result), &data); err == nil {
+			return data.Summary, data.Summary
+		}
+	case "Process":
+		var data struct {
+			Command string `json:"command"`
+			Stdout  string `json:"stdout"`
+			Stderr  string `json:"stderr"`
+		}
+		if err := json.Unmarshal([]byte(result), &data); err == nil {
+			full := fmt.Sprintf("Command: %s\nStdout: %s\nStderr: %s", data.Command, data.Stdout, data.Stderr)
+			return full, fmt.Sprintf("Executed: %s", data.Command)
+		}
+	}
+
+	return result, result
+}
+
 // GetLastUsage returns the usage from the last API call
 func (m *AIModelIntegration) GetLastUsage() (*entities.Usage, error) {
+	if m.lastUsage == nil {
+		return nil, fmt.Errorf("no usage data available")
+	}
 	return m.lastUsage, nil
-}
-
-// sanitizeMalformedContent removes specific malformed tool call patterns that confuse the AI
-func sanitizeMalformedContent(content string) string {
-	// Remove specific malformed patterns seen in AI responses
-	content = strings.ReplaceAll(content, "<xai:function_call>", "")
-	content = strings.ReplaceAll(content, "</xai:function_call", "")
-	content = strings.ReplaceAll(content, "<parameter", "")
-	content = strings.ReplaceAll(content, "</parameter", "")
-	content = strings.ReplaceAll(content, `{"content">`, "")
-	// Remove common malformed tag patterns
-	content = strings.ReplaceAll(content, "\u003c/", "") // </
-	content = strings.ReplaceAll(content, "\u003e", "")  // >
-	return content
-}
-
-// extractToolContent extracts full content for AI and summary for TUI from tool results
-func (m *AIModelIntegration) extractToolContent(toolName, result, toolError string) (fullContent, summaryContent string) {
-	// Try to parse as JSON (both success and error responses are now JSON)
-	var jsonData map[string]interface{}
-	if err := json.Unmarshal([]byte(result), &jsonData); err != nil {
-		// Fallback: not JSON, use result as-is (shouldn't happen with updated tools)
-		if toolError != "" {
-			// Sanitize error message to prevent model confusion from malformed patterns
-			sanitizedError := sanitizeMalformedContent(toolError)
-			fullContent = fmt.Sprintf("ERROR: Tool %s failed with error: %s", toolName, sanitizedError)
-			summaryContent = fullContent
-		} else {
-			fullContent = fmt.Sprintf("SUCCESS: Tool %s completed: %s", toolName, result)
-			summaryContent = result
-		}
-		return
-	}
-
-	// Extract summary for TUI
-	if summary, ok := jsonData["summary"].(string); ok {
-		summaryContent = summary
-	} else {
-		summaryContent = result
-	}
-
-	// For AI, return the JSON directly to allow structured parsing
-	fullContent = result
-
-	return
 }
 
 // Ensure AIModelIntegration implements the AIModelIntegration interface

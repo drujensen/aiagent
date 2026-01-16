@@ -67,14 +67,21 @@ func (t *WebSearchTool) FullDescription() string {
 	return b.String()
 }
 
-func (t *WebSearchTool) Parameters() []entities.Parameter {
-	return []entities.Parameter{
-		{
-			Name:        "query",
-			Type:        "string",
-			Description: "The search query",
-			Required:    true,
+func (t *WebSearchTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"query": map[string]any{
+				"type":        "string",
+				"description": "Search query",
+			},
+			"num_results": map[string]any{
+				"type":        "integer",
+				"description": "Number of results",
+				"default":     10,
+			},
 		},
+		"required": []string{"query"},
 	}
 }
 
@@ -83,27 +90,28 @@ func (t *WebSearchTool) Execute(arguments string) (string, error) {
 	// Log the search query
 	t.logger.Debug("Executing search", zap.String("arguments", arguments))
 
-	// Parse the arguments to extract the query
+	// Parse the arguments
 	type args struct {
-		Query string `json:"query"`
+		Query      string `json:"query"`
+		NumResults int    `json:"num_results,omitempty"`
 	}
-	var query string
 	var argumentsArgs args
 
 	if err := json.Unmarshal([]byte(arguments), &argumentsArgs); err != nil {
-		// If unmarshaling into struct fails, try as a simple string
-		if err := json.Unmarshal([]byte(arguments), &query); err != nil {
-			t.logger.Error("Failed to parse arguments", zap.Error(err))
-			return "", err
-		}
-	} else {
-		query = argumentsArgs.Query
+		return `{"results": [], "error": "failed to parse arguments"}`, nil
 	}
 
-	t.logger.Info("Search query", zap.String("query", query))
+	query := argumentsArgs.Query
+	numResults := argumentsArgs.NumResults
+	if numResults == 0 {
+		numResults = 10
+	}
+	if numResults > 30 {
+		numResults = 30
+	}
+
 	if query == "" {
-		t.logger.Error("Search query cannot be empty")
-		return "", fmt.Errorf("search query cannot be empty")
+		return `{"results": [], "error": "query is required"}`, nil
 	}
 
 	// Get the Tavily API key from configuration
@@ -170,72 +178,32 @@ func (t *WebSearchTool) Execute(arguments string) (string, error) {
 	// Parse the response
 	var result TavilyResponse
 	if err := json.Unmarshal(bodyBytes, &result); err != nil {
-		t.logger.Error("Failed to parse search response", zap.Error(err))
-		return "", err
+		return `{"results": [], "error": "failed to parse API response"}`, nil
 	}
 
-	// Create TUI-friendly summary
-	var summary strings.Builder
-	summary.WriteString(fmt.Sprintf("🔍 Web Search: %s\n\n", query))
-
-	if result.Answer != "" {
-		summary.WriteString(fmt.Sprintf("💡 Answer: %s\n\n", result.Answer))
+	// Limit results
+	if len(result.Results) > numResults {
+		result.Results = result.Results[:numResults]
 	}
 
-	if len(result.Results) > 0 {
-		summary.WriteString("📋 Top Results:\n")
-		previewCount := 3
-		if len(result.Results) < previewCount {
-			previewCount = len(result.Results)
-		}
-
-		for i := 0; i < previewCount; i++ {
-			res := result.Results[i]
-			summary.WriteString(fmt.Sprintf("%d. %s\n", i+1, res.Title))
-			summary.WriteString(fmt.Sprintf("   %s\n", res.URL))
-
-			// Truncate content preview to 100 characters
-			contentPreview := res.Content
-			if len(contentPreview) > 100 {
-				contentPreview = contentPreview[:100] + "..."
-			}
-			summary.WriteString(fmt.Sprintf("   %s\n\n", contentPreview))
-		}
-
-		if len(result.Results) > 3 {
-			summary.WriteString(fmt.Sprintf("... and %d more results\n", len(result.Results)-3))
-		}
-	} else if result.Answer == "" {
-		summary.WriteString("❌ No results found")
+	var grokResults []map[string]any
+	for _, res := range result.Results {
+		grokResults = append(grokResults, map[string]any{
+			"title":   res.Title,
+			"url":     res.URL,
+			"snippet": res.Content,
+		})
 	}
 
-	// Create JSON response with summary for TUI and full data for AI
-	response := struct {
-		Summary     string `json:"summary"`
-		Query       string `json:"query"`
-		Answer      string `json:"answer"`
-		FullResults []struct {
-			Title   string  `json:"title"`
-			URL     string  `json:"url"`
-			Content string  `json:"content"`
-			Score   float64 `json:"score"`
-		} `json:"full_results"`
-		TotalResults int `json:"total_results"`
-	}{
-		Summary:      summary.String(),
-		Query:        query,
-		Answer:       result.Answer,
-		FullResults:  result.Results,
-		TotalResults: len(result.Results),
-	}
-
-	jsonResult, err := json.Marshal(response)
+	jsonResult, err := json.Marshal(map[string]any{
+		"results": grokResults,
+		"error":   "",
+	})
 	if err != nil {
-		t.logger.Error("Failed to marshal web search response", zap.Error(err))
-		return summary.String(), nil // Fallback to summary only
+		return `{"results": [], "error": "failed to marshal response"}`, nil
 	}
 
-	t.logger.Info("Web search completed", zap.String("query", query), zap.Int("results", len(result.Results)))
+	t.logger.Info("Web search completed", zap.String("query", query), zap.Int("results", len(grokResults)))
 	return string(jsonResult), nil
 }
 

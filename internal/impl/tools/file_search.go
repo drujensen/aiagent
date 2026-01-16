@@ -49,38 +49,24 @@ func (t *FileSearchTool) FullDescription() string {
 	return fmt.Sprintf("%s\n\nParameters:\n- path: file or directory path\n- pattern: regex pattern to search for\n- file_pattern: file pattern filter (optional)\n- case_sensitive: boolean (optional)\n- all_files: search all files in directory (optional)", t.Description())
 }
 
-func (t *FileSearchTool) Parameters() []entities.Parameter {
-	return []entities.Parameter{
-		{
-			Name:        "path",
-			Type:        "string",
-			Description: "The file or directory path",
-			Required:    true,
+func (t *FileSearchTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"pattern": map[string]any{
+				"type":        "string",
+				"description": "Search regex or string",
+			},
+			"directory": map[string]any{
+				"type":        "string",
+				"description": "Root dir to search",
+			},
+			"file_ext": map[string]any{
+				"type":        "string",
+				"description": "File extension filter (e.g., '.go')",
+			},
 		},
-		{
-			Name:        "pattern",
-			Type:        "string",
-			Description: "Search pattern",
-			Required:    true, // Making pattern required for simplicity, as it's essential for search
-		},
-		{
-			Name:        "all_files",
-			Type:        "boolean",
-			Description: "Search all files in directory recursively (automatically enabled for directories)",
-			Required:    false,
-		},
-		{
-			Name:        "file_pattern",
-			Type:        "string",
-			Description: "Glob pattern to filter files (e.g., '*.go') when all_files=true",
-			Required:    false,
-		},
-		{
-			Name:        "case_sensitive",
-			Type:        "boolean",
-			Description: "Perform case-sensitive search (default: false)",
-			Required:    false,
-		},
+		"required": []string{"pattern", "directory"},
 	}
 }
 
@@ -116,167 +102,57 @@ func (t *FileSearchTool) checkFileSize(path string) (bool, error) {
 }
 
 func (t *FileSearchTool) Execute(arguments string) (string, error) {
-	t.logger.Debug("Executing file search command", zap.String("arguments", arguments))
+	t.logger.Debug("Executing code search", zap.String("arguments", arguments))
 	var args struct {
-		Path          string `json:"path"`
-		Pattern       string `json:"pattern"`
-		AllFiles      bool   `json:"all_files"`
-		FilePattern   string `json:"file_pattern"`
-		CaseSensitive bool   `json:"case_sensitive"`
+		Pattern   string `json:"pattern"`
+		Directory string `json:"directory"`
+		FileExt   string `json:"file_ext,omitempty"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		t.logger.Error("Failed to parse arguments", zap.Error(err))
-		return "", fmt.Errorf("failed to parse arguments: %v", err)
+		return `{"results": [], "error": "failed to parse arguments"}`, nil
 	}
 
-	if args.Path == "" {
-		t.logger.Error("Path is required")
-		return "", fmt.Errorf("path is required")
-	}
 	if args.Pattern == "" {
-		t.logger.Error("Pattern is required")
-		return "", fmt.Errorf("pattern is required")
+		return `{"results": [], "error": "pattern is required"}`, nil
+	}
+	if args.Directory == "" {
+		return `{"results": [], "error": "directory is required"}`, nil
 	}
 
-	fullPath, err := t.validatePath(args.Path)
+	fullPath, err := t.validatePath(args.Directory)
 	if err != nil {
-		return "", err
+		return fmt.Sprintf(`{"results": [], "error": "invalid directory: %s"}`, err.Error()), nil
 	}
 
-	workspace := t.configuration["workspace"]
-	if workspace == "" {
-		workspace, _ = os.Getwd()
+	filePattern := "*"
+	if args.FileExt != "" {
+		filePattern = "*" + args.FileExt
 	}
-	relPath, err := filepath.Rel(workspace, fullPath)
+
+	results, err := t.searchMultipleFiles(fullPath, args.Pattern, filePattern, false)
 	if err != nil {
-		relPath = args.Path // fallback
+		return fmt.Sprintf(`{"results": [], "error": "search failed: %s"}`, err.Error()), nil
 	}
 
-	// Check if path is a directory and automatically set all_files=true if not specified
-	info, err := os.Stat(fullPath)
+	var grokResults []map[string]any
+	for filePath, fileResults := range results {
+		for _, result := range fileResults {
+			grokResults = append(grokResults, map[string]any{
+				"file":    filePath,
+				"line":    result.Line,
+				"snippet": result.Text,
+			})
+		}
+	}
+
+	jsonResult, err := json.Marshal(map[string]any{
+		"results": grokResults,
+		"error":   "",
+	})
 	if err != nil {
-		return "", fmt.Errorf("path does not exist: %v", err)
-	}
-	if info.IsDir() && !args.AllFiles {
-		// Automatically enable all_files for directories to simplify usage
-		args.AllFiles = true
-		t.logger.Debug("Automatically enabled all_files for directory search", zap.String("path", fullPath))
+		return `{"results": [], "error": "failed to marshal response"}`, nil
 	}
 
-	var summary strings.Builder
-	var fullResults interface{}
-	var totalMatches int
-
-	if args.AllFiles {
-		results, err := t.searchMultipleFiles(fullPath, args.Pattern, args.FilePattern, args.CaseSensitive)
-		if err != nil {
-			t.logger.Error("Failed to search multiple files", zap.String("path", fullPath), zap.Error(err))
-			return "", err
-		}
-
-		// Count total matches
-		for _, fileResults := range results {
-			totalMatches += len(fileResults)
-		}
-
-		// Create TUI-friendly summary
-		summary.WriteString(fmt.Sprintf("🔍 File Search: %s\n", args.Pattern))
-		summary.WriteString(fmt.Sprintf("📂 Directory: %s\n", relPath))
-		if args.FilePattern != "" {
-			summary.WriteString(fmt.Sprintf("📄 File Pattern: %s\n", args.FilePattern))
-		}
-		summary.WriteString(fmt.Sprintf("📊 Results: %d files with matches, %d total matches\n\n", len(results), totalMatches))
-
-		// Show first 3 files with matches
-		fileCount := 0
-		for filePath, fileResults := range results {
-			if fileCount >= 3 {
-				break
-			}
-			summary.WriteString(fmt.Sprintf("📄 %s (%d matches):\n", filePath, len(fileResults)))
-
-			// Show first 2 matches per file
-			matchCount := 0
-			for _, result := range fileResults {
-				if matchCount >= 2 {
-					break
-				}
-				summary.WriteString(fmt.Sprintf("   %6d: %s\n", result.Line, result.Text))
-				matchCount++
-			}
-
-			if len(fileResults) > 2 {
-				summary.WriteString(fmt.Sprintf("   ... and %d more matches\n", len(fileResults)-2))
-			}
-			summary.WriteString("\n")
-			fileCount++
-		}
-
-		if len(results) > 3 {
-			summary.WriteString(fmt.Sprintf("... and %d more files with matches\n", len(results)-3))
-		}
-
-		fullResults = results
-	} else {
-		results, err := t.search(fullPath, args.Pattern, args.CaseSensitive)
-		if err != nil {
-			t.logger.Error("Failed to search file", zap.String("path", fullPath), zap.Error(err))
-			return "", err
-		}
-
-		totalMatches = len(results)
-
-		// Create TUI-friendly summary
-		summary.WriteString(fmt.Sprintf("🔍 File Search: %s\n", args.Pattern))
-		summary.WriteString(fmt.Sprintf("📄 File: %s\n", relPath))
-		summary.WriteString(fmt.Sprintf("📊 Results: %d matches\n\n", totalMatches))
-
-		// Show first 5 matches
-		previewCount := 5
-		if len(results) < previewCount {
-			previewCount = len(results)
-		}
-
-		for i := 0; i < previewCount; i++ {
-			result := results[i]
-			summary.WriteString(fmt.Sprintf("%6d: %s\n", result.Line, result.Text))
-		}
-
-		if len(results) > 5 {
-			summary.WriteString(fmt.Sprintf("\n... and %d more matches\n", len(results)-5))
-		}
-
-		fullResults = results
-	}
-
-	// Create JSON response with summary for TUI and full data for AI
-	response := struct {
-		Summary       string      `json:"summary"`
-		Pattern       string      `json:"pattern"`
-		Path          string      `json:"path"`
-		AllFiles      bool        `json:"all_files"`
-		FilePattern   string      `json:"file_pattern,omitempty"`
-		CaseSensitive bool        `json:"case_sensitive"`
-		FullResults   interface{} `json:"full_results"`
-		TotalMatches  int         `json:"total_matches"`
-	}{
-		Summary:       summary.String(),
-		Pattern:       args.Pattern,
-		Path:          relPath,
-		AllFiles:      args.AllFiles,
-		FilePattern:   args.FilePattern,
-		CaseSensitive: args.CaseSensitive,
-		FullResults:   fullResults,
-		TotalMatches:  totalMatches,
-	}
-
-	jsonResult, err := json.Marshal(response)
-	if err != nil {
-		t.logger.Error("Failed to marshal file search response", zap.Error(err))
-		return summary.String(), nil // Fallback to summary only
-	}
-
-	t.logger.Info("File search completed", zap.String("path", fullPath), zap.Bool("all_files", args.AllFiles), zap.Int("matches", totalMatches))
 	return string(jsonResult), nil
 }
 

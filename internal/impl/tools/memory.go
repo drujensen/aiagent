@@ -98,63 +98,63 @@ func (t *MemoryTool) FullDescription() string {
 	return b.String()
 }
 
-func (t *MemoryTool) Parameters() []entities.Parameter {
-	return []entities.Parameter{
-		{
-			Name:        "operation",
-			Type:        "string",
-			Enum:        []string{"create_entities", "create_relations", "add_observations", "delete_entities", "delete_observations", "delete_relations", "read_graph", "search_nodes", "open_nodes"},
-			Description: "The memory operation to perform",
-			Required:    true,
+func (t *MemoryTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"operation": map[string]any{
+				"type":        "string",
+				"description": "The memory operation to perform",
+				"enum":        []string{"create_entities", "create_relations", "add_observations", "delete_entities", "delete_observations", "delete_relations", "read_graph", "search_nodes", "open_nodes"},
+			},
+			"entities": map[string]any{
+				"type":        "array",
+				"description": "Array of entities with name, entityType, and observations (for create_entities)",
+				"items": map[string]any{
+					"type": "object",
+				},
+			},
+			"relations": map[string]any{
+				"type":        "array",
+				"description": "Array of relations with from, to, and relationType (for create_relations, delete_relations)",
+				"items": map[string]any{
+					"type": "object",
+				},
+			},
+			"observations": map[string]any{
+				"type":        "array",
+				"description": "Array of observations with entityName and contents (for add_observations)",
+				"items": map[string]any{
+					"type": "object",
+				},
+			},
+			"entityNames": map[string]any{
+				"type":        "array",
+				"description": "Array of entity names (for delete_entities)",
+				"items": map[string]any{
+					"type": "string",
+				},
+			},
+			"deletions": map[string]any{
+				"type":        "array",
+				"description": "Array of deletions with entityName and observations (for delete_observations)",
+				"items": map[string]any{
+					"type": "object",
+				},
+			},
+			"query": map[string]any{
+				"type":        "string",
+				"description": "Search query for nodes (for search_nodes)",
+			},
+			"names": map[string]any{
+				"type":        "array",
+				"description": "Array of entity names to retrieve (for open_nodes)",
+				"items": map[string]any{
+					"type": "string",
+				},
+			},
 		},
-		{
-			Name:        "entities",
-			Type:        "array",
-			Items:       []entities.Item{{Type: "object"}},
-			Description: "Array of entities with name, entityType, and observations (for create_entities)",
-			Required:    false,
-		},
-		{
-			Name:        "relations",
-			Type:        "array",
-			Items:       []entities.Item{{Type: "object"}},
-			Description: "Array of relations with from, to, and relationType (for create_relations, delete_relations)",
-			Required:    false,
-		},
-		{
-			Name:        "observations",
-			Type:        "array",
-			Items:       []entities.Item{{Type: "object"}},
-			Description: "Array of observations with entityName and contents (for add_observations)",
-			Required:    false,
-		},
-		{
-			Name:        "entityNames",
-			Type:        "array",
-			Items:       []entities.Item{{Type: "string"}},
-			Description: "Array of entity names (for delete_entities)",
-			Required:    false,
-		},
-		{
-			Name:        "deletions",
-			Type:        "array",
-			Items:       []entities.Item{{Type: "object"}},
-			Description: "Array of deletions with entityName and observations (for delete_observations)",
-			Required:    false,
-		},
-		{
-			Name:        "query",
-			Type:        "string",
-			Description: "Search query for nodes (for search_nodes)",
-			Required:    false,
-		},
-		{
-			Name:        "names",
-			Type:        "array",
-			Items:       []entities.Item{{Type: "string"}},
-			Description: "Array of entity names to retrieve (for open_nodes)",
-			Required:    false,
-		},
+		"required": []string{"operation"},
 	}
 }
 

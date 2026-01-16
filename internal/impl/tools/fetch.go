@@ -72,34 +72,32 @@ func (t *FetchTool) FullDescription() string {
 	return b.String()
 }
 
-func (t *FetchTool) Parameters() []entities.Parameter {
-	return []entities.Parameter{
-		{
-			Name:        "operation",
-			Type:        "string",
-			Enum:        []string{"GET", "POST", "PATCH", "PUT", "DELETE", "HEAD", "OPTIONS"},
-			Description: "The HTTP operation to perform",
-			Required:    true,
+func (t *FetchTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"operation": map[string]any{
+				"type":        "string",
+				"description": "The HTTP operation to perform",
+				"enum":        []string{"GET", "POST", "PATCH", "PUT", "DELETE", "HEAD", "OPTIONS"},
+			},
+			"url": map[string]any{
+				"type":        "string",
+				"description": "The URL to fetch. Must include the protocol (e.g., http:// or https://)",
+			},
+			"headers": map[string]any{
+				"type":        "array",
+				"description": "Array of headers in the format 'key:value' to include in the request",
+				"items": map[string]any{
+					"type": "string",
+				},
+			},
+			"body": map[string]any{
+				"type":        "string",
+				"description": "The BODY of the request",
+			},
 		},
-		{
-			Name:        "url",
-			Type:        "string",
-			Description: "The URL to fetch. Must include the protocol (e.g., http:// or https://)",
-			Required:    true,
-		},
-		{
-			Name:        "headers",
-			Type:        "array",
-			Items:       []entities.Item{{Type: "string"}},
-			Description: "Array of headers in the format 'key:value' to include in the request",
-			Required:    false,
-		},
-		{
-			Name:        "body",
-			Type:        "string",
-			Description: "The BODY of the request",
-			Required:    false,
-		},
+		"required": []string{"operation", "url"},
 	}
 }
 

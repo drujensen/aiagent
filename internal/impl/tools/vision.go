@@ -8,8 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-
-	"github.com/drujensen/aiagent/internal/domain/entities"
 )
 
 type VisionTool struct {
@@ -35,26 +33,24 @@ func (v *VisionTool) Configuration() map[string]string {
 	return v.ConfigurationField
 }
 
-func (v *VisionTool) Parameters() []entities.Parameter {
-	return []entities.Parameter{
-		{
-			Name:        "image_path",
-			Type:        "string",
-			Description: "Path to the image file for base64 encoding",
-			Required:    false,
+func (v *VisionTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"image_path": map[string]any{
+				"type":        "string",
+				"description": "Path to the image file for base64 encoding",
+			},
+			"image_url": map[string]any{
+				"type":        "string",
+				"description": "Direct URL to the image",
+			},
+			"prompt": map[string]any{
+				"type":        "string",
+				"description": "Text prompt for the image",
+			},
 		},
-		{
-			Name:        "image_url",
-			Type:        "string",
-			Description: "Direct URL to the image",
-			Required:    false,
-		},
-		{
-			Name:        "prompt",
-			Type:        "string",
-			Description: "Text prompt for the image",
-			Required:    true,
-		},
+		"required": []string{"prompt"},
 	}
 }
 

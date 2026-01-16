@@ -55,39 +55,33 @@ func (t *DirectoryTool) FullDescription() string {
 	return fmt.Sprintf("%s\n\nParameters:\n- operation: create_directory, list_directory, directory_tree, move, delete\n- path: directory path (required for create_directory, move, delete; optional for list_directory, directory_tree - defaults to current directory)\n- destination: destination path (for move)\n- confirm: boolean (required for delete)", t.Description())
 }
 
-func (t *DirectoryTool) Parameters() []entities.Parameter {
-	return []entities.Parameter{
-		{
-			Name:        "operation",
-			Type:        "string",
-			Enum:        []string{"create_directory", "list_directory", "directory_tree", "move", "delete"},
-			Description: "The directory operation to perform",
-			Required:    true,
+func (t *DirectoryTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"operation": map[string]any{
+				"type":        "string",
+				"description": "The directory operation to perform",
+				"enum":        []string{"create_directory", "list_directory", "directory_tree", "move", "delete"},
+			},
+			"path": map[string]any{
+				"type":        "string",
+				"description": "The directory or file path",
+			},
+			"destination": map[string]any{
+				"type":        "string",
+				"description": "Destination path (for move operation)",
+			},
+			"depth_limit": map[string]any{
+				"type":        "integer",
+				"description": "Maximum recursion depth for directory_tree (default: unlimited)",
+			},
+			"confirm": map[string]any{
+				"type":        "boolean",
+				"description": "Confirm deletion for delete operation",
+			},
 		},
-		{
-			Name:        "path",
-			Type:        "string",
-			Description: "The directory or file path",
-			Required:    false,
-		},
-		{
-			Name:        "destination",
-			Type:        "string",
-			Description: "Destination path (for move operation)",
-			Required:    false,
-		},
-		{
-			Name:        "depth_limit",
-			Type:        "integer",
-			Description: "Maximum recursion depth for directory_tree (default: unlimited)",
-			Required:    false,
-		},
-		{
-			Name:        "confirm",
-			Type:        "boolean",
-			Description: "Confirm deletion for delete operation",
-			Required:    false,
-		},
+		"required": []string{"operation"},
 	}
 }
 

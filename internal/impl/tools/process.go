@@ -64,60 +64,20 @@ func (t *ProcessTool) FullDescription() string {
 	return fmt.Sprintf("%s\n\nParameters:\n- command: shell command to execute\n- shell: run in shell (optional, default false)\n- timeout: timeout in seconds (optional)\n\nNote: Output limited to 4096 tokens.", t.Description())
 }
 
-func (t *ProcessTool) Parameters() []entities.Parameter {
-	return []entities.Parameter{
-		{
-			Name:        "command",
-			Type:        "string",
-			Description: "The full command to execute (e.g., 'git clone https://github.com/repo')",
-			Required:    true,
-		},
-		{
-			Name:        "shell",
-			Type:        "boolean",
-			Description: "Run the command through the OS default shell to inherit PATH and environment",
-			Required:    false,
-		},
-		{
-			Name:        "input",
-			Type:        "string",
-			Description: "Input data to send to the process's stdin",
-			Required:    false,
-		},
-		{
-			Name:        "background",
-			Type:        "boolean",
-			Description: "Run the command in the background (e.g., for web servers)",
-			Required:    false,
-		},
-		{
-			Name:        "timeout",
-			Type:        "integer",
-			Description: "Timeout in seconds (default: 30, 0 for no timeout)",
-			Required:    false,
-		},
-		{
-			Name: "env",
-			Type: "array",
-			Items: []entities.Item{
-				{Type: "string"},
+func (t *ProcessTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"command": map[string]any{
+				"type":        "string",
+				"description": "Shell command to run",
 			},
-			Description: "Environment variables as key=value pairs (e.g., ['PORT=8080'])",
-			Required:    false,
+			"working_dir": map[string]any{
+				"type":        "string",
+				"description": "Directory to execute in",
+			},
 		},
-		{
-			Name:        "pid",
-			Type:        "integer",
-			Description: "PID of a background process to check or kill",
-			Required:    false,
-		},
-		{
-			Name:        "action",
-			Type:        "string",
-			Enum:        []string{"run", "write", "read", "status", "kill"},
-			Description: "Action to perform: run (default), write (send to stdin), read (read from stdout/stderr), status (check PID), or kill (stop PID)",
-			Required:    false,
-		},
+		"required": []string{"command"},
 	}
 }
 
@@ -141,12 +101,18 @@ type ProcessArgs struct {
 }
 
 func (t *ProcessTool) Execute(arguments string) (string, error) {
-	t.logger.Debug("Executing process", zap.String("arguments", arguments))
+	t.logger.Debug("Executing shell command", zap.String("arguments", arguments))
 
-	var args ProcessArgs
+	var args struct {
+		Command    string `json:"command"`
+		WorkingDir string `json:"working_dir"`
+	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		t.logger.Error("Failed to parse arguments", zap.Error(err))
-		return "", err
+		return `{"output": "", "exit_code": 1, "error": "failed to parse arguments"}`, nil
+	}
+
+	if args.Command == "" {
+		return `{"output": "", "exit_code": 1, "error": "command is required"}`, nil
 	}
 
 	workspace := t.configuration["workspace"]
@@ -154,33 +120,31 @@ func (t *ProcessTool) Execute(arguments string) (string, error) {
 		var err error
 		workspace, err = os.Getwd()
 		if err != nil {
-			return "", fmt.Errorf("could not get current directory: %v", err)
+			return fmt.Sprintf(`{"output": "", "exit_code": 1, "error": "could not get current directory: %s"}`, err.Error()), nil
 		}
 	}
 
-	if args.Action == "" {
-		args.Action = "run"
+	workingDir := workspace
+	if args.WorkingDir != "" {
+		workingDir = args.WorkingDir
 	}
 
-	switch args.Action {
-	case "run":
-		results, err := t.runCommand(args, workspace)
-		if err != nil {
-			return results, err
+	cmd := exec.Command("sh", "-c", args.Command)
+	cmd.Dir = workingDir
+
+	output, err := cmd.CombinedOutput()
+	exitCode := 0
+	errorMsg := ""
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		} else {
+			exitCode = 1
+			errorMsg = err.Error()
 		}
-		return t.formatRunOutput(results)
-	case "write":
-		return t.writeToProcess(args)
-	case "read":
-		return t.readFromProcess(args)
-	case "status":
-		return t.checkStatus(args.PID)
-	case "kill":
-		return t.killProcess(args.PID)
-	default:
-		t.logger.Error("Unknown action", zap.String("action", args.Action))
-		return "", fmt.Errorf("unknown action: %s", args.Action)
 	}
+
+	return fmt.Sprintf(`{"output": %q, "exit_code": %d, "error": %q}`, string(output), exitCode, errorMsg), nil
 }
 
 // splitShellArgs splits a command string into arguments, respecting quoted strings and escapes

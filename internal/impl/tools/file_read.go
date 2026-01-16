@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
@@ -49,26 +50,20 @@ func (t *FileReadTool) FullDescription() string {
 	return fmt.Sprintf("%s\n\nParameters:\n- filePath: relative path to file from workspace root\n- offset: starting line number (0-based, optional)\n- limit: max lines to read (optional, default 2000)", t.Description())
 }
 
-func (t *FileReadTool) Parameters() []entities.Parameter {
-	return []entities.Parameter{
-		{
-			Name:        "filePath",
-			Type:        "string",
-			Description: "The relative path to the file to read from workspace root",
-			Required:    true,
+func (t *FileReadTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"path": map[string]any{
+				"type":        "string",
+				"description": "Full or relative path to the file",
+			},
+			"lines": map[string]any{
+				"type":        "string",
+				"description": "Optional range of lines to read (e.g., \"1-10\" for lines 1 through 10)",
+			},
 		},
-		{
-			Name:        "offset",
-			Type:        "integer",
-			Description: "The line number to start reading from (0-based)",
-			Required:    false,
-		},
-		{
-			Name:        "limit",
-			Type:        "integer",
-			Description: "The number of lines to read (defaults to 2000)",
-			Required:    false,
-		},
+		"required": []string{"path"},
 	}
 }
 
@@ -106,124 +101,83 @@ func (t *FileReadTool) checkFileSize(path string) (bool, error) {
 func (t *FileReadTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing file read command", zap.String("arguments", arguments))
 	var args struct {
-		FilePath string `json:"filePath"`
-		Offset   int    `json:"offset"`
-		Limit    int    `json:"limit"`
+		Path  string `json:"path"`
+		Lines string `json:"lines,omitempty"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
-		return "", fmt.Errorf("failed to parse arguments: %v", err)
+		return `{"content": "", "error": "failed to parse arguments"}`, nil
 	}
 
-	if args.FilePath == "" {
-		t.logger.Error("FilePath is required")
-		return "", fmt.Errorf("filePath is required")
+	if args.Path == "" {
+		t.logger.Error("Path is required")
+		return `{"content": "", "error": "path is required"}`, nil
 	}
 
-	if args.Limit == 0 {
-		args.Limit = 2000
+	// Parse lines range
+	offset := 0
+	limit := 2000
+	if args.Lines != "" {
+		if strings.Contains(args.Lines, "-") {
+			parts := strings.Split(args.Lines, "-")
+			if len(parts) == 2 {
+				start, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
+				end, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
+				if err1 == nil && err2 == nil && start > 0 && end >= start {
+					offset = start - 1 // 0-based
+					limit = end - start + 1
+				}
+			}
+		} else {
+			// Single line number
+			if line, err := strconv.Atoi(args.Lines); err == nil && line > 0 {
+				offset = line - 1
+				limit = 1
+			}
+		}
 	}
 
-	fullPath, err := t.validatePath(args.FilePath)
+	fullPath, err := t.validatePath(args.Path)
 	if err != nil {
-		return "", err
+		return fmt.Sprintf(`{"content": "", "error": "%s"}`, err.Error()), nil
 	}
 	if ok, err := t.checkFileSize(fullPath); !ok {
-		return "", err
+		return fmt.Sprintf(`{"content": "", "error": "%s"}`, err.Error()), nil
 	}
 	file, err := os.Open(fullPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to open file: %v", err)
+		return fmt.Sprintf(`{"content": "", "error": "failed to open file: %s"}`, err.Error()), nil
 	}
 	defer file.Close()
 
 	const maxLines = 2000
-	if args.Limit > maxLines {
-		args.Limit = maxLines
+	if limit > maxLines {
+		limit = maxLines
 	}
 
-	var lines []LineResult
+	var lines []string
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
 	readCount := 0
-	hasMore := false
 
 	for scanner.Scan() {
 		lineNum++
-		if lineNum-1 < args.Offset {
+		if lineNum-1 < offset {
 			continue
 		}
-		if readCount >= args.Limit {
-			hasMore = true
+		if readCount >= limit {
 			break
 		}
-		lines = append(lines, LineResult{
-			Line: lineNum,
-			Text: scanner.Text(),
-		})
+		lines = append(lines, scanner.Text())
 		readCount++
 	}
 
 	if err := scanner.Err(); err != nil {
-		t.logger.Error("Error reading file", zap.String("path", fullPath), zap.Error(err))
-		return "", fmt.Errorf("error reading file: %v", err)
+		return fmt.Sprintf(`{"content": "", "error": "error reading file: %s"}`, err.Error()), nil
 	}
 
-	if len(lines) == 0 {
-		return "No lines found in file", fmt.Errorf("no lines found in file")
-	}
-
-	// Create TUI-friendly summary (first 5 lines only)
-	var result strings.Builder
-	result.WriteString(fmt.Sprintf("📄 %s (%d lines total)\n\n", filepath.Base(fullPath), lineNum))
-
-	previewLines := 5
-	if len(lines) < previewLines {
-		previewLines = len(lines)
-	}
-
-	for i := 0; i < previewLines; i++ {
-		result.WriteString(fmt.Sprintf("%6d: %s\n", lines[i].Line, lines[i].Text))
-	}
-
-	if len(lines) > 5 {
-		result.WriteString(fmt.Sprintf("... and %d more lines\n", len(lines)-5))
-	}
-
-	if hasMore {
-		result.WriteString("\n⚠️  File has more content beyond the limit. Use offset and limit to read additional sections.")
-	}
-
-	// For AI processing, include full content as structured data
-	// The TUI will only show the summary above
-	fullContent := make([]string, len(lines))
-	for i, line := range lines {
-		fullContent[i] = fmt.Sprintf("%6d: %s", line.Line, line.Text)
-	}
-
-	// Create JSON response with summary for TUI and full data for AI
-	response := struct {
-		Summary     string   `json:"summary"`
-		FullContent []string `json:"full_content"`
-		FilePath    string   `json:"file_path"`
-		TotalLines  int      `json:"total_lines"`
-		HasMore     bool     `json:"has_more"`
-	}{
-		Summary:     result.String(),
-		FullContent: fullContent,
-		FilePath:    fullPath,
-		TotalLines:  lineNum,
-		HasMore:     hasMore,
-	}
-
-	jsonResult, err := json.Marshal(response)
-	if err != nil {
-		t.logger.Error("Failed to marshal file read response", zap.Error(err))
-		return result.String(), nil // Fallback to summary only
-	}
-
-	t.logger.Info("File read successfully", zap.String("path", fullPath), zap.Int("lines", len(lines)), zap.Bool("hasMore", hasMore))
-	return string(jsonResult), nil
+	content := strings.Join(lines, "\n")
+	return fmt.Sprintf(`{"content": %q, "error": ""}`, content), nil
 }
 
 var _ entities.Tool = (*FileReadTool)(nil)

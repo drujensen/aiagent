@@ -58,20 +58,20 @@ func (t *ImageTool) FullDescription() string {
 	return b.String()
 }
 
-func (t *ImageTool) Parameters() []entities.Parameter {
-	return []entities.Parameter{
-		{
-			Name:        "prompt",
-			Type:        "string",
-			Description: "The text prompt for image generation",
-			Required:    true,
+func (t *ImageTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"prompt": map[string]any{
+				"type":        "string",
+				"description": "The text prompt for image generation",
+			},
+			"n": map[string]any{
+				"type":        "integer",
+				"description": "Number of images to generate (1-10)",
+			},
 		},
-		{
-			Name:        "n",
-			Type:        "integer",
-			Description: "Number of images to generate (1-10)",
-			Required:    false,
-		},
+		"required": []string{"prompt"},
 	}
 }
 

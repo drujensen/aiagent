@@ -50,41 +50,37 @@ func (t *ProjectTool) FullDescription() string {
 	return fmt.Sprintf("%s\n\nParameters:\n- operation: 'read' or 'get_source'\n- language: programming language (optional, auto-detected)\n- filters: custom file patterns (optional)\n- max_file_size: file size limit in bytes (optional)", t.Description())
 }
 
-func (t *ProjectTool) Parameters() []entities.Parameter {
-	return []entities.Parameter{
-		{
-			Name:        "operation",
-			Type:        "string",
-			Enum:        []string{"read", "get_source"},
-			Description: "The operation to perform ('read' for project file, 'get_source' for file map and source code)",
-			Required:    true,
+func (t *ProjectTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"operation": map[string]any{
+				"type":        "string",
+				"description": "The operation to perform ('read' for project file, 'get_source' for file map and source code)",
+				"enum":        []string{"read", "get_source"},
+			},
+			"language": map[string]any{
+				"type":        "string",
+				"description": "Programming language to determine default file patterns and parsing (e.g., 'go', 'csharp')",
+				"enum":        []string{"all", "shell", "assembly", "c", "cpp", "rust", "go", "csharp", "objective-c", "swift", "java", "kotlin", "clojure", "groovy", "lua", "elixir", "scala", "dart", "haskell", "javascript", "typescript", "python", "ruby", "php", "perl", "r", "html", "stylesheet"},
+			},
+			"filters": map[string]any{
+				"type":        "array",
+				"description": "List of file patterns to include (e.g., '**/*.go', 'go.mod'). Overrides language defaults.",
+				"items": map[string]any{
+					"type": "string",
+				},
+			},
+			"max_file_size": map[string]any{
+				"type":        "integer",
+				"description": "Maximum file size in bytes; if exceeded, content/structure is replaced with a message (default: 0, no limit)",
+			},
+			"max_total_size": map[string]any{
+				"type":        "integer",
+				"description": "Maximum total output size in characters; if exceeded, remaining files are skipped (default: 200000)",
+			},
 		},
-		{
-			Name:        "language",
-			Type:        "string",
-			Description: "Programming language to determine default file patterns and parsing (e.g., 'go', 'csharp')",
-			Required:    false,
-			Enum:        []string{"all", "shell", "assembly", "c", "cpp", "rust", "go", "csharp", "objective-c", "swift", "java", "kotlin", "clojure", "groovy", "lua", "elixir", "scala", "dart", "haskell", "javascript", "typescript", "python", "ruby", "php", "perl", "r", "html", "stylesheet"},
-		},
-		{
-			Name:        "filters",
-			Type:        "array",
-			Items:       []entities.Item{{Type: "string"}},
-			Description: "List of file patterns to include (e.g., '**/*.go', 'go.mod'). Overrides language defaults.",
-			Required:    false,
-		},
-		{
-			Name:        "max_file_size",
-			Type:        "integer",
-			Description: "Maximum file size in bytes; if exceeded, content/structure is replaced with a message (default: 0, no limit)",
-			Required:    false,
-		},
-		{
-			Name:        "max_total_size",
-			Type:        "integer",
-			Description: "Maximum total output size in characters; if exceeded, remaining files are skipped (default: 200000)",
-			Required:    false,
-		},
+		"required": []string{"operation"},
 	}
 }
 

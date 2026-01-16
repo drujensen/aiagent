@@ -47,7 +47,7 @@ type Tool interface {
 	FullDescription() string
 	Configuration() map[string]string
 	UpdateConfiguration(config map[string]string)
-	Parameters() []Parameter
+	Schema() map[string]any
 	Execute(arguments string) (string, error)
 }
 

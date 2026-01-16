@@ -67,14 +67,16 @@ func (t *SwaggerTool) FullDescription() string {
 	return b.String()
 }
 
-func (t *SwaggerTool) Parameters() []entities.Parameter {
-	return []entities.Parameter{
-		{
-			Name:        "fetch",
-			Type:        "boolean",
-			Description: "Whether to fetch and return the Swagger API specification (default: true)",
-			Required:    false,
+func (t *SwaggerTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"fetch": map[string]any{
+				"type":        "boolean",
+				"description": "Whether to fetch and return the Swagger API specification (default: true)",
+			},
 		},
+		"required": []string{},
 	}
 }
 

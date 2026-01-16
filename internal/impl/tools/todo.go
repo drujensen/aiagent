@@ -75,37 +75,33 @@ func (t *TodoTool) FullDescription() string {
 	return b.String()
 }
 
-func (t *TodoTool) Parameters() []entities.Parameter {
-	return []entities.Parameter{
-		{
-			Name:        "action",
-			Type:        "string",
-			Description: "Action to perform: write, read, update_status",
-			Required:    true,
-			Enum:        []string{"write", "read", "update_status"},
-		},
-		{
-			Name:        "todos",
-			Type:        "array",
-			Description: "For write action: array of todo objects with content, priority",
-			Required:    false,
-			Items: []entities.Item{
-				{Type: "object"},
+func (t *TodoTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"action": map[string]any{
+				"type":        "string",
+				"description": "Action to perform: write, read, update_status",
+				"enum":        []string{"write", "read", "update_status"},
+			},
+			"todos": map[string]any{
+				"type":        "array",
+				"description": "For write action: array of todo objects with content, priority",
+				"items": map[string]any{
+					"type": "object",
+				},
+			},
+			"id": map[string]any{
+				"type":        "string",
+				"description": "For update_status action: the ID of the todo to update",
+			},
+			"status": map[string]any{
+				"type":        "string",
+				"description": "For update_status action: new status (pending, in_progress, completed, cancelled)",
+				"enum":        []string{"pending", "in_progress", "completed", "cancelled"},
 			},
 		},
-		{
-			Name:        "id",
-			Type:        "string",
-			Description: "For update_status action: the ID of the todo to update",
-			Required:    false,
-		},
-		{
-			Name:        "status",
-			Type:        "string",
-			Description: "For update_status action: new status (pending, in_progress, completed, cancelled)",
-			Required:    false,
-			Enum:        []string{"pending", "in_progress", "completed", "cancelled"},
-		},
+		"required": []string{"action"},
 	}
 }
 

@@ -118,33 +118,10 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 			return nil, fmt.Errorf("operation canceled by user")
 		}
 
-		requiredFields := make([]string, 0)
-		for _, param := range (*tool).Parameters() {
-			if param.Required {
-				requiredFields = append(requiredFields, param.Name)
-			}
-		}
-
-		properties := make(map[string]any)
-		for _, param := range (*tool).Parameters() {
-			property := map[string]any{
-				"type":        param.Type,
-				"description": param.Description,
-			}
-			if len(param.Enum) > 0 {
-				property["enum"] = param.Enum
-			}
-			properties[param.Name] = property
-		}
-
 		tools[i] = map[string]any{
-			"name":        (*tool).Name(),
-			"description": (*tool).Description(),
-			"input_schema": map[string]any{
-				"type":       "object",
-				"properties": properties,
-				"required":   requiredFields,
-			},
+			"name":         (*tool).Name(),
+			"description":  (*tool).Description(),
+			"input_schema": (*tool).Schema(),
 		}
 	}
 

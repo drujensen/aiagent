@@ -60,39 +60,33 @@ func (b *BrowserTool) UpdateConfiguration(config map[string]string) {
 	b.configuration = config
 }
 
-func (b *BrowserTool) Parameters() []entities.Parameter {
-	return []entities.Parameter{
-		{
-			Name:        "operation",
-			Type:        "string",
-			Enum:        []string{"open", "click", "screenshot", "close", "getTitle", "getPageSource", "getElementText", "getElementAttribute", "setInputValue"},
-			Description: "The browser operation to perform",
-			Required:    true,
+func (b *BrowserTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"operation": map[string]any{
+				"type":        "string",
+				"description": "The browser operation to perform",
+				"enum":        []string{"open", "click", "screenshot", "close", "getTitle", "getPageSource", "getElementText", "getElementAttribute", "setInputValue"},
+			},
+			"url": map[string]any{
+				"type":        "string",
+				"description": "The URL for navigation (required for 'navigate')",
+			},
+			"selector": map[string]any{
+				"type":        "string",
+				"description": "CSS selector for operations like 'click'",
+			},
+			"value": map[string]any{
+				"type":        "string",
+				"description": "The value to set for input fields (required for 'setInputValue')",
+			},
+			"filename": map[string]any{
+				"type":        "string",
+				"description": "The name of the file to save the screenshot (required for 'screenshot')",
+			},
 		},
-		{
-			Name:        "url",
-			Type:        "string",
-			Description: "The URL for navigation (required for 'navigate')",
-			Required:    false,
-		},
-		{
-			Name:        "selector",
-			Type:        "string",
-			Description: "CSS selector for operations like 'click'",
-			Required:    false,
-		},
-		{
-			Name:        "value",
-			Type:        "string",
-			Description: "The value to set for input fields (required for 'setInputValue')",
-			Required:    false,
-		},
-		{
-			Name:        "filename",
-			Type:        "string",
-			Description: "The name of the file to save the screenshot (required for 'screenshot')",
-			Required:    false,
-		},
+		"required": []string{"operation"},
 	}
 }
 
