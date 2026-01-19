@@ -1,233 +1,213 @@
 {{define "chat_form_content"}}
-<main class="content">
-  <div class="home-content">
-      <div class="chat-welcome">
-           {{if not .IsEdit}}
-           <h1>Start a New Conversation</h1>
-           <p>Choose how you'd like to begin</p>
-           {{end}}
+<div class="chat-welcome">
+    {{if not .IsEdit}}
+    <h1>Start a New Conversation</h1>
+    <p>Choose how you'd like to begin</p>
+    <div class="quick-start-options">
+       <div class="option-card" onclick="startWithDefaults()">
+           <div class="option-icon">🚀</div>
+           <h3>Quick Start</h3>
+           <p>Get started immediately with smart defaults</p>
+           <small>Research Agent + GPT-4.1 Standard</small>
+       </div>
+    </div>
+    {{end}}
 
-           {{if not .IsEdit}}
-           <div class="quick-start-options">
-               <div class="option-card" onclick="startWithDefaults()">
-                   <div class="option-icon">🚀</div>
-                   <h3>Quick Start</h3>
-                   <p>Get started immediately with smart defaults</p>
-                   <small>Research Agent + GPT-4.1 Standard</small>
-               </div>
-
-               <div class="option-card" onclick="showAdvancedOptions()">
-                   <div class="option-icon">⚙️</div>
-                   <h3>Custom Setup</h3>
-                   <p>Choose your agent and model</p>
-                   <small>Full control over configuration</small>
-               </div>
-           </div>
-           {{end}}
-
-           <div id="advanced-options" class="advanced-options" {{if not .IsEdit}}style="display: none;"{{end}}>
-               <form
-                   {{if .IsEdit}}hx-put="/chats/{{.Chat.ID}}"{{else}}hx-post="/chats"{{end}}
-                   hx-target="#response-message"
-                   hx-swap="innerHTML">
-                   <div style="background: #333; border: 1px solid #444; padding: 20px; border-radius: 8px; max-width: 800px; margin: 0 auto; text-align: center;">
-                       <h2 style="color: #fff; margin-bottom: 30px; border-bottom: 2px solid #444;">{{if .IsEdit}}Edit Chat{{else}}Create Chat{{end}}</h2>
-                       <div class="form-group" style="margin-bottom: 20px; text-align: left;">
-                           <label for="chat-name" style="display: block; margin-bottom: 5px; font-weight: bold; color: #fff;">Conversation Name:</label>
-                           <input type="text" id="chat-name" name="chat-name" class="form-control" placeholder="Enter conversation name (optional)" value="{{.Chat.Name}}">
-                           <small class="form-text" style="display: block; margin-top: 5px; font-size: 12px; color: #ccc;">Leave blank to auto-generate based on your first message</small>
-                       </div>
-                       <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                           <div class="form-group" style="text-align: left;">
-                               <label for="agent-select" style="display: block; margin-bottom: 5px; font-weight: bold; color: #fff;">AI Agent:</label>
-                               <select id="agent-select" name="agent-select" class="form-control">
-                                   <option value="">Select an AI Agent</option>
-                                   {{range .Agents}}
-                                   <option value="{{.ID}}"{{if (eq .ID $.Chat.AgentID)}}selected{{end}}>{{.Name}}</option>
-                                   {{end}}
-                               </select>
-                               <small class="form-text" style="display: block; margin-top: 5px; font-size: 12px; color: #ccc;">Defines the AI's behavior and personality</small>
-                           </div>
-                           <div class="form-group" style="text-align: left;">
-                               <label for="model-select" style="display: block; margin-bottom: 5px; font-weight: bold; color: #fff;">AI Model:</label>
-                               <select id="model-select" name="model-select" class="form-control">
-                                   <option value="">Select an AI Model</option>
-                                   {{range .Models}}
-                                   <option value="{{.ID}}"{{if (eq .ID $.Chat.ModelID)}}selected{{end}}>{{.Name}}</option>
-                                   {{end}}
-                               </select>
-                               <small class="form-text" style="display: block; margin-top: 5px; font-size: 12px; color: #ccc;">Controls speed, cost, and capabilities</small>
-                           </div>
-                       </div>
-                       <button type="submit" class="btn-primary">{{if .IsEdit}}Update{{else}}Create{{end}} Chat</button>
-                   </div>
-               </form>
-           </div>
-
-          <div id="response-message"></div>
+    <form
+       {{if .IsEdit}}hx-put="/chats/{{.Chat.ID}}"{{else}}hx-post="/chats"{{end}}
+       hx-target="#response-message"
+       hx-swap="innerHTML">
+      <h2 style="">{{if .IsEdit}}Edit Chat{{else}}Create Chat{{end}}</h2>
+      <div class="form-group" style="margin-bottom: 20px; text-align: left;">
+         <label for="chat-name" style="display: block; margin-bottom: 5px; font-weight: bold; color: #fff;">Conversation Name:</label>
+         <input type="text" id="chat-name" name="chat-name" class="form-control" placeholder="Enter conversation name (optional)" value="{{.Chat.Name}}">
+         <small class="form-text" style="display: block; margin-top: 5px; font-size: 12px; color: #ccc;">Leave blank to auto-generate based on your first message</small>
       </div>
-  </div>
-</main>
+      <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+         <div class="form-group" style="text-align: left;">
+             <label for="agent-select" style="display: block; margin-bottom: 5px; font-weight: bold; color: #fff;">AI Agent:</label>
+             <select id="agent-select" name="agent-select" class="form-control">
+                 <option value="">Select an AI Agent</option>
+                 {{range .Agents}}
+                 <option value="{{.ID}}"{{if (eq .ID $.Chat.AgentID)}}selected{{end}}>{{.Name}}</option>
+                 {{end}}
+             </select>
+             <small class="form-text" style="display: block; margin-top: 5px; font-size: 12px; color: #ccc;">Defines the AI's behavior and personality</small>
+         </div>
+         <div class="form-group" style="text-align: left;">
+             <label for="model-select" style="display: block; margin-bottom: 5px; font-weight: bold; color: #fff;">AI Model:</label>
+             <select id="model-select" name="model-select" class="form-control">
+                 <option value="">Select an AI Model</option>
+                 {{range .Models}}
+                 <option value="{{.ID}}"{{if (eq .ID $.Chat.ModelID)}}selected{{end}}>{{.Name}}</option>
+                 {{end}}
+             </select>
+             <small class="form-text" style="display: block; margin-top: 5px; font-size: 12px; color: #ccc;">Controls speed, cost, and capabilities</small>
+         </div>
+      </div>
+      <button type="submit" class="btn-primary">{{if .IsEdit}}Update{{else}}Create{{end}} Chat</button>
+    </form>
+    <div id="response-message"></div>
+</div>
 
 <style>
-.chat-welcome {
-    max-width: 800px;
-    margin: 0 auto;
-    text-align: center;
-    padding: 40px 20px;
-}
+  .chat-welcome {
+      background: #333;
+      border: 1px solid #444;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 800px;
+      margin: 0 auto;
+      text-align: center;
+  }
 
-.chat-welcome h1 {
+  .chat-welcome h1 {
+      color: #fff;
+      margin-bottom: 10px;
+      font-size: 2.5em;
+  }
+
+  .chat-welcome h2 {
     color: #fff;
-    margin-bottom: 10px;
-    font-size: 2.5em;
-}
-
-.chat-welcome > p {
-    color: #ccc;
-    font-size: 1.2em;
-    margin-bottom: 40px;
-}
-
-.quick-start-options {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
     margin-bottom: 30px;
-}
+    border-bottom: 2px solid #444;
+  }
 
-.option-card {
-    border: 2px solid #555;
-    border-radius: 12px;
-    padding: 30px 20px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    background: #2a2a2a;
-    color: #fff;
-}
+  .chat-welcome > p {
+      color: #ccc;
+      font-size: 1.2em;
+      margin-bottom: 40px;
+  }
 
-.option-card:hover {
-    border-color: #007bff;
-    box-shadow: 0 4px 12px rgba(0,123,255,0.15);
-    transform: translateY(-2px);
-    background: #3a3a3a;
-}
+  .quick-start-options {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+  }
 
-.option-icon {
-    font-size: 2.5em;
-    margin-bottom: 15px;
-}
+  .option-card {
+      border: 2px solid #555;
+      border-radius: 12px;
+      padding: 30px 20px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: #2a2a2a;
+      color: #fff;
+  }
 
-.option-card h3 {
-    color: #fff;
-    margin: 0 0 10px 0;
-    font-size: 1.4em;
-}
+  .option-card:hover {
+      border-color: #007bff;
+      box-shadow: 0 4px 12px rgba(0,123,255,0.15);
+      transform: translateY(-2px);
+      background: #3a3a3a;
+  }
 
-.option-card p {
-    color: #ccc;
-    margin: 0 0 15px 0;
-    font-size: 1em;
-}
+  .option-icon {
+      font-size: 2.5em;
+      margin-bottom: 15px;
+  }
 
-.option-card small {
-    color: #aaa;
-    font-size: 0.9em;
-}
+  .option-card h3 {
+      color: #fff;
+      margin: 0 0 10px 0;
+      font-size: 1.4em;
+  }
 
-.advanced-options {
-    background: #333;
-    border: 1px solid #444;
-    border-radius: 8px;
-    padding: 20px;
-    margin-top: 20px;
-}
+  .option-card p {
+      color: #ccc;
+      margin: 0 0 15px 0;
+      font-size: 1em;
+  }
 
-.form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-bottom: 20px;
-}
+  .option-card small {
+      color: #aaa;
+      font-size: 0.9em;
+  }
 
-.form-group {
-    text-align: left;
-}
+  .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+  }
 
-.form-group label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: bold;
-    color: #fff;
-}
+  .form-group {
+      text-align: left;
+  }
 
-.form-control {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #555;
-    border-radius: 4px;
-    font-size: 14px;
-    box-sizing: border-box;
-    background-color: #1a1a1a;
-    color: #fff;
-}
+  .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #fff;
+  }
 
-.form-control:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
-    background-color: #2a2a2a;
-}
+  .form-control {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #555;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+      background-color: #1a1a1a;
+      color: #fff;
+  }
 
-.form-text {
-    display: block;
-    margin-top: 5px;
-    font-size: 12px;
-    color: #ccc;
-}
+  .form-control:focus {
+      outline: none;
+      border-color: #007bff;
+      box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+      background-color: #2a2a2a;
+  }
 
-.form-actions {
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    margin-top: 30px;
-}
+  .form-text {
+      display: block;
+      margin-top: 5px;
+      font-size: 12px;
+      color: #ccc;
+  }
 
-.btn {
-    padding: 12px 24px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s;
-    text-decoration: none;
-    display: inline-block;
-    text-align: center;
-}
+  .form-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 30px;
+  }
 
+  .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+      text-decoration: none;
+      display: inline-block;
+      text-align: center;
+  }
 
+  .btn-secondary {
+      background: #6c757d;
+      color: white;
+  }
 
-.btn-secondary {
-    background: #6c757d;
-    color: white;
-}
+  .btn-secondary:hover {
+      background: #545b62;
+      transform: translateY(-1px);
+  }
 
-.btn-secondary:hover {
-    background: #545b62;
-    transform: translateY(-1px);
-}
+  @media (max-width: 768px) {
+      .form-row {
+          grid-template-columns: 1fr;
+          gap: 15px;
+      }
 
-@media (max-width: 768px) {
-    .form-row {
-        grid-template-columns: 1fr;
-        gap: 15px;
-    }
-
-    .quick-start-options {
-        grid-template-columns: 1fr;
-    }
-}
+      .quick-start-options {
+          grid-template-columns: 1fr;
+      }
+  }
 </style>
 
 <script>

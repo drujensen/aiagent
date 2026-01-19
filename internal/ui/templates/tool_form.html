@@ -1,23 +1,6 @@
 {{define "tool_form_content"}}
-<div id="response-message"></div>
 <div class="agent-form">
     <h2>{{if .IsEdit}}Edit Tool{{else}}Create Tool{{end}}</h2>
-    <style>
-    .agent-form {
-        background: #333;
-        border: 1px solid #444;
-        padding: 20px;
-        border-radius: 8px;
-        max-width: 800px;
-        margin: 0 auto;
-        text-align: center;
-    }
-    .agent-form h2 {
-        color: #fff;
-        margin-bottom: 30px;
-        border-bottom: 2px solid #444;
-    }
-    </style>
     <form
         {{if .IsEdit}}hx-put="/tools/{{.Tool.ID}}"{{else}}hx-post="/tools"{{end}}
         hx-target="#response-message"
@@ -68,4 +51,22 @@
          <button type="submit" class="btn-primary">Save Tool</button>
     </form>
 </div>
+<div id="response-message"></div>
+
+<style>
+  .agent-form {
+      background: #333;
+      border: 1px solid #444;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 800px;
+      margin: 0 auto;
+      text-align: center;
+  }
+  .agent-form h2 {
+      color: #fff;
+      margin-bottom: 30px;
+      border-bottom: 2px solid #444;
+  }
+</style>
 {{end}}
