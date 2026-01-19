@@ -10,11 +10,12 @@ import (
 )
 
 type TUI struct {
-	chatService  services.ChatService
-	agentService services.AgentService
-	modelService services.ModelService
-	toolService  services.ToolService
-	activeChat   *entities.Chat
+	chatService     services.ChatService
+	agentService    services.AgentService
+	modelService    services.ModelService
+	providerService services.ProviderService
+	toolService     services.ToolService
+	activeChat      *entities.Chat
 
 	chatView    ChatView
 	chatForm    ChatForm
@@ -30,7 +31,7 @@ type TUI struct {
 	err   error
 }
 
-func NewTUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService) TUI {
+func NewTUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, providerService services.ProviderService, toolService services.ToolService) TUI {
 	ctx := context.Background()
 
 	activeChat, err := chatService.GetActiveChat(ctx)
@@ -44,14 +45,15 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 	}
 
 	return TUI{
-		chatService:  chatService,
-		agentService: agentService,
-		modelService: modelService,
-		toolService:  toolService,
-		activeChat:   activeChat,
+		chatService:     chatService,
+		agentService:    agentService,
+		modelService:    modelService,
+		providerService: providerService,
+		toolService:     toolService,
+		activeChat:      activeChat,
 
 		chatView:    NewChatView(chatService, agentService, modelService, activeChat),
-		chatForm:    NewChatForm(chatService, agentService, modelService),
+		chatForm:    NewChatForm(chatService, agentService, modelService, providerService),
 		historyView: NewHistoryView(chatService),
 		usageView:   NewUsageView(chatService, agentService, modelService),
 		helpView:    NewHelpView(),

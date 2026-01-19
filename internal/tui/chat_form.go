@@ -19,33 +19,71 @@ var (
 	ErrNoAgentSelected = errors.New("no agent selected")
 )
 
-type ChatForm struct {
-	chatService  services.ChatService
-	agentService services.AgentService
-	modelService services.ModelService
-	nameField    textinput.Model
-	agentsList   list.Model
-	modelsList   list.Model
-	agents       []*entities.Agent
-	models       []*entities.Model
-	chatName     string
-	focused      string // "name" or "list"
-	err          error
-	width        int
-	height       int
+// ModelWithPricing wraps a model with its pricing info for display
+type ModelWithPricing struct {
+	*entities.Model
+	Pricing *entities.ModelPricing
 }
 
-func NewChatForm(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService) ChatForm {
+func (m ModelWithPricing) FilterValue() string {
+	return m.Model.FilterValue()
+}
+
+func (m ModelWithPricing) Title() string {
+	return m.Model.Title()
+}
+
+func (m ModelWithPricing) Description() string {
+	baseDesc := m.Model.Description()
+	if m.Pricing != nil {
+		priceDesc := fmt.Sprintf("$%.2f/$%.2f per 1M tokens", m.Pricing.InputPricePerMille, m.Pricing.OutputPricePerMille)
+		return fmt.Sprintf("%s | %s", baseDesc, priceDesc)
+	}
+	return baseDesc
+}
+
+type ChatForm struct {
+	chatService     services.ChatService
+	agentService    services.AgentService
+	modelService    services.ModelService
+	providerService services.ProviderService
+	nameField       textinput.Model
+	agentsList      list.Model
+	modelsList      list.Model
+	agents          []*entities.Agent
+	models          []ModelWithPricing
+	chatName        string
+	focused         string // "name", "agents", or "models"
+	err             error
+	width           int
+	height          int
+}
+
+func NewChatForm(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, providerService services.ProviderService) ChatForm {
 	ctx := context.Background()
 	agents, err := agentService.ListAgents(ctx)
 	if err != nil {
 		fmt.Printf("Error listing agents: %v\n", err)
 		agents = []*entities.Agent{}
 	}
-	models, err := modelService.ListModels(ctx)
+	rawModels, err := modelService.ListModels(ctx)
 	if err != nil {
 		fmt.Printf("Error listing models: %v\n", err)
-		models = []*entities.Model{}
+		rawModels = []*entities.Model{}
+	}
+
+	// Create models with pricing info
+	models := make([]ModelWithPricing, len(rawModels))
+	for i, model := range rawModels {
+		// Look up pricing for this model
+		var pricing *entities.ModelPricing
+		if provider, err := providerService.GetProvider(ctx, model.ProviderID); err == nil {
+			pricing = provider.GetModelPricing(model.ModelName)
+		}
+		models[i] = ModelWithPricing{
+			Model:   model,
+			Pricing: pricing,
+		}
 	}
 
 	// Initialize name field with wider width and explicit placeholder styling
@@ -83,15 +121,16 @@ func NewChatForm(chatService services.ChatService, agentService services.AgentSe
 	modelsList.SetShowPagination(false)
 
 	return ChatForm{
-		chatService:  chatService,
-		agentService: agentService,
-		modelService: modelService,
-		nameField:    nameField,
-		agentsList:   agentsList,
-		modelsList:   modelsList,
-		agents:       agents,
-		models:       models,
-		focused:      "name",
+		chatService:     chatService,
+		agentService:    agentService,
+		modelService:    modelService,
+		providerService: providerService,
+		nameField:       nameField,
+		agentsList:      agentsList,
+		modelsList:      modelsList,
+		agents:          agents,
+		models:          models,
+		focused:         "name",
 	}
 }
 
@@ -103,9 +142,12 @@ func (c *ChatForm) SetChatName(name string) {
 	c.err = nil
 	// Ensure name field has focus
 	c.nameField.Focus()
-	// Reset agent selection to first item or none
+	// Reset selections to first items
 	if len(c.agents) > 0 {
 		c.agentsList.Select(0)
+	}
+	if len(c.models) > 0 {
+		c.modelsList.Select(0) // Default to first model (Grok 4.1 Fast)
 	}
 }
 
@@ -122,7 +164,29 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 		c.width = m.Width
 		c.height = m.Height
 		c.nameField.Width = c.width - 6
-		c.agentsList.SetSize(c.width-6, c.height-10)
+
+		// Calculate available height for lists (accounting for fixed elements)
+		// Fixed elements take about 10-12 lines, reserve space for two lists
+		availableHeight := c.height - 16
+		if availableHeight < 8 {
+			availableHeight = 8 // Minimum height
+		}
+		// Give each list half the remaining height, but cap at reasonable sizes
+		listHeight := availableHeight / 2
+		if listHeight > 15 {
+			listHeight = 15 // Cap maximum height
+		}
+		if listHeight < 4 {
+			listHeight = 4 // Minimum height
+		}
+
+		listWidth := (c.width - 10) / 2 // Split width, accounting for borders and spacing
+		if listWidth < 25 {
+			listWidth = 25 // Minimum width for readable content
+		}
+
+		c.agentsList.SetSize(listWidth, listHeight)
+		c.modelsList.SetSize(listWidth, listHeight)
 		return c, nil
 
 	case tea.KeyMsg:
@@ -130,14 +194,20 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 		case "esc":
 			return c, func() tea.Msg { return canceledCreateChatMsg{} }
 		case "tab", "shift+tab":
-			if c.focused == "name" {
-				c.focused = "list"
+			switch c.focused {
+			case "name":
+				c.focused = "agents"
 				c.nameField.Blur()
 				c.agentsList.SetShowStatusBar(true)
-			} else {
-				c.focused = "name"
-				c.nameField.Focus()
+				c.modelsList.SetShowStatusBar(false)
+			case "agents":
+				c.focused = "models"
 				c.agentsList.SetShowStatusBar(false)
+				c.modelsList.SetShowStatusBar(true)
+			case "models":
+				c.focused = "name"
+				c.modelsList.SetShowStatusBar(false)
+				c.nameField.Focus()
 			}
 			return c, nil
 		case "enter":
@@ -149,20 +219,32 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 				c.err = ErrNoAgentSelected
 				return c, nil
 			}
+			if c.modelsList.SelectedItem() == nil {
+				c.err = errors.New("no model selected")
+				return c, nil
+			}
 			selectedAgent := c.agentsList.SelectedItem().(*entities.Agent)
-			return c, createChatCmd(c.chatService, c.modelService, c.nameField.Value(), selectedAgent.ID)
+			selectedModelWithPricing := c.modelsList.SelectedItem().(ModelWithPricing)
+			return c, createChatCmd(c.chatService, c.nameField.Value(), selectedAgent.ID, selectedModelWithPricing.ID)
 		}
 	}
 
-	if c.focused == "name" {
+	switch c.focused {
+	case "name":
 		var cmd tea.Cmd
 		c.nameField, cmd = c.nameField.Update(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
-	} else {
+	case "agents":
 		var cmd tea.Cmd
 		c.agentsList, cmd = c.agentsList.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	case "models":
+		var cmd tea.Cmd
+		c.modelsList, cmd = c.modelsList.Update(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -190,8 +272,7 @@ func (c ChatForm) View() string {
 	outerStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.ThickBorder()).
 		BorderForeground(lipgloss.Color("4")). // Blue for outer border
-		Width(c.width - 2).
-		Height(c.height - 2)
+		Width(c.width - 2)
 
 	var sb strings.Builder
 
@@ -207,16 +288,35 @@ func (c ChatForm) View() string {
 		sb.WriteString(nameFieldStyle.Render(lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(c.nameField.Value())))
 	}
 
-	// Render the agents list with border
-	listStyle := unfocusedBorder.Width(c.width - 4).Height(c.agentsList.Height())
-	if c.focused == "list" {
-		listStyle = focusedBorder.Width(c.width - 4).Height(c.agentsList.Height())
+	// Render the agents and models lists side by side
+	listWidth := (c.width - 10) / 2
+	if listWidth < 25 {
+		listWidth = 25
 	}
-	sb.WriteString(listStyle.Render(c.agentsList.View()))
+
+	// Agents list
+	agentsStyle := unfocusedBorder.Width(listWidth).Height(c.agentsList.Height())
+	if c.focused == "agents" {
+		agentsStyle = focusedBorder.Width(listWidth).Height(c.agentsList.Height())
+	}
+
+	// Models list
+	modelsStyle := unfocusedBorder.Width(listWidth).Height(c.modelsList.Height())
+	if c.focused == "models" {
+		modelsStyle = focusedBorder.Width(listWidth).Height(c.modelsList.Height())
+	}
+
+	// Create two-column layout
+	agentsContent := "Agents:\n" + agentsStyle.Render(c.agentsList.View())
+	modelsContent := "Models:\n" + modelsStyle.Render(c.modelsList.View())
+
+	// Use lipgloss.JoinHorizontal to properly align the columns
+	layout := lipgloss.JoinHorizontal(lipgloss.Top, agentsContent, modelsContent)
+	sb.WriteString(layout)
 	sb.WriteString("\n")
 
 	// Render instructions
-	instructions := "Press Enter to create chat, Tab to switch focus, Esc to cancel"
+	instructions := "Press Enter to create chat, Tab to switch between name/agents/models, Esc to cancel"
 	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions + "\n"))
 
 	// Render error if any
@@ -228,15 +328,9 @@ func (c ChatForm) View() string {
 	return outerStyle.Render(sb.String())
 }
 
-func createChatCmd(cs services.ChatService, ms services.ModelService, name, agentID string) tea.Cmd {
+func createChatCmd(cs services.ChatService, name, agentID, modelID string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		// For now, use the first available model as default
-		models, err := ms.ListModels(ctx)
-		if err != nil || len(models) == 0 {
-			return errMsg(fmt.Errorf("no models available"))
-		}
-		modelID := models[0].ID
 		newChat, err := cs.CreateChat(ctx, agentID, modelID, name)
 		if err != nil {
 			return errMsg(err)

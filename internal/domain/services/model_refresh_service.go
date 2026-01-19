@@ -93,7 +93,7 @@ func (s *modelRefreshService) refreshProvider(ctx context.Context, provider *ent
 
 	for _, modelData := range (*fetched)[string(provider.Type)].Models {
 		pricing := entities.ModelPricing{
-			Name:                modelData.Name,
+			Name:                modelData.ID,
 			InputPricePerMille:  modelData.Cost.Input,
 			OutputPricePerMille: modelData.Cost.Output,
 			ContextWindow:       modelData.Limit.Context,

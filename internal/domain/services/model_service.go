@@ -2,12 +2,12 @@ package services
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
-	"github.com/drujensen/aiagent/internal/domain/errs"
+	errs "github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
-
 	"go.uber.org/zap"
 )
 
@@ -37,78 +37,66 @@ func (s *modelService) ListModels(ctx context.Context) ([]*entities.Model, error
 	if err != nil {
 		return nil, err
 	}
+
+	// Sort models by provider type, then by name
+	sort.Slice(models, func(i, j int) bool {
+		if models[i].ProviderType != models[j].ProviderType {
+			return models[i].ProviderType < models[j].ProviderType
+		}
+		return models[i].Name < models[j].Name
+	})
+
 	return models, nil
 }
 
 func (s *modelService) GetModel(ctx context.Context, id string) (*entities.Model, error) {
 	if id == "" {
-		return nil, errors.ValidationErrorf("model ID is required")
+		return nil, errs.ValidationErrorf("model ID is required")
 	}
 
 	model, err := s.modelRepo.GetModel(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-
 	return model, nil
 }
 
 func (s *modelService) CreateModel(ctx context.Context, model *entities.Model) error {
 	if model.ID == "" {
-		return errors.ValidationErrorf("model id is required")
+		return errs.ValidationErrorf("model id is required")
 	}
 	if model.Name == "" {
-		return errors.ValidationErrorf("model name is required")
+		return errs.ValidationErrorf("model name is required")
 	}
 	if model.ModelName == "" {
-		return errors.ValidationErrorf("model name is required")
+		return errs.ValidationErrorf("model name is required")
 	}
 
 	model.CreatedAt = time.Now()
-	model.UpdatedAt = model.CreatedAt
+	model.UpdatedAt = time.Now()
 
-	if err := s.modelRepo.CreateModel(ctx, model); err != nil {
-		return err
-	}
-
-	return nil
+	return s.modelRepo.CreateModel(ctx, model)
 }
 
 func (s *modelService) UpdateModel(ctx context.Context, model *entities.Model) error {
 	if model.ID == "" {
-		return errors.ValidationErrorf("model ID is required")
+		return errs.ValidationErrorf("model ID is required")
 	}
-
-	existing, err := s.modelRepo.GetModel(ctx, model.ID)
-	if err != nil {
-		return err
-	}
-
 	if model.Name == "" {
-		return errors.ValidationErrorf("model name is required")
+		return errs.ValidationErrorf("model name is required")
 	}
 
-	model.CreatedAt = existing.CreatedAt
 	model.UpdatedAt = time.Now()
 
-	if err := s.modelRepo.UpdateModel(ctx, model); err != nil {
-		return err
-	}
-
-	return nil
+	return s.modelRepo.UpdateModel(ctx, model)
 }
 
 func (s *modelService) DeleteModel(ctx context.Context, id string) error {
 	if id == "" {
-		return errors.ValidationErrorf("model ID is required")
+		return errs.ValidationErrorf("model ID is required")
 	}
 
-	err := s.modelRepo.DeleteModel(ctx, id)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.modelRepo.DeleteModel(ctx, id)
 }
 
 func (s *modelService) GetModelsByProvider(ctx context.Context, providerID string) ([]*entities.Model, error) {
