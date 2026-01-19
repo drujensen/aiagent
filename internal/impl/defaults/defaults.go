@@ -377,7 +377,7 @@ func DefaultModels() []*entities.Model {
 		},
 		{
 			ID:              "3CA94BFA-5CD5-44FD-9EBC-3F780105B821",
-			Name:            "GPT-5.1 Codex Mini Cheap Coding",
+			Name:            "GPT-5.1 Codex Mini",
 			ProviderID:      "1E4697B3-233F-4004-B513-692E5F6EABE6",
 			ProviderType:    entities.ProviderOpenAI,
 			ModelName:       "gpt-5.1-codex-mini",
@@ -407,7 +407,7 @@ func DefaultModels() []*entities.Model {
 		},
 		{
 			ID:              "17403C9E-A943-4CF1-AC39-7DCF5B513135",
-			Name:            "Claude Haiku 4.5 Cheap Coding",
+			Name:            "Claude Haiku 4.5",
 			ProviderID:      "B978105A-802B-480B-BF79-D50EB8FB21B0",
 			ProviderType:    entities.ProviderAnthropic,
 			ModelName:       "claude-haiku-4.5",
@@ -437,7 +437,7 @@ func DefaultModels() []*entities.Model {
 		},
 		{
 			ID:              "2EEEFC70-E455-4B64-8951-038564AB9B46",
-			Name:            "Gemini 2.5 Flash Lite Cheap Coding",
+			Name:            "Gemini 2.5 Flash Lite",
 			ProviderID:      "E384327C-337D-4EA5-88D5-B1FC4147CD6D",
 			ProviderType:    entities.ProviderGoogle,
 			ModelName:       "gemini-2.5-flash-lite",
@@ -452,20 +452,6 @@ func DefaultModels() []*entities.Model {
 
 		// X.AI Models
 		{
-			ID:              "659D1EAD-AA0A-45CD-BE28-5472F419B0DB",
-			Name:            "Grok Code Fast",
-			ProviderID:      "FD3C37A7-C9C0-4AA9-A4B7-C43D52806A98",
-			ProviderType:    entities.ProviderXAI,
-			ModelName:       "grok-code-fast-1",
-			APIKey:          "#{XAI_API_KEY}#",
-			Temperature:     &[]float64{0.3}[0],
-			MaxTokens:       &[]int{1000000}[0],
-			ContextWindow:   &[]int{2000000}[0],
-			ReasoningEffort: "",
-			CreatedAt:       time.Now(),
-			UpdatedAt:       time.Now(),
-		},
-		{
 			ID:              "4C1054B1-A3EA-45DC-9BE1-09073D74CC09",
 			Name:            "Grok 4 Best Performance",
 			ProviderID:      "FD3C37A7-C9C0-4AA9-A4B7-C43D52806A98",
@@ -473,6 +459,20 @@ func DefaultModels() []*entities.Model {
 			ModelName:       "grok-4",
 			APIKey:          "#{XAI_API_KEY}#",
 			Temperature:     &[]float64{0.7}[0],
+			MaxTokens:       &[]int{1000000}[0],
+			ContextWindow:   &[]int{2000000}[0],
+			ReasoningEffort: "",
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		},
+		{
+			ID:              "659D1EAD-AA0A-45CD-BE28-5472F419B0DB",
+			Name:            "Grok Code Fast",
+			ProviderID:      "FD3C37A7-C9C0-4AA9-A4B7-C43D52806A98",
+			ProviderType:    entities.ProviderXAI,
+			ModelName:       "grok-code-fast-1",
+			APIKey:          "#{XAI_API_KEY}#",
+			Temperature:     &[]float64{0.3}[0],
 			MaxTokens:       &[]int{1000000}[0],
 			ContextWindow:   &[]int{2000000}[0],
 			ReasoningEffort: "",
