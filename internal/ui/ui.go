@@ -181,7 +181,7 @@ func (u *UI) Run() error {
 
 	homeController := uiapicontrollers.NewHomeController(u.logger, tmpl, u.chatService, u.agentService, u.modelService, u.toolService)
 	agentController := uiapicontrollers.NewAgentController(u.logger, tmpl, u.agentService, u.toolService, u.providerService)
-	modelController := uiapicontrollers.NewModelController(u.logger, tmpl, u.modelService)
+	modelController := uiapicontrollers.NewModelController(u.logger, tmpl, u.modelService, u.providerService)
 	chatController := uiapicontrollers.NewChatController(u.logger, tmpl, u.chatService, u.agentService, u.modelService)
 	toolFactory, err := tools.NewToolFactory()
 	if err != nil {

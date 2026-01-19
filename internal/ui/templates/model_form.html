@@ -14,27 +14,23 @@
         </div>
 
         <div class="form-row">
-            <div class="form-group">
-                <label for="provider_type">Provider Type:</label>
-                <select id="provider_type" name="provider_type" class="form-control" required>
-                    <option value="">Select Provider</option>
-                    <option value="openai" {{if eq .Model.ProviderType "openai"}}selected{{end}}>OpenAI</option>
-                    <option value="anthropic" {{if eq .Model.ProviderType "anthropic"}}selected{{end}}>Anthropic</option>
-                    <option value="google" {{if eq .Model.ProviderType "google"}}selected{{end}}>Google</option>
-                    <option value="xai" {{if eq .Model.ProviderType "xai"}}selected{{end}}>X.AI</option>
-                    <option value="deepseek" {{if eq .Model.ProviderType "deepseek"}}selected{{end}}>DeepSeek</option>
-                    <option value="together" {{if eq .Model.ProviderType "together"}}selected{{end}}>Together</option>
-                    <option value="groq" {{if eq .Model.ProviderType "groq"}}selected{{end}}>Groq</option>
-                    <option value="mistral" {{if eq .Model.ProviderType "mistral"}}selected{{end}}>Mistral</option>
-                    <option value="ollama" {{if eq .Model.ProviderType "ollama"}}selected{{end}}>Ollama</option>
-                </select>
-            </div>
+             <div class="form-group">
+                 <label for="provider_type">Provider:</label>
+                 <select id="provider_type" name="provider_type" class="form-control" required>
+                     <option value="">Select Provider</option>
+                     {{range .Providers}}
+                     <option value="{{.Type}}" {{if eq $.Model.ProviderType .Type}}selected{{end}}>{{.Name}}</option>
+                     {{end}}
+                 </select>
+             </div>
 
-            <div class="form-group">
-                <label for="model_name">Model Name:</label>
-                <input type="text" id="model_name" name="model_name" class="form-control" value="{{.Model.ModelName}}" required placeholder="e.g., gpt-4, claude-3-5-sonnet">
-                <small class="form-text">The actual model identifier from the provider</small>
-            </div>
+             <div class="form-group">
+                 <label for="model_name">Model Name:</label>
+                 <select id="model_name" name="model_name" class="form-control" required>
+                     <option value="">Select Provider First</option>
+                 </select>
+                 <small class="form-text">The actual model identifier from the provider</small>
+             </div>
         </div>
 
         <div class="form-group">
@@ -179,6 +175,30 @@
 </style>
 
 <script>
+function populateModels(providerType, selectedModel) {
+    if (providerType) {
+        fetch('/api/providers/' + providerType)
+            .then(response => response.json())
+            .then(provider => {
+                const modelSelect = document.getElementById('model_name');
+                modelSelect.innerHTML = '<option value="">Select Model</option>';
+                provider.models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.name;
+                    option.textContent = model.name;
+                    if (model.name === selectedModel) option.selected = true;
+                    modelSelect.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching models:', error);
+                document.getElementById('model_name').innerHTML = '<option value="">Error loading models</option>';
+            });
+    } else {
+        document.getElementById('model_name').innerHTML = '<option value="">Select Provider First</option>';
+    }
+}
+
 // Auto-populate API key placeholder based on provider selection
 document.getElementById('provider_type').addEventListener('change', function() {
     const provider = this.value;
@@ -202,11 +222,36 @@ document.getElementById('provider_type').addEventListener('change', function() {
             case 'deepseek':
                 placeholder = '#{DEEPSEEK_API_KEY}#';
                 break;
+            case 'together':
+                placeholder = '#{TOGETHER_API_KEY}#';
+                break;
+            case 'groq':
+                placeholder = '#{GROQ_API_KEY}#';
+                break;
+            case 'mistral':
+                placeholder = '#{MISTRAL_API_KEY}#';
+                break;
+            case 'ollama':
+                placeholder = '#{OLLAMA_API_KEY}#';
+                break;
         }
         apiKeyInput.placeholder = placeholder;
         if (!apiKeyInput.value) {
             apiKeyInput.value = placeholder;
         }
+    }
+
+    // Populate models when provider changes
+    populateModels(provider, '');
+});
+
+// Populate models on page load if editing
+document.addEventListener('DOMContentLoaded', function() {
+    const providerSelect = document.getElementById('provider_type');
+    const selectedProvider = providerSelect.value;
+    const selectedModel = '{{.Model.ModelName}}';
+    if (selectedProvider) {
+        populateModels(selectedProvider, selectedModel);
     }
 });
 </script>

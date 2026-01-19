@@ -15,16 +15,18 @@ import (
 )
 
 type ModelController struct {
-	logger       *zap.Logger
-	tmpl         *template.Template
-	modelService services.ModelService
+	logger          *zap.Logger
+	tmpl            *template.Template
+	modelService    services.ModelService
+	providerService services.ProviderService
 }
 
-func NewModelController(logger *zap.Logger, tmpl *template.Template, modelService services.ModelService) *ModelController {
+func NewModelController(logger *zap.Logger, tmpl *template.Template, modelService services.ModelService, providerService services.ProviderService) *ModelController {
 	return &ModelController{
-		logger:       logger,
-		tmpl:         tmpl,
-		modelService: modelService,
+		logger:          logger,
+		tmpl:            tmpl,
+		modelService:    modelService,
+		providerService: providerService,
 	}
 }
 
@@ -77,6 +79,12 @@ func (c *ModelController) ModelFormHandler(eCtx echo.Context) error {
 		}
 	}
 
+	providers, err := c.providerService.ListProviders(eCtx.Request().Context())
+	if err != nil {
+		c.logger.Error("Failed to list providers", zap.Error(err))
+		return eCtx.String(http.StatusInternalServerError, "Failed to load providers")
+	}
+
 	modelData := struct {
 		ID              string
 		Name            string
@@ -112,6 +120,7 @@ func (c *ModelController) ModelFormHandler(eCtx echo.Context) error {
 		"ContentTemplate": "model_form_content",
 		"Model":           modelData,
 		"IsEdit":          isEdit,
+		"Providers":       providers,
 	}
 
 	eCtx.Response().Header().Set("Content-Type", "text/html")
@@ -120,16 +129,16 @@ func (c *ModelController) ModelFormHandler(eCtx echo.Context) error {
 
 func (c *ModelController) CreateModelHandler(eCtx echo.Context) error {
 	name := eCtx.FormValue("name")
-	providerID := eCtx.FormValue("provider_id")
 	providerTypeStr := eCtx.FormValue("provider_type")
 	modelName := eCtx.FormValue("model_name")
 	apiKey := eCtx.FormValue("api_key")
 
-	if name == "" || providerID == "" || modelName == "" {
+	if name == "" || providerTypeStr == "" || modelName == "" {
 		return eCtx.String(http.StatusBadRequest, "Name, provider, and model name are required")
 	}
 
 	providerType := entities.ProviderType(providerTypeStr)
+	providerID := providerTypeStr
 
 	// Parse optional fields
 	var temperature *float64
@@ -179,16 +188,16 @@ func (c *ModelController) UpdateModelHandler(eCtx echo.Context) error {
 	}
 
 	name := eCtx.FormValue("name")
-	providerID := eCtx.FormValue("provider_id")
 	providerTypeStr := eCtx.FormValue("provider_type")
 	modelName := eCtx.FormValue("model_name")
 	apiKey := eCtx.FormValue("api_key")
 
-	if name == "" || providerID == "" || modelName == "" {
+	if name == "" || providerTypeStr == "" || modelName == "" {
 		return eCtx.String(http.StatusBadRequest, "Name, provider, and model name are required")
 	}
 
 	providerType := entities.ProviderType(providerTypeStr)
+	providerID := providerTypeStr
 
 	// Parse optional fields
 	var temperature *float64

@@ -18,7 +18,6 @@ require (
 	github.com/kujtimiihoxha/vimtea v0.0.2
 	github.com/labstack/echo/v4 v4.13.3
 	github.com/pkoukk/tiktoken-go v0.1.7
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/stretchr/testify v1.11.1
 	github.com/yuin/goldmark v1.7.8
 	go.mongodb.org/mongo-driver v1.17.2
@@ -53,6 +52,7 @@ require (
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect

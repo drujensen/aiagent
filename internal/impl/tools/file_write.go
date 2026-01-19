@@ -46,6 +46,16 @@ func (t *FileWriteTool) UpdateConfiguration(config map[string]string) {
 	t.configuration = config
 }
 
+func (t *FileWriteTool) Parameters() []entities.Parameter {
+	return []entities.Parameter{
+		{Name: "operation", Type: "string", Enum: []string{"write", "edit"}, Description: "Operation to perform", Required: true},
+		{Name: "path", Type: "string", Description: "File path", Required: true},
+		{Name: "content", Type: "string", Description: "File content for write operation", Required: false},
+		{Name: "old_string", Type: "string", Description: "String to replace for edit operation", Required: false},
+		{Name: "replace_all", Type: "boolean", Description: "Replace all occurrences", Required: false},
+	}
+}
+
 func (t *FileWriteTool) FullDescription() string {
 	return fmt.Sprintf("%s\n\nParameters:\n- operation: 'write' or 'edit'\n- path: file path (absolute or relative to workspace)\n- content: file content (for write)\n- old_string, new_string: exact strings to replace (for edit)\n- replace_all: boolean (optional)", t.Description())
 }
