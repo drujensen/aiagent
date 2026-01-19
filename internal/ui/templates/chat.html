@@ -1,46 +1,46 @@
 {{define "chat_content"}}
 <main class="content">
-    <section class="chat-header">
+    <section class="chat-header" style="background: #333; padding: 10px 0; border-bottom: 1px solid #444;">
         <div class="chat-info">
             <div class="agent-info">
-                <i class="fas fa-robot"></i>
-                <span>Agent: {{.AgentName}}</span>
-                <button class="btn btn-sm btn-outline" onclick="showAgentSwitcher()">
-                    <i class="fas fa-exchange-alt"></i> Switch
+                <i class="fas fa-robot" style="color: #fff;"></i>
+                <span style="color: #fff;">Agent: {{.AgentName}}</span>
+                <button class="btn btn-sm btn-primary" onclick="showAgentSwitcher()">
+                    <i class="fas fa-exchange-alt" style="color: #fff;"></i> Switch
                 </button>
             </div>
             <div class="model-info">
-                <i class="fas fa-brain"></i>
-                <span>Model: {{.ModelName}}</span>
-                <button class="btn btn-sm btn-outline" onclick="showModelSwitcher()">
-                    <i class="fas fa-exchange-alt"></i> Switch
+                <i class="fas fa-brain" style="color: #fff;"></i>
+                <span style="color: #fff;">Model: {{.ModelName}}</span>
+                <button class="btn btn-sm btn-primary" onclick="showModelSwitcher()">
+                    <i class="fas fa-exchange-alt" style="color: #fff;"></i> Switch
                 </button>
             </div>
         </div>
-        <div id="agent-switcher" class="agent-switcher" style="display: none;">
-            <select id="agent-select" class="form-control form-control-sm">
-                <option value="">Select Agent</option>
-                {{range .AvailableAgents}}
-                <option value="{{.ID}}" {{if eq .ID $.CurrentAgentID}}selected{{end}}>{{.Name}}</option>
-                {{else}}
-                <option value="" disabled>No agents available</option>
-                {{end}}
-            </select>
-            <button class="btn btn-sm btn-primary" onclick="switchAgent()">Switch</button>
-            <button class="btn btn-sm btn-secondary" onclick="hideAgentSwitcher()">Cancel</button>
-        </div>
-        <div id="model-switcher" class="model-switcher" style="display: none;">
-            <select id="model-select" class="form-control form-control-sm">
-                <option value="">Select Model</option>
-                {{range .AvailableModels}}
-                <option value="{{.ID}}" {{if eq .ID $.CurrentModelID}}selected{{end}}>{{.Name}}</option>
-                {{else}}
-                <option value="" disabled>No models available</option>
-                {{end}}
-            </select>
-            <button class="btn btn-sm btn-primary" onclick="switchModel()">Switch</button>
-            <button class="btn btn-sm btn-secondary" onclick="hideModelSwitcher()">Cancel</button>
-        </div>
+         <div id="agent-switcher" class="agent-switcher" style="display: none; background: #333; color: #fff; padding: 10px; border-radius: 4px;">
+             <select id="agent-select" class="form-control form-control-sm">
+                 <option value="">Select Agent</option>
+                 {{range .AvailableAgents}}
+                 <option value="{{.ID}}" {{if eq .ID $.CurrentAgentID}}selected{{end}}>{{.Name}}</option>
+                 {{else}}
+                 <option value="" disabled>No agents available</option>
+                 {{end}}
+             </select>
+             <button class="btn btn-sm btn-primary" onclick="switchAgent()">Switch</button>
+             <button class="btn btn-sm btn-secondary" onclick="hideAgentSwitcher()">Cancel</button>
+         </div>
+         <div id="model-switcher" class="model-switcher" style="display: none; background: #333; color: #fff; padding: 10px; border-radius: 4px;">
+             <select id="model-select" class="form-control form-control-sm">
+                 <option value="">Select Model</option>
+                 {{range .AvailableModels}}
+                 <option value="{{.ID}}" {{if eq .ID $.CurrentModelID}}selected{{end}}>{{.Name}}</option>
+                 {{else}}
+                 <option value="" disabled>No models available</option>
+                 {{end}}
+             </select>
+             <button class="btn btn-sm btn-primary" onclick="switchModel()">Switch</button>
+             <button class="btn btn-sm btn-secondary" onclick="hideModelSwitcher()">Cancel</button>
+         </div>
     </section>
     <section class="message-history" id="message-history">
         <div id="messages-container" class="messages-container" data-chat-id="{{.ChatID}}">

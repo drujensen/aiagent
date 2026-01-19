@@ -58,6 +58,7 @@
     right: 60px;
     top: 50%;
     transform: translateY(-50%);
+    border-top: 1px solid #444;
 }
 
 .hamburger {
