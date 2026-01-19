@@ -665,18 +665,14 @@ a:active, button:active, .message-content:active {
 }
 
 .btn-primary {
-    display: inline-flex;
-    align-items: center;
-    padding: 10px 20px;
     background-color: #464EB8;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    margin-top: 20px;
-    justify-content: center;
-    width: 100%;
+    color: white;
+    padding: 12px 24px;
+    font-size: 16px;
+}
+
+.btn-primary:hover {
+    background-color: #5a67d8;
 }
 
 .btn-primary i {

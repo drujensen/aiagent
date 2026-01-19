@@ -2,6 +2,75 @@
 <div id="response-message"></div>
 <div class="agent-form">
     <h2>{{if .IsEdit}}Edit Agent{{else}}Create Agent{{end}}</h2>
+    <style>
+    .agent-form {
+        background: #333;
+        padding: 20px;
+        border-radius: 8px;
+        max-width: 800px;
+        margin: 0 auto;
+        text-align: center;
+    }
+    .agent-form h2 {
+        color: #fff;
+        margin-bottom: 30px;
+    }
+    .form-group {
+        margin-bottom: 20px;
+        text-align: left;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #fff;
+    }
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #555;
+        border-radius: 4px;
+        font-size: 14px;
+        box-sizing: border-box;
+        background: #1a1a1a;
+        color: #fff;
+    }
+    .form-control[rows] {
+        resize: vertical;
+        min-height: 100px;
+    }
+    .form-text {
+        display: block;
+        margin-top: 5px;
+        font-size: 12px;
+        color: #ccc;
+    }
+    .tools-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+    }
+    .tool-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border: 1px solid #555;
+        border-radius: 4px;
+        background: #1a1a1a;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        color: #fff;
+    }
+    .tool-checkbox:hover {
+        background: #2a2a2a;
+    }
+    .tool-checkbox input[type="checkbox"] {
+        margin: 0;
+        cursor: pointer;
+    }
+    </style>
     <form
         {{if .IsEdit}}hx-put="/agents/{{.Agent.ID}}"{{else}}hx-post="/agents"{{end}}
         hx-target="#response-message"
@@ -33,133 +102,7 @@
             <small class="form-text">Select tools this agent can use</small>
         </div>
 
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary">
-                <i class="fas fa-save"></i> {{if .IsEdit}}Update{{else}}Create{{end}} Agent
-            </button>
-            <button type="button" class="btn btn-secondary" onclick="window.history.back()">
-                <i class="fas fa-times"></i> Cancel
-            </button>
-        </div>
+         <button type="submit" class="btn-primary">{{if .IsEdit}}Update{{else}}Create{{end}} Agent</button>
     </form>
 </div>
-<style>
-.agent-form {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-.agent-form h2 {
-    color: #333;
-    margin-bottom: 30px;
-    border-bottom: 2px solid #007bff;
-    padding-bottom: 10px;
-}
-
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: bold;
-    color: #333;
-}
-
-.form-control {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-    box-sizing: border-box;
-    font-family: monospace;
-}
-
-.form-control:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
-}
-
-.form-control[rows] {
-    resize: vertical;
-    min-height: 200px;
-}
-
-.form-text {
-    display: block;
-    margin-top: 5px;
-    font-size: 12px;
-    color: #666;
-}
-
-.tools-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 10px;
-    margin-top: 10px;
-}
-
-.tool-checkbox {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background: #f8f9fa;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.tool-checkbox:hover {
-    background: #e9ecef;
-}
-
-.tool-checkbox input[type="checkbox"] {
-    margin: 0;
-    cursor: pointer;
-}
-
-.form-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 1px solid #eee;
-}
-
-.btn {
-    display: inline-block;
-    padding: 10px 20px;
-    text-decoration: none;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background-color 0.2s;
-    text-align: center;
-}
-
-.btn-primary {
-    background-color: #007bff;
-    color: white;
-}
-
-.btn-primary:hover {
-    background-color: #0056b3;
-}
-
-.btn-secondary {
-    background-color: #6c757d;
-    color: white;
-}
-
-.btn-secondary:hover {
-    background-color: #545b62;
-}
-</style>
 {{end}}
