@@ -1,4 +1,5 @@
 {{define "agent_form_content"}}
+<div id="response-message"></div>
 <div class="agent-form">
     <h2>{{if .IsEdit}}Edit Agent{{else}}Create Agent{{end}}</h2>
     <form
@@ -41,10 +42,6 @@
             </button>
         </div>
     </form>
-    <div id="response-message"></div>
-</div>
-    </form>
-    <div id="response-message"></div>
 </div>
 <style>
 .agent-form {

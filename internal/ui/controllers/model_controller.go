@@ -31,29 +31,11 @@ func NewModelController(logger *zap.Logger, tmpl *template.Template, modelServic
 }
 
 func (c *ModelController) RegisterRoutes(e *echo.Echo) {
-	e.GET("/models", c.ListModelsHandler)
 	e.GET("/models/new", c.ModelFormHandler)
 	e.POST("/models", c.CreateModelHandler)
 	e.GET("/models/:id/edit", c.ModelFormHandler)
 	e.PUT("/models/:id", c.UpdateModelHandler)
 	e.DELETE("/models/:id", c.DeleteModelHandler)
-}
-
-func (c *ModelController) ListModelsHandler(eCtx echo.Context) error {
-	models, err := c.modelService.ListModels(eCtx.Request().Context())
-	if err != nil {
-		c.logger.Error("Failed to list models", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Internal server error")
-	}
-
-	data := map[string]any{
-		"Title":           "AI Models",
-		"ContentTemplate": "models_content",
-		"Models":          models,
-	}
-
-	eCtx.Response().Header().Set("Content-Type", "text/html")
-	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)
 }
 
 func (c *ModelController) ModelFormHandler(eCtx echo.Context) error {

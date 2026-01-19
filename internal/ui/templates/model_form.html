@@ -1,4 +1,5 @@
 {{define "model_form_content"}}
+<div id="response-message"></div>
 <div class="model-form">
     <h2>{{if .IsEdit}}Edit Model{{else}}Create Model{{end}}</h2>
     <form
@@ -74,7 +75,7 @@
             <button type="submit" class="btn btn-primary">
                 {{if .IsEdit}}Update Model{{else}}Create Model{{end}}
             </button>
-            <a href="/models" class="btn btn-secondary">Cancel</a>
+             <a href="/" class="btn btn-secondary">Cancel</a>
         </div>
     </form>
 </div>
