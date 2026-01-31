@@ -482,7 +482,7 @@ func DefaultModels() []*entities.Model {
 
 		// Drujensen Models
 		{
-			ID:              "NEW-DJ-MODEL-ID-12345",
+			ID:              "913C78D1-B2E4-4DA2-8ABE-3CCEF85D5387",
 			Name:            "Qwen3 Coder Latest",
 			ProviderID:      "659D1EAD-AA0A-45CD-BE28-5472F419B0DB",
 			ProviderType:    entities.ProviderDrujensen,
