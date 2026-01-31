@@ -17,8 +17,45 @@ import (
 	"github.com/kujtimiihoxha/vimtea"
 )
 
+// formatToolName formats tool names with relevant arguments for display
+func formatToolName(toolName, arguments string) (string, string) {
+	switch toolName {
+	case "FileRead", "FileWrite", "Directory":
+		var args struct {
+			Path string `json:"path"`
+		}
+		if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Path != "" {
+			return toolName, args.Path
+		}
+	case "FileSearch":
+		var args struct {
+			Pattern   string `json:"pattern"`
+			Directory string `json:"directory"`
+		}
+		if err := json.Unmarshal([]byte(arguments), &args); err == nil {
+			detail := args.Pattern
+			if args.Directory != "" && args.Directory != "." {
+				detail += " in " + args.Directory
+			}
+			return toolName, detail
+		}
+	case "Process":
+		var args struct {
+			Command string `json:"command"`
+		}
+		if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Command != "" {
+			// Truncate long commands
+			if len(args.Command) > 50 {
+				args.Command = args.Command[:47] + "..."
+			}
+			return toolName, args.Command
+		}
+	}
+	return toolName, ""
+}
+
 // formatToolResult formats tool execution results for display
-func formatToolResult(toolName, result string, diff string) string {
+func formatToolResult(toolName, result string, diff string, arguments string) string {
 	switch toolName {
 	case "FileWrite":
 		return formatFileWriteResult(result, diff)
@@ -26,6 +63,10 @@ func formatToolResult(toolName, result string, diff string) string {
 		return formatFileSearchResult(result)
 	case "Memory":
 		return formatMemoryResult(result)
+	case "Process":
+		return formatProcessResult(result)
+	case "WebSearch":
+		return formatWebSearchResult(result, arguments)
 	default:
 		// Try to extract summary from JSON responses
 		var jsonResponse struct {
@@ -38,6 +79,63 @@ func formatToolResult(toolName, result string, diff string) string {
 		// For non-JSON results or JSON without summary, return as-is
 		return result
 	}
+}
+
+// formatProcessResult formats Process tool results
+func formatProcessResult(result string) string {
+	// First, try to parse as summary format (if tool returns {"summary": "..."})
+	var summaryResponse struct {
+		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal([]byte(result), &summaryResponse); err == nil && summaryResponse.Summary != "" {
+		// Fix incomplete summaries
+		if summaryResponse.Summary == "Executed: " {
+			return "Executed successfully"
+		}
+		return summaryResponse.Summary
+	}
+
+	// Otherwise, parse as output format
+	var response struct {
+		Output   string `json:"output"`
+		ExitCode int    `json:"exit_code"`
+		Error    string `json:"error"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		// If parsing fails, return the original result
+		return result
+	}
+
+	if response.Error != "" {
+		return fmt.Sprintf("Failed: %s", response.Error)
+	}
+
+	if response.ExitCode != 0 {
+		return fmt.Sprintf("Failed with exit code %d", response.ExitCode)
+	}
+
+	return "Executed successfully"
+}
+
+// formatWebSearchResult formats WebSearch tool results
+func formatWebSearchResult(result string, arguments string) string {
+	var args struct {
+		Query string `json:"query"`
+	}
+
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Query != "" {
+		return fmt.Sprintf("Searched for: %s", args.Query)
+	}
+
+	// Fallback
+	var jsonResponse struct {
+		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal([]byte(result), &jsonResponse); err == nil && jsonResponse.Summary != "" {
+		return jsonResponse.Summary
+	}
+	return "Web search completed"
 }
 
 // getToolStatusIcon returns an appropriate icon based on tool execution status
@@ -549,9 +647,14 @@ func (c *ChatView) updateEditorContent() {
 			sb.WriteString(c.systemStyle.Render("Tool: ") + "\n")
 			// Display tool call events
 			for _, event := range message.ToolCallEvents {
-				formattedResult := formatToolResult(event.ToolName, event.Result, event.Diff)
+				formattedResult := formatToolResult(event.ToolName, event.Result, event.Diff, event.Arguments)
+				name, suffix := formatToolName(event.ToolName, event.Arguments)
 				statusIcon := getToolStatusIcon(event.Error != "")
-				sb.WriteString(c.systemStyle.Render("  ↳ ") + statusIcon + " " + event.ToolName + ":\n")
+				displayName := name + ":"
+				if suffix != "" {
+					displayName += " " + suffix
+				}
+				sb.WriteString(c.systemStyle.Render("  ↳ ") + statusIcon + " " + displayName + "\n")
 				sb.WriteString(c.systemStyle.Render("    ") + strings.ReplaceAll(formattedResult, "\n", "\n    ") + "\n")
 				if event.Error != "" {
 					errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true) // Red and bold
@@ -569,9 +672,14 @@ func (c *ChatView) updateEditorContent() {
 			sb.WriteString(c.systemStyle.Render("Tool: ") + "\n")
 			// Display tool call events
 			for _, event := range tempMsg.ToolCallEvents {
-				formattedResult := formatToolResult(event.ToolName, event.Result, event.Diff)
+				formattedResult := formatToolResult(event.ToolName, event.Result, event.Diff, event.Arguments)
+				name, suffix := formatToolName(event.ToolName, event.Arguments)
 				statusIcon := getToolStatusIcon(event.Error != "")
-				sb.WriteString(c.systemStyle.Render("  ↳ ") + statusIcon + " " + event.ToolName + ":\n")
+				displayName := name + ":"
+				if suffix != "" {
+					displayName += " " + suffix
+				}
+				sb.WriteString(c.systemStyle.Render("  ↳ ") + statusIcon + " " + displayName + "\n")
 				sb.WriteString(c.systemStyle.Render("    ") + strings.ReplaceAll(formattedResult, "\n", "\n    ") + "\n")
 				if event.Error != "" {
 					errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true) // Red and bold

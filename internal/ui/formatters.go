@@ -9,8 +9,55 @@ import (
 	"strings"
 )
 
+// formatToolName formats tool names with relevant arguments for display
+func formatToolName(toolName, arguments string) string {
+	name, suffix := formatToolNameParts(toolName, arguments)
+	displayName := name + ":"
+	if suffix != "" {
+		displayName += " " + suffix
+	}
+	return displayName
+}
+
+// formatToolNameParts returns name and suffix separately for templates
+func formatToolNameParts(toolName, arguments string) (string, string) {
+	switch toolName {
+	case "FileRead", "FileWrite", "Directory":
+		var args struct {
+			Path string `json:"path"`
+		}
+		if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Path != "" {
+			return toolName, args.Path
+		}
+	case "FileSearch":
+		var args struct {
+			Pattern   string `json:"pattern"`
+			Directory string `json:"directory"`
+		}
+		if err := json.Unmarshal([]byte(arguments), &args); err == nil {
+			detail := args.Pattern
+			if args.Directory != "" && args.Directory != "." {
+				detail += " in " + args.Directory
+			}
+			return toolName, detail
+		}
+	case "Process":
+		var args struct {
+			Command string `json:"command"`
+		}
+		if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Command != "" {
+			// Truncate long commands
+			if len(args.Command) > 50 {
+				args.Command = args.Command[:47] + "..."
+			}
+			return toolName, args.Command
+		}
+	}
+	return toolName, ""
+}
+
 // formatToolResult formats tool execution results for Web UI display
-func formatToolResult(toolName, result string, diff string) template.HTML {
+func formatToolResult(toolName, result string, diff string, arguments string) template.HTML {
 	switch toolName {
 	case "FileWrite":
 		return formatFileWriteResult(result, diff)
@@ -21,11 +68,13 @@ func formatToolResult(toolName, result string, diff string) template.HTML {
 	case "Directory":
 		return formatDirectoryResult(result)
 	case "Process":
-		return formatProcessResult(result)
+		return formatProcessResult(result, arguments)
 	case "Project":
 		return formatProjectResult(result)
 	case "Memory":
 		return formatMemoryResult(result)
+	case "WebSearch":
+		return formatWebSearchResult(result, arguments)
 	default:
 		// Try to extract summary from JSON responses
 		var jsonResponse struct {
@@ -144,16 +193,61 @@ func formatDirectoryResult(result string) template.HTML {
 }
 
 // formatProcessResult formats Process tool results
-func formatProcessResult(result string) template.HTML {
-	var response struct {
+func formatProcessResult(result string, arguments string) template.HTML {
+	// First, try to parse as summary format (if tool returns {"summary": "..."})
+	var summaryResponse struct {
 		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal([]byte(result), &summaryResponse); err == nil && summaryResponse.Summary != "" {
+		// Fix incomplete summaries
+		summary := summaryResponse.Summary
+		if summary == "Executed: " {
+			summary = "Executed successfully"
+		}
+		return template.HTML(fmt.Sprintf("<div class=\"tool-summary\">%s</div>", html.EscapeString(summary)))
+	}
+
+	// Otherwise, parse as output format
+	var response struct {
+		Output   string `json:"output"`
+		ExitCode int    `json:"exit_code"`
+		Error    string `json:"error"`
 	}
 
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		return formatGenericResult(result)
 	}
 
-	return template.HTML(fmt.Sprintf("<div class=\"tool-summary\">%s</div>", html.EscapeString(response.Summary)))
+	var summary string
+	if response.Error != "" {
+		summary = fmt.Sprintf("Failed: %s", response.Error)
+	} else if response.ExitCode != 0 {
+		summary = fmt.Sprintf("Failed with exit code %d", response.ExitCode)
+	} else {
+		summary = "Executed successfully"
+	}
+
+	return template.HTML(fmt.Sprintf("<div class=\"tool-summary\">%s</div>", html.EscapeString(summary)))
+}
+
+// formatWebSearchResult formats WebSearch tool results
+func formatWebSearchResult(result string, arguments string) template.HTML {
+	var args struct {
+		Query string `json:"query"`
+	}
+
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Query != "" {
+		return template.HTML(fmt.Sprintf("<div class=\"tool-summary\">Searched for: %s</div>", html.EscapeString(args.Query)))
+	}
+
+	// Fallback
+	var jsonResponse struct {
+		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal([]byte(result), &jsonResponse); err == nil && jsonResponse.Summary != "" {
+		return template.HTML(fmt.Sprintf("<div class=\"tool-summary\">%s</div>", html.EscapeString(jsonResponse.Summary)))
+	}
+	return template.HTML("<div class=\"tool-summary\">Web search completed</div>")
 }
 
 // formatProjectResult formats Project tool results

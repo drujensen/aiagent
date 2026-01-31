@@ -153,6 +153,7 @@ func (u *UI) Run() error {
 	funcMap := template.FuncMap{
 		"renderMarkdown":   renderMarkdown,
 		"formatToolResult": formatToolResult,
+		"formatToolName":   formatToolName,
 		"inArray": func(value string, array []string) bool {
 			return slices.Contains(array, value)
 		},

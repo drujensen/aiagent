@@ -12,10 +12,10 @@
     </div>
      {{else if eq .Role "tool"}}
        <div class="message tool-message">
-         {{range .ToolCallEvents}}
-           <div class="tool-event">
-             <div class="tool-name">{{.ToolName}}</div>
-             <div class="tool-result">{{formatToolResult .ToolName .Result .Diff}}</div>
+          {{range .ToolCallEvents}}
+            <div class="tool-event">
+              <div class="tool-name">{{formatToolName .ToolName .Arguments}}</div>
+              <div class="tool-result">{{formatToolResult .ToolName .Result .Diff .Arguments}}</div>
              {{if .Error}}
                <div class="tool-error">{{.Error}}</div>
              {{end}}

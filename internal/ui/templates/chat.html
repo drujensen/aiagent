@@ -75,10 +75,10 @@
                     </div>
                    {{else if eq $msg.Role "tool"}}
                        <div class="message tool-message">
-                           {{range $msg.ToolCallEvents}}
-                             <div class="tool-event">
-                               <div class="tool-name">{{.ToolName}}</div>
-                               <div class="tool-result">{{formatToolResult .ToolName .Result .Diff}}</div>
+                            {{range $msg.ToolCallEvents}}
+                              <div class="tool-event">
+                                <div class="tool-name">{{formatToolName .ToolName .Arguments}}</div>
+                                <div class="tool-result">{{formatToolResult .ToolName .Result .Diff .Arguments}}</div>
                                {{if .Error}}
                                  <div class="tool-error">{{.Error}}</div>
                                {{end}}
