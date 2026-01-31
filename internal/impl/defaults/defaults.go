@@ -479,5 +479,21 @@ func DefaultModels() []*entities.Model {
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
+
+		// Drujensen Models
+		{
+			ID:              "NEW-DJ-MODEL-ID-12345",
+			Name:            "Qwen3 Coder Latest",
+			ProviderID:      "659D1EAD-AA0A-45CD-BE28-5472F419B0DB",
+			ProviderType:    entities.ProviderDrujensen,
+			ModelName:       "qwen3-coder:latest",
+			APIKey:          "#{DRUJENSEN_API_KEY}#",
+			Temperature:     &[]float64{0.7}[0],
+			MaxTokens:       &[]int{32000}[0],
+			ContextWindow:   &[]int{64000}[0],
+			ReasoningEffort: "",
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		},
 	}
 }
