@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -19,6 +21,13 @@ import (
 	"go.uber.org/zap"
 )
 
+// RetryConfig holds retry configuration
+type RetryConfig struct {
+	MaxRetries int
+	BaseDelay  time.Duration
+	MaxDelay   time.Duration
+}
+
 // AIModelIntegration implements the Base API
 type AIModelIntegration struct {
 	baseURL               string
@@ -30,10 +39,17 @@ type AIModelIntegration struct {
 	lastUsage             *entities.Usage
 	totalPromptTokens     int
 	totalCompletionTokens int
+	retryConfig           RetryConfig
+	timeout               time.Duration
 }
 
 // NewAIModelIntegration creates a new Base integration
 func NewAIModelIntegration(baseURL, apiKey, model string, toolRepo interfaces.ToolRepository, logger *zap.Logger) (*AIModelIntegration, error) {
+	return NewAIModelIntegrationWithTimeout(baseURL, apiKey, model, toolRepo, logger, 30*time.Minute)
+}
+
+// NewAIModelIntegrationWithTimeout creates a new Base integration with configurable timeout
+func NewAIModelIntegrationWithTimeout(baseURL, apiKey, model string, toolRepo interfaces.ToolRepository, logger *zap.Logger, timeout time.Duration) (*AIModelIntegration, error) {
 	if baseURL == "" {
 		return nil, fmt.Errorf("baseURL cannot be empty")
 	}
@@ -43,17 +59,90 @@ func NewAIModelIntegration(baseURL, apiKey, model string, toolRepo interfaces.To
 	if model == "" {
 		return nil, fmt.Errorf("model cannot be empty")
 	}
+	if timeout <= 0 {
+		timeout = 30 * time.Minute
+	}
 	return &AIModelIntegration{
 		baseURL:               baseURL,
 		apiKey:                apiKey,
-		httpClient:            &http.Client{Timeout: 30 * time.Minute},
+		httpClient:            &http.Client{Timeout: timeout},
 		model:                 model,
 		toolRepo:              toolRepo,
 		logger:                logger,
 		lastUsage:             &entities.Usage{},
 		totalPromptTokens:     0,
 		totalCompletionTokens: 0,
+		retryConfig: RetryConfig{
+			MaxRetries: 5,
+			BaseDelay:  1 * time.Second,
+			MaxDelay:   30 * time.Second,
+		},
+		timeout: timeout,
 	}, nil
+}
+
+// shouldRetry determines if an error should trigger a retry
+func (m *AIModelIntegration) shouldRetry(err error, statusCode int) bool {
+	if err != nil {
+		// Network errors
+		return true
+	}
+
+	// HTTP status codes that should be retried
+	switch statusCode {
+	case http.StatusTooManyRequests, // 429
+		http.StatusInternalServerError, // 500
+		http.StatusBadGateway,          // 502
+		http.StatusServiceUnavailable,  // 503
+		http.StatusGatewayTimeout:      // 504
+		return true
+	}
+
+	return false
+}
+
+// getRetryDelay calculates exponential backoff delay with jitter
+func (m *AIModelIntegration) getRetryDelay(attempt int) time.Duration {
+	// Exponential backoff: baseDelay * 2^(attempt-1)
+	exponent := uint(attempt - 1)
+	if exponent > 62 { // Prevent overflow
+		exponent = 62
+	}
+	delay := m.retryConfig.BaseDelay * time.Duration(1<<exponent)
+
+	// Cap at max delay
+	if delay > m.retryConfig.MaxDelay {
+		delay = m.retryConfig.MaxDelay
+	}
+
+	// Add jitter (±25%)
+	jitter := time.Duration(float64(delay) * 0.25 * (2.0*rand.Float64() - 1.0))
+	return delay + jitter
+}
+
+// getErrorDescription returns user-friendly error description
+func (m *AIModelIntegration) getErrorDescription(err error, statusCode int) string {
+	if err != nil {
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			return "connection timeout"
+		}
+		return "connection error"
+	}
+
+	switch statusCode {
+	case http.StatusTooManyRequests:
+		return "rate limit exceeded"
+	case http.StatusInternalServerError:
+		return "server error"
+	case http.StatusBadGateway:
+		return "bad gateway"
+	case http.StatusServiceUnavailable:
+		return "service unavailable"
+	case http.StatusGatewayTimeout:
+		return "gateway timeout"
+	default:
+		return "unexpected error"
+	}
 }
 
 // For a generic Base-compatible API
@@ -141,6 +230,8 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 	var lastAssistantContents []string
 	consecutiveFailures := 0
 	const maxConsecutiveFailures = 10 // Stop after 10 consecutive tool failures
+	emptyResponseRetries := 0
+	const maxEmptyResponseRetries = 3 // Retry up to 3 times for empty responses
 
 	for {
 		iterationCount++
@@ -182,35 +273,64 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		req.Header.Set("Authorization", "Bearer "+m.apiKey)
 
 		var resp *http.Response
-		for attempt := 0; attempt < 3; attempt++ {
+		var lastStatusCode int
+
+		for attempt := 0; attempt <= m.retryConfig.MaxRetries; attempt++ {
 			if ctx.Err() == context.Canceled {
 				return nil, fmt.Errorf("operation canceled by user")
 			}
 
 			resp, err = m.httpClient.Do(req)
-			if err != nil {
-				if ctx.Err() == context.Canceled {
-					return nil, fmt.Errorf("operation canceled by user")
+
+			if err != nil || (resp != nil && resp.StatusCode != http.StatusOK) {
+				if resp != nil {
+					lastStatusCode = resp.StatusCode
 				}
-				if attempt < 2 {
-					m.logger.Warn("Error making request, retrying", zap.Error(err))
-					time.Sleep(time.Duration(attempt+1) * time.Second)
+
+				if attempt < m.retryConfig.MaxRetries && m.shouldRetry(err, lastStatusCode) {
+					delay := m.getRetryDelay(attempt + 1)
+					errorDesc := m.getErrorDescription(err, lastStatusCode)
+
+					retryMsg := &entities.Message{
+						ID:   uuid.New().String(),
+						Role: "assistant",
+						Content: fmt.Sprintf("API request failed (attempt %d/%d): %s. Retrying in %.1f seconds...",
+							attempt+1, m.retryConfig.MaxRetries+1, errorDesc, delay.Seconds()),
+						Timestamp: time.Now(),
+					}
+
+					m.logger.Warn("API request failed, retrying",
+						zap.Int("attempt", attempt+1),
+						zap.Int("maxRetries", m.retryConfig.MaxRetries+1),
+						zap.Error(err),
+						zap.Int("statusCode", lastStatusCode),
+						zap.Duration("delay", delay))
+
+					if callback != nil {
+						if callbackErr := callback([]*entities.Message{retryMsg}); callbackErr != nil {
+							m.logger.Error("Failed to send retry message", zap.Error(callbackErr))
+						}
+					}
+
+					time.Sleep(delay)
 					continue
 				}
-				return nil, fmt.Errorf("error making request: %v", err)
-			}
-			if resp.StatusCode == http.StatusTooManyRequests {
-				if attempt < 2 {
-					time.Sleep(time.Duration(attempt+1) * time.Second)
-					continue
+
+				// Final failure
+				if err != nil {
+					return nil, fmt.Errorf("failed to reach AI provider after %d attempts: %v", attempt+1, err)
 				}
-				return nil, fmt.Errorf("rate limit exceeded")
+				if resp != nil {
+					body, _ := io.ReadAll(resp.Body)
+					m.logger.Error("Final failure with unexpected status code",
+						zap.Int("status", resp.StatusCode),
+						zap.String("body", string(body)),
+						zap.Int("attempts", attempt+1))
+					return nil, fmt.Errorf("failed to reach AI provider after %d attempts: unexpected status %d", attempt+1, resp.StatusCode)
+				}
 			}
-			if resp.StatusCode != http.StatusOK {
-				body, _ := io.ReadAll(resp.Body)
-				m.logger.Error("Unexpected status code", zap.Int("status", resp.StatusCode), zap.String("body", string(body)))
-				return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
-			}
+
+			// Success
 			break
 		}
 		defer resp.Body.Close()
@@ -337,9 +457,41 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				zap.Int("toolCallsCount", len(toolCalls)))
 			shouldBreak = false
 		case "stop":
-			m.logger.Info("AI finished with stop - ending processing")
-			finalContent = content
-			shouldBreak = true
+			// Check if response is empty - this indicates the model failed to generate content
+			if content == "" && len(toolCalls) == 0 {
+				if emptyResponseRetries < maxEmptyResponseRetries {
+					emptyResponseRetries++
+					m.logger.Warn("Received empty response from AI, retrying",
+						zap.Int("emptyResponseRetry", emptyResponseRetries),
+						zap.Int("maxEmptyResponseRetries", maxEmptyResponseRetries))
+
+					// Send retry message to UI
+					if callback != nil {
+						retryMsg := &entities.Message{
+							ID:   uuid.New().String(),
+							Role: "assistant",
+							Content: fmt.Sprintf("AI returned empty response (attempt %d/%d), retrying...",
+								emptyResponseRetries, maxEmptyResponseRetries+1),
+							Timestamp: time.Now(),
+						}
+						if err := callback([]*entities.Message{retryMsg}); err != nil {
+							m.logger.Error("Failed to send empty response retry message", zap.Error(err))
+						}
+					}
+
+					// Continue the loop to retry
+					shouldBreak = false
+					continue
+				} else {
+					m.logger.Warn("Maximum empty response retries reached, ending processing")
+					finalContent = "Failed to generate a response after multiple attempts. The AI model may be experiencing issues."
+					shouldBreak = true
+				}
+			} else {
+				m.logger.Info("AI finished with stop - ending processing")
+				finalContent = content
+				shouldBreak = true
+			}
 		case "length":
 			m.logger.Warn("AI finished due to length limit - ending processing")
 			finalContent = content + "\n\n[Response truncated due to length limit]"
