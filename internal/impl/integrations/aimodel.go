@@ -114,7 +114,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			"type": "function",
 			"function": map[string]any{
 				"name":        (*tool).Name(),
-				"description": (*tool).FullDescription(),
+				"description": (*tool).Description(),
 				"parameters":  (*tool).Schema(),
 				"strict":      true,
 			},
@@ -137,7 +137,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 
 	var newMessages []*entities.Message
 	iterationCount := 0
-	const maxIterations = 25 // Reasonable limit for most tasks
+	const maxIterations = 100 // Increased for comprehensive testing tasks
 	var lastAssistantContents []string
 	consecutiveFailures := 0
 	const maxConsecutiveFailures = 10 // Stop after 10 consecutive tool failures

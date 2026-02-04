@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
+	"github.com/google/uuid"
 
 	"go.uber.org/zap"
 )
@@ -193,7 +194,7 @@ func (t *TodoTool) writeTodos(todos []struct {
 			Content:   todo.Content,
 			Status:    "pending",
 			Priority:  todo.Priority,
-			ID:        fmt.Sprintf("%d", time.Now().UnixNano()),
+			ID:        uuid.New().String(),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
