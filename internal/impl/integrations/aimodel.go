@@ -45,7 +45,7 @@ type AIModelIntegration struct {
 
 // NewAIModelIntegration creates a new Base integration
 func NewAIModelIntegration(baseURL, apiKey, model string, toolRepo interfaces.ToolRepository, logger *zap.Logger) (*AIModelIntegration, error) {
-	return NewAIModelIntegrationWithTimeout(baseURL, apiKey, model, toolRepo, logger, 30*time.Minute)
+	return NewAIModelIntegrationWithTimeout(baseURL, apiKey, model, toolRepo, logger, 5*time.Minute)
 }
 
 // NewAIModelIntegrationWithTimeout creates a new Base integration with configurable timeout
