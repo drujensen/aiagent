@@ -651,7 +651,7 @@ func (c *ChatView) updateEditorContent() {
 		// Set editor size to fit screen minus textarea, footer, and separators
 		if c.width > 0 && c.height > 0 {
 			editorWidth := c.width
-			editorHeight := c.height - c.textarea.Height() - 3 // textarea 3, footer 1, separators 2
+			editorHeight := c.height - 5 // textarea (2) + footer (1) + separators (2)
 			if editorHeight < 1 {
 				editorHeight = 1
 			}
@@ -749,10 +749,10 @@ func (c *ChatView) updateEditorContent() {
 	// Ensure editor maintains current focus state
 	c.editor.SetFocus(c.focused == "editor")
 
-	// Set editor size: textarea (3) + footer (1) + separators (2) = 6 total
+	// Set editor size: textarea (2) + footer (1) + separators (2) = 5 total
 	if c.width > 0 && c.height > 0 {
 		editorWidth := c.width
-		editorHeight := c.height - 6
+		editorHeight := c.height - 5
 		if editorHeight < 1 {
 			editorHeight = 1
 		}
@@ -1108,7 +1108,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 
 		// Set editor size to fit screen minus textarea, footer, and separators
 		editorWidth := c.width
-		editorHeight := c.height - c.textarea.Height() - 3 // textarea, footer 1, separators 2
+		editorHeight := c.height - 5 // textarea (2) + footer (1) + separators (2)
 		if editorHeight < 1 {
 			editorHeight = 1
 		}
@@ -1133,7 +1133,12 @@ func (c ChatView) View() string {
 	separator := lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true).Render(strings.Repeat("═", c.width))
 
 	// Editor
-	editorPart := style.Render(c.editor.View())
+	editorHeight := c.height - 5 // textarea (2) + footer (1) + separators (2)
+	if editorHeight < 1 {
+		editorHeight = 1
+	}
+	editorStyle := lipgloss.NewStyle().Width(c.width).Height(editorHeight)
+	editorPart := editorStyle.Render(c.editor.View())
 
 	// Textarea
 	taStyle := style.Height(c.textarea.Height())
