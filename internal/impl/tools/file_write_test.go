@@ -50,15 +50,8 @@ func TestFileWriteTool_WriteOperation(t *testing.T) {
 		t.Errorf("Expected success=true, got %v", resultData["success"])
 	}
 
-	// Check that it has a diff
-	if diff, ok := resultData["diff"].(string); !ok || diff == "" {
-		t.Errorf("Expected non-empty diff, got %v", resultData["diff"])
-	}
-
-	// Check that summary contains "File Created"
-	if summary, ok := resultData["summary"].(string); !ok || !strings.Contains(summary, "File Created") {
-		t.Errorf("Expected summary to contain 'File Created', got %v", resultData["summary"])
-	}
+	// Note: diff and summary are added by UI formatting, not the tool itself
+	// The tool only returns success/error status
 
 	// Verify file was created
 	fullPath := filepath.Join(tempDir, "test.txt")
@@ -172,13 +165,7 @@ func TestFileWriteTool_ErrorCases(t *testing.T) {
 	config := map[string]string{"workspace": tempDir}
 	tool := NewFileWriteTool("test-file-error", "Test File Error Tool", config, logger)
 
-	// Test 1: Missing operation
-	_, err = tool.Execute(`{"path": "test.txt", "content": "test"}`)
-	if err == nil || !strings.Contains(err.Error(), "operation is required") {
-		t.Errorf("Expected error for missing operation, got: %v", err)
-	}
-
-	// Test 2: Missing path
+	// Test 1: Missing path
 	_, err = tool.Execute(`{"operation": "write", "content": "test"}`)
 	if err == nil || !strings.Contains(err.Error(), "path is required") {
 		t.Errorf("Expected error for missing path, got: %v", err)
@@ -192,7 +179,7 @@ func TestFileWriteTool_ErrorCases(t *testing.T) {
 
 	// Test 4: Missing content for write
 	_, err = tool.Execute(`{"operation": "write", "path": "test.txt"}`)
-	if err == nil || !strings.Contains(err.Error(), "content is required for write operation") {
+	if err == nil || !strings.Contains(err.Error(), "content is required") {
 		t.Errorf("Expected error for missing content in write, got: %v", err)
 	}
 

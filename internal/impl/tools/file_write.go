@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
@@ -48,9 +49,9 @@ func (t *FileWriteTool) UpdateConfiguration(config map[string]string) {
 
 func (t *FileWriteTool) Parameters() []entities.Parameter {
 	return []entities.Parameter{
-		{Name: "operation", Type: "string", Enum: []string{"write", "edit"}, Description: "Operation to perform", Required: true},
+		{Name: "operation", Type: "string", Enum: []string{"write", "edit"}, Description: "Operation to perform (auto-detected if not specified)", Required: false},
 		{Name: "path", Type: "string", Description: "File path", Required: true},
-		{Name: "content", Type: "string", Description: "File content for write operation", Required: false},
+		{Name: "content", Type: "string", Description: "File content for write operation", Required: true},
 		{Name: "old_string", Type: "string", Description: "String to replace for edit operation", Required: false},
 		{Name: "replace_all", Type: "boolean", Description: "Replace all occurrences", Required: false},
 	}
@@ -117,61 +118,209 @@ func (t *FileWriteTool) validatePath(path string) (string, error) {
 func (t *FileWriteTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing file write command", zap.String("arguments", arguments))
 
-	var args struct {
-		Path    string `json:"path"`
-		Content string `json:"content"`
-		Mode    string `json:"mode,omitempty"`
+	var rawArgs map[string]interface{}
+	if err := json.Unmarshal([]byte(arguments), &rawArgs); err != nil {
+		return "", fmt.Errorf("failed to parse arguments")
 	}
 
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return `{"success": false, "error": "failed to parse arguments"}`, nil
+	// Extract fields with proper defaults
+	args := struct {
+		Operation  string
+		Path       string
+		Content    string
+		Mode       string
+		OldString  string
+		ReplaceAll bool
+	}{
+		Operation:  getStringField(rawArgs, "operation"),
+		Path:       getStringField(rawArgs, "path"),
+		Content:    getStringField(rawArgs, "content"),
+		Mode:       getStringField(rawArgs, "mode"),
+		OldString:  getStringField(rawArgs, "old_string"),
+		ReplaceAll: getBoolField(rawArgs, "replace_all"),
 	}
 
 	if args.Path == "" {
-		return `{"success": false, "error": "path is required"}`, nil
-	}
-	if args.Content == "" {
-		return `{"success": false, "error": "content is required"}`, nil
+		return "", fmt.Errorf("path is required")
 	}
 
-	if args.Mode == "" {
-		args.Mode = "overwrite"
+	// Auto-detect operation based on parameters
+	if args.Operation == "" {
+		if args.OldString != "" {
+			args.Operation = "edit"
+		} else {
+			args.Operation = "write"
+		}
 	}
-	if args.Mode != "overwrite" && args.Mode != "append" {
-		return `{"success": false, "error": "mode must be 'overwrite' or 'append'"}`, nil
+
+	// Validate operation
+	if args.Operation != "write" && args.Operation != "edit" {
+		return "", fmt.Errorf("operation must be 'write' or 'edit'")
+	}
+
+	// Validate required fields based on operation
+	if args.Operation == "write" {
+		if args.Content == "" {
+			return "", fmt.Errorf("content is required")
+		}
+		if args.Mode == "" {
+			args.Mode = "overwrite"
+		}
+		if args.Mode != "overwrite" && args.Mode != "append" {
+			return "", fmt.Errorf("mode must be 'overwrite' or 'append'")
+		}
+	} else if args.Operation == "edit" {
+		if args.OldString == "" {
+			return "", fmt.Errorf("old_string is required for edit operation")
+		}
+		if args.Content == "" {
+			return "", fmt.Errorf("content (new_string) is required for edit operation")
+		}
+	}
+
+	// Validate operation
+	if args.Operation != "write" && args.Operation != "edit" {
+		return "", fmt.Errorf("operation must be 'write' or 'edit'")
+	}
+
+	// Validate required fields based on operation
+	if args.Operation == "write" {
+		if args.Content == "" {
+			return "", fmt.Errorf("content is required for write operation")
+		}
+		if args.Mode == "" {
+			args.Mode = "overwrite"
+		}
+		if args.Mode != "overwrite" && args.Mode != "append" {
+			return "", fmt.Errorf("mode must be 'overwrite' or 'append'")
+		}
+	} else if args.Operation == "edit" {
+		if args.OldString == "" {
+			return "", fmt.Errorf("old_string is required for edit operation")
+		}
+		if args.Content == "" {
+			return "", fmt.Errorf("content (new_string) is required for edit operation")
+		}
 	}
 
 	fullPath, err := t.validatePath(args.Path)
 	if err != nil {
-		return fmt.Sprintf(`{"success": false, "error": "invalid path: %s"}`, err.Error()), nil
+		return "", fmt.Errorf("invalid path: %s", err.Error())
 	}
 
-	// Create backup if file exists and we're overwriting
-	if args.Mode == "overwrite" {
-		if _, err := os.Stat(fullPath); err == nil {
+	if args.Operation == "write" {
+		return t.executeWriteOperation(args, fullPath)
+	} else if args.Operation == "edit" {
+		return t.executeEditOperation(args, fullPath)
+	}
+
+	return `{"success": false, "error": "invalid operation"}`, nil
+}
+
+// executeWriteOperation handles write operations (create/overwrite/append)
+func (t *FileWriteTool) executeWriteOperation(args struct {
+	Operation  string
+	Path       string
+	Content    string
+	Mode       string
+	OldString  string
+	ReplaceAll bool
+}, fullPath string) (string, error) {
+	// Determine the operation type and create backup if needed
+	fileExisted := false
+	operation := "create"
+	if _, err := os.Stat(fullPath); err == nil {
+		fileExisted = true
+		if args.Mode == "overwrite" {
+			operation = "overwrite"
 			backupPath := fullPath + ".backup"
 			if err := t.createBackup(fullPath, backupPath); err != nil {
 				t.logger.Warn("Failed to create backup", zap.Error(err))
 			}
+		} else if args.Mode == "append" {
+			operation = "append"
 		}
+	} else if args.Mode == "append" {
+		operation = "append"
 	}
 
 	var file *os.File
+	var err error
 	if args.Mode == "append" {
 		file, err = os.OpenFile(fullPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	} else {
 		file, err = os.OpenFile(fullPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	}
 	if err != nil {
-		return fmt.Sprintf(`{"success": false, "error": "failed to open file: %s"}`, err.Error()), nil
+		return "", fmt.Errorf("failed to open file: %s", err.Error())
 	}
 	defer file.Close()
 
 	if _, err := file.WriteString(args.Content); err != nil {
-		return fmt.Sprintf(`{"success": false, "error": "failed to write file: %s"}`, err.Error()), nil
+		return "", fmt.Errorf("failed to write file: %s", err.Error())
 	}
 
-	return `{"success": true, "error": ""}`, nil
+	// Generate diff for the operation
+	diff := t.generateDiff(args.Path, operation, args.Content, args.Mode == "append")
+
+	// Generate summary
+	summary := "File created successfully"
+	if fileExisted && args.Mode == "overwrite" {
+		summary = "File overwritten successfully"
+	} else if args.Mode == "append" {
+		summary = "Content appended successfully"
+	}
+
+	return fmt.Sprintf(`{"success": true, "summary": %q, "diff": %q, "path": %q, "occurrences": 0, "replaced_all": false}`, summary, diff, args.Path), nil
+}
+
+// executeEditOperation handles edit operations (find and replace)
+func (t *FileWriteTool) executeEditOperation(args struct {
+	Operation  string
+	Path       string
+	Content    string
+	Mode       string
+	OldString  string
+	ReplaceAll bool
+}, fullPath string) (string, error) {
+	// Read the current file content
+	content, err := os.ReadFile(fullPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file: %s", err.Error())
+	}
+
+	fileContent := string(content)
+
+	// Count total occurrences
+	totalOccurrences := strings.Count(fileContent, args.OldString)
+
+	// Perform the replacement
+	var newContent string
+	var occurrences int
+	if args.ReplaceAll {
+		newContent = strings.ReplaceAll(fileContent, args.OldString, args.Content)
+		occurrences = totalOccurrences
+	} else {
+		// Replace only the first occurrence
+		if idx := strings.Index(fileContent, args.OldString); idx >= 0 {
+			newContent = fileContent[:idx] + args.Content + fileContent[idx+len(args.OldString):]
+			occurrences = totalOccurrences // Return total count found
+		} else {
+			return "", fmt.Errorf("old_string not found in file")
+		}
+	}
+
+	// Write the modified content back
+	if err := os.WriteFile(fullPath, []byte(newContent), 0644); err != nil {
+		return "", fmt.Errorf("failed to write modified content: %s", err.Error())
+	}
+
+	// Generate diff showing the change
+	diff := t.generateEditDiff(args.Path, fileContent, newContent, args.OldString, args.Content, occurrences)
+
+	summary := fmt.Sprintf("Replaced %d occurrence(s) of '%s' with '%s'", occurrences, args.OldString, args.Content)
+
+	return fmt.Sprintf(`{"success": true, "summary": %q, "diff": %q, "path": %q, "occurrences": %d, "replaced_all": %t}`, summary, diff, args.Path, occurrences, args.ReplaceAll), nil
 }
 
 func (t *FileWriteTool) createBackup(src, dst string) error {
@@ -189,6 +338,91 @@ func (t *FileWriteTool) createBackup(src, dst string) error {
 
 	_, err = io.Copy(dstFile, srcFile)
 	return err
+}
+
+// generateDiff creates a simple unified diff showing the changes made
+func (t *FileWriteTool) generateDiff(path, operation, content string, wasAppend bool) string {
+	var diff strings.Builder
+
+	// Create a simple unified diff header
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	diff.WriteString(fmt.Sprintf("--- %s\t%s\n", path, timestamp))
+	diff.WriteString(fmt.Sprintf("+++ %s\t%s\n", path, timestamp))
+
+	if wasAppend {
+		diff.WriteString("@@ -1,0 +1,0 @@\n") // Simplified for append
+	} else {
+		diff.WriteString("@@ -1 +1 @@\n") // Simplified hunk header
+	}
+
+	lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
+
+	switch operation {
+	case "create":
+		// Show all lines as additions
+		for _, line := range lines {
+			diff.WriteString("+")
+			diff.WriteString(line)
+			diff.WriteString("\n")
+		}
+	case "overwrite":
+		// For overwrites, show the new content as replacement
+		for _, line := range lines {
+			diff.WriteString("+")
+			diff.WriteString(line)
+			diff.WriteString("\n")
+		}
+	case "append":
+		// Show appended content as additions
+		for _, line := range lines {
+			diff.WriteString("+")
+			diff.WriteString(line)
+			diff.WriteString("\n")
+		}
+	}
+
+	return diff.String()
+}
+
+// generateEditDiff creates a diff showing the edit changes
+func (t *FileWriteTool) generateEditDiff(path, oldContent, newContent, oldString, newString string, occurrences int) string {
+	var diff strings.Builder
+
+	// Create a unified diff header
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	diff.WriteString(fmt.Sprintf("--- %s\t%s\n", path, timestamp))
+	diff.WriteString(fmt.Sprintf("+++ %s\t%s\n", path, timestamp))
+
+	// Simple diff showing the change
+	diff.WriteString("@@ -1 +1 @@\n")
+	if occurrences > 0 {
+		diff.WriteString("-")
+		diff.WriteString(oldString)
+		diff.WriteString("\n+")
+		diff.WriteString(newString)
+		diff.WriteString("\n")
+	}
+
+	return diff.String()
+}
+
+// Helper functions for parsing JSON fields
+func getStringField(data map[string]interface{}, key string) string {
+	if val, ok := data[key]; ok {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return ""
+}
+
+func getBoolField(data map[string]interface{}, key string) bool {
+	if val, ok := data[key]; ok {
+		if b, ok := val.(bool); ok {
+			return b
+		}
+	}
+	return false
 }
 
 var _ entities.Tool = (*FileWriteTool)(nil)

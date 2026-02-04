@@ -57,6 +57,8 @@ func formatToolName(toolName, arguments string) (string, string) {
 // formatToolResult formats tool execution results for display
 func formatToolResult(toolName, result string, diff string, arguments string) string {
 	switch toolName {
+	case "FileRead":
+		return formatFileReadResult(result)
 	case "FileWrite":
 		return formatFileWriteResult(result, diff)
 	case "FileSearch":
@@ -391,6 +393,30 @@ func formatDiff(diff string) string {
 	}
 
 	return output.String()
+}
+
+// formatFileReadResult formats FileRead tool results
+func formatFileReadResult(result string) string {
+	var response struct {
+		Summary string `json:"summary"`
+		Error   string `json:"error"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		// If parsing fails, return the original result
+		return result
+	}
+
+	if response.Error != "" {
+		return fmt.Sprintf("Error reading file: %s", response.Error)
+	}
+
+	// Return the summary created by the tool
+	if response.Summary != "" {
+		return response.Summary
+	}
+
+	return "File read successfully"
 }
 
 // formatDirectoryResult formats Directory tool results

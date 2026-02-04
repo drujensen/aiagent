@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
@@ -340,21 +339,19 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 					toolError = "Tool not found"
 					m.logger.Warn("Tool not found", zap.String("toolName", toolName))
 				}
-				// Extract full data for AI and summary for TUI
-				fullContent, summaryContent := m.extractToolContent(toolName, toolResult, toolError)
-
-				// Create tool call event with summary for TUI
-				toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, summaryContent, toolError, diff, nil)
-
-				// Publish real-time event for TUI updates
-				events.PublishToolCallEvent(toolEvent)
-
+				// Use raw tool result for both AI and UI display
 				var content string
 				if toolError != "" {
 					content = fmt.Sprintf("Tool %s failed with error: %s", toolName, toolError)
 				} else {
-					content = fullContent // Full data for AI reasoning
+					content = toolResult
 				}
+
+				// Create tool call event with raw result for UI formatting
+				toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, content, toolError, diff, nil)
+
+				// Publish real-time event for TUI updates
+				events.PublishToolCallEvent(toolEvent)
 
 				toolResponseMessage := &entities.Message{
 					ID:             uuid.New().String(),
@@ -426,39 +423,6 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 
 	m.logger.Info("Generated messages", zap.Any("messages", newMessages))
 	return newMessages, nil
-}
-
-// extractToolContent extracts full content for AI and summary for TUI from tool results
-func (m *AnthropicIntegration) extractToolContent(toolName, result, toolError string) (fullContent, summaryContent string) {
-	// Try to parse as JSON (both success and error responses are now JSON)
-	var jsonData map[string]interface{}
-	if err := json.Unmarshal([]byte(result), &jsonData); err != nil {
-		// Fallback: not JSON, use result as-is (shouldn't happen with updated tools)
-		if toolError != "" {
-			// Sanitize error message to prevent model confusion from malformed patterns
-			sanitizedError := strings.ReplaceAll(toolError, "<xai:function_call>", "")
-			sanitizedError = strings.ReplaceAll(sanitizedError, "</xai:function_call", "")
-			sanitizedError = strings.ReplaceAll(sanitizedError, `{"content">`, "")
-			fullContent = fmt.Sprintf("Tool %s failed with error: %s", toolName, sanitizedError)
-			summaryContent = fullContent
-		} else {
-			fullContent = fmt.Sprintf("Tool %s succeeded: %s", toolName, result)
-			summaryContent = result
-		}
-		return
-	}
-
-	// Extract summary for TUI
-	if summary, ok := jsonData["summary"].(string); ok {
-		summaryContent = summary
-	} else {
-		summaryContent = result
-	}
-
-	// For AI, return the JSON directly to allow structured parsing
-	fullContent = result
-
-	return
 }
 
 // ensureToolCallResponsesAnthropic validates that every tool call has a corresponding response

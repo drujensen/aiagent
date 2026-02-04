@@ -152,15 +152,22 @@ func formatFileReadResult(result string) template.HTML {
 		return formatGenericResult(result)
 	}
 
-	// Only show the summary, hide file contents from UI
-	if response.Summary != "" {
-		return template.HTML(fmt.Sprintf("<div class=\"tool-summary\">%s</div>", html.EscapeString(response.Summary)))
+	// For Web UI, show simple summary without content preview
+	if response.Lines > 0 {
+		fileName := "file"
+		if response.Path != "" {
+			fileName = filepath.Base(response.Path)
+		}
+		return template.HTML(fmt.Sprintf("<div class=\"tool-summary\">📄 %s (%d lines read)</div>", html.EscapeString(fileName), response.Lines))
 	}
 
-	// Fallback if no summary
-	if response.Path != "" && response.Lines > 0 {
-		fileName := filepath.Base(response.Path)
-		return template.HTML(fmt.Sprintf("<div class=\"tool-summary\">📄 %s (%d lines total)</div>", html.EscapeString(fileName), response.Lines))
+	if response.Content != "" {
+		lines := strings.Split(response.Content, "\n")
+		fileName := "file"
+		if response.Path != "" {
+			fileName = filepath.Base(response.Path)
+		}
+		return template.HTML(fmt.Sprintf("<div class=\"tool-summary\">📄 %s (%d lines read)</div>", html.EscapeString(fileName), len(lines)))
 	}
 
 	return template.HTML("<div class=\"tool-summary\">File read successfully</div>")

@@ -484,17 +484,14 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 					consecutiveFailures = 0 // Reset on success
 				}
 			}
-			// Extract full data for AI and summary for TUI
-			fullContent, summaryContent := m.extractToolContent(toolName, toolResult, toolError)
+			// Use raw tool result for both AI and UI display
+			content := toolResult
 
-			// Create tool call event with summary for TUI
-			toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, summaryContent, toolError, diff, nil)
+			// Create tool call event with raw result for UI formatting
+			toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, toolResult, toolError, diff, nil)
 
 			// Publish real-time event for TUI updates (Web UI uses message history refresh)
 			events.PublishToolCallEvent(toolEvent)
-
-			// Always provide structured JSON content to AI for consistent parsing
-			content := fullContent
 
 			var newMessage = &entities.Message{
 				ID:             uuid.New().String(),
@@ -658,43 +655,6 @@ func (m *AIModelIntegration) extractDiffFromResult(result string) string {
 		return resultData.Diff
 	}
 	return ""
-}
-
-// extractToolContent extracts tool content for AI processing
-func (m *AIModelIntegration) extractToolContent(toolName, result, toolError string) (fullContent, summaryContent string) {
-	if toolError != "" {
-		return fmt.Sprintf("Tool %s failed: %s", toolName, toolError), fmt.Sprintf("❌ %s failed", toolName)
-	}
-
-	switch toolName {
-	case "FileRead":
-		var data struct {
-			Summary     string   `json:"summary"`
-			FullContent []string `json:"full_content"`
-		}
-		if err := json.Unmarshal([]byte(result), &data); err == nil {
-			return strings.Join(data.FullContent, "\n"), data.Summary
-		}
-	case "FileWrite":
-		var data struct {
-			Summary string `json:"summary"`
-		}
-		if err := json.Unmarshal([]byte(result), &data); err == nil {
-			return data.Summary, data.Summary
-		}
-	case "Process":
-		var data struct {
-			Command string `json:"command"`
-			Stdout  string `json:"stdout"`
-			Stderr  string `json:"stderr"`
-		}
-		if err := json.Unmarshal([]byte(result), &data); err == nil {
-			full := fmt.Sprintf("Command: %s\nStdout: %s\nStderr: %s", data.Command, data.Stdout, data.Stderr)
-			return full, fmt.Sprintf("Executed: %s", data.Command)
-		}
-	}
-
-	return result, result
 }
 
 // GetLastUsage returns the usage from the last API call
