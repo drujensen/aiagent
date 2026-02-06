@@ -473,6 +473,54 @@ func formatGenericResult(result string) string {
 	return output.String()
 }
 
+// formatTokenCount formats a token count with comma separators for thousands
+func formatTokenCount(count int) string {
+	if count < 1000 {
+		return fmt.Sprintf("%d", count)
+	}
+
+	// Convert to string and add commas
+	str := fmt.Sprintf("%d", count)
+	var result strings.Builder
+
+	// Process from right to left, adding commas every 3 digits
+	for i, digit := range reversedString(str) {
+		if i > 0 && i%3 == 0 {
+			result.WriteByte(',')
+		}
+		result.WriteByte(byte(digit))
+	}
+
+	return reversedString(result.String())
+}
+
+// reversedString returns the reverse of a string
+func reversedString(s string) string {
+	runes := []rune(s)
+	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+		runes[i], runes[j] = runes[j], runes[i]
+	}
+	return string(runes)
+}
+
+// getLastRequestUsage returns the token count and cost from the most recent API request
+func getLastRequestUsage(chat *entities.Chat) (int, float64) {
+	if chat == nil || len(chat.Messages) == 0 {
+		return 0, 0.0
+	}
+
+	// Find the most recent assistant message (which has the API usage)
+	for i := len(chat.Messages) - 1; i >= 0; i-- {
+		msg := chat.Messages[i]
+		if msg.Role == "assistant" && msg.Usage != nil {
+			return msg.Usage.TotalTokens, msg.Usage.Cost
+		}
+	}
+
+	// If no assistant message with usage found, return 0
+	return 0, 0.0
+}
+
 type ChatView struct {
 	chatService        services.ChatService
 	agentService       services.AgentService
@@ -1146,13 +1194,16 @@ func (c ChatView) View() string {
 		titleStyle := lipgloss.NewStyle().PaddingLeft(1).Bold(true).Foreground(lipgloss.Color("15"))
 
 		var tokenInfo string
-		if c.activeChat.Usage != nil {
-			tokenCountStr := fmt.Sprintf("%d", c.activeChat.Usage.TotalTokens)
+		// Use per-request usage instead of accumulated totals
+		requestTokens, requestCost := getLastRequestUsage(c.activeChat)
+		if requestTokens > 0 || requestCost > 0 {
+			// Format token count with commas
+			tokenCountStr := formatTokenCount(requestTokens)
 			if c.currentModel != nil && c.currentModel.ContextWindow != nil && *c.currentModel.ContextWindow > 0 {
-				percentage := int(float64(c.activeChat.Usage.TotalTokens) / float64(*c.currentModel.ContextWindow) * 100)
-				tokenInfo = fmt.Sprintf("%s %d%% ($%.2f)", tokenCountStr, percentage, c.activeChat.Usage.TotalCost)
+				percentage := int(float64(requestTokens) / float64(*c.currentModel.ContextWindow) * 100)
+				tokenInfo = fmt.Sprintf("%s %d%% ($%.2f)", tokenCountStr, percentage, requestCost)
 			} else {
-				tokenInfo = fmt.Sprintf("%s ($%.2f)", tokenCountStr, c.activeChat.Usage.TotalCost)
+				tokenInfo = fmt.Sprintf("%s ($%.2f)", tokenCountStr, requestCost)
 			}
 		}
 
