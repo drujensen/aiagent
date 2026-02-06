@@ -141,11 +141,11 @@ function populateModels(providerType, selectedModel) {
             .then(response => response.json())
             .then(provider => {
                 const modelSelect = document.getElementById('model_name');
-                modelSelect.innerHTML = '<option value="">Select Model</option>';
+                modelSelect.innerHTML = '<option value="">Select Model</option>'; provider.models.sort((a, b) => a.name.localeCompare(b.name));
                 provider.models.forEach(model => {
                     const option = document.createElement('option');
                     option.value = model.name;
-                    option.textContent = model.name;
+                    option.textContent = `${model.name} input: ${model.input_price_per_mille.toFixed(2)} output: ${model.output_price_per_mille.toFixed(2)}`;
                     if (model.name === selectedModel) option.selected = true;
                     modelSelect.appendChild(option);
                 });

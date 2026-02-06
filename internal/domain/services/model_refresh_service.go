@@ -91,15 +91,26 @@ func (s *modelRefreshService) refreshProvider(ctx context.Context, provider *ent
 		Models:     make([]entities.ModelPricing, 0),
 	}
 
-	for _, modelData := range (*fetched)[string(provider.Type)].Models {
+	// Handle drujensen provider specially - it doesn't exist in models.dev
+	if provider.Type == entities.ProviderDrujensen {
 		pricing := entities.ModelPricing{
-			Name:                modelData.ID,
-			InputPricePerMille:  modelData.Cost.Input,  // Keep as per million tokens
-			OutputPricePerMille: modelData.Cost.Output, // Keep as per million tokens
-			ContextWindow:       modelData.Limit.Context,
+			Name:                "qwen3-coder:latest",
+			InputPricePerMille:  0, // 0 pricing as requested
+			OutputPricePerMille: 0, // 0 pricing as requested
+			ContextWindow:       64000,
 		}
-
 		providerToUpdate.Models = append(providerToUpdate.Models, pricing)
+	} else {
+		for _, modelData := range (*fetched)[string(provider.Type)].Models {
+			pricing := entities.ModelPricing{
+				Name:                modelData.ID,
+				InputPricePerMille:  modelData.Cost.Input,  // Keep as per million tokens
+				OutputPricePerMille: modelData.Cost.Output, // Keep as per million tokens
+				ContextWindow:       modelData.Limit.Context,
+			}
+
+			providerToUpdate.Models = append(providerToUpdate.Models, pricing)
+		}
 	}
 
 	providerToUpdate.UpdatedAt = time.Now()
