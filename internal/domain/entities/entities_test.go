@@ -90,7 +90,7 @@ func TestNewProvider(t *testing.T) {
 	baseURL := "https://api.openai.com"
 	apiKeyName := "OPENAI_API_KEY"
 	models := []ModelPricing{
-		{Name: "gpt-4", InputPricePerMille: 3.00, OutputPricePerMille: 15.00, ContextWindow: 128000},
+		{Name: "gpt-4", InputPricePerMille: 30.00, OutputPricePerMille: 60.00, ContextWindow: 128000},
 	}
 
 	provider := NewProvider(id, name, providerType, baseURL, apiKeyName, models)
@@ -117,8 +117,8 @@ func TestNewProvider(t *testing.T) {
 
 func TestProvider_GetModelPricing(t *testing.T) {
 	models := []ModelPricing{
-		{Name: "gpt-4", InputPricePerMille: 3.00, OutputPricePerMille: 15.00, ContextWindow: 128000},
-		{Name: "gpt-3.5", InputPricePerMille: 0.50, OutputPricePerMille: 1.50, ContextWindow: 64000},
+		{Name: "gpt-4", InputPricePerMille: 30.00, OutputPricePerMille: 60.00, ContextWindow: 128000},
+		{Name: "gpt-3.5", InputPricePerMille: 5.00, OutputPricePerMille: 15.00, ContextWindow: 64000},
 	}
 
 	provider := &Provider{Models: models}
@@ -128,8 +128,8 @@ func TestProvider_GetModelPricing(t *testing.T) {
 	if pricing == nil {
 		t.Fatal("Expected pricing for gpt-4, got nil")
 	}
-	if pricing.InputPricePerMille != 3.00 {
-		t.Errorf("Expected input price 3.00, got %f", pricing.InputPricePerMille)
+	if pricing.InputPricePerMille != 30.00 {
+		t.Errorf("Expected input price 30.00, got %f", pricing.InputPricePerMille)
 	}
 
 	// Test non-existing model
@@ -332,8 +332,8 @@ func TestMessage_AddUsage(t *testing.T) {
 
 	message.AddUsage(promptTokens, completionTokens, inputCostPerMille, outputCostPerMille)
 
-	expectedInputCost := float64(promptTokens) * inputCostPerMille / 1000.0
-	expectedOutputCost := float64(completionTokens) * outputCostPerMille / 1000.0
+	expectedInputCost := float64(promptTokens) * inputCostPerMille / 1000000.0
+	expectedOutputCost := float64(completionTokens) * outputCostPerMille / 1000000.0
 	expectedTotalCost := expectedInputCost + expectedOutputCost
 
 	if message.Usage == nil {

@@ -47,8 +47,8 @@ func (m *Message) AddUsage(promptTokens, completionTokens int, inputCostPerMille
 	totalTokens := promptTokens + completionTokens
 
 	// Calculate cost
-	inputCost := float64(promptTokens) * inputCostPerMille / 1000.0
-	outputCost := float64(completionTokens) * outputCostPerMille / 1000.0
+	inputCost := float64(promptTokens) * inputCostPerMille / 1000000.0
+	outputCost := float64(completionTokens) * outputCostPerMille / 1000000.0
 	totalCost := inputCost + outputCost
 
 	// Create or update usage

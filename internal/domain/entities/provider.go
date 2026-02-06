@@ -24,8 +24,8 @@ const (
 // ModelPricing represents the cost structure for a specific model
 type ModelPricing struct {
 	Name                string  `json:"name" bson:"name"`                                     // Model name (e.g., "gpt-4o", "claude-3-opus")
-	InputPricePerMille  float64 `json:"input_price_per_mille" bson:"input_price_per_mille"`   // Cost per 1000 input tokens
-	OutputPricePerMille float64 `json:"output_price_per_mille" bson:"output_price_per_mille"` // Cost per 1000 output tokens
+	InputPricePerMille  float64 `json:"input_price_per_mille" bson:"input_price_per_mille"`   // Cost per million input tokens
+	OutputPricePerMille float64 `json:"output_price_per_mille" bson:"output_price_per_mille"` // Cost per million output tokens
 	ContextWindow       int     `json:"context_window" bson:"context_window"`                 // Maximum context length in tokens
 }
 

@@ -430,7 +430,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 	// Calculate total cost
 	var totalCost float64
 	if totalUsage != nil {
-		totalCost = (float64(totalUsage.PromptTokens)*inputPricePerMille + float64(totalUsage.CompletionTokens)*outputPricePerMille) / 1000.0
+		totalCost = (float64(totalUsage.PromptTokens)*inputPricePerMille + float64(totalUsage.CompletionTokens)*outputPricePerMille) / 1000000.0
 	}
 
 	// Add usage information to the last message
