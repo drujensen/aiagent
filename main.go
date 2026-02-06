@@ -128,11 +128,7 @@ func main() {
 		agentRepo = repositoriesMongo.NewMongoAgentRepository(db.Collection("agents"))
 		chatRepo = repositoriesMongo.NewMongoChatRepository(db.Collection("chats"))
 		providerRepo = repositoriesMongo.NewMongoProviderRepository(db.Collection("providers"))
-		// TODO: Implement MongoDB model repository
-		modelRepo, err = repositoriesJson.NewJSONModelRepository(dataDir)
-		if err != nil {
-			logger.Fatal("Failed to initialize model repository", zap.Error(err))
-		}
+		modelRepo = repositoriesMongo.NewMongoModelRepository(db.Collection("models"))
 		toolRepo, err = repositoriesMongo.NewToolRepository(db.Collection("tools"), toolFactory, logger)
 		if err != nil {
 			logger.Fatal("Failed to initialize tool repository", zap.Error(err))
