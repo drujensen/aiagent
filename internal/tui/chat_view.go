@@ -648,10 +648,10 @@ func (c *ChatView) updateEditorContent() {
 		)
 		// Ensure editor is not focused initially
 		c.editor.SetFocus(false)
-		// Set editor size to fit screen minus textarea, footer, and separators
+		// Set editor size to fit screen minus textarea, footer, separators, and header
 		if c.width > 0 && c.height > 0 {
 			editorWidth := c.width
-			editorHeight := c.height - 5 // textarea (2) + footer (1) + separators (2)
+			editorHeight := c.height - 6 // textarea (2) + footer (1) + separators (2) + header (1)
 			if editorHeight < 1 {
 				editorHeight = 1
 			}
@@ -749,10 +749,10 @@ func (c *ChatView) updateEditorContent() {
 	// Ensure editor maintains current focus state
 	c.editor.SetFocus(c.focused == "editor")
 
-	// Set editor size: textarea (2) + footer (1) + separators (2) = 5 total
+	// Set editor size: textarea (2) + footer (1) + separators (2) + header (1) = 6 total
 	if c.width > 0 && c.height > 0 {
 		editorWidth := c.width
-		editorHeight := c.height - 5
+		editorHeight := c.height - 6
 		if editorHeight < 1 {
 			editorHeight = 1
 		}
@@ -1106,9 +1106,9 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		c.width = m.Width
 		c.height = m.Height
 
-		// Set editor size to fit screen minus textarea, footer, and separators
+		// Set editor size to fit screen minus textarea, footer, separators, and header
 		editorWidth := c.width
-		editorHeight := c.height - 5 // textarea (2) + footer (1) + separators (2)
+		editorHeight := c.height - 6 // textarea (2) + footer (1) + separators (2) + header (1)
 		if editorHeight < 1 {
 			editorHeight = 1
 		}
@@ -1130,15 +1130,39 @@ func (c ChatView) View() string {
 	style := lipgloss.NewStyle().Width(c.width)
 
 	// Separator
-	separator := lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true).Render(strings.Repeat("═", c.width))
+	separator := lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true).Render(strings.Repeat("\u2500", c.width))
 
-	// Editor
-	editorHeight := c.height - 5 // textarea (2) + footer (1) + separators (2)
+	// Editor - needs to account for header taking space
+	editorHeight := c.height - 6 // textarea (2) + footer (1) + separators (2) + header (1)
 	if editorHeight < 1 {
 		editorHeight = 1
 	}
 	editorStyle := lipgloss.NewStyle().Width(c.width).Height(editorHeight)
 	editorPart := editorStyle.Render(c.editor.View())
+
+	// Header - title left (bold bright white), token info right
+	header := ""
+	if c.activeChat != nil && c.width > 0 {
+		titleStyle := lipgloss.NewStyle().PaddingLeft(1).Bold(true).Foreground(lipgloss.Color("15"))
+
+		var tokenInfo string
+		if c.activeChat.Usage != nil {
+			tokenCountStr := fmt.Sprintf("%d", c.activeChat.Usage.TotalTokens)
+			if c.currentModel != nil && c.currentModel.ContextWindow != nil && *c.currentModel.ContextWindow > 0 {
+				percentage := int(float64(c.activeChat.Usage.TotalTokens) / float64(*c.currentModel.ContextWindow) * 100)
+				tokenInfo = fmt.Sprintf("%s %d%% ($%.2f)", tokenCountStr, percentage, c.activeChat.Usage.TotalCost)
+			} else {
+				tokenInfo = fmt.Sprintf("%s ($%.2f)", tokenCountStr, c.activeChat.Usage.TotalCost)
+			}
+		}
+
+		headerLine := lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			titleStyle.Render(c.activeChat.Name),
+			lipgloss.NewStyle().Width(c.width-lipgloss.Width(c.activeChat.Name)-2).Align(lipgloss.Right).Render(tokenInfo),
+		)
+		header = headerLine
+	}
 
 	// Textarea
 	taStyle := style.Height(c.textarea.Height())
@@ -1167,7 +1191,7 @@ func (c ChatView) View() string {
 	rightStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Align(lipgloss.Right).Inline(true).Width(c.width - lipgloss.Width(instructions))
 	footerPart := footerStyle.Render(lipgloss.JoinHorizontal(lipgloss.Top, leftStyle.Render(instructions), rightStyle.Render(footerInfo)))
 
-	return lipgloss.JoinVertical(lipgloss.Top, editorPart, separator, textareaPart, separator, footerPart)
+	return lipgloss.JoinVertical(lipgloss.Top, editorPart, header, separator, textareaPart, separator, footerPart)
 }
 
 func sendMessageCmd(cs services.ChatService, chatID string, msg *entities.Message, ctx context.Context) tea.Cmd {

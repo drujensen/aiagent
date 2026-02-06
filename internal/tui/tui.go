@@ -350,11 +350,6 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 
-		t.commandMenu, cmd = t.commandMenu.Update(msg)
-		if cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-
 		return t, tea.Batch(cmds...)
 	}
 

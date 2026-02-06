@@ -28,6 +28,7 @@ type ChatService interface {
 	DeleteChat(ctx context.Context, id string) error
 	SendMessage(ctx context.Context, id string, message *entities.Message) (*entities.Message, error)
 	SaveMessagesIncrementally(ctx context.Context, chatID string, messages []*entities.Message) error
+	CalculateTotalChatCost(ctx context.Context, chatID string) (float64, error)
 }
 
 type chatService struct {
@@ -669,5 +670,20 @@ func (s *chatService) ensureToolCallResponses(messages []*entities.Message) []*e
 	return messages
 }
 
-// verify that chatService implements ChatService
-var _ ChatService = &chatService{}
+// CalculateTotalChatCost calculates the total cost of all messages in a chat
+func (s *chatService) CalculateTotalChatCost(ctx context.Context, chatID string) (float64, error) {
+	if chatID == "" {
+		return 0, errors.ValidationErrorf("chat ID is required")
+	}
+
+	chat, err := s.chatRepo.GetChat(ctx, chatID)
+	if err != nil {
+		return 0, err
+	}
+
+	if chat.Usage == nil {
+		return 0, nil
+	}
+
+	return chat.Usage.TotalCost, nil
+}
