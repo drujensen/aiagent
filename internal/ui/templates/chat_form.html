@@ -2,15 +2,7 @@
 <div class="chat-welcome">
     {{if not .IsEdit}}
     <h1>Start a New Conversation</h1>
-    <p>Choose how you'd like to begin</p>
-    <div class="quick-start-options">
-       <div class="option-card" onclick="startWithDefaults()">
-           <div class="option-icon">🚀</div>
-           <h3>Quick Start</h3>
-           <p>Get started immediately with smart defaults</p>
-           <small>Research Agent + GPT-4.1 Standard</small>
-       </div>
-    </div>
+    <p>Configure your conversation settings below</p>
     {{end}}
 
     <form
@@ -57,7 +49,7 @@
       padding: 20px;
       border-radius: 8px;
       max-width: 800px;
-      margin: 0 auto;
+      margin: 25px auto 0 auto;
       text-align: center;
   }
 
@@ -67,11 +59,11 @@
       font-size: 2.5em;
   }
 
-  .chat-welcome h2 {
-    color: #fff;
-    margin-bottom: 30px;
-    border-bottom: 2px solid #444;
-  }
+   .chat-welcome h2 {
+     color: #fff;
+     margin-bottom: 20px;
+     border-bottom: 2px solid #444;
+   }
 
   .chat-welcome > p {
       color: #ccc;
@@ -79,58 +71,15 @@
       margin-bottom: 40px;
   }
 
-  .quick-start-options {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 20px;
-      margin-bottom: 30px;
-  }
 
-  .option-card {
-      border: 2px solid #555;
-      border-radius: 12px;
-      padding: 30px 20px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      background: #2a2a2a;
-      color: #fff;
-  }
 
-  .option-card:hover {
-      border-color: #007bff;
-      box-shadow: 0 4px 12px rgba(0,123,255,0.15);
-      transform: translateY(-2px);
-      background: #3a3a3a;
-  }
-
-  .option-icon {
-      font-size: 2.5em;
-      margin-bottom: 15px;
-  }
-
-  .option-card h3 {
-      color: #fff;
-      margin: 0 0 10px 0;
-      font-size: 1.4em;
-  }
-
-  .option-card p {
-      color: #ccc;
-      margin: 0 0 15px 0;
-      font-size: 1em;
-  }
-
-  .option-card small {
-      color: #aaa;
-      font-size: 0.9em;
-  }
-
-  .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      margin-bottom: 20px;
-  }
+   .form-row {
+       display: grid;
+       grid-template-columns: 1fr 1fr;
+       gap: 20px;
+       margin-bottom: 20px;
+       padding-top: 20px;
+   }
 
   .form-group {
       text-align: left;
@@ -175,20 +124,34 @@
       margin-top: 30px;
   }
 
-  .btn {
-      padding: 12px 24px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: all 0.2s;
-      text-decoration: none;
-      display: inline-block;
-      text-align: center;
-  }
+   .btn {
+       border: none;
+       border-radius: 6px;
+       cursor: pointer;
+       font-size: 14px;
+       font-weight: 500;
+       transition: all 0.2s;
+       text-decoration: none;
+       display: inline-block;
+       text-align: center;
+   }
 
-  .btn-secondary {
+   .btn-primary {
+       padding: 10px 20px;
+       background-color: #464EB8;
+       color: #fff;
+       border: none;
+       border-radius: 0 0 5px 0;
+       cursor: pointer;
+       white-space: nowrap;
+   }
+
+   .btn-primary:hover {
+       background-color: #3a42a0;
+       transform: translateY(-1px);
+   }
+
+   .btn-secondary {
       background: #6c757d;
       color: white;
   }
@@ -198,53 +161,15 @@
       transform: translateY(-1px);
   }
 
-  @media (max-width: 768px) {
-      .form-row {
-          grid-template-columns: 1fr;
-          gap: 15px;
-      }
-
-      .quick-start-options {
-          grid-template-columns: 1fr;
-      }
-  }
+   @media (max-width: 768px) {
+       .form-row {
+           grid-template-columns: 1fr;
+           gap: 15px;
+       }
+   }
 </style>
 
 <script>
-function startWithDefaults() {
-    // Auto-create chat with default agent and model
-    fetch('/chats', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            name: '',
-            agent_id: '',  // Will use default
-            model_id: ''   // Will use default
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.id) {
-            window.location.href = '/chats/' + data.id;
-        } else {
-            alert('Failed to create chat');
-        }
-    })
-    .catch(error => {
-        alert('Failed to create chat: ' + error.message);
-    });
-}
-
-function showAdvancedOptions() {
-    document.querySelector('.quick-start-options').style.display = 'none';
-    document.getElementById('advanced-options').style.display = 'block';
-}
-
-function hideAdvancedOptions() {
-    document.getElementById('advanced-options').style.display = 'none';
-    document.querySelector('.quick-start-options').style.display = 'grid';
-}
+// No quick start functionality - users must configure chats manually
 </script>
 {{end}}
