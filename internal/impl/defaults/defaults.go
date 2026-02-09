@@ -66,7 +66,7 @@ func DefaultProviders() []*entities.Provider {
 			Models:     []entities.ModelPricing{},
 		},
 		{
-			ID:         "659D1EAD-AA0A-45CD-BE28-5472F419B0DB",
+			ID:         "511D9293-347A-495E-8C56-1A7B7D2185BB",
 			Name:       "Drujensen",
 			Type:       "drujensen",
 			BaseURL:    "https://ai.drujensen.com",
@@ -499,7 +499,7 @@ func DefaultModels() []*entities.Model {
 		{
 			ID:              "913C78D1-B2E4-4DA2-8ABE-3CCEF85D5387",
 			Name:            "Qwen3 Coder Latest",
-			ProviderID:      "659D1EAD-AA0A-45CD-BE28-5472F419B0DB",
+			ProviderID:      "511D9293-347A-495E-8C56-1A7B7D2185BB",
 			ProviderType:    entities.ProviderDrujensen,
 			ModelName:       "qwen3-coder:latest",
 			APIKey:          "#{DRUJENSEN_API_KEY}#",
