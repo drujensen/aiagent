@@ -3,7 +3,6 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -227,17 +226,13 @@ func (t *FileWriteTool) executeWriteOperation(args struct {
 	OldString  string
 	ReplaceAll bool
 }, fullPath string) (string, error) {
-	// Determine the operation type and create backup if needed
+	// Determine the operation type
 	fileExisted := false
 	operation := "create"
 	if _, err := os.Stat(fullPath); err == nil {
 		fileExisted = true
 		if args.Mode == "overwrite" {
 			operation = "overwrite"
-			backupPath := fullPath + ".backup"
-			if err := t.createBackup(fullPath, backupPath); err != nil {
-				t.logger.Warn("Failed to create backup", zap.Error(err))
-			}
 		} else if args.Mode == "append" {
 			operation = "append"
 		}
@@ -438,23 +433,6 @@ func (t *FileWriteTool) executeEditOperation(args struct {
 	summary := fmt.Sprintf("Replaced %d occurrence(s) of '%s' with '%s'", occurrences, args.OldString, args.Content)
 
 	return fmt.Sprintf(`{"success": true, "summary": %q, "diff": %q, "path": %q, "occurrences": %d, "replaced_all": %t}`, summary, diff, args.Path, occurrences, args.ReplaceAll), nil
-}
-
-func (t *FileWriteTool) createBackup(src, dst string) error {
-	srcFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer srcFile.Close()
-
-	dstFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer dstFile.Close()
-
-	_, err = io.Copy(dstFile, srcFile)
-	return err
 }
 
 // generateDiff creates a simple unified diff showing the changes made

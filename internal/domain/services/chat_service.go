@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -456,6 +457,11 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 	// Validate that all tool calls have responses
 	newMessages = s.ensureToolCallResponses(newMessages)
 
+	// Check for compression instructions in tool results
+	if err := s.processCompressionInstructions(ctx, chat, newMessages); err != nil {
+		s.logger.Warn("Failed to process compression instructions", zap.Error(err))
+	}
+
 	// Return the last message (final assistant response)
 	if len(newMessages) > 0 {
 		return newMessages[len(newMessages)-1], nil
@@ -514,6 +520,359 @@ func isSafeSplit(messages []entities.Message, split int) bool {
 	}
 
 	return true
+}
+
+// processCompressionInstructions checks for compression instructions in tool messages
+// and executes compression if found
+func (s *chatService) processCompressionInstructions(ctx context.Context, chat *entities.Chat, messages []*entities.Message) error {
+	for _, msg := range messages {
+		if msg.Role == "tool" && strings.Contains(msg.Content, "compression_instruction") {
+			var result map[string]interface{}
+			if err := json.Unmarshal([]byte(msg.Content), &result); err != nil {
+				continue // Not a valid JSON result, skip
+			}
+
+			if instruction, ok := result["compression_instruction"].(map[string]interface{}); ok {
+				action, _ := instruction["action"].(string)
+				if action == "compress_range" {
+					return s.executeCompressionInstruction(ctx, chat, instruction)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// executeCompressionInstruction performs the actual compression based on the instruction
+func (s *chatService) executeCompressionInstruction(ctx context.Context, chat *entities.Chat, instruction map[string]interface{}) error {
+	startIdx, _ := instruction["start_message_index"].(float64)
+	endIdx, _ := instruction["end_message_index"].(float64)
+	summaryType, _ := instruction["summary_type"].(string)
+	description, _ := instruction["description"].(string)
+
+	s.logger.Info("Executing compression instruction",
+		zap.Int("start_index", int(startIdx)),
+		zap.Int("end_index", int(endIdx)),
+		zap.String("summary_type", summaryType))
+
+	// Get current messages
+	messages := chat.Messages
+
+	// Validate range
+	start := int(startIdx)
+	end := int(endIdx)
+	if start < 0 || end >= len(messages) || start > end {
+		return fmt.Errorf("invalid compression range: start=%d, end=%d, total_messages=%d", start, end, len(messages))
+	}
+
+	// Extract messages to compress
+	messagesToCompress := messages[start : end+1]
+
+	// Analyze content to enhance summarization
+	contentAnalysis := s.analyzeMessages(messagesToCompress)
+
+	// Create summarization prompt based on type and content analysis
+	var prompt string
+	switch summaryType {
+	case "task_cleanup":
+		prompt = s.buildTaskCleanupPrompt(contentAnalysis)
+	case "plan_update":
+		prompt = s.buildPlanUpdatePrompt(contentAnalysis)
+	case "context_preservation":
+		prompt = s.buildContextPreservationPrompt(contentAnalysis)
+	case "full_reset":
+		prompt = s.buildFullResetPrompt(contentAnalysis)
+	default:
+		prompt = "You are an expert at summarizing conversation history. Create a concise summary of the following conversation that captures all important context, decisions, and information. The summary will be used as context for future messages in this conversation."
+	}
+
+	// Add description if provided
+	if description != "" {
+		prompt = fmt.Sprintf("Task: %s\n\n%s", description, prompt)
+	}
+
+	// Create summary using existing compression logic
+	summaryMsg, err := s.createSummaryFromMessages(ctx, messagesToCompress, prompt)
+	if err != nil {
+		return fmt.Errorf("failed to create summary: %v", err)
+	}
+
+	// Replace the range with the summary
+	newMessages := make([]entities.Message, 0, len(messages)-len(messagesToCompress)+1)
+	newMessages = append(newMessages, messages[:start]...)
+	newMessages = append(newMessages, *summaryMsg)
+	newMessages = append(newMessages, messages[end+1:]...)
+
+	chat.Messages = newMessages
+
+	// Save the updated chat
+	if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
+		return fmt.Errorf("failed to save compressed chat: %v", err)
+	}
+
+	s.logger.Info("Successfully compressed messages",
+		zap.Int("original_count", len(messages)),
+		zap.Int("compressed_count", len(newMessages)),
+		zap.Int("removed_count", len(messagesToCompress)-1))
+
+	return nil
+}
+
+// analyzeMessageContent performs content analysis to identify architectural vs implementation content
+func (s *chatService) analyzeMessageContent(content string) map[string]bool {
+	analysis := map[string]bool{
+		"has_interface":       false,
+		"has_contract":        false,
+		"has_design_decision": false,
+		"has_error_handling":  false,
+		"has_configuration":   false,
+		"has_debugging":       false,
+		"has_implementation":  false,
+	}
+
+	contentLower := strings.ToLower(content)
+
+	// Architectural indicators
+	if strings.Contains(contentLower, "interface") ||
+		strings.Contains(contentLower, "type ") ||
+		strings.Contains(contentLower, "struct") {
+		analysis["has_interface"] = true
+	}
+
+	if strings.Contains(contentLower, "contract") ||
+		strings.Contains(contentLower, "agreement") ||
+		strings.Contains(contentLower, "promise") {
+		analysis["has_contract"] = true
+	}
+
+	if strings.Contains(contentLower, "decision") ||
+		strings.Contains(contentLower, "design") ||
+		strings.Contains(contentLower, "architecture") {
+		analysis["has_design_decision"] = true
+	}
+
+	if strings.Contains(contentLower, "error") ||
+		strings.Contains(contentLower, "handle") ||
+		strings.Contains(contentLower, "catch") ||
+		strings.Contains(contentLower, "panic") {
+		analysis["has_error_handling"] = true
+	}
+
+	if strings.Contains(contentLower, "config") ||
+		strings.Contains(contentLower, "setup") ||
+		strings.Contains(contentLower, "initialize") {
+		analysis["has_configuration"] = true
+	}
+
+	// Implementation indicators
+	if strings.Contains(contentLower, "debug") ||
+		strings.Contains(contentLower, "print") ||
+		strings.Contains(contentLower, "log") ||
+		strings.Contains(contentLower, "fmt.printf") {
+		analysis["has_debugging"] = true
+	}
+
+	if strings.Contains(contentLower, "func ") ||
+		strings.Contains(contentLower, "method") ||
+		strings.Contains(contentLower, "implementation") {
+		analysis["has_implementation"] = true
+	}
+
+	return analysis
+}
+
+// createSummaryFromMessages creates a summary message from a slice of messages
+func (s *chatService) createSummaryFromMessages(ctx context.Context, messages []entities.Message, prompt string) (*entities.Message, error) {
+	// Get AI model for summarization (reuse existing logic)
+	model, err := s.modelRepo.GetModel(ctx, "gpt-4") // Use GPT-4 for summarization
+	if err != nil {
+		// Fallback to first available model
+		models, err := s.modelRepo.ListModels(ctx)
+		if err != nil || len(models) == 0 {
+			return nil, fmt.Errorf("no AI model available for summarization")
+		}
+		model = models[0]
+	}
+
+	provider, err := s.providerRepo.GetProvider(ctx, model.ProviderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get provider: %v", err)
+	}
+
+	apiKey, err := s.config.ResolveEnvironmentVariable(model.APIKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve API key: %v", err)
+	}
+
+	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
+	aiModel, err := aiModelFactory.CreateModelIntegration(model, provider, apiKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AI model: %v", err)
+	}
+
+	// Create summary prompt message
+	summaryPrompt := &entities.Message{
+		Role:    "system",
+		Content: prompt,
+	}
+
+	// Messages for summarization
+	var historyMsgs []*entities.Message
+	historyMsgs = append(historyMsgs, summaryPrompt)
+
+	// Add messages to summarize
+	for i := range messages {
+		msg := messages[i]
+		historyMsgs = append(historyMsgs, &msg)
+	}
+
+	// Generate summary
+	options := map[string]any{
+		"temperature": 0.0,
+		"max_tokens":  1000,
+	}
+
+	summaryResponse, err := aiModel.GenerateResponse(ctx, historyMsgs, nil, options, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate summary: %v", err)
+	}
+
+	if len(summaryResponse) == 0 {
+		return nil, fmt.Errorf("no summary generated")
+	}
+
+	// Create summary message
+	summaryMsg := &entities.Message{
+		ID:        uuid.New().String(),
+		Role:      "assistant",
+		Content:   summaryResponse[0].Content,
+		Timestamp: time.Now(),
+	}
+
+	return summaryMsg, nil
+}
+
+// analyzeMessages performs content analysis on a slice of messages
+func (s *chatService) analyzeMessages(messages []entities.Message) map[string]int {
+	analysis := map[string]int{
+		"interfaces":       0,
+		"contracts":        0,
+		"design_decisions": 0,
+		"error_handling":   0,
+		"configuration":    0,
+		"debugging":        0,
+		"implementation":   0,
+	}
+
+	for _, msg := range messages {
+		msgAnalysis := s.analyzeMessageContent(msg.Content)
+		if msgAnalysis["has_interface"] {
+			analysis["interfaces"]++
+		}
+		if msgAnalysis["has_contract"] {
+			analysis["contracts"]++
+		}
+		if msgAnalysis["has_design_decision"] {
+			analysis["design_decisions"]++
+		}
+		if msgAnalysis["has_error_handling"] {
+			analysis["error_handling"]++
+		}
+		if msgAnalysis["has_configuration"] {
+			analysis["configuration"]++
+		}
+		if msgAnalysis["has_debugging"] {
+			analysis["debugging"]++
+		}
+		if msgAnalysis["has_implementation"] {
+			analysis["implementation"]++
+		}
+	}
+
+	return analysis
+}
+
+// buildTaskCleanupPrompt creates a targeted prompt for task completion cleanup
+func (s *chatService) buildTaskCleanupPrompt(analysis map[string]int) string {
+	prompt := "Summarize this completed task implementation. "
+
+	// Emphasize preservation based on content found
+	if analysis["interfaces"] > 0 {
+		prompt += "PRESERVE: All interface definitions and type contracts created. "
+	}
+	if analysis["design_decisions"] > 0 {
+		prompt += "PRESERVE: Design decisions that affect future development. "
+	}
+	if analysis["error_handling"] > 0 {
+		prompt += "PRESERVE: Error handling patterns and exception strategies established. "
+	}
+	if analysis["configuration"] > 0 {
+		prompt += "PRESERVE: Configuration changes and setup requirements. "
+	}
+
+	// Emphasize removal of implementation details
+	prompt += "\n\nREMOVE/CONDENSE: "
+	if analysis["debugging"] > 0 {
+		prompt += "Debugging output, print statements, and troubleshooting steps. "
+	}
+	prompt += "Step-by-step implementation details, intermediate code iterations, and tool execution logs. "
+
+	prompt += "\n\nFocus on the final result and architectural impact, not the journey."
+	return prompt
+}
+
+// buildPlanUpdatePrompt creates a prompt for updating project plans
+func (s *chatService) buildPlanUpdatePrompt(analysis map[string]int) string {
+	prompt := "Update the project plan and overview. "
+
+	if analysis["interfaces"] > 0 {
+		prompt += "PRESERVE: Current active interfaces and contracts. "
+	}
+	if analysis["design_decisions"] > 0 {
+		prompt += "PRESERVE: Current architectural decisions and patterns. "
+	}
+
+	prompt += "\n\nREMOVE: Previous/outdated plans, abandoned approaches, and historical context that no longer applies. "
+
+	prompt += "\n\nCreate a clean, current overview that reflects the latest project state."
+	return prompt
+}
+
+// buildContextPreservationPrompt creates a prompt for preserving important context
+func (s *chatService) buildContextPreservationPrompt(analysis map[string]int) string {
+	prompt := "Preserve essential context while removing conversational noise. "
+
+	if analysis["interfaces"] > 0 || analysis["contracts"] > 0 {
+		prompt += "KEEP: All architectural definitions, interfaces, and contracts. "
+	}
+	if analysis["design_decisions"] > 0 {
+		prompt += "KEEP: Key design decisions and architectural choices. "
+	}
+	if analysis["error_handling"] > 0 {
+		prompt += "KEEP: Established error handling patterns. "
+	}
+
+	prompt += "\n\nCONDENSE/REMOVE: Debugging sessions, repetitive tool calls, intermediate steps, and chatty conversation. "
+
+	prompt += "\n\nMaintain continuity for future development work."
+	return prompt
+}
+
+// buildFullResetPrompt creates a prompt for major project resets
+func (s *chatService) buildFullResetPrompt(analysis map[string]int) string {
+	prompt := "Create a minimal foundation summary for major project changes. "
+
+	if analysis["interfaces"] > 0 {
+		prompt += "KEEP ONLY: Core interface definitions still relevant. "
+	}
+	if analysis["design_decisions"] > 0 {
+		prompt += "KEEP ONLY: Fundamental architectural decisions. "
+	}
+
+	prompt += "\n\nREMOVE: Implementation details, historical context, previous plans, and everything not essential for starting fresh. "
+
+	prompt += "\n\nProvide just enough context for new development to begin."
+	return prompt
 }
 
 // compressMessages summarizes older messages to reduce token count while preserving context

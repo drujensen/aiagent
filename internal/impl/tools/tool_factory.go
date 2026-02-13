@@ -134,10 +134,18 @@ func NewToolFactory() (*ToolFactory, error) {
 	}
 	toolFactory.toolFactories["Todo"] = &ToolFactoryEntry{
 		Name:        "Todo",
-		Description: "This tool manages a structured task list for complex tasks, allowing creation, reading, and status updates of todos.",
+		Description: "This tool manages a structured task list for complex tasks, allowing creation, reading, and status updates of todos with workflow grouping support.",
 		ConfigKeys:  []string{"workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewTodoTool(name, description, configuration, logger)
+		},
+	}
+	toolFactory.toolFactories["Compression"] = &ToolFactoryEntry{
+		Name:        "Compression",
+		Description: "This tool provides intelligent context compression for managing conversation history, allowing selective summarization of message ranges based on different compression strategies.",
+		ConfigKeys:  []string{"workspace"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewCompressionTool(name, description, configuration, logger)
 		},
 	}
 	return toolFactory, nil

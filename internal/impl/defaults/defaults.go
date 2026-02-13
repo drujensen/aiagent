@@ -143,7 +143,7 @@ Stop researching when:
 - If information is incomplete, clearly state what you know and what you don't
 - Provide sources and evidence for claims
 - Ask for clarification only when essential` + systemPrompt,
-			Tools:     []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo"},
+			Tools:     []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -179,7 +179,7 @@ Stop planning when:
 - Be specific about task scope and effort
 - Clearly indicate task dependencies
 - Focus on actionable items` + systemPrompt,
-			Tools:     []string{"WebSearch", "Project", "FileRead", "FileSearch", "Directory", "Todo"},
+			Tools:     []string{"WebSearch", "Project", "FileRead", "FileSearch", "Directory", "Todo", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -248,7 +248,7 @@ This precise approach prevents duplicate functions, wrong placements, and other 
 - After making file edits, automatically run the lint/format/build/test cycle using Process tool
 - After tool usage, assess if additional steps are needed to complete the task
 - Continue autonomously - don't stop after individual actions unless the task is fully complete\` + systemPrompt,
-			Tools:     []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process"},
+			Tools:     []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -273,7 +273,7 @@ func DefaultTools() []*entities.ToolData {
 			ID:            "575B620F-8E41-4294-ADF7-B04B8ACB8F0D",
 			ToolType:      "Project",
 			Name:          "Project",
-			Description:   "This tool reads project details from a project file to provide context for the agent.",
+			Description:   "This tool provides project context: reads project details from AGENTS.md and shows directory structure without reading file contents.",
 			Configuration: map[string]string{"project_file": "AGENTS.md"},
 			CreatedAt:     now,
 			UpdatedAt:     now,
@@ -365,6 +365,15 @@ func DefaultTools() []*entities.ToolData {
 			ToolType:      "Todo",
 			Name:          "Todo",
 			Description:   "REQUIRED for complex multi-step tasks. Create structured plans and track progress autonomously. Use this tool to break down work and ensure complete execution without user intervention.",
+			Configuration: map[string]string{},
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+		{
+			ID:            "E3FB888D-61A0-4EE7-AB5F-8FE44A5F43A9",
+			ToolType:      "Compression",
+			Name:          "Compression",
+			Description:   "Provides intelligent context compression for managing conversation history. Allows selective summarization of message ranges based on different strategies while preserving architectural context.",
 			Configuration: map[string]string{},
 			CreatedAt:     now,
 			UpdatedAt:     now,

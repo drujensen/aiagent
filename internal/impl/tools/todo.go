@@ -15,12 +15,13 @@ import (
 )
 
 type TodoItem struct {
-	Content   string    `json:"content"`
-	Status    string    `json:"status"`   // pending, in_progress, completed, cancelled
-	Priority  string    `json:"priority"` // high, medium, low
-	ID        string    `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Content    string    `json:"content"`
+	Status     string    `json:"status"`   // pending, in_progress, completed, cancelled
+	Priority   string    `json:"priority"` // high, medium, low
+	ID         string    `json:"id"`
+	WorkflowID string    `json:"workflow_id,omitempty"` // Optional grouping for multi-step workflows
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type TodoList struct {
@@ -64,9 +65,10 @@ func (t *TodoTool) FullDescription() string {
 	b.WriteString(t.Description())
 	b.WriteString("\n\n")
 	b.WriteString("## Usage Instructions\n")
-	b.WriteString("This tool manages a structured task list for complex tasks. It supports creating, reading, updating, and managing tasks with priorities and statuses.\n")
+	b.WriteString("This tool manages a structured task list for complex tasks. It supports creating, reading, updating, and managing tasks with priorities, statuses, and workflow grouping.\n")
 	b.WriteString("Tasks can have statuses: pending, in_progress, completed, cancelled\n")
 	b.WriteString("Priorities: high, medium, low\n")
+	b.WriteString("Workflows: Use workflow_id to group related tasks (e.g., 'auth-feature', 'user-registration')\n")
 	b.WriteString("\n## Configuration\n")
 	b.WriteString("| Key           | Value         |\n")
 	b.WriteString("|---------------|---------------|\n")
@@ -87,9 +89,25 @@ func (t *TodoTool) Schema() map[string]any {
 			},
 			"todos": map[string]any{
 				"type":        "array",
-				"description": "For write action: array of todo objects with content, priority",
+				"description": "For write action: array of todo objects with content, priority, and optional workflow_id",
 				"items": map[string]any{
 					"type": "object",
+					"properties": map[string]any{
+						"content": map[string]any{
+							"type":        "string",
+							"description": "Task description",
+						},
+						"priority": map[string]any{
+							"type":        "string",
+							"description": "Task priority: high, medium, low",
+							"enum":        []string{"high", "medium", "low"},
+						},
+						"workflow_id": map[string]any{
+							"type":        "string",
+							"description": "Optional workflow identifier for grouping related tasks",
+						},
+					},
+					"required": []string{"content"},
 				},
 			},
 			"id": map[string]any{
@@ -153,8 +171,9 @@ func (t *TodoTool) Execute(arguments string) (string, error) {
 	var args struct {
 		Action string `json:"action"`
 		Todos  []struct {
-			Content  string `json:"content"`
-			Priority string `json:"priority"`
+			Content    string `json:"content"`
+			Priority   string `json:"priority"`
+			WorkflowID string `json:"workflow_id,omitempty"`
 		} `json:"todos,omitempty"`
 		ID     string `json:"id,omitempty"`
 		Status string `json:"status,omitempty"`
@@ -178,8 +197,9 @@ func (t *TodoTool) Execute(arguments string) (string, error) {
 }
 
 func (t *TodoTool) writeTodos(todos []struct {
-	Content  string `json:"content"`
-	Priority string `json:"priority"`
+	Content    string `json:"content"`
+	Priority   string `json:"priority"`
+	WorkflowID string `json:"workflow_id,omitempty"`
 }) (string, error) {
 	todoList, err := t.loadTodos()
 	if err != nil {
@@ -191,12 +211,13 @@ func (t *TodoTool) writeTodos(todos []struct {
 			todo.Priority = "medium"
 		}
 		newTodo := TodoItem{
-			Content:   todo.Content,
-			Status:    "pending",
-			Priority:  todo.Priority,
-			ID:        uuid.New().String(),
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
+			Content:    todo.Content,
+			Status:     "pending",
+			Priority:   todo.Priority,
+			ID:         uuid.New().String(),
+			WorkflowID: todo.WorkflowID,
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
 		}
 		todoList.Todos = append(todoList.Todos, newTodo)
 	}
@@ -265,30 +286,35 @@ func (t *TodoTool) readTodos() (string, error) {
 	var result strings.Builder
 	result.WriteString("📋 Task Plan:\n\n")
 
+	// Group todos by workflow
+	workflows := make(map[string][]TodoItem)
+	orphaned := []TodoItem{}
+
 	for _, todo := range todoList.Todos {
-		checkbox := ""
-		switch todo.Status {
-		case "pending":
-			checkbox = "- [ ]"
-		case "in_progress":
-			checkbox = "- [🔄]"
-		case "completed":
-			checkbox = "- [x]"
-		case "cancelled":
-			checkbox = "- [❌]"
+		if todo.WorkflowID != "" {
+			workflows[todo.WorkflowID] = append(workflows[todo.WorkflowID], todo)
+		} else {
+			orphaned = append(orphaned, todo)
 		}
+	}
 
-		priorityIcon := ""
-		switch todo.Priority {
-		case "high":
-			priorityIcon = "🔴"
-		case "medium":
-			priorityIcon = "🟡"
-		case "low":
-			priorityIcon = "🟢"
+	// Display workflows
+	for workflowID, todos := range workflows {
+		result.WriteString(fmt.Sprintf("## %s\n", workflowID))
+		for _, todo := range todos {
+			result.WriteString(t.formatTodo(todo))
 		}
+		result.WriteString("\n")
+	}
 
-		result.WriteString(fmt.Sprintf("%s %s %s\n", checkbox, priorityIcon, todo.Content))
+	// Display orphaned todos
+	if len(orphaned) > 0 {
+		if len(workflows) > 0 {
+			result.WriteString("## General Tasks\n")
+		}
+		for _, todo := range orphaned {
+			result.WriteString(t.formatTodo(todo))
+		}
 	}
 
 	// JSON for AI processing
@@ -298,6 +324,32 @@ func (t *TodoTool) readTodos() (string, error) {
 	})
 
 	return string(jsonResult), nil
+}
+
+func (t *TodoTool) formatTodo(todo TodoItem) string {
+	checkbox := ""
+	switch todo.Status {
+	case "pending":
+		checkbox = "- [ ]"
+	case "in_progress":
+		checkbox = "- [🔄]"
+	case "completed":
+		checkbox = "- [x]"
+	case "cancelled":
+		checkbox = "- [❌]"
+	}
+
+	priorityIcon := ""
+	switch todo.Priority {
+	case "high":
+		priorityIcon = "🔴"
+	case "medium":
+		priorityIcon = "🟡"
+	case "low":
+		priorityIcon = "🟢"
+	}
+
+	return fmt.Sprintf("%s %s %s\n", checkbox, priorityIcon, todo.Content)
 }
 
 func (t *TodoTool) updateStatus(id, status string) (string, error) {
