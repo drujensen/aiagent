@@ -16,8 +16,7 @@ import (
 
 type TodoItem struct {
 	Content    string    `json:"content"`
-	Status     string    `json:"status"`   // pending, in_progress, completed, cancelled
-	Priority   string    `json:"priority"` // high, medium, low
+	Status     string    `json:"status"` // pending, in_progress, completed, cancelled
 	ID         string    `json:"id"`
 	WorkflowID string    `json:"workflow_id,omitempty"` // Optional grouping for multi-step workflows
 	CreatedAt  time.Time `json:"created_at"`
@@ -65,10 +64,11 @@ func (t *TodoTool) FullDescription() string {
 	b.WriteString(t.Description())
 	b.WriteString("\n\n")
 	b.WriteString("## Usage Instructions\n")
-	b.WriteString("This tool manages a structured task list for complex tasks. It supports creating, reading, updating, and managing tasks with priorities, statuses, and workflow grouping.\n")
+	b.WriteString("This tool manages a structured task list for complex tasks. It supports creating, reading, updating, and managing tasks with statuses and workflow grouping.\n")
 	b.WriteString("Tasks can have statuses: pending, in_progress, completed, cancelled\n")
-	b.WriteString("Priorities: high, medium, low\n")
 	b.WriteString("Workflows: Use workflow_id to group related tasks (e.g., 'auth-feature', 'user-registration')\n")
+	b.WriteString("\nPer-session support: session_id is required and auto-injected by the chat service using current chat.ID.\n")
+	b.WriteString("LLMs do not need to provide it. Clear: Use action='clear' to delete all todos for the session.\n")
 	b.WriteString("\n## Configuration\n")
 	b.WriteString("| Key           | Value         |\n")
 	b.WriteString("|---------------|---------------|\n")
@@ -84,23 +84,18 @@ func (t *TodoTool) Schema() map[string]any {
 		"properties": map[string]any{
 			"action": map[string]any{
 				"type":        "string",
-				"description": "Action to perform: write, read, update_status",
-				"enum":        []string{"write", "read", "update_status"},
+				"description": "Action to perform: write, read, update_status, clear",
+				"enum":        []string{"write", "read", "update_status", "clear"},
 			},
 			"todos": map[string]any{
 				"type":        "array",
-				"description": "For write action: array of todo objects with content, priority, and optional workflow_id",
+				"description": "For write action: array of todo objects with content and optional workflow_id",
 				"items": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"content": map[string]any{
 							"type":        "string",
 							"description": "Task description",
-						},
-						"priority": map[string]any{
-							"type":        "string",
-							"description": "Task priority: high, medium, low",
-							"enum":        []string{"high", "medium", "low"},
 						},
 						"workflow_id": map[string]any{
 							"type":        "string",
@@ -119,21 +114,26 @@ func (t *TodoTool) Schema() map[string]any {
 				"description": "For update_status action: new status (pending, in_progress, completed, cancelled)",
 				"enum":        []string{"pending", "in_progress", "completed", "cancelled"},
 			},
+			"session_id": map[string]any{
+				"type":        "string",
+				"description": "Required chat session ID (auto-injected by service).",
+			},
 		},
-		"required": []string{"action"},
+		"required": []string{"action", "session_id"},
 	}
 }
 
-func (t *TodoTool) getTodoFilePath() string {
+func (t *TodoTool) getTodoFilePath(sessionID string) string {
 	workspace := t.configuration["workspace"]
 	if workspace == "" {
 		workspace, _ = os.Getwd()
 	}
-	return filepath.Join(workspace, ".aiagent", "todos.json")
+	dir := filepath.Join(workspace, ".aiagent")
+	return filepath.Join(dir, fmt.Sprintf("todos_%s.json", sessionID))
 }
 
-func (t *TodoTool) loadTodos() (*TodoList, error) {
-	path := t.getTodoFilePath()
+func (t *TodoTool) loadTodos(sessionID string) (*TodoList, error) {
+	path := t.getTodoFilePath(sessionID)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return &TodoList{Todos: []TodoItem{}}, nil
 	}
@@ -151,8 +151,8 @@ func (t *TodoTool) loadTodos() (*TodoList, error) {
 	return &todoList, nil
 }
 
-func (t *TodoTool) saveTodos(todoList *TodoList) error {
-	path := t.getTodoFilePath()
+func (t *TodoTool) saveTodos(sessionID string, todoList *TodoList) error {
+	path := t.getTodoFilePath(sessionID)
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
@@ -172,48 +172,49 @@ func (t *TodoTool) Execute(arguments string) (string, error) {
 		Action string `json:"action"`
 		Todos  []struct {
 			Content    string `json:"content"`
-			Priority   string `json:"priority"`
 			WorkflowID string `json:"workflow_id,omitempty"`
 		} `json:"todos,omitempty"`
-		ID     string `json:"id,omitempty"`
-		Status string `json:"status,omitempty"`
+		ID        string `json:"id,omitempty"`
+		Status    string `json:"status,omitempty"`
+		SessionID string `json:"session_id"`
 	}
-
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
 		return "", fmt.Errorf("failed to parse arguments: %v", err)
 	}
 
+	sessionID := args.SessionID
+	if sessionID == "" {
+		return "", fmt.Errorf("session_id is required")
+	}
+
 	switch args.Action {
 	case "write":
-		return t.writeTodos(args.Todos)
+		return t.writeTodos(sessionID, args.Todos)
 	case "read":
-		return t.readTodos()
+		return t.readTodos(sessionID)
 	case "update_status":
-		return t.updateStatus(args.ID, args.Status)
+		return t.updateStatus(sessionID, args.ID, args.Status)
+	case "clear":
+		return t.clearTodos(sessionID)
 	default:
 		return "", fmt.Errorf("unknown action: %s", args.Action)
 	}
 }
 
-func (t *TodoTool) writeTodos(todos []struct {
+func (t *TodoTool) writeTodos(sessionID string, todos []struct {
 	Content    string `json:"content"`
-	Priority   string `json:"priority"`
 	WorkflowID string `json:"workflow_id,omitempty"`
 }) (string, error) {
-	todoList, err := t.loadTodos()
+	todoList, err := t.loadTodos(sessionID)
 	if err != nil {
 		return "", err
 	}
 
 	for _, todo := range todos {
-		if todo.Priority == "" {
-			todo.Priority = "medium"
-		}
 		newTodo := TodoItem{
 			Content:    todo.Content,
 			Status:     "pending",
-			Priority:   todo.Priority,
 			ID:         uuid.New().String(),
 			WorkflowID: todo.WorkflowID,
 			CreatedAt:  time.Now(),
@@ -222,7 +223,7 @@ func (t *TodoTool) writeTodos(todos []struct {
 		todoList.Todos = append(todoList.Todos, newTodo)
 	}
 
-	if err := t.saveTodos(todoList); err != nil {
+	if err := t.saveTodos(sessionID, todoList); err != nil {
 		return "", err
 	}
 
@@ -246,17 +247,7 @@ func (t *TodoTool) writeTodos(todos []struct {
 				checkbox = "- [❌]"
 			}
 
-			priorityIcon := ""
-			switch todo.Priority {
-			case "high":
-				priorityIcon = "🔴"
-			case "medium":
-				priorityIcon = "🟡"
-			case "low":
-				priorityIcon = "🟢"
-			}
-
-			result.WriteString(fmt.Sprintf("%s %s %s\n", checkbox, priorityIcon, todo.Content))
+			result.WriteString(fmt.Sprintf("%s %s\n", checkbox, todo.Content))
 		}
 	}
 
@@ -269,8 +260,8 @@ func (t *TodoTool) writeTodos(todos []struct {
 	return string(jsonResult), nil
 }
 
-func (t *TodoTool) readTodos() (string, error) {
-	todoList, err := t.loadTodos()
+func (t *TodoTool) readTodos(sessionID string) (string, error) {
+	todoList, err := t.loadTodos(sessionID)
 	if err != nil {
 		return "", err
 	}
@@ -339,21 +330,11 @@ func (t *TodoTool) formatTodo(todo TodoItem) string {
 		checkbox = "- [❌]"
 	}
 
-	priorityIcon := ""
-	switch todo.Priority {
-	case "high":
-		priorityIcon = "🔴"
-	case "medium":
-		priorityIcon = "🟡"
-	case "low":
-		priorityIcon = "🟢"
-	}
-
-	return fmt.Sprintf("%s %s %s\n", checkbox, priorityIcon, todo.Content)
+	return fmt.Sprintf("%s %s\n", checkbox, todo.Content)
 }
 
-func (t *TodoTool) updateStatus(id, status string) (string, error) {
-	todoList, err := t.loadTodos()
+func (t *TodoTool) updateStatus(sessionID, id, status string) (string, error) {
+	todoList, err := t.loadTodos(sessionID)
 	if err != nil {
 		return "", err
 	}
@@ -372,7 +353,7 @@ func (t *TodoTool) updateStatus(id, status string) (string, error) {
 		return "", fmt.Errorf("todo with id %s not found", id)
 	}
 
-	if err := t.saveTodos(todoList); err != nil {
+	if err := t.saveTodos(sessionID, todoList); err != nil {
 		return "", err
 	}
 
@@ -396,17 +377,7 @@ func (t *TodoTool) updateStatus(id, status string) (string, error) {
 				checkbox = "- [❌]"
 			}
 
-			priorityIcon := ""
-			switch todo.Priority {
-			case "high":
-				priorityIcon = "🔴"
-			case "medium":
-				priorityIcon = "🟡"
-			case "low":
-				priorityIcon = "🟢"
-			}
-
-			result.WriteString(fmt.Sprintf("%s %s %s\n", checkbox, priorityIcon, todo.Content))
+			result.WriteString(fmt.Sprintf("%s %s\n", checkbox, todo.Content))
 		}
 	}
 
@@ -417,6 +388,17 @@ func (t *TodoTool) updateStatus(id, status string) (string, error) {
 	})
 
 	return string(jsonResult), nil
+}
+
+func (t *TodoTool) clearTodos(sessionID string) (string, error) {
+	path := t.getTodoFilePath(sessionID)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return `{"summary": "No todos found for this session."}`, nil
+	}
+	if err := os.Remove(path); err != nil {
+		return "", err
+	}
+	return `{"summary": "Cleared all todos for this session."}`, nil
 }
 
 var _ entities.Tool = (*TodoTool)(nil)
