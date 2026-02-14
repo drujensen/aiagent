@@ -58,7 +58,7 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 		usageView:   NewUsageView(chatService, agentService, modelService),
 		helpView:    NewHelpView(),
 		agentView:   NewAgentView(agentService),
-		modelView:   NewModelView(modelService),
+		modelView:   NewModelView(modelService, providerService),
 		toolView:    NewToolView(toolService),
 		commandMenu: NewCommandMenu(),
 

@@ -12,15 +12,17 @@ import (
 )
 
 type ModelView struct {
-	modelService services.ModelService
-	list         list.Model
-	width        int
-	height       int
-	err          error
-	mode         string // "view" or "switch"
+	modelService    services.ModelService
+	providerService services.ProviderService
+	filterService   *services.ModelFilterService
+	list            list.Model
+	width           int
+	height          int
+	err             error
+	mode            string // "view" or "switch"
 }
 
-func NewModelView(modelService services.ModelService) ModelView {
+func NewModelView(modelService services.ModelService, providerService services.ProviderService) ModelView {
 	delegate := list.NewDefaultDelegate()
 	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("6")).Bold(true)
 	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("7"))
@@ -28,14 +30,16 @@ func NewModelView(modelService services.ModelService) ModelView {
 
 	l := list.New([]list.Item{}, delegate, 100, 10)
 	l.Title = "Available Models"
-	l.SetShowStatusBar(false)
+	l.SetShowStatusBar(true)
 	l.SetFilteringEnabled(true)
 	l.SetShowPagination(true)
 
 	return ModelView{
-		modelService: modelService,
-		list:         l,
-		mode:         "view",
+		modelService:    modelService,
+		providerService: providerService,
+		filterService:   services.NewModelFilterService(),
+		list:            l,
+		mode:            "view",
 	}
 }
 
@@ -59,18 +63,18 @@ func (v ModelView) Update(msg tea.Msg) (ModelView, tea.Cmd) {
 			if v.mode != "switch" {
 				return v, nil
 			}
-			if selected, ok := v.list.SelectedItem().(*entities.Model); ok {
+			if selected, ok := v.list.SelectedItem().(ModelWithPricing); ok {
 				return v, func() tea.Msg { return modelSelectedMsg{modelID: selected.ID} }
 			}
 		}
 
 	case modelsFetchedMsg:
-		items := make([]list.Item, len(m.models))
-		for i, model := range m.models {
-			items[i] = model
-		}
+		items := m.models
 		if len(items) == 0 {
-			items = append(items, list.Item(&entities.Model{Name: "No models available", ModelName: ""}))
+			items = append(items, ModelWithPricing{
+				Model:   &entities.Model{Name: "No models available", ModelName: ""},
+				Pricing: nil,
+			})
 		}
 		v.list.SetItems(items)
 		v.err = nil
@@ -126,10 +130,34 @@ func (v ModelView) View() string {
 func (v ModelView) fetchModelsCmd() tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		models, err := v.modelService.ListModels(ctx)
+		allModels, err := v.modelService.ListModels(ctx)
 		if err != nil {
 			return errMsg(err)
 		}
-		return modelsFetchedMsg{models: models}
+
+		// Filter to only show chat-compatible models
+		filteredModels := v.filterService.FilterChatCompatibleModels(allModels)
+
+		// Create models with pricing info
+		modelsWithPricing := make([]ModelWithPricing, len(filteredModels))
+		for i, model := range filteredModels {
+			// Look up pricing for this model
+			var pricing *entities.ModelPricing
+			if provider, err := v.providerService.GetProvider(ctx, model.ProviderID); err == nil {
+				pricing = provider.GetModelPricing(model.ModelName)
+			}
+			modelsWithPricing[i] = ModelWithPricing{
+				Model:   model,
+				Pricing: pricing,
+			}
+		}
+
+		return modelsFetchedMsg{models: func() []list.Item {
+			items := make([]list.Item, len(modelsWithPricing))
+			for i, model := range modelsWithPricing {
+				items[i] = model
+			}
+			return items
+		}()}
 	}
 }

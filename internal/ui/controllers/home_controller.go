@@ -11,22 +11,24 @@ import (
 )
 
 type HomeController struct {
-	logger       *zap.Logger
-	tmpl         *template.Template
-	chatService  services.ChatService
-	agentService services.AgentService
-	modelService services.ModelService
-	toolService  services.ToolService
+	logger        *zap.Logger
+	tmpl          *template.Template
+	chatService   services.ChatService
+	agentService  services.AgentService
+	modelService  services.ModelService
+	filterService *services.ModelFilterService
+	toolService   services.ToolService
 }
 
 func NewHomeController(logger *zap.Logger, tmpl *template.Template, chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService) *HomeController {
 	return &HomeController{
-		logger:       logger,
-		tmpl:         tmpl,
-		chatService:  chatService,
-		agentService: agentService,
-		modelService: modelService,
-		toolService:  toolService,
+		logger:        logger,
+		tmpl:          tmpl,
+		chatService:   chatService,
+		agentService:  agentService,
+		modelService:  modelService,
+		filterService: services.NewModelFilterService(),
+		toolService:   toolService,
 	}
 }
 
@@ -96,13 +98,17 @@ func (c *HomeController) AgentsPartialHandler(eCtx echo.Context) error {
 }
 
 func (c *HomeController) ModelsPartialHandler(eCtx echo.Context) error {
-	models, err := c.modelService.ListModels(eCtx.Request().Context())
+	allModels, err := c.modelService.ListModels(eCtx.Request().Context())
 	if err != nil {
 		c.logger.Error("Failed to list models", zap.Error(err))
 		return eCtx.String(http.StatusInternalServerError, "Failed to load models")
 	}
+
+	// Filter to only show chat-compatible models
+	filteredModels := c.filterService.FilterChatCompatibleModels(allModels)
+
 	data := map[string]any{
-		"Models": models,
+		"Models": filteredModels,
 	}
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_models", data)
 }

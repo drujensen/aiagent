@@ -30,11 +30,17 @@ type ProviderData struct {
 }
 
 type ModelData struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Cost        CostData  `json:"cost"`
-	Limit       LimitData `json:"limit"`
-	ReleaseDate string    `json:"release_date"`
+	ID               string    `json:"id"`
+	Name             string    `json:"name"`
+	Family           string    `json:"family"`
+	Attachment       bool      `json:"attachment"`
+	Reasoning        bool      `json:"reasoning"`
+	ToolCall         bool      `json:"tool_call"`
+	Temperature      bool      `json:"temperature"`
+	StructuredOutput bool      `json:"structured_output"`
+	Cost             CostData  `json:"cost"`
+	Limit            LimitData `json:"limit"`
+	ReleaseDate      string    `json:"release_date"`
 }
 
 type CostData struct {

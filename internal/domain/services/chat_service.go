@@ -282,11 +282,12 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		return nil, errors.InternalErrorf("failed to get provider for model %s: %v", chat.ModelID, err)
 	}
 
-	// Resolve API key from model
-	resolvedAPIKey, err := s.config.ResolveEnvironmentVariable(model.APIKey)
+	// Resolve API key from provider
+	apiKeyReference := "#{" + provider.APIKeyName + "}#"
+	resolvedAPIKey, err := s.config.ResolveEnvironmentVariable(apiKeyReference)
 	if err != nil {
-		s.logger.Error("Failed to resolve API key", zap.String("model_id", model.ID), zap.Error(err))
-		return nil, errors.InternalErrorf("failed to resolve API key for model %s: %v", model.ID, err)
+		s.logger.Error("Failed to resolve API key", zap.String("provider_id", provider.ID), zap.Error(err))
+		return nil, errors.InternalErrorf("failed to resolve API key for provider %s: %v", provider.ID, err)
 	}
 
 	contextLength := 128000 // default
@@ -730,7 +731,8 @@ func (s *chatService) createSummaryFromMessages(ctx context.Context, messages []
 		return nil, fmt.Errorf("failed to get provider: %v", err)
 	}
 
-	apiKey, err := s.config.ResolveEnvironmentVariable(model.APIKey)
+	apiKeyReference := "#{" + provider.APIKeyName + "}#"
+	apiKey, err := s.config.ResolveEnvironmentVariable(apiKeyReference)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve API key: %v", err)
 	}

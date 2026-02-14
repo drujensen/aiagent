@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/charmbracelet/bubbles/list"
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/events"
 )
@@ -68,7 +69,7 @@ type (
 	startModelSwitchMsg struct{}
 	modelSelectedMsg    struct{ modelID string }
 	modelsFetchedMsg    struct {
-		models []*entities.Model
+		models []list.Item
 	}
 	modelsCancelledMsg struct{}
 )

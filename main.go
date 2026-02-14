@@ -73,6 +73,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Load global config
+	globalConfig, err := config.LoadGlobalConfig(zap.NewNop())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load global config: %v\n", err)
+		os.Exit(1)
+	}
+
 	logConfig := zap.NewDevelopmentConfig()
 	logConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	if modeStr == "tui" {
@@ -162,6 +169,21 @@ func main() {
 		logger.Fatal("Failed to initialize defaults", zap.Error(err))
 	}
 
+	// Check if models exist, if not sync them automatically
+	models, err := modelRepo.ListModels(context.Background())
+	if err != nil {
+		logger.Fatal("Failed to check existing models", zap.Error(err))
+	}
+	if len(models) == 0 {
+		logger.Info("No models found, performing automatic model sync")
+		modelsDevClient := modelsdev.NewModelsDevClient(logger)
+		refreshService := services.NewModelRefreshService(providerRepo, modelRepo, modelsDevClient, globalConfig, logger)
+		if err := refreshService.SyncAllModels(context.Background()); err != nil {
+			logger.Fatal("Failed to sync models automatically", zap.Error(err))
+		}
+		logger.Info("Automatic model sync completed")
+	}
+
 	providerService := services.NewProviderService(providerRepo, logger)
 	agentService := services.NewAgentService(agentRepo, logger)
 	modelService := services.NewModelService(modelRepo, logger)
@@ -170,18 +192,18 @@ func main() {
 
 	// Create ModelRefreshService for refresh functionality
 	modelsDevClient := modelsdev.NewModelsDevClient(logger)
-	modelRefreshService := services.NewModelRefreshService(providerRepo, modelsDevClient, logger)
+	modelRefreshService := services.NewModelRefreshService(providerRepo, modelRepo, modelsDevClient, globalConfig, logger)
 
 	if modeStr == "refresh" {
 		// Create the ModelRefreshService
 		modelsDevClient := modelsdev.NewModelsDevClient(logger)
-		refreshService := services.NewModelRefreshService(providerRepo, modelsDevClient, logger)
+		refreshService := services.NewModelRefreshService(providerRepo, modelRepo, modelsDevClient, globalConfig, logger)
 
-		fmt.Println("Refreshing providers from models.dev...")
-		if err := refreshService.RefreshAllProviders(context.Background()); err != nil {
-			logger.Fatal("Failed to refresh providers", zap.Error(err))
+		fmt.Println("Refreshing providers and syncing models from models.dev...")
+		if err := refreshService.SyncAllModels(context.Background()); err != nil {
+			logger.Fatal("Failed to sync models", zap.Error(err))
 		}
-		fmt.Println("Provider refresh completed successfully!")
+		fmt.Println("Model sync completed successfully!")
 		return
 	}
 
@@ -247,22 +269,6 @@ func initializeDefaults(ctx context.Context, providerRepo interfaces.ProviderRep
 			}
 		}
 		logger.Info("Initialized tools with default data")
-	}
-
-	// Check and populate models
-	models, err := modelRepo.ListModels(ctx)
-	if err != nil {
-		logger.Error("Failed to list models", zap.Error(err))
-		return err
-	}
-	if len(models) == 0 {
-		for _, model := range defaults.DefaultModels() {
-			if err := modelRepo.CreateModel(ctx, model); err != nil {
-				logger.Error("Failed to create default model", zap.String("model", model.Name), zap.Error(err))
-				return err
-			}
-		}
-		logger.Info("Initialized models with default data")
 	}
 
 	return nil

@@ -46,6 +46,7 @@ type ChatForm struct {
 	chatService     services.ChatService
 	agentService    services.AgentService
 	modelService    services.ModelService
+	filterService   *services.ModelFilterService
 	providerService services.ProviderService
 	nameField       textinput.Model
 	agentsList      list.Model
@@ -72,9 +73,13 @@ func NewChatForm(chatService services.ChatService, agentService services.AgentSe
 		rawModels = []*entities.Model{}
 	}
 
+	// Filter models to only show chat-compatible ones
+	filterService := services.NewModelFilterService()
+	filteredModels := filterService.FilterChatCompatibleModels(rawModels)
+
 	// Create models with pricing info
-	models := make([]ModelWithPricing, len(rawModels))
-	for i, model := range rawModels {
+	models := make([]ModelWithPricing, len(filteredModels))
+	for i, model := range filteredModels {
 		// Look up pricing for this model
 		var pricing *entities.ModelPricing
 		if provider, err := providerService.GetProvider(ctx, model.ProviderID); err == nil {
@@ -116,7 +121,7 @@ func NewChatForm(chatService services.ChatService, agentService services.AgentSe
 	}
 	modelsList := list.New(modelItems, delegate, 100, 10)
 	modelsList.Title = "Select a Model"
-	modelsList.SetShowStatusBar(false)
+	modelsList.SetShowStatusBar(true)
 	modelsList.SetFilteringEnabled(true)
 	modelsList.SetShowPagination(false)
 
@@ -124,6 +129,7 @@ func NewChatForm(chatService services.ChatService, agentService services.AgentSe
 		chatService:     chatService,
 		agentService:    agentService,
 		modelService:    modelService,
+		filterService:   filterService,
 		providerService: providerService,
 		nameField:       nameField,
 		agentsList:      agentsList,

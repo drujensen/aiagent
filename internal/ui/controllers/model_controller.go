@@ -146,7 +146,14 @@ func (c *ModelController) CreateModelHandler(eCtx echo.Context) error {
 
 	reasoningEffort := eCtx.FormValue("reasoning_effort")
 
-	model := entities.NewModel(name, providerID, providerType, modelName, apiKey, temperature, maxTokens, contextWindow, reasoningEffort)
+	model := entities.NewModel(name, providerID, providerType, modelName, apiKey, temperature, maxTokens, contextWindow, reasoningEffort,
+		"",    // Family (unknown for manually created models)
+		false, // Reasoning
+		true,  // ToolCall (assume true for manually created models)
+		true,  // Temperature (assume true for manually created models)
+		false, // Attachment
+		false, // StructuredOutput
+	)
 
 	if err := c.modelService.CreateModel(eCtx.Request().Context(), model); err != nil {
 		c.logger.Error("Failed to create model", zap.Error(err))
@@ -206,18 +213,24 @@ func (c *ModelController) UpdateModelHandler(eCtx echo.Context) error {
 	reasoningEffort := eCtx.FormValue("reasoning_effort")
 
 	model := &entities.Model{
-		ID:              id,
-		Name:            name,
-		ProviderID:      providerID,
-		ProviderType:    providerType,
-		ModelName:       modelName,
-		APIKey:          apiKey,
-		Temperature:     temperature,
-		MaxTokens:       maxTokens,
-		ContextWindow:   contextWindow,
-		ReasoningEffort: reasoningEffort,
-		CreatedAt:       existing.CreatedAt,
-		UpdatedAt:       existing.UpdatedAt,
+		ID:               id,
+		Name:             name,
+		ProviderID:       providerID,
+		ProviderType:     providerType,
+		ModelName:        modelName,
+		APIKey:           apiKey,
+		Temperature:      temperature,
+		MaxTokens:        maxTokens,
+		ContextWindow:    contextWindow,
+		ReasoningEffort:  reasoningEffort,
+		Family:           existing.Family,
+		Reasoning:        existing.Reasoning,
+		ToolCall:         existing.ToolCall,
+		TemperatureCap:   existing.TemperatureCap,
+		Attachment:       existing.Attachment,
+		StructuredOutput: existing.StructuredOutput,
+		CreatedAt:        existing.CreatedAt,
+		UpdatedAt:        existing.UpdatedAt,
 	}
 
 	if err := c.modelService.UpdateModel(eCtx.Request().Context(), model); err != nil {
