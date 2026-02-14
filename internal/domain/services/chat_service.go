@@ -535,6 +535,21 @@ func (s *chatService) processCompressionInstructions(ctx context.Context, chat *
 			if instruction, ok := result["compression_instruction"].(map[string]interface{}); ok {
 				action, _ := instruction["action"].(string)
 				if action == "compress_range" {
+					// EMIT TOOL CALL EVENT FOR COMPRESSION START
+					event := entities.NewToolCallEvent(
+						uuid.New().String(),            // toolCallID
+						"compression",                  // toolName
+						fmt.Sprintf("%v", instruction), // arguments
+						"",                             // result (will be updated later)
+						"",                             // error
+						"",                             // diff
+						map[string]string{
+							"chat_id": chat.ID,
+							"action":  "start_compression",
+						},
+					)
+					events.PublishToolCallEvent(event)
+
 					return s.executeCompressionInstruction(ctx, chat, instruction)
 				}
 			}
@@ -614,6 +629,22 @@ func (s *chatService) executeCompressionInstruction(ctx context.Context, chat *e
 		zap.Int("original_count", len(messages)),
 		zap.Int("compressed_count", len(newMessages)),
 		zap.Int("removed_count", len(messagesToCompress)-1))
+
+	// EMIT TOOL CALL EVENT FOR COMPRESSION COMPLETE
+	event := entities.NewToolCallEvent(
+		uuid.New().String(), // toolCallID
+		"compression",       // toolName
+		fmt.Sprintf("Compressed messages %d-%d (%s)", start, end, summaryType),                             // arguments summary
+		fmt.Sprintf("Successfully compressed %d messages into 1 summary message", len(messagesToCompress)), // result
+		"", // error
+		fmt.Sprintf("-%d messages", len(messagesToCompress)-1), // diff
+		map[string]string{
+			"chat_id":     chat.ID,
+			"action":      "complete_compression",
+			"summaryType": summaryType,
+		},
+	)
+	events.PublishToolCallEvent(event)
 
 	return nil
 }
