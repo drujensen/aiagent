@@ -165,19 +165,14 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 		c.height = m.Height
 		c.nameField.Width = c.width - 6
 
-		// Calculate available height for lists (accounting for fixed elements)
-		// Fixed elements take about 10-12 lines, reserve space for two lists
-		availableHeight := c.height - 16
+		// Calculate available height for lists (accounting for fixed elements: name field + labels + instructions + borders)
+		availableHeight := c.height - 12
 		if availableHeight < 8 {
-			availableHeight = 8 // Minimum height
+			availableHeight = 8
 		}
-		// Give each list half the remaining height, but cap at reasonable sizes
-		listHeight := availableHeight / 2
-		if listHeight > 15 {
-			listHeight = 15 // Cap maximum height
-		}
+		listHeight := (availableHeight - 2) / 2 // Subtract 2 for "Agents:"/"Models:" labels, split evenly
 		if listHeight < 4 {
-			listHeight = 4 // Minimum height
+			listHeight = 4
 		}
 
 		listWidth := (c.width - 10) / 2 // Split width, accounting for borders and spacing
