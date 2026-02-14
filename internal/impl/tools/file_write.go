@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -58,7 +57,19 @@ func (t *FileWriteTool) Parameters() []entities.Parameter {
 }
 
 func (t *FileWriteTool) FullDescription() string {
-	return fmt.Sprintf("%s\n\nParameters:\n- operation: 'write' or 'edit'\n- path: file path (absolute or relative to workspace)\n- content: file content (for write)\n- old_string, new_string: exact strings to replace (for edit)\n- replace_all: boolean (optional)", t.Description())
+	return fmt.Sprintf(`%s
+
+**Operations**:
+- **write**: path, content, mode="overwrite|append" (default overwrite)
+- **edit** (auto-detect if old_string present): path, old_string (exact from FileRead), content=new_string, replace_all=bool (default false, replaces first)
+
+**Best Practice**:
+1. FileRead → copy exact snippet (indent/whitespace preserved) as old_string
+2. FileWrite operation="edit" old_string="old...", content="new..."
+3. Verify: re-FileRead
+
+Examples:
+{"operation":"edit","path":"foo.go","old_string":"func foo(){","content":"func foo() error {\n  return nil\n}","replace_all":false}`, t.Description())
 }
 
 func (t *FileWriteTool) Schema() map[string]any {
@@ -178,31 +189,6 @@ func (t *FileWriteTool) Execute(arguments string) (string, error) {
 		}
 	}
 
-	// Validate operation
-	if args.Operation != "write" && args.Operation != "edit" {
-		return "", fmt.Errorf("operation must be 'write' or 'edit'")
-	}
-
-	// Validate required fields based on operation
-	if args.Operation == "write" {
-		if args.Content == "" {
-			return "", fmt.Errorf("content is required for write operation")
-		}
-		if args.Mode == "" {
-			args.Mode = "overwrite"
-		}
-		if args.Mode != "overwrite" && args.Mode != "append" {
-			return "", fmt.Errorf("mode must be 'overwrite' or 'append'")
-		}
-	} else if args.Operation == "edit" {
-		if args.OldString == "" {
-			return "", fmt.Errorf("old_string is required for edit operation")
-		}
-		if args.Content == "" {
-			return "", fmt.Errorf("content (new_string) is required for edit operation")
-		}
-	}
-
 	fullPath, err := t.validatePath(args.Path)
 	if err != nil {
 		return "", fmt.Errorf("invalid path: %s", err.Error())
@@ -286,121 +272,6 @@ func (t *FileWriteTool) executeEditOperation(args struct {
 	}
 
 	fileContent := string(content)
-
-	// Check if we're working with hashline format content
-	isHashline := strings.Contains(fileContent, ":") && strings.Contains(fileContent, "|") && strings.Contains(fileContent, "\n")
-
-	if isHashline {
-		// Hashline mode - parse the content to find line matches
-		// Parse hashline content to understand structure
-		lines := strings.Split(strings.TrimSuffix(fileContent, "\n"), "\n")
-
-		// Extract line information from hashline format
-		lineMap := make(map[string]string)    // hash -> line content
-		lineNumberMap := make(map[string]int) // hash -> line number (1-based)
-
-		for _, line := range lines {
-			if strings.Contains(line, ":") {
-				parts := strings.SplitN(line, ":", 2)
-				if len(parts) == 2 {
-					hash := parts[0]
-					content := strings.SplitN(parts[1], "|", 2)
-					if len(content) == 2 {
-						lineMap[hash] = content[1]
-						// Extract line number from the beginning of the line (first part)
-						lineNumStr := strings.Split(line, ":")[0]
-						if lineNum, err := strconv.Atoi(lineNumStr); err == nil {
-							lineNumberMap[hash] = lineNum
-						}
-					}
-				}
-			} else {
-				// Simple line without hash, add to map for backward compatibility
-				// We're not using index here, so we don't generate hash based on line number
-				lineMap[line] = line
-				lineNumberMap[line] = 0 // Placeholder for line number
-			}
-		}
-
-		// Find exact hash matches for the content to replace
-		occurrences := 0
-		foundLineHashes := []string{}
-
-		for hash, content := range lineMap {
-			if content == args.OldString {
-				occurrences++
-				foundLineHashes = append(foundLineHashes, hash)
-			}
-		}
-
-		// If no exact match, try partial match (hashline approach - for LLMs that may produce slight variations)
-		if occurrences == 0 {
-			// For LLM-generated content, try to find a matching line by content
-			// This is a more lenient approach that could be used in LLM context
-			for hash, content := range lineMap {
-				// Try to match the content - this allows for more robust LLM-based editing
-				// This is a more lenient approach that could be used in LLM context
-				if strings.Contains(content, args.OldString) ||
-					strings.Contains(args.OldString, content) {
-					occurrences++
-					foundLineHashes = append(foundLineHashes, hash)
-				}
-			}
-		}
-
-		// If still no matches, this means the content was modified since the file was read
-		// and the hash doesn't match anymore, which should fail the operation as expected
-		if occurrences == 0 {
-			return "", fmt.Errorf("old_string not found in file (content has changed since file was read - hash mismatch)")
-		}
-
-		// Build new file content with replacements
-		var newContent strings.Builder
-		lineIndex := 0
-
-		for _, line := range lines {
-			if strings.Contains(line, ":") {
-				// Hashline format
-				parts := strings.SplitN(line, ":", 2)
-				if len(parts) == 2 {
-					hash := parts[0]
-					content := strings.SplitN(parts[1], "|", 2)
-					if len(content) == 2 {
-						if lineIndex < len(foundLineHashes) && foundLineHashes[lineIndex] == hash {
-							// Replace this line with new content that preserves the same hash
-							// This ensures the line can still be identified if modified in the future
-							newHash := generateSimpleHash(args.Content)
-							newContent.WriteString(fmt.Sprintf("%s:%s|%s\n", hash, newHash, args.Content))
-							lineIndex++
-						} else {
-							newContent.WriteString(line + "\n")
-						}
-					} else {
-						newContent.WriteString(line + "\n")
-					}
-				} else {
-					newContent.WriteString(line + "\n")
-				}
-			} else {
-				// Regular line without hash
-				if lineIndex < len(foundLineHashes) && strings.Contains(line, args.OldString) {
-					newContent.WriteString(fmt.Sprintf("%s\n", args.Content))
-					lineIndex++
-				} else {
-					newContent.WriteString(line + "\n")
-				}
-			}
-		}
-
-		// Write the modified content back
-		if err := os.WriteFile(fullPath, []byte(newContent.String()), 0644); err != nil {
-			return "", fmt.Errorf("failed to write modified content: %s", err.Error())
-		}
-
-		summary := fmt.Sprintf("Replaced %d occurrence(s) in hashline file", occurrences)
-
-		return fmt.Sprintf(`{"success": true, "summary": %q, "path": %q, "occurrences": %d, "replaced_all": %t}`, summary, args.Path, occurrences, args.ReplaceAll), nil
-	}
 
 	// Regular string replacement mode
 	// Count total occurrences

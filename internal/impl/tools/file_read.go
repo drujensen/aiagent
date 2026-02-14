@@ -176,61 +176,26 @@ func (t *FileReadTool) Execute(arguments string) (string, error) {
 		return fmt.Sprintf(`{"content": "", "error": "error reading file: %s"}`, err.Error()), nil
 	}
 
-	// Generate hashline format for all lines
-	var hashlineContent strings.Builder
-	for i, line := range lines {
-		// Create a simple hash based on line content (this is the hashline format)
-		hash := t.generateSimpleHash(line)
-		hashlineContent.WriteString(fmt.Sprintf("%d:%s|%s\n", i+1, hash, line))
-	}
+	content := strings.Join(lines, "\n")
 
 	// Create TUI-friendly summary
 	var summary strings.Builder
 	summary.WriteString(fmt.Sprintf("📄 File content (%d lines)\n\n", len(lines)))
 
-	// Show first 20 lines with hashline format
 	previewCount := 20
 	if len(lines) < previewCount {
 		previewCount = len(lines)
 	}
 
 	for i := 0; i < previewCount; i++ {
-		hash := t.generateSimpleHash(lines[i])
-		summary.WriteString(fmt.Sprintf("%4d:%s| %s\n", i+1, hash, lines[i]))
+		summary.WriteString(fmt.Sprintf("%4d: %s\n", i+1, lines[i]))
 	}
 
 	if len(lines) > 20 {
 		summary.WriteString(fmt.Sprintf("\n... and %d more lines\n", len(lines)-20))
 	}
 
-	return fmt.Sprintf(`{"content": %q, "summary": %q, "lines": %d, "error": ""}`, hashlineContent.String(), summary.String(), len(lines)), nil
-}
-
-// generateSimpleHash creates a simple hash based on line content for hashline functionality
-func generateSimpleHash(line string) string {
-	// Use a proper hash of the full line content for better uniqueness
-	if len(line) == 0 {
-		return "000"
-	}
-
-	// Calculate a hash based on the full line content using a simple but effective algorithm
-	// This approach creates different hashes for different content, which is the key requirement
-	var hash uint32 = 5381
-	for _, char := range line {
-		hash = ((hash << 5) + hash) + uint32(char)
-	}
-
-	// Convert to 3-character string representation
-	// Using modulo to get a 3-digit hash that's more unique than just first few chars
-	hashValue := hash % 1000
-	result := fmt.Sprintf("%03d", hashValue)
-
-	return result
-}
-
-// generateSimpleHash creates a simple hash based on line content for hashline functionality
-func (t *FileReadTool) generateSimpleHash(line string) string {
-	return generateSimpleHash(line)
+	return fmt.Sprintf(`{"content": %q, "summary": %q, "lines": %d, "error": ""}`, content, summary.String(), len(lines)), nil
 }
 
 var _ entities.Tool = (*FileReadTool)(nil)
