@@ -1196,15 +1196,13 @@ func (c ChatView) View() string {
 		var tokenInfo string
 		// Use per-request usage instead of accumulated totals
 		requestTokens, requestCost := getLastRequestUsage(c.activeChat)
-		if requestTokens > 0 || requestCost > 0 {
-			// Format token count with commas
-			tokenCountStr := formatTokenCount(requestTokens)
-			if c.currentModel != nil && c.currentModel.ContextWindow != nil && *c.currentModel.ContextWindow > 0 {
-				percentage := int(float64(requestTokens) / float64(*c.currentModel.ContextWindow) * 100)
-				tokenInfo = fmt.Sprintf("%s %d%% ($%.2f)", tokenCountStr, percentage, requestCost)
-			} else {
-				tokenInfo = fmt.Sprintf("%s ($%.2f)", tokenCountStr, requestCost)
-			}
+		// Format token count with commas
+		tokenCountStr := formatTokenCount(requestTokens)
+		if c.currentModel != nil && c.currentModel.ContextWindow != nil && *c.currentModel.ContextWindow > 0 && requestTokens > 0 {
+			percentage := int(float64(requestTokens) / float64(*c.currentModel.ContextWindow) * 100)
+			tokenInfo = fmt.Sprintf("%s %d%% ($%.2f)", tokenCountStr, percentage, requestCost)
+		} else {
+			tokenInfo = fmt.Sprintf("%s ($%.2f)", tokenCountStr, requestCost)
 		}
 
 		headerLine := lipgloss.JoinHorizontal(

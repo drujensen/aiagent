@@ -172,13 +172,9 @@ func (c ChatForm) Update(msg tea.Msg) (ChatForm, tea.Cmd) {
 		c.nameField.Width = c.width - 6
 
 		// Calculate available height for lists (accounting for fixed elements: name field + labels + instructions + borders)
-		availableHeight := c.height - 12
-		if availableHeight < 8 {
-			availableHeight = 8
-		}
-		listHeight := (availableHeight - 2) / 2 // Subtract 2 for "Agents:"/"Models:" labels, split evenly
-		if listHeight < 4 {
-			listHeight = 4
+		listHeight := c.height - 10
+		if listHeight < 5 {
+			listHeight = 5
 		}
 
 		listWidth := (c.width - 10) / 2 // Split width, accounting for borders and spacing
@@ -273,7 +269,8 @@ func (c ChatForm) View() string {
 	outerStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.ThickBorder()).
 		BorderForeground(lipgloss.Color("4")). // Blue for outer border
-		Width(c.width - 2)
+		Width(c.width - 2).
+		Height(c.height)
 
 	var sb strings.Builder
 
