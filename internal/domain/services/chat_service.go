@@ -440,6 +440,11 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		lastMsg := newMessages[len(newMessages)-1]
 		lastMsg.AddUsage(lastUsage.PromptTokens, lastUsage.CompletionTokens, inputPricePerMille, outputPricePerMille)
 		lastMsg.Usage.Cost = totalCost
+
+		// Save the updated message with usage information
+		if err := s.SaveMessagesIncrementally(ctx, chat.ID, []*entities.Message{lastMsg}); err != nil {
+			s.logger.Warn("Failed to save message with usage information", zap.Error(err))
+		}
 	}
 
 	// Check if this is a partial response due to cancellation
