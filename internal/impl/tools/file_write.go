@@ -76,19 +76,33 @@ func (t *FileWriteTool) Schema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
+			"operation": map[string]any{
+				"type":        "string",
+				"description": "Operation to perform (write or edit). Auto-detected if not specified.",
+				"enum":        []string{"write", "edit"},
+			},
 			"path": map[string]any{
 				"type":        "string",
 				"description": "Path to write to",
 			},
 			"content": map[string]any{
 				"type":        "string",
-				"description": "Text to write",
+				"description": "Text to write (for write) or replacement text (for edit)",
 			},
 			"mode": map[string]any{
 				"type":        "string",
-				"description": "\"overwrite\" or \"append\"",
+				"description": "\"overwrite\" or \"append\" (for write operation only)",
 				"enum":        []string{"overwrite", "append"},
 				"default":     "overwrite",
+			},
+			"old_string": map[string]any{
+				"type":        "string",
+				"description": "String to replace (for edit operation)",
+			},
+			"replace_all": map[string]any{
+				"type":        "boolean",
+				"description": "Replace all occurrences (for edit operation)",
+				"default":     false,
 			},
 		},
 		"required": []string{"path", "content"},

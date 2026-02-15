@@ -295,3 +295,68 @@ func TestFileWriteTool_Parameters(t *testing.T) {
 		t.Errorf("Invalid replace_all parameter: %v", params[4])
 	}
 }
+
+func TestFileWriteTool_Schema(t *testing.T) {
+	logger := zap.NewNop()
+	tool := NewFileWriteTool("test-schema", "Test Schema", nil, logger)
+
+	schema := tool.Schema()
+
+	// Check that schema is an object
+	schemaType, ok := schema["type"].(string)
+	if !ok || schemaType != "object" {
+		t.Errorf("Expected schema type 'object', got %v", schema["type"])
+	}
+
+	properties, ok := schema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("Schema properties not found or not a map")
+	}
+
+	// Check required properties
+	required, ok := schema["required"].([]string)
+	if !ok || len(required) != 2 || required[0] != "path" || required[1] != "content" {
+		t.Errorf("Expected required fields ['path', 'content'], got %v", required)
+	}
+
+	// Check that all expected properties are present
+	expectedProps := []string{"operation", "path", "content", "mode", "old_string", "replace_all"}
+	for _, prop := range expectedProps {
+		if _, exists := properties[prop]; !exists {
+			t.Errorf("Expected property '%s' not found in schema", prop)
+		}
+	}
+
+	// Check operation property
+	opProp, ok := properties["operation"].(map[string]any)
+	if !ok {
+		t.Errorf("Operation property not a map")
+	} else {
+		if desc, ok := opProp["description"].(string); !ok || !strings.Contains(desc, "Auto-detected") {
+			t.Errorf("Invalid operation description: %v", desc)
+		}
+		if enum, ok := opProp["enum"].([]string); !ok || len(enum) != 2 {
+			t.Errorf("Invalid operation enum: %v", enum)
+		}
+	}
+
+	// Check old_string property
+	oldStrProp, ok := properties["old_string"].(map[string]any)
+	if !ok {
+		t.Errorf("old_string property not a map")
+	} else {
+		if desc, ok := oldStrProp["description"].(string); !ok || !strings.Contains(desc, "replace") {
+			t.Errorf("Invalid old_string description: %v", desc)
+		}
+	}
+
+	// Check replace_all property
+	replaceProp, ok := properties["replace_all"].(map[string]any)
+	if !ok {
+		t.Errorf("replace_all property not a map")
+	} else {
+		if typ, ok := replaceProp["type"].(string); !ok || typ != "boolean" {
+			t.Errorf("Invalid replace_all type: %v", typ)
+		}
+	}
+}
