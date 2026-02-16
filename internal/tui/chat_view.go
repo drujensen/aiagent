@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
@@ -558,7 +559,7 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	ta.SetHeight(3)
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
 	ta.ShowLineNumbers = false
-	ta.KeyMap.InsertNewline.SetEnabled(false)
+	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("ctrl+j"))
 
 	us := lipgloss.NewStyle().Foreground(lipgloss.Color("5"))
 	as := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
