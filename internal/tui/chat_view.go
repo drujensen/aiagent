@@ -555,7 +555,7 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	ta.Focus()
 	ta.Prompt = "┃ "
 	ta.SetWidth(30)
-	ta.SetHeight(2)
+	ta.SetHeight(3)
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
 	ta.ShowLineNumbers = false
 	ta.KeyMap.InsertNewline.SetEnabled(false)
@@ -699,7 +699,7 @@ func (c *ChatView) updateEditorContent() {
 		// Set editor size to fit screen minus textarea, footer, separators, and header
 		if c.width > 0 && c.height > 0 {
 			editorWidth := c.width
-			editorHeight := c.height - 6 // textarea (2) + footer (1) + separators (2) + header (1)
+			editorHeight := c.height - (c.textarea.Height() + 1 + 2 + 1) // textarea (dynamic) + footer (1) + separators (2) + header (1)
 			if editorHeight < 1 {
 				editorHeight = 1
 			}
@@ -797,10 +797,10 @@ func (c *ChatView) updateEditorContent() {
 	// Ensure editor maintains current focus state
 	c.editor.SetFocus(c.focused == "editor")
 
-	// Set editor size: textarea (2) + footer (1) + separators (2) + header (1) = 6 total
+	// Set editor size: textarea (dynamic) + footer (1) + separators (2) + header (1)
 	if c.width > 0 && c.height > 0 {
 		editorWidth := c.width
-		editorHeight := c.height - 6
+		editorHeight := c.height - (c.textarea.Height() + 1 + 2 + 1)
 		if editorHeight < 1 {
 			editorHeight = 1
 		}
@@ -1156,7 +1156,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 
 		// Set editor size to fit screen minus textarea, footer, separators, and header
 		editorWidth := c.width
-		editorHeight := c.height - 6 // textarea (2) + footer (1) + separators (2) + header (1)
+		editorHeight := c.height - (c.textarea.Height() + 1 + 2 + 1) // textarea (dynamic) + footer (1) + separators (2) + header (1)
 		if editorHeight < 1 {
 			editorHeight = 1
 		}
@@ -1181,7 +1181,7 @@ func (c ChatView) View() string {
 	separator := lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true).Render(strings.Repeat("\u2500", c.width))
 
 	// Editor - needs to account for header taking space
-	editorHeight := c.height - 6 // textarea (2) + footer (1) + separators (2) + header (1)
+	editorHeight := c.height - (c.textarea.Height() + 1 + 2 + 1) // textarea (dynamic) + footer (1) + separators (2) + header (1)
 	if editorHeight < 1 {
 		editorHeight = 1
 	}
