@@ -556,7 +556,7 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	ta.Focus()
 	ta.Prompt = "┃ "
 	ta.SetWidth(30)
-	ta.SetHeight(1)
+	ta.SetHeight(2)
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
 	ta.ShowLineNumbers = false
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("ctrl+j"))
@@ -976,8 +976,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 					Role:    "user",
 				}
 				c.textarea.Reset()
-				c.textarea.SetHeight(1)
-				editorHeight := c.height - (1 + 1 + 2 + 1)
+				c.textarea.SetHeight(2)
+				editorHeight := c.height - (2 + 1 + 2 + 1)
 				if editorHeight < 1 {
 					editorHeight = 1
 				}
@@ -1030,8 +1030,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				currentLineHeight := c.textarea.LineInfo().Height
 				effectiveLines := max(logicalLines, currentLineHeight)
 				currentHeight := c.textarea.Height()
-				if effectiveLines > currentHeight && currentHeight < 5 {
-					newHeight := min(5, effectiveLines)
+				if effectiveLines != currentHeight {
+					newHeight := min(5, max(2, effectiveLines))
 					c.textarea.SetHeight(newHeight)
 					editorHeight := c.height - (newHeight + 1 + 2 + 1)
 					if editorHeight < 1 {
