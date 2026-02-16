@@ -258,7 +258,22 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 					toolError = err.Error()
 					m.logger.Warn("Failed to get tool", zap.String("toolName", toolName), zap.Error(err))
 				} else if tool != nil {
-					result, err := (*tool).Execute(toolCall.Function.Arguments)
+					// Inject session_id into todowrite tool arguments
+					args := toolCall.Function.Arguments
+					if toolName == "todowrite" {
+						if sessionID, ok := options["session_id"].(string); ok && sessionID != "" {
+							var argsMap map[string]any
+							if err := json.Unmarshal([]byte(args), &argsMap); err == nil {
+								if _, exists := argsMap["session_id"]; !exists {
+									argsMap["session_id"] = sessionID
+									if newArgs, err := json.Marshal(argsMap); err == nil {
+										args = string(newArgs)
+									}
+								}
+							}
+						}
+					}
+					result, err := (*tool).Execute(args)
 					if err != nil {
 						toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
 						toolError = err.Error()

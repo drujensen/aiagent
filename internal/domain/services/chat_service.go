@@ -361,6 +361,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 	options := map[string]any{
 		"temperature": 0.0,
 		"max_tokens":  16384, // Increased for complex multi-tool tasks
+		"session_id":  chat.ID,
 	}
 	if model.Temperature != nil {
 		options["temperature"] = *model.Temperature

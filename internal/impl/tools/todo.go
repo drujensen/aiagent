@@ -339,6 +339,11 @@ func (t *TodoTool) updateStatus(sessionID, id, status string) (string, error) {
 		return "", err
 	}
 
+	if len(todoList.Todos) == 0 {
+		// Log potential session_id mismatch for debugging
+		fmt.Printf("Warning: Attempting to update todo %s in session %s, but no todos found. Possible session_id mismatch.\n", id, sessionID)
+	}
+
 	found := false
 	for i := range todoList.Todos {
 		if todoList.Todos[i].ID == id {
