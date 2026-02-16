@@ -556,7 +556,7 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	ta.Focus()
 	ta.Prompt = "┃ "
 	ta.SetWidth(30)
-	ta.SetHeight(3)
+	ta.SetHeight(1)
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
 	ta.ShowLineNumbers = false
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("ctrl+j"))
@@ -976,6 +976,12 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 					Role:    "user",
 				}
 				c.textarea.Reset()
+				c.textarea.SetHeight(1)
+				editorHeight := c.height - (1 + 1 + 2 + 1)
+				if editorHeight < 1 {
+					editorHeight = 1
+				}
+				c.editor.SetSize(c.width, editorHeight)
 				c.activeChat.Messages = append(c.activeChat.Messages, *message)
 				// Initialize tool call status tracking for this message
 				c.toolCallStatus = make(map[string]bool)
@@ -1019,6 +1025,19 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				c.textarea, cmd = c.textarea.Update(m)
 				if cmd != nil {
 					cmds = append(cmds, cmd)
+				}
+				logicalLines := c.textarea.LineCount()
+				currentLineHeight := c.textarea.LineInfo().Height
+				effectiveLines := max(logicalLines, currentLineHeight)
+				currentHeight := c.textarea.Height()
+				if effectiveLines > currentHeight && currentHeight < 5 {
+					newHeight := min(5, effectiveLines)
+					c.textarea.SetHeight(newHeight)
+					editorHeight := c.height - (newHeight + 1 + 2 + 1)
+					if editorHeight < 1 {
+						editorHeight = 1
+					}
+					c.editor.SetSize(c.width, editorHeight)
 				}
 			} else if c.focused == "editor" {
 				// Pass all keystrokes to vimtea editor when focused
