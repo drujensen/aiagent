@@ -355,7 +355,17 @@ func (t *TodoTool) updateStatus(sessionID, id, status string) (string, error) {
 	}
 
 	if !found {
-		return "", fmt.Errorf("todo with id %s not found", id)
+		// Build helpful error message with available IDs
+		var availableIDs []string
+		for _, todo := range todoList.Todos {
+			availableIDs = append(availableIDs, todo.ID)
+		}
+
+		if len(availableIDs) > 0 {
+			return "", fmt.Errorf("todo with id '%s' not found in session '%s'. Available IDs: [%s]", id, sessionID, strings.Join(availableIDs, ", "))
+		} else {
+			return "", fmt.Errorf("todo with id '%s' not found in session '%s'. No todos exist for this session", id, sessionID)
+		}
 	}
 
 	if err := t.saveTodos(sessionID, todoList); err != nil {
