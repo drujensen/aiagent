@@ -226,7 +226,7 @@ When editing files, follow these CRITICAL steps to ensure accuracy:
 
 1. **ALWAYS READ FIRST**: Before making any changes, use FileReadTool to get the exact current content
 2. **EXACT STRING MATCHING**: Copy the old_string EXACTLY including all whitespace, indentation, and line breaks
-Copy **exact plain text** (including all whitespace, indentation, line breaks) from FileReadTool "content" or "summary" as old_string for precise matching.
+Copy **exact plain text** (including all whitespace, indentation, line breaks) from FileReadTool "content" field as old_string for precise matching.
 
 3. **USE PRECISE EDITS**: FileWriteTool operation="edit":
    - old_string: Exact snippet (1-3 lines preferred)
@@ -240,7 +240,7 @@ Copy **exact plain text** (including all whitespace, indentation, line breaks) f
 5. **VERIFY**: Re-read file post-edit to confirm.
 
 **Example**:
-1. FileRead → copy "  if err != nil {" 
+1. FileRead returns: {"content": "  if err != nil {\n    return err\n  }", "lines": 2}
 2. FileWrite edit old_string="  if err != nil {", content="  if err != nil {\n    return err\n  }"
 
 

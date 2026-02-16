@@ -178,24 +178,7 @@ func (t *FileReadTool) Execute(arguments string) (string, error) {
 
 	content := strings.Join(lines, "\n")
 
-	// Create TUI-friendly summary
-	var summary strings.Builder
-	summary.WriteString(fmt.Sprintf("📄 File content (%d lines)\n\n", len(lines)))
-
-	previewCount := 20
-	if len(lines) < previewCount {
-		previewCount = len(lines)
-	}
-
-	for i := 0; i < previewCount; i++ {
-		summary.WriteString(fmt.Sprintf("%4d: %s\n", i+1, lines[i]))
-	}
-
-	if len(lines) > 20 {
-		summary.WriteString(fmt.Sprintf("\n... and %d more lines\n", len(lines)-20))
-	}
-
-	return fmt.Sprintf(`{"content": %q, "summary": %q, "lines": %d, "error": ""}`, content, summary.String(), len(lines)), nil
+	return fmt.Sprintf(`{"content": %q, "lines": %d, "error": ""}`, content, len(lines)), nil
 }
 
 var _ entities.Tool = (*FileReadTool)(nil)

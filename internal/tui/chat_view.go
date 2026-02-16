@@ -399,7 +399,7 @@ func formatDiff(diff string) string {
 // formatFileReadResult formats FileRead tool results
 func formatFileReadResult(result string) string {
 	var response struct {
-		Summary string `json:"summary"`
+		Content string `json:"content"`
 		Error   string `json:"error"`
 	}
 
@@ -412,12 +412,25 @@ func formatFileReadResult(result string) string {
 		return fmt.Sprintf("Error reading file: %s", response.Error)
 	}
 
-	// Return the summary created by the tool
-	if response.Summary != "" {
-		return response.Summary
+	// Generate TUI-friendly summary with line numbers
+	lines := strings.Split(response.Content, "\n")
+	var summary strings.Builder
+	summary.WriteString(fmt.Sprintf("📄 File content (%d lines)\n\n", len(lines)))
+
+	previewCount := 20
+	if len(lines) < previewCount {
+		previewCount = len(lines)
 	}
 
-	return "File read successfully"
+	for i := 0; i < previewCount; i++ {
+		summary.WriteString(fmt.Sprintf("%4d: %s\n", i+1, lines[i]))
+	}
+
+	if len(lines) > 20 {
+		summary.WriteString(fmt.Sprintf("\n... and %d more lines\n", len(lines)-20))
+	}
+
+	return summary.String()
 }
 
 // formatDirectoryResult formats Directory tool results

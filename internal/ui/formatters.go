@@ -142,7 +142,6 @@ func formatFileWriteResult(result string, diff string) template.HTML {
 // formatFileReadResult formats FileRead tool results
 func formatFileReadResult(result string) template.HTML {
 	var response struct {
-		Summary string `json:"summary"`
 		Path    string `json:"path"`
 		Content string `json:"content"`
 		Lines   int    `json:"lines"`
