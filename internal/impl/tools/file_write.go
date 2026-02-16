@@ -303,7 +303,23 @@ func (t *FileWriteTool) executeEditOperation(args struct {
 			newContent = fileContent[:idx] + args.Content + fileContent[idx+len(args.OldString):]
 			occurrences = totalOccurrences // Return total count found
 		} else {
-			return "", fmt.Errorf("old_string not found in file")
+			// Provide helpful error with context
+			fileLines := strings.Split(fileContent, "\n")
+			previewLines := 5
+			if len(fileLines) < previewLines {
+				previewLines = len(fileLines)
+			}
+			var preview strings.Builder
+			preview.WriteString("File preview (first ")
+			preview.WriteString(fmt.Sprintf("%d lines):\n", previewLines))
+			for i := 0; i < previewLines; i++ {
+				preview.WriteString(fmt.Sprintf("  %d: %s\n", i+1, fileLines[i]))
+			}
+			if len(fileLines) > previewLines {
+				preview.WriteString(fmt.Sprintf("  ... and %d more lines\n", len(fileLines)-previewLines))
+			}
+
+			return "", fmt.Errorf("old_string not found in file.\nSearched for: %q\n%s", args.OldString, preview.String())
 		}
 	}
 
