@@ -16,7 +16,8 @@ import (
 
 type TodoItem struct {
 	Content    string    `json:"content"`
-	Status     string    `json:"status"` // pending, in_progress, completed, cancelled
+	Status     string    `json:"status"`   // pending, in_progress, completed, cancelled
+	Priority   string    `json:"priority"` // high, medium, low
 	ID         string    `json:"id"`
 	WorkflowID string    `json:"workflow_id,omitempty"` // Optional grouping for multi-step workflows
 	CreatedAt  time.Time `json:"created_at"`
@@ -82,44 +83,46 @@ func (t *TodoTool) Schema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"action": map[string]any{
-				"type":        "string",
-				"description": "Action to perform: write, read, update_status, clear",
-				"enum":        []string{"write", "read", "update_status", "clear"},
-			},
 			"todos": map[string]any{
 				"type":        "array",
-				"description": "For write action: array of todo objects with content and optional workflow_id",
+				"description": "The updated todo list",
 				"items": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"content": map[string]any{
 							"type":        "string",
-							"description": "Task description",
+							"description": "Brief description of the task",
 						},
-						"workflow_id": map[string]any{
+						"status": map[string]any{
 							"type":        "string",
-							"description": "Optional workflow identifier for grouping related tasks",
+							"description": "Current status of the task: pending, in_progress, completed, cancelled",
+							"enum":        []string{"pending", "in_progress", "completed", "cancelled"},
+						},
+						"priority": map[string]any{
+							"type":        "string",
+							"description": "Priority level of the task: high, medium, low",
+							"enum":        []string{"high", "medium", "low"},
 						},
 					},
-					"required": []string{"content"},
+					"required": []string{"content", "status", "priority"},
 				},
 			},
 			"id": map[string]any{
 				"type":        "string",
-				"description": "For update_status action: the ID of the todo to update",
+				"description": "For update_status: the ID of the todo to update",
 			},
 			"status": map[string]any{
 				"type":        "string",
-				"description": "For update_status action: new status (pending, in_progress, completed, cancelled)",
+				"description": "For update_status: new status (pending, in_progress, completed, cancelled)",
 				"enum":        []string{"pending", "in_progress", "completed", "cancelled"},
 			},
 			"session_id": map[string]any{
 				"type":        "string",
-				"description": "Required chat session ID (auto-injected by service).",
+				"description": "Required chat session ID",
 			},
 		},
-		"required": []string{"action", "session_id"},
+		"required":             []string{"todos", "session_id"},
+		"additionalProperties": false,
 	}
 }
 
@@ -169,11 +172,12 @@ func (t *TodoTool) saveTodos(sessionID string, todoList *TodoList) error {
 func (t *TodoTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing todo command", zap.String("arguments", arguments))
 	var args struct {
-		Action string `json:"action"`
+		Action string `json:"action,omitempty"`
 		Todos  []struct {
-			Content    string `json:"content"`
-			WorkflowID string `json:"workflow_id,omitempty"`
-		} `json:"todos,omitempty"`
+			Content  string `json:"content"`
+			Status   string `json:"status"`
+			Priority string `json:"priority"`
+		} `json:"todos"`
 		ID        string `json:"id,omitempty"`
 		Status    string `json:"status,omitempty"`
 		SessionID string `json:"session_id"`
@@ -188,7 +192,19 @@ func (t *TodoTool) Execute(arguments string) (string, error) {
 		return "", fmt.Errorf("session_id is required")
 	}
 
-	switch args.Action {
+	// Use action if provided, otherwise infer
+	action := args.Action
+	if action == "" {
+		if len(args.Todos) > 0 {
+			action = "write"
+		} else if args.ID != "" && args.Status != "" {
+			action = "update_status"
+		} else {
+			action = "read"
+		}
+	}
+
+	switch action {
 	case "write":
 		return t.writeTodos(sessionID, args.Todos)
 	case "read":
@@ -198,13 +214,14 @@ func (t *TodoTool) Execute(arguments string) (string, error) {
 	case "clear":
 		return t.clearTodos(sessionID)
 	default:
-		return "", fmt.Errorf("unknown action: %s", args.Action)
+		return "", fmt.Errorf("unknown action: %s", action)
 	}
 }
 
 func (t *TodoTool) writeTodos(sessionID string, todos []struct {
-	Content    string `json:"content"`
-	WorkflowID string `json:"workflow_id,omitempty"`
+	Content  string `json:"content"`
+	Status   string `json:"status"`
+	Priority string `json:"priority"`
 }) (string, error) {
 	todoList, err := t.loadTodos(sessionID)
 	if err != nil {
@@ -212,11 +229,20 @@ func (t *TodoTool) writeTodos(sessionID string, todos []struct {
 	}
 
 	for _, todo := range todos {
+		status := todo.Status
+		if status == "" {
+			status = "pending"
+		}
+		priority := todo.Priority
+		if priority == "" {
+			priority = "medium"
+		}
 		newTodo := TodoItem{
 			Content:    todo.Content,
-			Status:     "pending",
+			Status:     status,
+			Priority:   priority,
 			ID:         uuid.New().String(),
-			WorkflowID: todo.WorkflowID,
+			WorkflowID: "", // Not used in schema
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
 		}

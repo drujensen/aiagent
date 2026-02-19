@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
@@ -47,23 +46,28 @@ func (t *FileReadTool) UpdateConfiguration(config map[string]string) {
 }
 
 func (t *FileReadTool) FullDescription() string {
-	return fmt.Sprintf("%s\n\nParameters:\n- filePath: relative path to file from workspace root\n- offset: starting line number (0-based, optional)\n- limit: max lines to read (optional, default 2000)", t.Description())
+	return fmt.Sprintf("%s\n\nParameters:\n- filePath: The absolute path to the file or directory to read\n- offset: The line number to start reading from (1-indexed)\n- limit: The maximum number of lines to read (defaults to 2000)", t.Description())
 }
 
 func (t *FileReadTool) Schema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"path": map[string]any{
+			"filePath": map[string]any{
 				"type":        "string",
-				"description": "Full or relative path to the file",
+				"description": "The absolute path to the file or directory to read",
 			},
-			"lines": map[string]any{
-				"type":        "string",
-				"description": "Optional range of lines to read (e.g., \"1-10\" for lines 1 through 10)",
+			"offset": map[string]any{
+				"type":        "number",
+				"description": "The line number to start reading from (1-indexed)",
+			},
+			"limit": map[string]any{
+				"type":        "number",
+				"description": "The maximum number of lines to read (defaults to 2000)",
 			},
 		},
-		"required": []string{"path"},
+		"required":             []string{"filePath"},
+		"additionalProperties": false,
 	}
 }
 
@@ -100,44 +104,32 @@ func (t *FileReadTool) checkFileSize(path string) (bool, error) {
 
 func (t *FileReadTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing file read command", zap.String("arguments", arguments))
-	var args struct {
-		Path  string `json:"path"`
-		Lines string `json:"lines,omitempty"`
-	}
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+	var rawArgs map[string]interface{}
+	if err := json.Unmarshal([]byte(arguments), &rawArgs); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
 		return `{"content": "", "error": "failed to parse arguments"}`, nil
 	}
 
-	if args.Path == "" {
-		t.logger.Error("Path is required")
-		return `{"content": "", "error": "path is required"}`, nil
+	filePath, _ := rawArgs["filePath"].(string)
+	offsetVal, _ := rawArgs["offset"].(float64)
+	limitVal, _ := rawArgs["limit"].(float64)
+	offset := int(offsetVal)
+	limit := int(limitVal)
+
+	if filePath == "" {
+		t.logger.Error("filePath is required")
+		return `{"content": "", "error": "filePath is required"}`, nil
 	}
 
-	// Parse lines range
-	offset := 0
-	limit := 2000
-	if args.Lines != "" {
-		if strings.Contains(args.Lines, "-") {
-			parts := strings.Split(args.Lines, "-")
-			if len(parts) == 2 {
-				start, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
-				end, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
-				if err1 == nil && err2 == nil && start > 0 && end >= start {
-					offset = start - 1 // 0-based
-					limit = end - start + 1
-				}
-			}
-		} else {
-			// Single line number
-			if line, err := strconv.Atoi(args.Lines); err == nil && line > 0 {
-				offset = line - 1
-				limit = 1
-			}
-		}
+	// Default values
+	if offset <= 0 {
+		offset = 1 // 1-indexed
+	}
+	if limit <= 0 {
+		limit = 2000
 	}
 
-	fullPath, err := t.validatePath(args.Path)
+	fullPath, err := t.validatePath(filePath)
 	if err != nil {
 		return fmt.Sprintf(`{"content": "", "error": "%s"}`, err.Error()), nil
 	}
@@ -162,7 +154,7 @@ func (t *FileReadTool) Execute(arguments string) (string, error) {
 
 	for scanner.Scan() {
 		lineNum++
-		if lineNum-1 < offset {
+		if lineNum < offset {
 			continue
 		}
 		if readCount >= limit {

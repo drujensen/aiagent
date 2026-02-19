@@ -61,7 +61,7 @@ func (t *ProcessTool) UpdateConfiguration(config map[string]string) {
 }
 
 func (t *ProcessTool) FullDescription() string {
-	return fmt.Sprintf("%s\n\nParameters:\n- command: shell command to execute\n- shell: run in shell (optional, default false)\n- timeout: timeout in seconds (optional)\n\nNote: Output limited to 4096 tokens.", t.Description())
+	return fmt.Sprintf("%s\n\nParameters:\n- command: The command to execute.\n- timeout: Optional timeout in milliseconds.\n- workdir: The working directory to run the command in. Defaults to /Users/drujensen/workspace/go/ai/aiagent.\n- description: Clear, concise description of what this command does in 5-10 words.", t.Description())
 }
 
 func (t *ProcessTool) Schema() map[string]any {
@@ -70,14 +70,23 @@ func (t *ProcessTool) Schema() map[string]any {
 		"properties": map[string]any{
 			"command": map[string]any{
 				"type":        "string",
-				"description": "Shell command to run",
+				"description": "The command to execute.",
 			},
-			"working_dir": map[string]any{
+			"timeout": map[string]any{
+				"type":        "number",
+				"description": "Optional timeout in milliseconds.",
+			},
+			"workdir": map[string]any{
 				"type":        "string",
-				"description": "Directory to execute in",
+				"description": "The working directory to run the command in. Defaults to /Users/drujensen/workspace/go/ai/aiagent.",
+			},
+			"description": map[string]any{
+				"type":        "string",
+				"description": "Clear, concise description of what this command does in 5-10 words.",
 			},
 		},
-		"required": []string{"command"},
+		"required":             []string{"command", "description"},
+		"additionalProperties": false,
 	}
 }
 

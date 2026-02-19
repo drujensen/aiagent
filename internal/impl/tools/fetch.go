@@ -76,48 +76,52 @@ func (t *FetchTool) Schema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"operation": map[string]any{
-				"type":        "string",
-				"description": "The HTTP operation to perform",
-				"enum":        []string{"GET", "POST", "PATCH", "PUT", "DELETE", "HEAD", "OPTIONS"},
-			},
 			"url": map[string]any{
 				"type":        "string",
-				"description": "The URL to fetch. Must include the protocol (e.g., http:// or https://)",
+				"description": "The URL to fetch content from",
 			},
-			"headers": map[string]any{
-				"type":        "array",
-				"description": "Array of headers in the format 'key:value' to include in the request",
-				"items": map[string]any{
-					"type": "string",
-				},
-			},
-			"body": map[string]any{
+			"format": map[string]any{
 				"type":        "string",
-				"description": "The BODY of the request",
+				"description": "The format to return the content in (text, markdown, or html). Defaults to markdown.",
+				"enum":        []string{"text", "markdown", "html"},
+			},
+			"timeout": map[string]any{
+				"type":        "number",
+				"description": "Optional timeout in seconds (max 120)",
 			},
 		},
-		"required": []string{"operation", "url"},
+		"required":             []string{"url", "format"},
+		"additionalProperties": false,
 	}
 }
 
 func (t *FetchTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing fetch operation", zap.String("arguments", arguments))
 
-	var args struct {
-		Operation string   `json:"operation"`
-		Url       string   `json:"url"`
-		Headers   []string `json:"headers"`
-		Body      string   `json:"body"`
-	}
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+	var rawArgs map[string]interface{}
+	if err := json.Unmarshal([]byte(arguments), &rawArgs); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
 		return "", err
 	}
 
-	if args.Operation == "" || args.Url == "" {
-		t.logger.Error("Operation and url are required")
-		return "", fmt.Errorf("operation and url are required")
+	url := ""
+	if u, ok := rawArgs["url"].(string); ok {
+		url = u
+	}
+	format := "markdown"
+	if f, ok := rawArgs["format"].(string); ok {
+		format = f
+	}
+	timeoutVal, _ := rawArgs["timeout"].(float64)
+	timeout := int(timeoutVal)
+
+	if url == "" {
+		t.logger.Error("url is required")
+		return "", fmt.Errorf("url is required")
+	}
+
+	if timeout > 0 && timeout <= 120 {
+		t.client.Timeout = time.Duration(timeout) * time.Second
 	}
 
 	userAgent := t.configuration["user_agent"]
@@ -125,25 +129,40 @@ func (t *FetchTool) Execute(arguments string) (string, error) {
 		userAgent = defaultUserAgent
 	}
 
-	switch args.Operation {
-	case "GET":
-		return t.get(args.Url, args.Headers)
-	case "POST":
-		return t.post(args.Url, args.Headers, args.Body)
-	case "PATCH":
-		return t.patch(args.Url, args.Headers, args.Body)
-	case "PUT":
-		return t.put(args.Url, args.Headers, args.Body)
-	case "DELETE":
-		return t.deleteRequest(args.Url, args.Headers)
-	case "HEAD":
-		return t.head(args.Url, args.Headers)
-	case "OPTIONS":
-		return t.options(args.Url, args.Headers)
-	default:
-		t.logger.Error("Unsupported operation", zap.String("operation", args.Operation))
-		return "", fmt.Errorf("unsupported operation: %s", args.Operation)
+	// For webfetch, default to GET
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
 	}
+	req.Header.Set("User-Agent", userAgent)
+
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %v", err)
+	}
+
+	content := string(body)
+
+	// Convert based on format
+	switch format {
+	case "text":
+		// Already text
+	case "html":
+		// Assume it's already HTML
+	case "markdown":
+		// Simple conversion: wrap in code blocks or something, but for now, return as is
+		content = fmt.Sprintf("```\n%s\n```", content)
+	default:
+		return "", fmt.Errorf("unsupported format: %s", format)
+	}
+
+	return fmt.Sprintf(`{"content": %q, "status_code": %d}`, content, resp.StatusCode), nil
 }
 
 func (t *FetchTool) get(url string, headers []string) (string, error) {

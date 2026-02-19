@@ -25,12 +25,12 @@ func TestFileWriteTool_WriteOperation(t *testing.T) {
 	config := map[string]string{"workspace": tempDir}
 	tool := NewFileWriteTool("test-file-write", "Test File Write Tool", config, logger)
 
-	// Test 1: Write a new file
+	// Test 1: Write a new file (oldString empty triggers write)
 	content := "Hello, World!\nThis is a test file."
 	argsData := map[string]interface{}{
-		"operation": "write",
-		"path":      "test.txt",
-		"content":   content,
+		"filePath":  "test.txt",
+		"oldString": "",
+		"newString": content,
 	}
 	argsBytes, _ := json.Marshal(argsData)
 	args := string(argsBytes)
@@ -88,7 +88,7 @@ func TestFileWriteTool_EditOperation(t *testing.T) {
 	}
 
 	// Test 1: Edit with replace first
-	args := `{"operation": "edit", "path": "edit.txt", "old_string": "Line 2", "content": "Updated Line", "replace_all": false}`
+	args := `{"filePath": "edit.txt", "oldString": "Line 2", "newString": "Updated Line", "replaceAll": false}`
 	result, err := tool.Execute(args)
 	if err != nil {
 		t.Fatalf("Failed to edit file: %v", err)
@@ -98,9 +98,9 @@ func TestFileWriteTool_EditOperation(t *testing.T) {
 	var response struct {
 		Summary     string `json:"summary"`
 		Success     bool   `json:"success"`
-		Path        string `json:"path"`
+		FilePath    string `json:"filePath"`
 		Occurrences int    `json:"occurrences"`
-		ReplacedAll bool   `json:"replaced_all"`
+		ReplacedAll bool   `json:"replacedAll"`
 		Diff        string `json:"diff"`
 	}
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
@@ -125,7 +125,7 @@ func TestFileWriteTool_EditOperation(t *testing.T) {
 	}
 
 	// Test 2: Edit with replace all
-	args = `{"operation": "edit", "path": "edit.txt", "old_string": "Line 2", "content": "Modified Line 2", "replace_all": true}`
+	args = `{"filePath": "edit.txt", "oldString": "Line 2", "newString": "Modified Line 2", "replaceAll": true}`
 	result, err = tool.Execute(args)
 	if err != nil {
 		t.Fatalf("Failed to edit file with replace all: %v", err)
@@ -165,34 +165,32 @@ func TestFileWriteTool_ErrorCases(t *testing.T) {
 	config := map[string]string{"workspace": tempDir}
 	tool := NewFileWriteTool("test-file-error", "Test File Error Tool", config, logger)
 
-	// Test 1: Missing path
-	_, err = tool.Execute(`{"operation": "write", "content": "test"}`)
-	if err == nil || !strings.Contains(err.Error(), "path is required") {
-		t.Errorf("Expected error for missing path, got: %v", err)
+	// Test 1: Missing filePath
+	_, err = tool.Execute(`{"newString": "test"}`)
+	if err == nil || !strings.Contains(err.Error(), "filePath is required") {
+		t.Errorf("Expected error for missing filePath, got: %v", err)
 	}
 
 	// Test 3: Invalid path (outside workspace)
-	_, err = tool.Execute(`{"operation": "write", "path": "../outside.txt", "content": "test"}`)
+	_, err = tool.Execute(`{"filePath": "../outside.txt", "newString": "test"}`)
 	if err == nil || !strings.Contains(err.Error(), "path is outside workspace") {
 		t.Errorf("Expected error for path outside workspace, got: %v", err)
 	}
 
-	// Test 4: Missing content for write
-	_, err = tool.Execute(`{"operation": "write", "path": "test.txt"}`)
-	if err == nil || !strings.Contains(err.Error(), "content is required") {
-		t.Errorf("Expected error for missing content in write, got: %v", err)
+	// Test 4: Missing newString for write
+	_, err = tool.Execute(`{"filePath": "test.txt"}`)
+	if err == nil || !strings.Contains(err.Error(), "newString is required for write operation") {
+		t.Errorf("Expected error for missing newString in write, got: %v", err)
 	}
 
-	// Test 5: Missing old_string for edit
-	_, err = tool.Execute(`{"operation": "edit", "path": "test.txt", "content": "new content"}`)
-	if err == nil || !strings.Contains(err.Error(), "old_string is required for edit operation") {
-		t.Errorf("Expected error for missing old_string in edit, got: %v", err)
-	}
+	// Test 5: Missing oldString for edit
+	_, err = tool.Execute(`{"filePath": "test.txt", "oldString": "old", "newString": "new content"}`)
+	// This should work as edit
 
-	// Test 6: Missing content for edit
-	_, err = tool.Execute(`{"operation": "edit", "path": "test.txt", "old_string": "old"}`)
-	if err == nil || !strings.Contains(err.Error(), "content (new_string) is required for edit operation") {
-		t.Errorf("Expected error for missing content in edit, got: %v", err)
+	// Test 6: Missing newString for edit
+	_, err = tool.Execute(`{"filePath": "test.txt", "oldString": "old"}`)
+	if err == nil || !strings.Contains(err.Error(), "newString is required for edit operation") {
+		t.Errorf("Expected error for missing newString in edit, got: %v", err)
 	}
 
 	// Test 7: Old string not found
@@ -202,9 +200,9 @@ func TestFileWriteTool_ErrorCases(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	_, err = tool.Execute(`{"operation": "edit", "path": "nonexistent.txt", "old_string": "not found", "content": "replacement"}`)
-	if err == nil || !strings.Contains(err.Error(), "old_string not found in file") {
-		t.Errorf("Expected error for old_string not found, got: %v", err)
+	_, err = tool.Execute(`{"filePath": "nonexistent.txt", "oldString": "not found", "newString": "replacement"}`)
+	if err == nil || !strings.Contains(err.Error(), "oldString not found in file") {
+		t.Errorf("Expected error for oldString not found, got: %v", err)
 	}
 }
 
@@ -237,7 +235,7 @@ func main(){fmt.Println("Hello")}`
 	}
 
 	// Edit the file to trigger formatting
-	args := `{"operation": "edit", "path": "test.go", "old_string": "package main", "content": "package main"}`
+	args := `{"filePath": "test.go", "oldString": "package main", "newString": "package main"}`
 	_, err = tool.Execute(args)
 	if err != nil {
 		t.Fatalf("Failed to edit Go file: %v", err)
@@ -262,7 +260,7 @@ func TestFileWriteTool_Parameters(t *testing.T) {
 	tool := NewFileWriteTool("test-params", "Test Parameters", nil, logger)
 
 	params := tool.Parameters()
-	expectedParams := []string{"operation", "path", "content", "old_string", "replace_all"}
+	expectedParams := []string{"filePath", "oldString", "newString", "replaceAll"}
 
 	if len(params) != len(expectedParams) {
 		t.Errorf("Expected %d parameters, got %d", len(expectedParams), len(params))
@@ -275,24 +273,20 @@ func TestFileWriteTool_Parameters(t *testing.T) {
 	}
 
 	// Check specific parameter properties
-	if params[0].Type != "string" || len(params[0].Enum) != 2 || params[0].Enum[0] != "write" || params[0].Enum[1] != "edit" {
-		t.Errorf("Invalid operation parameter: %v", params[0])
+	if params[0].Type != "string" || !params[0].Required {
+		t.Errorf("Invalid filePath parameter: %v", params[0])
 	}
 
 	if params[1].Type != "string" || !params[1].Required {
-		t.Errorf("Invalid path parameter: %v", params[1])
+		t.Errorf("Invalid oldString parameter: %v", params[1])
 	}
 
 	if params[2].Type != "string" || !params[2].Required {
-		t.Errorf("Invalid content parameter: %v", params[2])
+		t.Errorf("Invalid newString parameter: %v", params[2])
 	}
 
-	if params[3].Type != "string" || params[3].Required {
-		t.Errorf("Invalid old_string parameter: %v", params[3])
-	}
-
-	if params[4].Type != "boolean" || params[4].Required {
-		t.Errorf("Invalid replace_all parameter: %v", params[4])
+	if params[3].Type != "boolean" || params[3].Required {
+		t.Errorf("Invalid replaceAll parameter: %v", params[3])
 	}
 }
 
@@ -315,48 +309,45 @@ func TestFileWriteTool_Schema(t *testing.T) {
 
 	// Check required properties
 	required, ok := schema["required"].([]string)
-	if !ok || len(required) != 2 || required[0] != "path" || required[1] != "content" {
-		t.Errorf("Expected required fields ['path', 'content'], got %v", required)
+	if !ok || len(required) != 3 || required[0] != "filePath" || required[1] != "oldString" || required[2] != "newString" {
+		t.Errorf("Expected required fields ['filePath', 'oldString', 'newString'], got %v", required)
 	}
 
 	// Check that all expected properties are present
-	expectedProps := []string{"operation", "path", "content", "mode", "old_string", "replace_all"}
+	expectedProps := []string{"filePath", "oldString", "newString", "replaceAll"}
 	for _, prop := range expectedProps {
 		if _, exists := properties[prop]; !exists {
 			t.Errorf("Expected property '%s' not found in schema", prop)
 		}
 	}
 
-	// Check operation property
-	opProp, ok := properties["operation"].(map[string]any)
+	// Check filePath property
+	filePathProp, ok := properties["filePath"].(map[string]any)
 	if !ok {
-		t.Errorf("Operation property not a map")
+		t.Errorf("filePath property not a map")
 	} else {
-		if desc, ok := opProp["description"].(string); !ok || !strings.Contains(desc, "Auto-detected") {
-			t.Errorf("Invalid operation description: %v", desc)
-		}
-		if enum, ok := opProp["enum"].([]string); !ok || len(enum) != 2 {
-			t.Errorf("Invalid operation enum: %v", enum)
+		if desc, ok := filePathProp["description"].(string); !ok || !strings.Contains(desc, "modify") {
+			t.Errorf("Invalid filePath description: %v", desc)
 		}
 	}
 
-	// Check old_string property
-	oldStrProp, ok := properties["old_string"].(map[string]any)
+	// Check oldString property
+	oldStrProp, ok := properties["oldString"].(map[string]any)
 	if !ok {
-		t.Errorf("old_string property not a map")
+		t.Errorf("oldString property not a map")
 	} else {
 		if desc, ok := oldStrProp["description"].(string); !ok || !strings.Contains(desc, "replace") {
-			t.Errorf("Invalid old_string description: %v", desc)
+			t.Errorf("Invalid oldString description: %v", desc)
 		}
 	}
 
-	// Check replace_all property
-	replaceProp, ok := properties["replace_all"].(map[string]any)
+	// Check replaceAll property
+	replaceProp, ok := properties["replaceAll"].(map[string]any)
 	if !ok {
-		t.Errorf("replace_all property not a map")
+		t.Errorf("replaceAll property not a map")
 	} else {
 		if typ, ok := replaceProp["type"].(string); !ok || typ != "boolean" {
-			t.Errorf("Invalid replace_all type: %v", typ)
+			t.Errorf("Invalid replaceAll type: %v", typ)
 		}
 	}
 }

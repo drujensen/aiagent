@@ -46,7 +46,7 @@ func (t *FileSearchTool) UpdateConfiguration(config map[string]string) {
 }
 
 func (t *FileSearchTool) FullDescription() string {
-	return fmt.Sprintf("%s\n\nParameters:\n- path: file or directory path\n- pattern: regex pattern to search for\n- file_pattern: file pattern filter (optional)\n- case_sensitive: boolean (optional)\n- all_files: search all files in directory (optional)", t.Description())
+	return fmt.Sprintf("%s\n\nParameters:\n- pattern: The regex pattern to search for in file contents\n- path: The directory to search in. Defaults to the current working directory.\n- include: File pattern to include in the search (e.g., \"*.js\", \"*.{ts,tsx}\")", t.Description())
 }
 
 func (t *FileSearchTool) Schema() map[string]any {
@@ -55,18 +55,19 @@ func (t *FileSearchTool) Schema() map[string]any {
 		"properties": map[string]any{
 			"pattern": map[string]any{
 				"type":        "string",
-				"description": "Search regex or string",
+				"description": "The regex pattern to search for in file contents",
 			},
-			"directory": map[string]any{
+			"path": map[string]any{
 				"type":        "string",
-				"description": "Root dir to search",
+				"description": "The directory to search in. Defaults to the current working directory.",
 			},
-			"file_ext": map[string]any{
+			"include": map[string]any{
 				"type":        "string",
-				"description": "File extension filter (e.g., '.go')",
+				"description": "File pattern to include in the search (e.g., \"*.js\", \"*.{ts,tsx}\")",
 			},
 		},
-		"required": []string{"pattern", "directory"},
+		"required":             []string{"pattern"},
+		"additionalProperties": false,
 	}
 }
 
@@ -103,33 +104,42 @@ func (t *FileSearchTool) checkFileSize(path string) (bool, error) {
 
 func (t *FileSearchTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing code search", zap.String("arguments", arguments))
-	var args struct {
-		Pattern   string `json:"pattern"`
-		Directory string `json:"directory"`
-		FileExt   string `json:"file_ext,omitempty"`
-	}
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+	var rawArgs map[string]interface{}
+	if err := json.Unmarshal([]byte(arguments), &rawArgs); err != nil {
 		return `{"results": [], "error": "failed to parse arguments"}`, nil
 	}
 
-	if args.Pattern == "" {
-		return `{"results": [], "error": "pattern is required"}`, nil
+	pattern := ""
+	if p, ok := rawArgs["pattern"].(string); ok {
+		pattern = p
 	}
-	if args.Directory == "" {
-		return `{"results": [], "error": "directory is required"}`, nil
+	path := ""
+	if p, ok := rawArgs["path"].(string); ok {
+		path = p
+	}
+	include := ""
+	if i, ok := rawArgs["include"].(string); ok {
+		include = i
 	}
 
-	fullPath, err := t.validatePath(args.Directory)
+	if pattern == "" {
+		return `{"results": [], "error": "pattern is required"}`, nil
+	}
+	if path == "" {
+		path = "." // default to current directory
+	}
+
+	fullPath, err := t.validatePath(path)
 	if err != nil {
-		return fmt.Sprintf(`{"results": [], "error": "invalid directory: %s"}`, err.Error()), nil
+		return fmt.Sprintf(`{"results": [], "error": "invalid path: %s"}`, err.Error()), nil
 	}
 
 	filePattern := "*"
-	if args.FileExt != "" {
-		filePattern = "*" + args.FileExt
+	if include != "" {
+		filePattern = include
 	}
 
-	results, err := t.searchMultipleFiles(fullPath, args.Pattern, filePattern, false)
+	results, err := t.searchMultipleFiles(fullPath, pattern, filePattern, false)
 	if err != nil {
 		return fmt.Sprintf(`{"results": [], "error": "search failed: %s"}`, err.Error()), nil
 	}
