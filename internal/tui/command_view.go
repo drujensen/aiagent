@@ -23,13 +23,13 @@ type CommandMenu struct {
 
 func NewCommandMenu() CommandMenu {
 	items := []list.Item{
-		CommandItem{name: "new", desc: "Create a new chat"},
-		CommandItem{name: "history", desc: "View chat history"},
-		CommandItem{name: "agents", desc: "View available agents"},
-		CommandItem{name: "tools", desc: "View available tools"},
-		CommandItem{name: "usage", desc: "Show usage statistics"},
-		CommandItem{name: "help", desc: "Show help screen"},
-		CommandItem{name: "exit", desc: "Exit the application"},
+		CommandItem{name: "new", desc: "Create a new chat (Ctrl+N)"},
+		CommandItem{name: "history", desc: "View chat history (Ctrl+H)"},
+		CommandItem{name: "agents", desc: "View available agents (Ctrl+A)"},
+		CommandItem{name: "tools", desc: "View available tools (Ctrl+T)"},
+		CommandItem{name: "models", desc: "View available models (Ctrl+M)"},
+		CommandItem{name: "usage", desc: "Show usage statistics (Ctrl+U)"},
+		CommandItem{name: "exit", desc: "Exit the application (Ctrl+X)"},
 	}
 
 	delegate := list.NewDefaultDelegate()
@@ -59,7 +59,16 @@ func (m CommandMenu) Update(msg tea.Msg) (CommandMenu, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.list.SetSize(m.width-6, m.height-6)
+		// Make list fill available height minus borders and instructions
+		// Content: list + \n + instructions = listHeight + 1
+		// Inner border: +2 (top/bottom)
+		// Outer border: +2 (top/bottom)
+		// Total: listHeight + 5 = m.height
+		listHeight := m.height - 5
+		if listHeight < 6 {
+			listHeight = 6 // Minimum height
+		}
+		m.list.SetSize(m.width-6, listHeight)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -86,12 +95,14 @@ func (m CommandMenu) View() string {
 
 	// Create the content first
 	instructions := "Type to filter, arrows/j/k to navigate, Enter to execute, Esc to cancel"
-	content := m.list.View() + "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions)
+	instructionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Width(m.width - 6) // Fit within inner border
+	content := m.list.View() + "\n" + instructionStyle.Render(instructions)
 
 	// Apply inner border
 	innerBorder := lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("6"))
+		BorderForeground(lipgloss.Color("6")).
+		Width(m.width - 4) // Account for outer border width
 
 	borderedContent := innerBorder.Render(content)
 

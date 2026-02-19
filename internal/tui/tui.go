@@ -26,7 +26,6 @@ type TUI struct {
 	chatView    ChatView
 	historyView HistoryView
 	usageView   UsageView
-	helpView    HelpView
 	agentView   AgentView
 	modelView   ModelView
 	toolView    ToolView
@@ -59,9 +58,8 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 		chatView:    NewChatView(chatService, agentService, modelService, logger, activeChat),
 		historyView: NewHistoryView(chatService),
 		usageView:   NewUsageView(chatService, agentService, modelService),
-		helpView:    NewHelpView(),
 		agentView:   NewAgentView(agentService),
-		modelView:   NewModelView(modelService, providerService),
+		modelView:   NewModelViewWithMode(modelService, providerService, "view"),
 		toolView:    NewToolView(toolService),
 		commandMenu: NewCommandMenu(),
 
@@ -75,7 +73,6 @@ func (t TUI) Init() tea.Cmd {
 		t.chatView.Init(),
 		t.historyView.Init(),
 		t.usageView.Init(),
-		t.helpView.Init(),
 		t.agentView.Init(),
 		t.modelView.Init(),
 		t.toolView.Init(),
@@ -153,17 +150,6 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.state = "chat/view"
 		if t.activeChat != nil {
 			t.chatView.updateEditorContent()
-		}
-		return t, nil
-
-	// Handle help view messages
-	case startHelpMsg:
-		t.state = "chat/help"
-		return t, t.helpView.Init()
-	case helpCancelledMsg:
-		t.state = "chat/view"
-		if t.activeChat != nil {
-			t.chatView.SetActiveChat(t.activeChat)
 		}
 		return t, nil
 
@@ -295,9 +281,10 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "usage":
 			t.state = "chat/usage"
 			return t, t.usageView.Init()
-		case "help":
-			t.state = "chat/help"
-			return t, t.helpView.Init()
+		case "models":
+			t.state = "models/list"
+			t.modelView.SetMode("switch")
+			return t, t.modelView.Init()
 		case "exit":
 			return t, tea.Quit
 		}
@@ -347,11 +334,6 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 
-		t.helpView, cmd = t.helpView.Update(msg)
-		if cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-
 		t.agentView, cmd = t.agentView.Update(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -367,6 +349,11 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 
+		t.commandMenu, cmd = t.commandMenu.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
 		return t, tea.Batch(cmds...)
 	}
 
@@ -378,8 +365,6 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.historyView, cmd = t.historyView.Update(msg)
 	case "chat/usage":
 		t.usageView, cmd = t.usageView.Update(msg)
-	case "chat/help":
-		t.helpView, cmd = t.helpView.Update(msg)
 	case "agents/list":
 		t.agentView, cmd = t.agentView.Update(msg)
 	case "models/list":
@@ -400,8 +385,6 @@ func (t TUI) View() string {
 		return t.historyView.View()
 	case "chat/usage":
 		return t.usageView.View()
-	case "chat/help":
-		return t.helpView.View()
 	case "agents/list":
 		return t.agentView.View()
 	case "models/list":

@@ -63,6 +63,10 @@ func (m ModelListItem) Description() string {
 }
 
 func NewModelView(modelService services.ModelService, providerService services.ProviderService) ModelView {
+	return NewModelViewWithMode(modelService, providerService, "view")
+}
+
+func NewModelViewWithMode(modelService services.ModelService, providerService services.ProviderService, mode string) ModelView {
 	delegate := list.NewDefaultDelegate()
 	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("6")).Bold(true)
 	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("7"))
@@ -82,8 +86,12 @@ func NewModelView(modelService services.ModelService, providerService services.P
 		providerService: providerService,
 		filterService:   services.NewModelFilterService(),
 		list:            l,
-		mode:            "view",
+		mode:            mode,
 	}
+}
+
+func (v *ModelView) SetMode(mode string) {
+	v.mode = mode
 }
 
 func (v ModelView) Init() tea.Cmd {

@@ -32,11 +32,6 @@ type (
 )
 
 type (
-	startHelpMsg     struct{}
-	helpCancelledMsg struct{}
-)
-
-type (
 	startAgentsMsg   struct{}
 	agentsFetchedMsg struct {
 		agents []*entities.Agent
