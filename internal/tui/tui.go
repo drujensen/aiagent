@@ -2,7 +2,9 @@ package tui
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/drujensen/aiagent/internal/domain/entities"
@@ -22,7 +24,6 @@ type TUI struct {
 	activeChat      *entities.Chat
 
 	chatView    ChatView
-	chatForm    ChatForm
 	historyView HistoryView
 	usageView   UsageView
 	helpView    HelpView
@@ -44,9 +45,6 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 	}
 
 	initialState := "chat/view"
-	if activeChat == nil {
-		initialState = "chat/create"
-	}
 
 	return TUI{
 		chatService:     chatService,
@@ -58,8 +56,7 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 		logger:          logger,
 		activeChat:      activeChat,
 
-		chatView:    NewChatView(chatService, agentService, modelService, activeChat),
-		chatForm:    NewChatForm(chatService, agentService, modelService, providerService),
+		chatView:    NewChatView(chatService, agentService, modelService, logger, activeChat),
 		historyView: NewHistoryView(chatService),
 		usageView:   NewUsageView(chatService, agentService, modelService),
 		helpView:    NewHelpView(),
@@ -74,8 +71,7 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 }
 
 func (t TUI) Init() tea.Cmd {
-	return tea.Batch(
-		t.chatForm.Init(),
+	cmds := []tea.Cmd{
 		t.chatView.Init(),
 		t.historyView.Init(),
 		t.usageView.Init(),
@@ -84,32 +80,37 @@ func (t TUI) Init() tea.Cmd {
 		t.modelView.Init(),
 		t.toolView.Init(),
 		t.commandMenu.Init(),
-	)
+	}
+
+	if t.activeChat == nil {
+		cmds = append(cmds, t.autoCreateChatCmd())
+	}
+
+	return tea.Batch(cmds...)
 }
 
 func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	// Handle chat view messages
-	case startCreateChatMsg:
-		t.state = "chat/create"
-		t.chatForm.SetChatName(string(msg))
-		return t, t.chatForm.Init()
+	case startAutoCreateChatMsg:
+		return t, t.autoCreateChatCmd()
 	case updatedChatMsg:
 		t.activeChat = msg
 		t.state = "chat/view"
 		var cmd tea.Cmd
 		t.chatView, cmd = t.chatView.Update(msg)
 		return t, cmd
-	case canceledCreateChatMsg:
-		t.state = "chat/view"
-		t.chatView.err = errors.New("New chat canceled")
-		if t.activeChat != nil {
-			t.chatView.updateEditorContent()
-		} else {
-			return t, tea.Quit
+	case chatCreatedMsg:
+		ctx := context.Background()
+		err := t.chatService.SetActiveChat(ctx, msg.ID)
+		if err != nil {
+			return t, func() tea.Msg { return errMsg(err) }
 		}
-		return t, t.chatView.Init()
+		t.activeChat = msg
+		t.chatView.SetActiveChat(msg)
+		t.state = "chat/view"
+		return t, nil
 	// Handle history view messages
 	case startHistoryMsg:
 		t.state = "chat/history"
@@ -239,6 +240,20 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if err := config.SaveGlobalConfig(t.globalConfig, t.logger); err != nil {
 			t.logger.Error("Failed to save global config", zap.Error(err))
 		}
+
+		// If the chat title is still the default and has messages, try to regenerate it with the new model
+		if strings.HasPrefix(updatedChat.Name, "New Chat") && len(updatedChat.Messages) >= 2 {
+			ctx := context.Background()
+			if regeneratedChat, err := t.chatService.GenerateAndUpdateTitle(ctx, updatedChat.ID); err != nil {
+				t.logger.Warn("Failed to regenerate title after model change", zap.Error(err))
+			} else {
+				// Update the active chat with the new title
+				t.activeChat = regeneratedChat
+				t.chatView.SetActiveChat(regeneratedChat)
+				t.logger.Info("Regenerated chat title after model change", zap.String("title", regeneratedChat.Name))
+			}
+		}
+
 		return t, nil
 
 	// Handle tools view messages
@@ -267,12 +282,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch msg.command {
 		case "new":
-			t.state = "chat/create"
-			t.chatForm.SetChatName("") // No name provided
-			// Clear active chat in chat view to show welcome message
-			t.chatView.activeChat = nil
-			t.chatView.updateEditorContent()
-			return t, t.chatForm.Init()
+			return t, t.autoCreateChatCmd()
 		case "history":
 			t.state = "chat/history"
 			return t, t.historyView.Init()
@@ -327,11 +337,6 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 
-		t.chatForm, cmd = t.chatForm.Update(msg)
-		if cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-
 		t.historyView, cmd = t.historyView.Update(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -369,8 +374,6 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch t.state {
 	case "chat/view":
 		t.chatView, cmd = t.chatView.Update(msg)
-	case "chat/create":
-		t.chatForm, cmd = t.chatForm.Update(msg)
 	case "chat/history":
 		t.historyView, cmd = t.historyView.Update(msg)
 	case "chat/usage":
@@ -393,8 +396,6 @@ func (t TUI) View() string {
 	switch t.state {
 	case "chat/view":
 		return t.chatView.View()
-	case "chat/create":
-		return t.chatForm.View()
 	case "chat/history":
 		return t.historyView.View()
 	case "chat/usage":
@@ -412,4 +413,64 @@ func (t TUI) View() string {
 	}
 
 	return "Error: Invalid state"
+}
+
+func (t *TUI) autoCreateChatCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+
+		// Get last used or default agent
+		agentID := t.globalConfig.LastUsedAgent
+		if agentID != "" {
+			// Validate that the agent exists
+			if _, err := t.agentService.GetAgent(ctx, agentID); err != nil {
+				agentID = "" // Reset if not found
+			}
+		}
+		if agentID == "" {
+			agents, _ := t.agentService.ListAgents(ctx)
+			if len(agents) > 0 {
+				agentID = agents[0].ID
+			}
+		}
+
+		// Get last used or default model
+		modelID := t.globalConfig.LastUsedModel
+		if modelID != "" {
+			// Validate that the model exists
+			if _, err := t.modelService.GetModel(ctx, modelID); err != nil {
+				modelID = "" // Reset if not found
+			}
+		}
+		if modelID == "" {
+			models, _ := t.modelService.ListModels(ctx)
+			if len(models) > 0 {
+				modelID = models[0].ID
+			}
+		}
+
+		// Update global config with last used agent and model
+		if agentID != "" {
+			t.globalConfig.LastUsedAgent = agentID
+			if err := config.SaveGlobalConfig(t.globalConfig, t.logger); err != nil {
+				t.logger.Warn("Failed to save global config", zap.Error(err))
+			}
+		}
+		if modelID != "" {
+			t.globalConfig.LastUsedModel = modelID
+			if err := config.SaveGlobalConfig(t.globalConfig, t.logger); err != nil {
+				t.logger.Warn("Failed to save global config", zap.Error(err))
+			}
+		}
+
+		// Generate temp title
+		tempTitle := fmt.Sprintf("New Chat - %s", time.Now().Format("2006-01-02 15:04"))
+
+		// Create and return chat
+		chat, err := t.chatService.CreateChat(ctx, agentID, modelID, tempTitle)
+		if err != nil {
+			return errMsg(err)
+		}
+		return chatCreatedMsg(chat)
+	}
 }

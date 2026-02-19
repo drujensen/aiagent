@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -46,7 +44,9 @@ func NewCommandMenu() CommandMenu {
 	l.SetShowPagination(false)
 
 	return CommandMenu{
-		list: l,
+		list:   l,
+		width:  80, // Default width
+		height: 20, // Default height
 	}
 }
 
@@ -81,25 +81,24 @@ func (m CommandMenu) Update(msg tea.Msg) (CommandMenu, tea.Cmd) {
 func (m CommandMenu) View() string {
 
 	if m.width == 0 || m.height == 0 {
-		return ""
+		return "Loading..."
 	}
 
-	outerStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.ThickBorder()).
-		BorderForeground(lipgloss.Color("4")).
-		Width(m.width - 2).
-		Height(m.height - 2)
+	// Create the content first
+	instructions := "Type to filter, arrows/j/k to navigate, Enter to execute, Esc to cancel"
+	content := m.list.View() + "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions)
 
+	// Apply inner border
 	innerBorder := lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("6")).
-		Width(m.list.Width()).
-		Height(m.list.Height())
+		BorderForeground(lipgloss.Color("6"))
 
-	var sb strings.Builder
-	instructions := "Type to filter, arrows/j/k to navigate, Enter to execute, Esc to cancel"
-	view := innerBorder.Render(m.list.View()) + "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions)
-	sb.WriteString(view)
+	borderedContent := innerBorder.Render(content)
 
-	return outerStyle.Render(sb.String())
+	// Apply outer border with full available space
+	outerStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.ThickBorder()).
+		BorderForeground(lipgloss.Color("4"))
+
+	return outerStyle.Render(borderedContent)
 }

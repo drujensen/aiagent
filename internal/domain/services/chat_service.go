@@ -30,6 +30,7 @@ type ChatService interface {
 	SendMessage(ctx context.Context, id string, message *entities.Message) (*entities.Message, error)
 	SaveMessagesIncrementally(ctx context.Context, chatID string, messages []*entities.Message) error
 	CalculateTotalChatCost(ctx context.Context, chatID string) (float64, error)
+	GenerateAndUpdateTitle(ctx context.Context, chatID string) (*entities.Chat, error)
 }
 
 type chatService struct {
@@ -246,6 +247,9 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		return nil, err
 	}
 
+	// Track if this is the first message exchange
+	isFirstExchange := len(chat.Messages) == 0
+
 	message.ID = uuid.New().String()
 	message.Timestamp = time.Now()
 	chat.Messages = append(chat.Messages, *message)
@@ -408,6 +412,18 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 			return nil, errors.CanceledErrorf("message processing was canceled")
 		}
 		return nil, errors.InternalErrorf("failed to generate AI response: %v", err)
+	}
+
+	// Generate title if this is the first message exchange
+	if isFirstExchange {
+		s.logger.Info("Generating title for new chat", zap.String("chat_id", chat.ID))
+		if updatedChat, err := s.GenerateAndUpdateTitle(ctx, chat.ID); err != nil {
+			s.logger.Warn("Failed to generate title", zap.Error(err))
+		} else {
+			s.logger.Info("Successfully updated chat title", zap.String("chat_id", chat.ID), zap.String("new_title", updatedChat.Name))
+			// Update the in-memory chat with the new title
+			*chat = *updatedChat
+		}
 	}
 
 	// Get usage information for billing
@@ -1098,4 +1114,139 @@ func (s *chatService) CalculateTotalChatCost(ctx context.Context, chatID string)
 	}
 
 	return chat.Usage.TotalCost, nil
+}
+
+func (s *chatService) GenerateAndUpdateTitle(ctx context.Context, chatID string) (*entities.Chat, error) {
+	s.logger.Info("Starting title generation", zap.String("chat_id", chatID))
+	chat, err := s.chatRepo.GetChat(ctx, chatID)
+	if err != nil {
+		s.logger.Error("Failed to get chat for title generation", zap.Error(err))
+		return nil, err
+	}
+	if len(chat.Messages) < 2 {
+		s.logger.Warn("Not enough messages for title generation", zap.Int("message_count", len(chat.Messages)))
+		return nil, fmt.Errorf("not enough messages")
+	}
+
+	// Get first user message and assistant response
+	var firstUser, firstAssistant string
+	for _, msg := range chat.Messages {
+		if msg.Role == "user" && firstUser == "" {
+			firstUser = msg.Content
+		} else if msg.Role == "assistant" && firstAssistant == "" {
+			firstAssistant = msg.Content
+			break
+		}
+	}
+
+	userMsgPreview := firstUser
+	if len(userMsgPreview) > 50 {
+		userMsgPreview = userMsgPreview[:50] + "..."
+	}
+	s.logger.Info("Extracting conversation preview for title", zap.String("user_msg", userMsgPreview))
+
+	// Generate title using AI (same model as chat)
+	prompt := fmt.Sprintf("Generate a short title (max 60 chars) summarizing this conversation: User: %s, Assistant: %s",
+		firstUser, firstAssistant)
+
+	title, err := s.generateTitleWithAI(ctx, chat.ModelID, prompt)
+	if err != nil {
+		s.logger.Warn("Title generation with AI failed", zap.Error(err))
+		return nil, err
+	}
+
+	s.logger.Info("Generated title", zap.String("title", title))
+
+	// Update chat title
+	updatedChat, err := s.UpdateChat(ctx, chatID, chat.AgentID, chat.ModelID, title)
+	if err != nil {
+		s.logger.Error("Failed to update chat title", zap.Error(err))
+		return nil, err
+	}
+
+	s.logger.Info("Chat title updated successfully", zap.String("chat_id", chatID), zap.String("title", title))
+	return updatedChat, nil
+}
+
+func (s *chatService) generateTitleWithAI(ctx context.Context, modelID, prompt string) (string, error) {
+	s.logger.Info("Generating title with AI", zap.String("model", modelID))
+
+	model, err := s.modelRepo.GetModel(ctx, modelID)
+	if err != nil {
+		s.logger.Error("Failed to get model for title generation", zap.Error(err))
+		return s.generateFallbackTitle(prompt), nil
+	}
+
+	provider, err := s.providerRepo.GetProvider(ctx, model.ProviderID)
+	if err != nil {
+		s.logger.Error("Failed to get provider for title generation", zap.Error(err))
+		return s.generateFallbackTitle(prompt), nil
+	}
+
+	apiKeyReference := "#{" + provider.APIKeyName + "}#"
+	apiKey, err := s.config.ResolveEnvironmentVariable(apiKeyReference)
+	if err != nil {
+		s.logger.Error("Failed to resolve API key for title generation", zap.Error(err))
+		return s.generateFallbackTitle(prompt), nil
+	}
+
+	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
+	aiModel, err := aiModelFactory.CreateModelIntegration(model, provider, apiKey)
+	if err != nil {
+		s.logger.Error("Failed to create AI model for title generation", zap.Error(err))
+		return s.generateFallbackTitle(prompt), nil
+	}
+
+	// Create title generation prompt
+	titlePrompt := &entities.Message{
+		Role:    "user",
+		Content: prompt,
+	}
+
+	// Generate title with low temperature for consistency
+	options := map[string]any{
+		"temperature": 0.1,
+		"max_tokens":  30, // Shorter for titles
+	}
+
+	s.logger.Debug("Calling AI for title generation")
+	response, err := aiModel.GenerateResponse(ctx, []*entities.Message{titlePrompt}, nil, options, nil)
+	if err != nil {
+		s.logger.Warn("AI title generation failed, using fallback", zap.Error(err))
+		return s.generateFallbackTitle(prompt), nil
+	}
+
+	if len(response) == 0 || response[0].Content == "" {
+		s.logger.Warn("AI returned empty title, using fallback")
+		return s.generateFallbackTitle(prompt), nil
+	}
+
+	// Clean up the title
+	title := strings.TrimSpace(response[0].Content)
+	title = strings.Trim(title, `"'`)
+	if len(title) > 60 {
+		title = title[:60]
+	}
+
+	s.logger.Info("AI generated title", zap.String("title", title))
+	return title, nil
+}
+
+func (s *chatService) generateFallbackTitle(prompt string) string {
+	// Extract title from the first user message as fallback
+	lines := strings.Split(prompt, "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "User: ") {
+			userMsg := strings.TrimPrefix(line, "User: ")
+			userMsg = strings.ReplaceAll(userMsg, "\n", " ")
+			userMsg = strings.TrimSpace(userMsg)
+			if len(userMsg) > 50 {
+				userMsg = userMsg[:50] + "..."
+			}
+			if userMsg != "" {
+				return userMsg
+			}
+		}
+	}
+	return "Chat Conversation"
 }

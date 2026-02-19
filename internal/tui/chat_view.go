@@ -16,6 +16,7 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/events"
 	"github.com/drujensen/aiagent/internal/domain/services"
 	"github.com/kujtimiihoxha/vimtea"
+	"go.uber.org/zap"
 )
 
 // formatToolName formats tool names with relevant arguments for display
@@ -539,6 +540,7 @@ type ChatView struct {
 	chatService        services.ChatService
 	agentService       services.AgentService
 	modelService       services.ModelService
+	logger             *zap.Logger
 	activeChat         *entities.Chat
 	editor             vimtea.Editor
 	textarea           textarea.Model
@@ -563,7 +565,7 @@ type ChatView struct {
 	toolCallStatus     map[string]bool    // Track completion status of tool calls (toolCallID -> completed)
 }
 
-func NewChatView(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, activeChat *entities.Chat) ChatView {
+func NewChatView(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, logger *zap.Logger, activeChat *entities.Chat) ChatView {
 	ta := textarea.New()
 	ta.Placeholder = "Type your message..."
 	ta.Focus()
@@ -586,6 +588,7 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		chatService:        chatService,
 		agentService:       agentService,
 		modelService:       modelService,
+		logger:             logger,
 		activeChat:         activeChat,
 		textarea:           ta,
 		spinner:            s,
@@ -696,6 +699,23 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 	}
 
 	c.updateEditorContent()
+
+	// Self-heal: Regenerate title if it's still default and has conversation
+	if strings.HasPrefix(chat.Name, "New Chat") && len(chat.Messages) >= 2 {
+		// Trigger title regeneration asynchronously
+		go func() {
+			ctx := context.Background()
+			if updatedChat, err := c.chatService.GenerateAndUpdateTitle(ctx, chat.ID); err != nil {
+				c.logger.Warn("Failed to regenerate title for old chat", zap.Error(err))
+			} else {
+				c.logger.Info("Regenerated title for old chat", zap.String("chat_id", chat.ID), zap.String("new_title", updatedChat.Name))
+				// Update the active chat reference if it matches
+				if c.activeChat != nil && c.activeChat.ID == updatedChat.ID {
+					c.activeChat = updatedChat
+				}
+			}
+		}()
+	}
 }
 
 func (c *ChatView) updateEditorContent() {
@@ -967,7 +987,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		case "ctrl+o":
 			return c, func() tea.Msg { return startModelSwitchMsg{} }
 		case "ctrl+n":
-			return c, func() tea.Msg { return startCreateChatMsg("") }
+			return c, func() tea.Msg { return startAutoCreateChatMsg{} }
 		case "ctrl+l":
 			// Toggle line numbers
 			c.lineNumbersEnabled = !c.lineNumbersEnabled
@@ -1170,18 +1190,20 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		c.cancel = nil
 		// Don't remove user's message if the error is due to cancellation
 		// The server should have saved the user's message and any partial results
-		if len(c.activeChat.Messages) > 0 && !strings.Contains(m.Error(), "canceled") {
+		if c.activeChat != nil && len(c.activeChat.Messages) > 0 && !strings.Contains(m.Error(), "canceled") {
 			lastIdx := len(c.activeChat.Messages) - 1
 			if c.activeChat.Messages[lastIdx].Role == "user" {
 				c.activeChat.Messages = c.activeChat.Messages[:lastIdx]
 			}
 		}
-		// Add error message to chat history
-		errorMsg := &entities.Message{
-			Content: "Error: " + m.Error(),
-			Role:    "system",
+		// Add error message to chat history only if we have an active chat
+		if c.activeChat != nil {
+			errorMsg := &entities.Message{
+				Content: "Error: " + m.Error(),
+				Role:    "system",
+			}
+			c.activeChat.Messages = append(c.activeChat.Messages, *errorMsg)
 		}
-		c.activeChat.Messages = append(c.activeChat.Messages, *errorMsg)
 		// Set error for immediate display
 		c.err = m
 		// Clear temporary messages and tool call status on error
@@ -1245,10 +1267,14 @@ func (c ChatView) View() string {
 			tokenInfo = fmt.Sprintf("%s ($%.2f)", tokenCountStr, requestCost)
 		}
 
+		chatName := "New Chat"
+		if c.activeChat != nil {
+			chatName = c.activeChat.Name
+		}
 		headerLine := lipgloss.JoinHorizontal(
 			lipgloss.Top,
-			titleStyle.Render(c.activeChat.Name),
-			lipgloss.NewStyle().Width(c.width-lipgloss.Width(c.activeChat.Name)-2).Align(lipgloss.Right).Render(tokenInfo),
+			titleStyle.Render(chatName),
+			lipgloss.NewStyle().Width(c.width-lipgloss.Width(chatName)-2).Align(lipgloss.Right).Render(tokenInfo),
 		)
 		header = headerLine
 	}

@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"strings"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -64,29 +62,23 @@ func (h HelpView) View() string {
 	• Use arrows/j/k to navigate
 	• Ctrl+C to quit`
 
-	// Outer container style (Vim-like overall border)
+	// Create the content first
+	instructions := "\nPress Esc to close"
+	content := helpText + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions)
+
+	// Apply inner border
+	innerBorder := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("6")).
+		Align(lipgloss.Center)
+
+	borderedContent := innerBorder.Render(content)
+
+	// Apply outer border with full available space
 	outerStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.ThickBorder()).
-		BorderForeground(lipgloss.Color("4")). // Blue for outer border
-		Width(h.width - 2).
-		Height(h.height - 2).
+		BorderForeground(lipgloss.Color("4")).
 		Align(lipgloss.Center)
 
-	// Inner style for text (focused since single component)
-	innerStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("6")). // Bright cyan
-		Width(h.width - 4).
-		Height(h.height - 4).
-		Align(lipgloss.Center)
-
-	var sb strings.Builder
-	sb.WriteString(innerStyle.Render(helpText))
-
-	// Instructions
-	instructions := "\nPress Esc to close"
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions))
-
-	// Wrap in outer border
-	return outerStyle.Render(sb.String())
+	return outerStyle.Render(borderedContent)
 }

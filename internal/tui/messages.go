@@ -8,8 +8,8 @@ import (
 
 type (
 	updatedChatMsg         *entities.Chat
-	startCreateChatMsg     string
-	canceledCreateChatMsg  struct{}
+	chatCreatedMsg         *entities.Chat
+	startAutoCreateChatMsg struct{}
 	cancelSpinnerMsg       struct{}
 	toolCallEventMsg       *entities.ToolCallEvent
 	messageHistoryEventMsg events.MessageHistoryEventData

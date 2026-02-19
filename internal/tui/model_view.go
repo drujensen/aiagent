@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -20,6 +21,22 @@ type ModelView struct {
 	height          int
 	err             error
 	mode            string // "view" or "switch"
+}
+
+type ModelWithPricing struct {
+	*entities.Model
+	Pricing *entities.ModelPricing
+}
+
+func (m ModelWithPricing) FilterValue() string { return m.ModelName }
+func (m ModelWithPricing) Title() string       { return m.ModelName }
+func (m ModelWithPricing) Description() string {
+	if m.Pricing != nil {
+		return fmt.Sprintf("$%.2f/$%.2f per 1M tokens",
+			m.Pricing.InputPricePerMille,
+			m.Pricing.OutputPricePerMille)
+	}
+	return fmt.Sprintf("Provider: %s", m.ProviderID)
 }
 
 func NewModelView(modelService services.ModelService, providerService services.ProviderService) ModelView {
