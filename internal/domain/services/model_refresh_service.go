@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
@@ -11,6 +13,42 @@ import (
 	"github.com/drujensen/aiagent/internal/impl/modelsdev"
 	"go.uber.org/zap"
 )
+
+// cleanModelDisplayName cleans up model names by removing dates and normalizing format
+func cleanModelDisplayName(modelID string) string {
+	// Remove date patterns like -20241022, -2024-10-22, etc.
+	datePattern1 := regexp.MustCompile(`-\d{8}$`)             // -20241022
+	datePattern2 := regexp.MustCompile(`-\d{4}-\d{2}-\d{2}$`) // -2024-10-22
+	cleaned := datePattern1.ReplaceAllString(modelID, "")
+	cleaned = datePattern2.ReplaceAllString(cleaned, "")
+
+	// Also remove "-latest" suffix
+	cleaned = strings.ReplaceAll(cleaned, "-latest", "")
+
+	// Replace hyphens and underscores with spaces for better readability
+	cleaned = strings.ReplaceAll(cleaned, "-", " ")
+	cleaned = strings.ReplaceAll(cleaned, "_", " ")
+
+	// Capitalize words for better display
+	words := strings.Fields(cleaned)
+	for i, word := range words {
+		if len(word) > 0 {
+			words[i] = strings.ToUpper(word[:1]) + strings.ToLower(word[1:])
+		}
+	}
+
+	return strings.Join(words, " ")
+}
+
+// generateModelDisplayName creates the clean display name for models
+func generateModelDisplayName(providerName, modelID string) string {
+	return cleanModelDisplayName(modelID)
+}
+
+// Test examples:
+// cleanModelDisplayName("claude-3-5-haiku-20241022") -> "Claude 3 5 Haiku"
+// cleanModelDisplayName("claude-3-5-haiku-latest") -> "Claude 3 5 Haiku"
+// cleanModelDisplayName("gpt-4o-2024-05-13") -> "Gpt 4o"
 
 type ModelRefreshService interface {
 	RefreshAllProviders(ctx context.Context) error
@@ -211,8 +249,17 @@ func (s *modelRefreshService) syncProviderModels(ctx context.Context, provider *
 
 		if existingModel, exists := existingByName[pricing.Name]; exists {
 			// Update existing model with latest pricing data
+			needsUpdate := false
+			expectedDisplayName := generateModelDisplayName(provider.Name, pricing.Name)
+			if existingModel.Name != expectedDisplayName {
+				existingModel.Name = expectedDisplayName
+				needsUpdate = true
+			}
 			if existingModel.ContextWindow == nil || *existingModel.ContextWindow != pricing.ContextWindow {
 				existingModel.ContextWindow = &pricing.ContextWindow
+				needsUpdate = true
+			}
+			if needsUpdate {
 				existingModel.UpdatedAt = time.Now()
 				if err := s.modelRepo.UpdateModel(ctx, existingModel); err != nil {
 					s.logger.Error("Failed to update model",
@@ -228,8 +275,9 @@ func (s *modelRefreshService) syncProviderModels(ctx context.Context, provider *
 		} else {
 			// Create new model
 			maxTokens := int(float64(pricing.ContextWindow) * s.globalConfig.DefaultMaxTokensRatio)
+			displayName := generateModelDisplayName(provider.Name, pricing.Name)
 			model := entities.NewModel(
-				provider.Name+" "+pricing.Name,     // Display name
+				displayName,                        // Display name
 				provider.ID,                        // Provider ID
 				provider.Type,                      // Provider type
 				pricing.Name,                       // Model name

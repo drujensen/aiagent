@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -23,27 +24,52 @@ type ModelView struct {
 	mode            string // "view" or "switch"
 }
 
-type ModelWithPricing struct {
-	*entities.Model
-	Pricing *entities.ModelPricing
+// ModelListItem represents either a provider header or a model in the list
+type ModelListItem struct {
+	IsHeader     bool
+	ProviderName string
+	Model        *entities.Model
+	Pricing      *entities.ModelPricing
 }
 
-func (m ModelWithPricing) FilterValue() string { return m.ModelName }
-func (m ModelWithPricing) Title() string       { return m.ModelName }
-func (m ModelWithPricing) Description() string {
+func (m ModelListItem) FilterValue() string {
+	if m.IsHeader {
+		return m.ProviderName
+	}
+	return m.Model.Name
+}
+
+func (m ModelListItem) Title() string {
+	if m.IsHeader {
+		return "▶ " + m.ProviderName
+	}
+	return "  " + m.Model.Name
+}
+
+func (m ModelListItem) Description() string {
+	if m.IsHeader {
+		return "" // Headers don't need descriptions
+	}
 	if m.Pricing != nil {
 		return fmt.Sprintf("$%.2f/$%.2f per 1M tokens",
 			m.Pricing.InputPricePerMille,
 			m.Pricing.OutputPricePerMille)
 	}
-	return fmt.Sprintf("Provider: %s", m.ProviderID)
+	// When no pricing available, show context window if available
+	if m.Model.ContextWindow != nil {
+		return fmt.Sprintf("Context: %d tokens", *m.Model.ContextWindow)
+	}
+	return ""
 }
 
 func NewModelView(modelService services.ModelService, providerService services.ProviderService) ModelView {
 	delegate := list.NewDefaultDelegate()
 	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("6")).Bold(true)
 	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("7"))
-	delegate.SetHeight(2)
+
+	// Make headers visually distinct when selected
+	delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Foreground(lipgloss.Color("15")) // White for normal items
+	delegate.SetHeight(2)                                                                      // Standard height for title + description
 
 	l := list.New([]list.Item{}, delegate, 100, 10)
 	l.Title = "Available Models"
@@ -69,7 +95,12 @@ func (v ModelView) Update(msg tea.Msg) (ModelView, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		v.width = m.Width
 		v.height = m.Height
-		v.list.SetSize(v.width-6, v.height-6)
+		// Reserve space for borders and instructions
+		listHeight := v.height - 8
+		if listHeight < 10 {
+			listHeight = 10 // Minimum height
+		}
+		v.list.SetSize(v.width-6, listHeight)
 		return v, nil
 
 	case tea.KeyMsg:
@@ -80,17 +111,18 @@ func (v ModelView) Update(msg tea.Msg) (ModelView, tea.Cmd) {
 			if v.mode != "switch" {
 				return v, nil
 			}
-			if selected, ok := v.list.SelectedItem().(ModelWithPricing); ok {
-				return v, func() tea.Msg { return modelSelectedMsg{modelID: selected.ID} }
+			if selected, ok := v.list.SelectedItem().(ModelListItem); ok && !selected.IsHeader {
+				return v, func() tea.Msg { return modelSelectedMsg{modelID: selected.Model.ID} }
 			}
 		}
 
 	case modelsFetchedMsg:
 		items := m.models
 		if len(items) == 0 {
-			items = append(items, ModelWithPricing{
-				Model:   &entities.Model{Name: "No models available", ModelName: ""},
-				Pricing: nil,
+			items = append(items, ModelListItem{
+				IsHeader: false,
+				Model:    &entities.Model{Name: "No models available", ModelName: ""},
+				Pricing:  nil,
 			})
 		}
 		v.list.SetItems(items)
@@ -155,26 +187,54 @@ func (v ModelView) fetchModelsCmd() tea.Cmd {
 		// Filter to only show chat-compatible models
 		filteredModels := v.filterService.FilterChatCompatibleModels(allModels)
 
-		// Create models with pricing info
-		modelsWithPricing := make([]ModelWithPricing, len(filteredModels))
-		for i, model := range filteredModels {
-			// Look up pricing for this model
-			var pricing *entities.ModelPricing
+		// Group models by provider
+		modelsByProvider := make(map[string][]*entities.Model)
+		providerNames := make(map[string]string)
+
+		for _, model := range filteredModels {
 			if provider, err := v.providerService.GetProvider(ctx, model.ProviderID); err == nil {
-				pricing = provider.GetModelPricing(model.ModelName)
-			}
-			modelsWithPricing[i] = ModelWithPricing{
-				Model:   model,
-				Pricing: pricing,
+				providerNames[model.ProviderID] = provider.Name
+				modelsByProvider[model.ProviderID] = append(modelsByProvider[model.ProviderID], model)
 			}
 		}
 
-		return modelsFetchedMsg{models: func() []list.Item {
-			items := make([]list.Item, len(modelsWithPricing))
-			for i, model := range modelsWithPricing {
-				items[i] = model
+		// Sort providers for consistent ordering
+		var providerIDs []string
+		for providerID := range modelsByProvider {
+			providerIDs = append(providerIDs, providerID)
+		}
+		sort.Strings(providerIDs)
+
+		// Create grouped items
+		var groupedItems []list.Item
+		for _, providerID := range providerIDs {
+			providerName := providerNames[providerID]
+			models := modelsByProvider[providerID]
+
+			// Add provider header
+			groupedItems = append(groupedItems, ModelListItem{
+				IsHeader:     true,
+				ProviderName: providerName,
+			})
+
+			// Add models for this provider
+			for _, model := range models {
+				var pricing *entities.ModelPricing
+				if provider, err := v.providerService.GetProvider(ctx, model.ProviderID); err == nil {
+					pricing = provider.GetModelPricing(model.ModelName)
+					// Debug: if no pricing found, show provider info instead
+					if pricing == nil {
+						// For models without pricing, show some info
+					}
+				}
+				groupedItems = append(groupedItems, ModelListItem{
+					IsHeader: false,
+					Model:    model,
+					Pricing:  pricing,
+				})
 			}
-			return items
-		}()}
+		}
+
+		return modelsFetchedMsg{models: groupedItems}
 	}
 }

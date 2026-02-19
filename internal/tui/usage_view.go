@@ -110,7 +110,7 @@ func (u UsageView) fetchUsageCmd() tea.Cmd {
 
 		var sb strings.Builder
 		sb.WriteString(fmt.Sprintf("Provider: %s\n", model.ProviderType))
-		sb.WriteString(fmt.Sprintf("Model: %s\n", model.ModelName))
+		sb.WriteString(fmt.Sprintf("Model: %s\n", model.Name))
 		sb.WriteString(fmt.Sprintf("Prompt Tokens: %d\n", activeChat.Usage.TotalPromptTokens))
 		sb.WriteString(fmt.Sprintf("Completion Tokens: %d\n", activeChat.Usage.TotalCompletionTokens))
 		sb.WriteString(fmt.Sprintf("Total Tokens: %d\n", activeChat.Usage.TotalTokens))
