@@ -70,7 +70,19 @@ func convertToOpenAIMessages(messages []*entities.Message) []map[string]any {
 		}
 
 		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
-			apiMsg["tool_calls"] = msg.ToolCalls
+			var toolCalls []map[string]any
+			for _, tc := range msg.ToolCalls {
+				tcMap := map[string]any{
+					"id":   tc.ID,
+					"type": tc.Type,
+					"function": map[string]any{
+						"name":      tc.Function.Name,
+						"arguments": tc.Function.Arguments,
+					},
+				}
+				toolCalls = append(toolCalls, tcMap)
+			}
+			apiMsg["tool_calls"] = toolCalls
 		} else if msg.Role == "tool" {
 			apiMsg["tool_call_id"] = msg.ToolCallID
 			apiMsg["content"] = msg.Content
@@ -188,9 +200,9 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			Choices []struct {
 				Index   int `json:"index"`
 				Message struct {
-					Role      string              `json:"role"`
-					Content   string              `json:"content"`
-					ToolCalls []entities.ToolCall `json:"tool_calls"`
+					Role      string           `json:"role"`
+					Content   string           `json:"content"`
+					ToolCalls []map[string]any `json:"tool_calls"`
 				} `json:"message"`
 				FinishReason string `json:"finish_reason"`
 			} `json:"choices"`
@@ -211,14 +223,34 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		choice := responseBody.Choices[0]
 		message := choice.Message
 
-		// Track usage
+		// Parse tool calls
+		var toolCalls []entities.ToolCall
+		for _, tcMap := range message.ToolCalls {
+			var tc entities.ToolCall
+			if id, ok := tcMap["id"].(string); ok {
+				tc.ID = id
+			}
+			if typ, ok := tcMap["type"].(string); ok {
+				tc.Type = typ
+			}
+			if fn, ok := tcMap["function"].(map[string]any); ok {
+				if name, ok := fn["name"].(string); ok {
+					tc.Function.Name = name
+				}
+				if args, ok := fn["arguments"].(string); ok {
+					tc.Function.Arguments = args
+				}
+			}
+
+			toolCalls = append(toolCalls, tc)
+		}
 		m.lastUsage.PromptTokens = responseBody.Usage.PromptTokens
 		m.lastUsage.CompletionTokens = responseBody.Usage.CompletionTokens
 		m.lastUsage.TotalTokens = responseBody.Usage.TotalTokens
 
 		// Log tool calls
-		if len(message.ToolCalls) > 0 {
-			m.logger.Info("Tool calls generated", zap.Any("toolCalls", message.ToolCalls))
+		if len(toolCalls) > 0 {
+			m.logger.Info("Tool calls generated", zap.Any("toolCalls", toolCalls))
 		} else {
 			m.logger.Info("No tool calls generated")
 		}
@@ -229,7 +261,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				ID:        uuid.New().String(),
 				Role:      "assistant",
 				Content:   message.Content,
-				ToolCalls: message.ToolCalls,
+				ToolCalls: toolCalls,
 				Timestamp: time.Now(),
 			}
 			newMessages = append(newMessages, toolCallMessage)
@@ -241,7 +273,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				}
 			}
 
-			for _, toolCall := range message.ToolCalls {
+			for _, toolCall := range toolCalls {
 				// Check for cancellation before executing tool
 				if ctx.Err() == context.Canceled {
 					return nil, fmt.Errorf("operation canceled by user")
@@ -324,10 +356,18 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 
 				// Append tool result to messages for next iteration
 				reqBody["messages"] = append(reqBody["messages"].([]map[string]any), map[string]any{
-					"role":       "assistant",
-					"content":    message.Content,
-					"tool_calls": []entities.ToolCall{toolCall},
+					"role": "assistant",
 				})
+				toolMessage := map[string]any{
+					"role":         "tool",
+					"content":      toolResult,
+					"tool_call_id": toolCall.ID,
+				}
+				// For Google Gemini, add name to function_response
+				if m.ProviderType() == entities.ProviderGoogle {
+					toolMessage["name"] = toolName
+				}
+				reqBody["messages"] = append(reqBody["messages"].([]map[string]any), toolMessage)
 				reqBody["messages"] = append(reqBody["messages"].([]map[string]any), map[string]any{
 					"role":         "tool",
 					"content":      toolResult,
