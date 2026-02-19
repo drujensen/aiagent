@@ -355,9 +355,6 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				}
 
 				// Append tool result to messages for next iteration
-				reqBody["messages"] = append(reqBody["messages"].([]map[string]any), map[string]any{
-					"role": "assistant",
-				})
 				toolMessage := map[string]any{
 					"role":         "tool",
 					"content":      toolResult,
