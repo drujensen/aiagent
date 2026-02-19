@@ -22,7 +22,10 @@ import (
 // formatToolName formats tool names with relevant arguments for display
 func formatToolName(toolName, arguments string) (string, string) {
 	switch toolName {
-	case "FileRead", "FileWrite", "Directory":
+	case "FileRead":
+		// Filename will be shown in the result, so return empty suffix
+		return toolName, ""
+	case "FileWrite", "Directory":
 		var args struct {
 			Path string `json:"path"`
 		}
@@ -60,7 +63,7 @@ func formatToolName(toolName, arguments string) (string, string) {
 func formatToolResult(toolName, result string, diff string, arguments string) string {
 	switch toolName {
 	case "FileRead":
-		return formatFileReadResult(result)
+		return formatFileReadResult(result, arguments)
 	case "FileWrite":
 		return formatFileWriteResult(result, diff)
 	case "FileSearch":
@@ -398,7 +401,7 @@ func formatDiff(diff string) string {
 }
 
 // formatFileReadResult formats FileRead tool results
-func formatFileReadResult(result string) string {
+func formatFileReadResult(result string, arguments string) string {
 	var response struct {
 		Content string `json:"content"`
 		Error   string `json:"error"`
@@ -413,9 +416,22 @@ func formatFileReadResult(result string) string {
 		return fmt.Sprintf("Error reading file: %s", response.Error)
 	}
 
-	// Generate TUI-friendly summary with line numbers
+	// Extract filename from arguments
+	var args struct {
+		FilePath string `json:"filePath"`
+	}
+	var filename string
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.FilePath != "" {
+		filename = args.FilePath
+	}
+
+	// Generate TUI-friendly summary with filename and line numbers
 	lines := strings.Split(response.Content, "\n")
 	var summary strings.Builder
+
+	if filename != "" {
+		summary.WriteString(fmt.Sprintf("FileRead: %s\n", filename))
+	}
 	summary.WriteString(fmt.Sprintf("📄 File content (%d lines)\n\n", len(lines)))
 
 	previewCount := 20
