@@ -27,6 +27,7 @@ type ModelPricing struct {
 	InputPricePerMille  float64 `json:"input_price_per_mille" bson:"input_price_per_mille"`   // Cost per million input tokens
 	OutputPricePerMille float64 `json:"output_price_per_mille" bson:"output_price_per_mille"` // Cost per million output tokens
 	ContextWindow       int     `json:"context_window" bson:"context_window"`                 // Maximum context length in tokens
+	MaxOutputTokens     int     `json:"max_output_tokens" bson:"max_output_tokens"`           // Maximum output tokens allowed
 }
 
 // Provider represents an AI model provider

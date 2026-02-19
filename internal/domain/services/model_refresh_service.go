@@ -145,6 +145,7 @@ func (s *modelRefreshService) refreshProvider(ctx context.Context, provider *ent
 			InputPricePerMille:  0, // 0 pricing as requested
 			OutputPricePerMille: 0, // 0 pricing as requested
 			ContextWindow:       64000,
+			MaxOutputTokens:     0, // Will use ratio fallback
 		}
 		providerToUpdate.Models = append(providerToUpdate.Models, pricing)
 	} else {
@@ -154,6 +155,7 @@ func (s *modelRefreshService) refreshProvider(ctx context.Context, provider *ent
 				InputPricePerMille:  modelData.Cost.Input,  // Keep as per million tokens
 				OutputPricePerMille: modelData.Cost.Output, // Keep as per million tokens
 				ContextWindow:       modelData.Limit.Context,
+				MaxOutputTokens:     modelData.Limit.Output,
 			}
 
 			providerToUpdate.Models = append(providerToUpdate.Models, pricing)
@@ -259,6 +261,15 @@ func (s *modelRefreshService) syncProviderModels(ctx context.Context, provider *
 				existingModel.ContextWindow = &pricing.ContextWindow
 				needsUpdate = true
 			}
+			// Update MaxTokens if pricing has MaxOutputTokens and it's different
+			expectedMaxTokens := pricing.MaxOutputTokens
+			if expectedMaxTokens <= 0 {
+				expectedMaxTokens = int(float64(pricing.ContextWindow) * s.globalConfig.DefaultMaxTokensRatio)
+			}
+			if existingModel.MaxTokens == nil || *existingModel.MaxTokens != expectedMaxTokens {
+				existingModel.MaxTokens = &expectedMaxTokens
+				needsUpdate = true
+			}
 			if needsUpdate {
 				existingModel.UpdatedAt = time.Now()
 				if err := s.modelRepo.UpdateModel(ctx, existingModel); err != nil {
@@ -274,7 +285,10 @@ func (s *modelRefreshService) syncProviderModels(ctx context.Context, provider *
 			delete(existingByName, pricing.Name)
 		} else {
 			// Create new model
-			maxTokens := int(float64(pricing.ContextWindow) * s.globalConfig.DefaultMaxTokensRatio)
+			maxTokens := pricing.MaxOutputTokens
+			if maxTokens <= 0 {
+				maxTokens = int(float64(pricing.ContextWindow) * s.globalConfig.DefaultMaxTokensRatio)
+			}
 			displayName := generateModelDisplayName(provider.Name, pricing.Name)
 			model := entities.NewModel(
 				displayName,                        // Display name
