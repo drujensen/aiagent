@@ -7,6 +7,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/services"
+	"github.com/drujensen/aiagent/internal/impl/config"
+	"go.uber.org/zap"
 )
 
 type TUI struct {
@@ -15,6 +17,8 @@ type TUI struct {
 	modelService    services.ModelService
 	providerService services.ProviderService
 	toolService     services.ToolService
+	globalConfig    *config.GlobalConfig
+	logger          *zap.Logger
 	activeChat      *entities.Chat
 
 	chatView    ChatView
@@ -31,7 +35,7 @@ type TUI struct {
 	err   error
 }
 
-func NewTUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, providerService services.ProviderService, toolService services.ToolService) TUI {
+func NewTUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, providerService services.ProviderService, toolService services.ToolService, globalConfig *config.GlobalConfig, logger *zap.Logger) TUI {
 	ctx := context.Background()
 
 	activeChat, err := chatService.GetActiveChat(ctx)
@@ -50,6 +54,8 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 		modelService:    modelService,
 		providerService: providerService,
 		toolService:     toolService,
+		globalConfig:    globalConfig,
+		logger:          logger,
 		activeChat:      activeChat,
 
 		chatView:    NewChatView(chatService, agentService, modelService, activeChat),
@@ -196,6 +202,11 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		t.chatView.updateEditorContent()
 		t.state = "chat/view"
+		// Save last used agent to global config
+		t.globalConfig.LastUsedAgent = msg.agentID
+		if err := config.SaveGlobalConfig(t.globalConfig, t.logger); err != nil {
+			t.logger.Error("Failed to save global config", zap.Error(err))
+		}
 		return t, t.chatView.Init()
 
 	case startModelSwitchMsg:
@@ -223,10 +234,11 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		t.chatView.updateEditorContent()
 		t.state = "chat/view"
-		return t, t.chatView.Init()
-
-	case modelsCancelledMsg:
-		t.state = "chat/view"
+		// Save last used model to global config
+		t.globalConfig.LastUsedModel = msg.modelID
+		if err := config.SaveGlobalConfig(t.globalConfig, t.logger); err != nil {
+			t.logger.Error("Failed to save global config", zap.Error(err))
+		}
 		return t, nil
 
 	// Handle tools view messages

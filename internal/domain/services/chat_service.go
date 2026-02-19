@@ -442,9 +442,23 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		lastMsg.AddUsage(lastUsage.PromptTokens, lastUsage.CompletionTokens, inputPricePerMille, outputPricePerMille)
 		lastMsg.Usage.Cost = totalCost
 
-		// Save the updated message with usage information
-		if err := s.SaveMessagesIncrementally(ctx, chat.ID, []*entities.Message{lastMsg}); err != nil {
-			s.logger.Warn("Failed to save message with usage information", zap.Error(err))
+		// Update the last message in the chat with usage information
+		currentChat, err := s.chatRepo.GetChat(ctx, chat.ID)
+		if err != nil {
+			s.logger.Warn("Failed to get current chat for usage update", zap.Error(err))
+		} else if len(currentChat.Messages) > 0 {
+			// Find the last assistant message and update its usage
+			for i := len(currentChat.Messages) - 1; i >= 0; i-- {
+				if currentChat.Messages[i].Role == "assistant" {
+					currentChat.Messages[i].Usage = lastMsg.Usage
+					currentChat.UpdateUsage()
+					currentChat.UpdatedAt = time.Now()
+					if err := s.chatRepo.UpdateChat(ctx, currentChat); err != nil {
+						s.logger.Warn("Failed to update chat with usage information", zap.Error(err))
+					}
+					break
+				}
+			}
 		}
 	}
 

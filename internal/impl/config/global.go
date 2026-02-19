@@ -13,6 +13,8 @@ import (
 type GlobalConfig struct {
 	DefaultTemperature    float64 `json:"default_temperature"`
 	DefaultMaxTokensRatio float64 `json:"default_max_tokens_ratio"`
+	LastUsedAgent         string  `json:"last_used_agent"`
+	LastUsedModel         string  `json:"last_used_model"`
 }
 
 // DefaultGlobalConfig returns the default global configuration
@@ -20,6 +22,8 @@ func DefaultGlobalConfig() *GlobalConfig {
 	return &GlobalConfig{
 		DefaultTemperature:    0.7,
 		DefaultMaxTokensRatio: 0.25,
+		LastUsedAgent:         "",
+		LastUsedModel:         "",
 	}
 }
 
@@ -36,6 +40,7 @@ func LoadGlobalConfig(logger *zap.Logger) (*GlobalConfig, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			logger.Debug("Global config file does not exist, using defaults", zap.String("path", configPath))
+			SaveGlobalConfig(config, logger) // Save defaults for future use
 			return config, nil
 		}
 		return nil, fmt.Errorf("failed to read global config file: %w", err)

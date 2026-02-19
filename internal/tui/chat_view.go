@@ -1099,6 +1099,13 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 	case messageHistoryEventMsg:
 		// Handle message history change event
 		if c.isProcessing && c.activeChat != nil && m.ChatID == c.activeChat.ID {
+			// Sync active chat messages to prevent stale data display
+			messages := make([]entities.Message, len(m.Messages))
+			for i, msg := range m.Messages {
+				messages[i] = *msg
+			}
+			c.activeChat.Messages = messages
+
 			// Only clear temp messages if this is the final message (no tool calls pending)
 			// This prevents tool call results from disappearing during live updates
 			if len(m.Messages) > 0 {
