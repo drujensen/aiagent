@@ -1128,13 +1128,11 @@ func (s *chatService) GenerateAndUpdateTitle(ctx context.Context, chatID string)
 		return nil, fmt.Errorf("not enough messages")
 	}
 
-	// Get first user message and assistant response
-	var firstUser, firstAssistant string
+	// Get first user message only (not assistant response)
+	var firstUser string
 	for _, msg := range chat.Messages {
 		if msg.Role == "user" && firstUser == "" {
 			firstUser = msg.Content
-		} else if msg.Role == "assistant" && firstAssistant == "" {
-			firstAssistant = msg.Content
 			break
 		}
 	}
@@ -1145,9 +1143,8 @@ func (s *chatService) GenerateAndUpdateTitle(ctx context.Context, chatID string)
 	}
 	s.logger.Info("Extracting conversation preview for title", zap.String("user_msg", userMsgPreview))
 
-	// Generate title using AI (same model as chat)
-	prompt := fmt.Sprintf("Generate a short title (max 60 chars) summarizing this conversation: User: %s, Assistant: %s",
-		firstUser, firstAssistant)
+	// Generate title using AI based on user request only
+	prompt := fmt.Sprintf("Generate a short title (max 60 chars) summarizing this user request: %s", firstUser)
 
 	title, err := s.generateTitleWithAI(ctx, chat.ModelID, prompt)
 	if err != nil {
