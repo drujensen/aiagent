@@ -290,7 +290,7 @@ func (t *FileWriteTool) executeEditOperation(args struct {
 	// Generate diff showing the change
 	diff := t.generateEditDiff(args.FilePath, fileContent, newContent, args.OldString, args.NewString, occurrences)
 
-	summary := fmt.Sprintf("Replaced %d occurrence(s) of '%s' with '%s'", occurrences, args.OldString, args.NewString)
+	summary := fmt.Sprintf("Replaced %d occurrence(s)", occurrences)
 
 	return fmt.Sprintf(`{"success": true, "summary": %q, "diff": %q, "filePath": %q, "occurrences": %d, "replacedAll": %t}`, summary, diff, args.FilePath, occurrences, args.ReplaceAll), nil
 }
@@ -348,14 +348,29 @@ func (t *FileWriteTool) generateEditDiff(filePath, oldContent, newContent, oldSt
 	diff.WriteString(fmt.Sprintf("--- %s\t%s\n", filePath, timestamp))
 	diff.WriteString(fmt.Sprintf("+++ %s\t%s\n", filePath, timestamp))
 
-	// Simple diff showing the change
+	// Split the old and new strings into lines
+	oldLines := strings.Split(strings.TrimSuffix(oldString, "\n"), "\n")
+	newLines := strings.Split(strings.TrimSuffix(newString, "\n"), "\n")
+
+	// Simple diff showing the change - show all lines that were replaced
 	diff.WriteString("@@ -1 +1 @@\n")
-	if occurrences > 0 {
-		diff.WriteString("-")
-		diff.WriteString(oldString)
-		diff.WriteString("\n+")
-		diff.WriteString(newString)
-		diff.WriteString("\n")
+
+	// Show removed lines
+	for _, line := range oldLines {
+		if line != "" || len(oldLines) > 1 { // Include empty lines if there are multiple lines
+			diff.WriteString("-")
+			diff.WriteString(line)
+			diff.WriteString("\n")
+		}
+	}
+
+	// Show added lines
+	for _, line := range newLines {
+		if line != "" || len(newLines) > 1 { // Include empty lines if there are multiple lines
+			diff.WriteString("+")
+			diff.WriteString(line)
+			diff.WriteString("\n")
+		}
 	}
 
 	return diff.String()

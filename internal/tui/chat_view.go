@@ -430,7 +430,7 @@ func formatFileReadResult(result string, arguments string) string {
 	var summary strings.Builder
 
 	if filename != "" {
-		summary.WriteString(fmt.Sprintf("FileRead: %s\n", filename))
+		summary.WriteString(fmt.Sprintf("FileName: %s\n", filename))
 	}
 	summary.WriteString(fmt.Sprintf("📄 File content (%d lines)\n\n", len(lines)))
 
