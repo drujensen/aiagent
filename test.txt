@@ -1,3 +1,0 @@
-Line 1: Hello World
-Line 2: String replace test!
-Line 3: End of file.
