@@ -136,6 +136,13 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			t.chatView.currentAgent = agent
 		}
+		model, err := t.modelService.GetModel(ctx2, chat.ModelID)
+		if err != nil {
+			t.chatView.err = err
+			t.chatView.currentModel = nil
+		} else {
+			t.chatView.currentModel = model
+		}
 		t.chatView.updateEditorContent()
 		t.state = "chat/view"
 		return t, nil
