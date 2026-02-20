@@ -97,6 +97,8 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.state = "chat/view"
 		var cmd tea.Cmd
 		t.chatView, cmd = t.chatView.Update(msg)
+		// Clear any potential error that occurred during update
+		t.chatView.err = nil
 		return t, cmd
 	case chatCreatedMsg:
 		ctx := context.Background()
@@ -107,6 +109,8 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.activeChat = msg
 		t.chatView.SetActiveChat(msg)
 		t.state = "chat/view"
+		// Clear any error that might have occurred during initialization
+		t.chatView.err = nil
 		return t, nil
 	// Handle history view messages
 	case startHistoryMsg:
