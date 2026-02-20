@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -83,9 +84,14 @@ func (t *TodoTool) Schema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
+			"action": map[string]any{
+				"type":        "string",
+				"description": "The action to perform: write (create todos), read (list todos), update_status (update a todo status), clear (delete all todos)",
+				"enum":        []string{"write", "read", "update_status", "clear"},
+			},
 			"todos": map[string]any{
 				"type":        "array",
-				"description": "The updated todo list",
+				"description": "The updated todo list (required for write action)",
 				"items": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
@@ -121,8 +127,7 @@ func (t *TodoTool) Schema() map[string]any {
 				"description": "Required chat session ID",
 			},
 		},
-		"required":             []string{"todos", "session_id"},
-		"additionalProperties": false,
+		"required": []string{"session_id"},
 	}
 }
 
@@ -253,6 +258,11 @@ func (t *TodoTool) writeTodos(sessionID string, todos []struct {
 		return "", err
 	}
 
+	// Sort todos by CreatedAt ascending
+	sort.Slice(todoList.Todos, func(i, j int) bool {
+		return todoList.Todos[i].CreatedAt.Before(todoList.Todos[j].CreatedAt)
+	})
+
 	// Build the response with action message and full task plan
 	var result strings.Builder
 	result.WriteString(fmt.Sprintf("Added %d todos to the list\n\n", len(todos)))
@@ -299,6 +309,11 @@ func (t *TodoTool) readTodos(sessionID string) (string, error) {
 		})
 		return string(jsonResult), nil
 	}
+
+	// Sort todos by CreatedAt ascending
+	sort.Slice(todoList.Todos, func(i, j int) bool {
+		return todoList.Todos[i].CreatedAt.Before(todoList.Todos[j].CreatedAt)
+	})
 
 	var result strings.Builder
 	result.WriteString("📋 Task Plan:\n\n")
