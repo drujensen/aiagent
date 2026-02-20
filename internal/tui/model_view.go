@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	key "github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -36,7 +37,7 @@ func (m ModelListItem) FilterValue() string {
 	if m.IsHeader {
 		return m.ProviderName
 	}
-	return m.Model.Name
+	return fmt.Sprintf("%s %s", m.Model.Name, m.ProviderName)
 }
 
 func (m ModelListItem) Title() string {
@@ -51,7 +52,8 @@ func (m ModelListItem) Description() string {
 		return "" // Headers don't need descriptions
 	}
 	if m.Pricing != nil {
-		return fmt.Sprintf("$%.2f/$%.2f per 1M tokens",
+		return fmt.Sprintf("%s - input: $%.2f output: $%.2f",
+			m.ProviderName,
 			m.Pricing.InputPricePerMille,
 			m.Pricing.OutputPricePerMille)
 	}
@@ -80,6 +82,10 @@ func NewModelViewWithMode(modelService services.ModelService, providerService se
 	l.SetShowStatusBar(true)
 	l.SetFilteringEnabled(true)
 	l.SetShowPagination(true)
+
+	// Disable the default quit key to prevent quitting the app from the model view
+	l.KeyMap.Quit = key.NewBinding(key.WithDisabled())
+	l.SetShowHelp(true)
 
 	return ModelView{
 		modelService:    modelService,
@@ -112,17 +118,31 @@ func (v ModelView) Update(msg tea.Msg) (ModelView, tea.Cmd) {
 		return v, nil
 
 	case tea.KeyMsg:
+		// Let the list handle filtering keys first
+		var cmd tea.Cmd
+		v.list, cmd = v.list.Update(msg)
+
+		// Then handle our custom keys
 		switch m.String() {
 		case "esc":
+			// Only close if not actively filtering
+			if v.list.FilterState() != list.Filtering {
+				v.list.SetFilterText("")
+				return v, func() tea.Msg { return modelsCancelledMsg{} }
+			}
+		case "q":
+			v.list.SetFilterText("")
 			return v, func() tea.Msg { return modelsCancelledMsg{} }
 		case "enter":
 			if v.mode != "switch" {
 				return v, nil
 			}
 			if selected, ok := v.list.SelectedItem().(ModelListItem); ok && !selected.IsHeader {
+				v.list.SetFilterText("")
 				return v, func() tea.Msg { return modelSelectedMsg{modelID: selected.Model.ID} }
 			}
 		}
+		return v, cmd
 
 	case modelsFetchedMsg:
 		items := m.models
@@ -133,7 +153,9 @@ func (v ModelView) Update(msg tea.Msg) (ModelView, tea.Cmd) {
 				Pricing:  nil,
 			})
 		}
+		v.list.SetFilteringEnabled(false)
 		v.list.SetItems(items)
+		v.list.SetFilteringEnabled(true)
 		v.err = nil
 		return v, nil
 
@@ -168,11 +190,7 @@ func (v ModelView) View() string {
 		Height(v.list.Height())
 
 	var sb strings.Builder
-	instructions := "Use arrows or j/k to navigate, Esc to return to chat"
-	if v.mode == "switch" {
-		instructions += ", Enter to switch model"
-	}
-	view := innerBorder.Render(v.list.View()) + "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(instructions)
+	view := innerBorder.Render(v.list.View())
 	sb.WriteString(view)
 
 	if v.err != nil {
@@ -236,9 +254,10 @@ func (v ModelView) fetchModelsCmd() tea.Cmd {
 					}
 				}
 				groupedItems = append(groupedItems, ModelListItem{
-					IsHeader: false,
-					Model:    model,
-					Pricing:  pricing,
+					IsHeader:     false,
+					ProviderName: providerName,
+					Model:        model,
+					Pricing:      pricing,
 				})
 			}
 		}

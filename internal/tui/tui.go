@@ -308,6 +308,13 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return t, nil
 
+	case modelsCancelledMsg:
+		t.state = "chat/view"
+		if t.activeChat != nil {
+			t.chatView.updateEditorContent()
+		}
+		return t, nil
+
 	// Handle global key messages and errors
 	case tea.KeyMsg:
 		switch msg.Type {
