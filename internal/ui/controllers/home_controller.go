@@ -36,7 +36,6 @@ func (c *HomeController) RegisterRoutes(e *echo.Echo) {
 	e.GET("/", c.HomeHandler)
 	e.GET("/sidebar/chats", c.ChatsPartialHandler)
 	e.GET("/sidebar/agents", c.AgentsPartialHandler)
-	e.GET("/sidebar/models", c.ModelsPartialHandler)
 	e.GET("/sidebar/tools", c.ToolsPartialHandler)
 }
 
@@ -95,22 +94,6 @@ func (c *HomeController) AgentsPartialHandler(eCtx echo.Context) error {
 		"Agents": agents,
 	}
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_agents", data)
-}
-
-func (c *HomeController) ModelsPartialHandler(eCtx echo.Context) error {
-	allModels, err := c.modelService.ListModels(eCtx.Request().Context())
-	if err != nil {
-		c.logger.Error("Failed to list models", zap.Error(err))
-		return eCtx.String(http.StatusInternalServerError, "Failed to load models")
-	}
-
-	// Filter to only show chat-compatible models
-	filteredModels := c.filterService.FilterChatCompatibleModels(allModels)
-
-	data := map[string]any{
-		"Models": filteredModels,
-	}
-	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "sidebar_models", data)
 }
 
 func (c *HomeController) ToolsPartialHandler(eCtx echo.Context) error {
