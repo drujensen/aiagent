@@ -62,7 +62,7 @@ func (h HistoryView) Update(msg tea.Msg) (HistoryView, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch m.String() {
-		case "esc":
+		case "esc", "q":
 			return h, func() tea.Msg { return historyCancelledMsg{} }
 		case "enter":
 			if selected := h.list.SelectedItem(); selected != nil {

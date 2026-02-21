@@ -53,7 +53,7 @@ func (v AgentView) Update(msg tea.Msg) (AgentView, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch m.String() {
-		case "esc":
+		case "esc", "q":
 			return v, func() tea.Msg { return agentsCancelledMsg{} }
 		case "enter":
 			if v.mode != "switch" {
