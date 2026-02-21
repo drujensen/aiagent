@@ -15,6 +15,7 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/events"
 	"github.com/drujensen/aiagent/internal/domain/services"
+	"github.com/drujensen/aiagent/internal/impl/config"
 	"github.com/drujensen/aiagent/internal/impl/tools"
 
 	uiapicontrollers "github.com/drujensen/aiagent/internal/ui/controllers"
@@ -39,13 +40,14 @@ type UI struct {
 	toolService         services.ToolService
 	providerService     services.ProviderService
 	modelRefreshService services.ModelRefreshService
+	globalConfig        *config.GlobalConfig
 	logger              *zap.Logger
 	wsUpgrader          websocket.Upgrader
 	wsClients           map[*websocket.Conn]bool
 	wsClientsMutex      sync.RWMutex
 }
 
-func NewUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService, providerService services.ProviderService, modelRefreshService services.ModelRefreshService, logger *zap.Logger) *UI {
+func NewUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService, providerService services.ProviderService, modelRefreshService services.ModelRefreshService, globalConfig *config.GlobalConfig, logger *zap.Logger) *UI {
 	ui := &UI{
 		chatService:         chatService,
 		agentService:        agentService,
@@ -53,6 +55,7 @@ func NewUI(chatService services.ChatService, agentService services.AgentService,
 		toolService:         toolService,
 		providerService:     providerService,
 		modelRefreshService: modelRefreshService,
+		globalConfig:        globalConfig,
 		logger:              logger,
 		wsUpgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
@@ -183,7 +186,7 @@ func (u *UI) Run() error {
 	homeController := uiapicontrollers.NewHomeController(u.logger, tmpl, u.chatService, u.agentService, u.modelService, u.toolService)
 	agentController := uiapicontrollers.NewAgentController(u.logger, tmpl, u.agentService, u.toolService, u.providerService)
 	modelController := uiapicontrollers.NewModelController(u.logger, tmpl, u.modelService, u.providerService)
-	chatController := uiapicontrollers.NewChatController(u.logger, tmpl, u.chatService, u.agentService, u.modelService)
+	chatController := uiapicontrollers.NewChatController(u.logger, tmpl, u.chatService, u.agentService, u.modelService, u.globalConfig)
 	toolFactory, err := tools.NewToolFactory()
 	if err != nil {
 		u.logger.Fatal("Failed to initialize tool factory", zap.Error(err))

@@ -1144,7 +1144,16 @@ func (s *chatService) GenerateAndUpdateTitle(ctx context.Context, chatID string)
 	s.logger.Info("Extracting conversation preview for title", zap.String("user_msg", userMsgPreview))
 
 	// Generate title using AI based on user request only
-	prompt := fmt.Sprintf("Generate a short title (max 60 chars) summarizing this user request: %s", firstUser)
+	prompt := fmt.Sprintf(`You are naming a chat conversation. Create a brief, descriptive title (max 60 chars) for this conversation based on the user's first message.
+
+Guidelines:
+- Focus on the topic or intent of the message
+- Use conversational, friendly language
+- For simple greetings like "hello" or "hi", use titles like "Greeting" or "Hello"
+- Keep it under 60 characters
+- Make it suitable for a chat sidebar
+
+User's first message: %s`, firstUser)
 
 	title, err := s.generateTitleWithAI(ctx, chat.ModelID, prompt)
 	if err != nil {
@@ -1200,9 +1209,9 @@ func (s *chatService) generateTitleWithAI(ctx context.Context, modelID, prompt s
 		Content: prompt,
 	}
 
-	// Generate title with low temperature for consistency
+	// Generate title with moderate temperature for better creativity while maintaining consistency
 	options := map[string]any{
-		"temperature": 0.1,
+		"temperature": 0.3,
 		"max_tokens":  30, // Shorter for titles
 	}
 

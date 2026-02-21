@@ -208,7 +208,7 @@ func main() {
 	}
 
 	if modeStr == "serve" {
-		uiApp := ui.NewUI(chatService, agentService, modelService, toolService, providerService, modelRefreshService, logger)
+		uiApp := ui.NewUI(chatService, agentService, modelService, toolService, providerService, modelRefreshService, globalConfig, logger)
 		if err := uiApp.Run(); err != nil {
 			logger.Fatal("UI failed", zap.Error(err))
 		}

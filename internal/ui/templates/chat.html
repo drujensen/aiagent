@@ -65,6 +65,14 @@
     <section class="message-input" id="message-input-section">
         {{template "message_controls" .}}
     </section>
+
+    <!-- Hidden element for title polling -->
+    <div id="title-poller"
+         hx-get="/chats/{{.ChatID}}/title"
+         hx-trigger="load, every 3s"
+         hx-swap="none"
+         hx-on::after-request="updateTitleIfChanged(event)">
+    </div>
 </main>
 
 <style>
@@ -107,5 +115,40 @@
 </style>
 
 <script>
+function updateTitleIfChanged(event) {
+    if (event.detail && event.detail.xhr) {
+        try {
+            const response = JSON.parse(event.detail.xhr.responseText);
+            const newTitle = response.title;
+            const currentTitle = document.title;
+
+            // Extract current chat title from page title (format: "Chat Title - AI Agents")
+            const titleParts = currentTitle.split(' - ');
+            const currentChatTitle = titleParts.length > 1 ? titleParts[0] : 'Chat';
+
+            if (newTitle && newTitle !== currentChatTitle) {
+                // Update page title
+                document.title = newTitle + ' - AI Agents';
+
+                // Update header title if it exists
+                const headerTitle = document.querySelector('h1');
+                if (headerTitle && headerTitle.textContent === currentChatTitle) {
+                    headerTitle.textContent = newTitle;
+                }
+
+                // Trigger sidebar refresh
+                htmx.trigger('body', 'refreshChats');
+
+                // Stop polling by removing the poller element
+                const poller = document.getElementById('title-poller');
+                if (poller) {
+                    poller.remove();
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to parse title response:', e);
+        }
+    }
+}
 </script>
 {{end}}

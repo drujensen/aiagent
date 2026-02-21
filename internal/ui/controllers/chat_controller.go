@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	errors "github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/services"
+	"github.com/drujensen/aiagent/internal/impl/config"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -24,16 +26,18 @@ type ChatController struct {
 	chatService     services.ChatService
 	agentService    services.AgentService
 	modelService    services.ModelService
+	globalConfig    *config.GlobalConfig
 	activeCancelers sync.Map // Maps chatID to context cancelFunc
 }
 
-func NewChatController(logger *zap.Logger, tmpl *template.Template, chatService services.ChatService, agentService services.AgentService, modelService services.ModelService) *ChatController {
+func NewChatController(logger *zap.Logger, tmpl *template.Template, chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, globalConfig *config.GlobalConfig) *ChatController {
 	return &ChatController{
 		logger:          logger,
 		tmpl:            tmpl,
 		chatService:     chatService,
 		agentService:    agentService,
 		modelService:    modelService,
+		globalConfig:    globalConfig,
 		activeCancelers: sync.Map{},
 	}
 }
@@ -52,6 +56,10 @@ func (c *ChatController) RegisterRoutes(e *echo.Echo) {
 	e.POST("/chats/:id/cancel", c.CancelMessageHandler)
 	e.GET("/chat-cost", c.ChatCostHandler)
 	e.GET("/chats/:id/messages", c.GetMessagesHandler)
+
+	// Title management endpoints
+	e.GET("/chats/:id/title", c.GetChatTitleHandler)
+	e.POST("/chats/:id/generate-title", c.GenerateTitleHandler)
 }
 
 func (c *ChatController) ChatHandler(eCtx echo.Context) error {
@@ -176,6 +184,26 @@ func (c *ChatController) ChatFormHandler(eCtx echo.Context) error {
 		chatData.ModelID = chat.ModelID
 	} else {
 		chatData.ID = uuid.New().String()
+
+		// Set defaults from last used agent/model
+		if c.globalConfig.LastUsedAgent != "" {
+			// Verify the agent still exists
+			for _, agent := range agents {
+				if agent.ID == c.globalConfig.LastUsedAgent {
+					chatData.AgentID = c.globalConfig.LastUsedAgent
+					break
+				}
+			}
+		}
+		if c.globalConfig.LastUsedModel != "" {
+			// Verify the model still exists
+			for _, model := range models {
+				if model.ID == c.globalConfig.LastUsedModel {
+					chatData.ModelID = c.globalConfig.LastUsedModel
+					break
+				}
+			}
+		}
 	}
 
 	data := map[string]any{
@@ -195,6 +223,7 @@ func (c *ChatController) CreateChatHandler(eCtx echo.Context) error {
 	contentType := eCtx.Request().Header.Get("Content-Type")
 
 	var agentID, modelID, name string
+	var message string
 
 	if strings.Contains(contentType, "application/json") {
 		// Quick start - use defaults
@@ -232,22 +261,98 @@ func (c *ChatController) CreateChatHandler(eCtx echo.Context) error {
 			modelID = models[0].ID
 		}
 	} else {
-		// Advanced options - form data
+		// Form data - could be quick start (with message) or advanced options
 		agentID = eCtx.FormValue("agent-select")
 		modelID = eCtx.FormValue("model-select")
 		name = eCtx.FormValue("chat-name")
+		message = eCtx.FormValue("message")
 
-		if agentID == "" {
-			return eCtx.String(http.StatusBadRequest, "Agent selection is required")
-		}
-		if modelID == "" {
-			return eCtx.String(http.StatusBadRequest, "Model selection is required")
+		// If message is provided, this is a quick start
+		if message != "" {
+			// Use defaults if not specified (last used or first available)
+			if agentID == "" {
+				if c.globalConfig.LastUsedAgent != "" {
+					agentID = c.globalConfig.LastUsedAgent
+				} else {
+					// Use first available agent as default
+					agents, err := c.agentService.ListAgents(eCtx.Request().Context())
+					if err != nil || len(agents) == 0 {
+						return eCtx.String(http.StatusInternalServerError, "No agents available")
+					}
+					agentID = agents[0].ID
+				}
+			}
+			if modelID == "" {
+				if c.globalConfig.LastUsedModel != "" {
+					modelID = c.globalConfig.LastUsedModel
+				} else {
+					// Use first available model as default
+					models, err := c.modelService.ListModels(eCtx.Request().Context())
+					if err != nil || len(models) == 0 {
+						return eCtx.String(http.StatusInternalServerError, "No models available")
+					}
+					modelID = models[0].ID
+				}
+			}
+
+			// Generate temporary title for quick start
+			if name == "" {
+				name = fmt.Sprintf("New Chat - %s", time.Now().Format("2006-01-02 15:04"))
+			}
+		} else {
+			// Traditional form - require selections
+			if agentID == "" {
+				return eCtx.String(http.StatusBadRequest, "Agent selection is required")
+			}
+			if modelID == "" {
+				return eCtx.String(http.StatusBadRequest, "Model selection is required")
+			}
 		}
 	}
 
 	chat, err := c.chatService.CreateChat(eCtx.Request().Context(), agentID, modelID, name)
 	if err != nil {
 		return eCtx.String(http.StatusInternalServerError, "Failed to create chat")
+	}
+
+	// Update global config with last used agent and model
+	if agentID != "" && agentID != c.globalConfig.LastUsedAgent {
+		c.globalConfig.LastUsedAgent = agentID
+		if err := config.SaveGlobalConfig(c.globalConfig, c.logger); err != nil {
+			c.logger.Warn("Failed to save global config with last used agent", zap.Error(err))
+		}
+	}
+	if modelID != "" && modelID != c.globalConfig.LastUsedModel {
+		c.globalConfig.LastUsedModel = modelID
+		if err := config.SaveGlobalConfig(c.globalConfig, c.logger); err != nil {
+			c.logger.Warn("Failed to save global config with last used model", zap.Error(err))
+		}
+	}
+
+	// If this is a quick start with message, send the first message
+	if message != "" {
+		userMessage := entities.NewMessage("user", message)
+
+		// Create a cancellable context
+		ctx, cancel := context.WithCancel(eCtx.Request().Context())
+		defer cancel()
+
+		// Store the cancellation function
+		c.activeCancelers.Store(chat.ID, cancel)
+
+		// Send the message and get the AI responses
+		_, err := c.chatService.SendMessage(ctx, chat.ID, userMessage)
+		if err != nil {
+			// If sending fails, still redirect to chat so user can retry
+			c.logger.Warn("Failed to send initial message, redirecting to chat anyway", zap.Error(err), zap.String("chatID", chat.ID))
+		}
+		// Note: SendMessage already generates title synchronously for first exchange
+
+		// Clean up cancellation
+		defer func() {
+			cancel()
+			c.activeCancelers.Delete(chat.ID)
+		}()
 	}
 
 	// For JSON requests, return JSON response
@@ -574,5 +679,50 @@ func (c *ChatController) GetMessagesHandler(eCtx echo.Context) error {
 	return eCtx.JSON(http.StatusOK, map[string]interface{}{
 		"chat_id":  chatID,
 		"messages": filteredMessages,
+	})
+}
+
+// GetChatTitleHandler returns the current title of a chat
+func (c *ChatController) GetChatTitleHandler(eCtx echo.Context) error {
+	chatID := eCtx.Param("id")
+	if chatID == "" {
+		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": "Chat ID is required"})
+	}
+
+	chat, err := c.chatService.GetChat(eCtx.Request().Context(), chatID)
+	if err != nil {
+		switch err.(type) {
+		case *errors.NotFoundError:
+			return eCtx.JSON(http.StatusNotFound, map[string]string{"error": "Chat not found"})
+		default:
+			c.logger.Error("Failed to get chat title", zap.Error(err))
+			return eCtx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to load chat"})
+		}
+	}
+
+	return eCtx.JSON(http.StatusOK, map[string]string{
+		"title": chat.Name,
+	})
+}
+
+// GenerateTitleHandler triggers asynchronous title generation for a chat
+func (c *ChatController) GenerateTitleHandler(eCtx echo.Context) error {
+	chatID := eCtx.Param("id")
+	if chatID == "" {
+		return eCtx.JSON(http.StatusBadRequest, map[string]string{"error": "Chat ID is required"})
+	}
+
+	// Trigger title generation asynchronously
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if _, err := c.chatService.GenerateAndUpdateTitle(ctx, chatID); err != nil {
+			c.logger.Warn("Failed to generate title", zap.Error(err), zap.String("chatID", chatID))
+		}
+	}()
+
+	return eCtx.JSON(http.StatusOK, map[string]string{
+		"status": "Title generation started",
 	})
 }
