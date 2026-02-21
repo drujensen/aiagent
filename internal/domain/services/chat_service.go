@@ -248,9 +248,6 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		return nil, err
 	}
 
-	// Track if this is the first message exchange
-	isFirstExchange := len(chat.Messages) == 0
-
 	message.ID = uuid.New().String()
 	message.Timestamp = time.Now()
 	chat.Messages = append(chat.Messages, *message)
@@ -258,6 +255,18 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 
 	if err = s.chatRepo.UpdateChat(ctx, chat); err != nil {
 		return nil, err
+	}
+
+	// Generate title if chat still has default title (allows retry if previous attempts failed)
+	if strings.HasPrefix(chat.Name, "New Chat") {
+		s.logger.Info("Generating title for chat with default title", zap.String("chat_id", chat.ID))
+		if updatedChat, err := s.GenerateAndUpdateTitle(ctx, chat.ID); err != nil {
+			s.logger.Warn("Failed to generate title", zap.Error(err))
+		} else {
+			s.logger.Info("Successfully updated chat title", zap.String("chat_id", chat.ID), zap.String("new_title", updatedChat.Name))
+			// Update the in-memory chat with the new title
+			*chat = *updatedChat
+		}
 	}
 
 	// Check for cancellation
@@ -413,18 +422,6 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 			return nil, errors.CanceledErrorf("message processing was canceled")
 		}
 		return nil, errors.InternalErrorf("failed to generate AI response: %v", err)
-	}
-
-	// Generate title if this is the first message exchange
-	if isFirstExchange {
-		s.logger.Info("Generating title for new chat", zap.String("chat_id", chat.ID))
-		if updatedChat, err := s.GenerateAndUpdateTitle(ctx, chat.ID); err != nil {
-			s.logger.Warn("Failed to generate title", zap.Error(err))
-		} else {
-			s.logger.Info("Successfully updated chat title", zap.String("chat_id", chat.ID), zap.String("new_title", updatedChat.Name))
-			// Update the in-memory chat with the new title
-			*chat = *updatedChat
-		}
 	}
 
 	// Get usage information for billing
@@ -1124,7 +1121,7 @@ func (s *chatService) GenerateAndUpdateTitle(ctx context.Context, chatID string)
 		s.logger.Error("Failed to get chat for title generation", zap.Error(err))
 		return nil, err
 	}
-	if len(chat.Messages) < 2 {
+	if len(chat.Messages) < 1 {
 		s.logger.Warn("Not enough messages for title generation", zap.Int("message_count", len(chat.Messages)))
 		return nil, fmt.Errorf("not enough messages")
 	}
