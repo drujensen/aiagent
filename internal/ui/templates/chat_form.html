@@ -19,12 +19,12 @@
          </div>
          <div class="form-group" style="text-align: left;">
              <label for="model-select" style="display: block; margin-bottom: 5px; font-weight: bold; color: #fff;">Model:</label>
-             <select id="model-select" name="model-select" class="form-control">
-                 <option value="">Select a Model</option>
-                 {{range .Models}}
-                 <option value="{{.ID}}"{{if (eq .ID $.Chat.ModelID)}}selected{{end}}>{{.Name}}</option>
-                 {{end}}
-             </select>
+              <select id="model-select" name="model-select" class="form-control">
+                  <option value="">Select a Model</option>
+                  {{range .Models}}
+                  <option value="{{.ID}}"{{if (eq .ID $.Chat.ModelID)}}selected{{end}}>{{.DisplayName}}</option>
+                  {{end}}
+              </select>
              <small class="form-text" style="display: block; margin-top: 5px; font-size: 12px; color: #ccc;">Controls speed, cost, and capabilities</small>
          </div>
       </div>
@@ -51,10 +51,10 @@
          </div>
          <div class="form-group" style="text-align: left;">
              <label for="model-select" style="display: block; margin-bottom: 5px; font-weight: bold; color: #fff;">Model:</label>
-             <select id="model-select" name="model-select" class="form-control" required>
+              <select id="model-select" name="model-select" class="form-control" required>
                  <option value="">Select a Model</option>
                  {{range .Models}}
-                 <option value="{{.ID}}"{{if (eq .ID $.Chat.ModelID)}}selected{{end}}>{{.Name}}</option>
+                 <option value="{{.ID}}"{{if (eq .ID $.Chat.ModelID)}}selected{{end}}>{{.DisplayName}}</option>
                  {{end}}
              </select>
          </div>

@@ -14,14 +14,15 @@ import (
 )
 
 type TUI struct {
-	chatService     services.ChatService
-	agentService    services.AgentService
-	modelService    services.ModelService
-	providerService services.ProviderService
-	toolService     services.ToolService
-	globalConfig    *config.GlobalConfig
-	logger          *zap.Logger
-	activeChat      *entities.Chat
+	chatService        services.ChatService
+	agentService       services.AgentService
+	modelService       services.ModelService
+	providerService    services.ProviderService
+	toolService        services.ToolService
+	modelFilterService *services.ModelFilterService
+	globalConfig       *config.GlobalConfig
+	logger             *zap.Logger
+	activeChat         *entities.Chat
 
 	chatView    ChatView
 	historyView HistoryView
@@ -35,7 +36,7 @@ type TUI struct {
 	err   error
 }
 
-func NewTUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, providerService services.ProviderService, toolService services.ToolService, globalConfig *config.GlobalConfig, logger *zap.Logger) TUI {
+func NewTUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, providerService services.ProviderService, toolService services.ToolService, modelFilterService *services.ModelFilterService, globalConfig *config.GlobalConfig, logger *zap.Logger) TUI {
 	ctx := context.Background()
 
 	activeChat, err := chatService.GetActiveChat(ctx)
@@ -46,20 +47,21 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 	initialState := "chat/view"
 
 	return TUI{
-		chatService:     chatService,
-		agentService:    agentService,
-		modelService:    modelService,
-		providerService: providerService,
-		toolService:     toolService,
-		globalConfig:    globalConfig,
-		logger:          logger,
-		activeChat:      activeChat,
+		chatService:        chatService,
+		agentService:       agentService,
+		modelService:       modelService,
+		providerService:    providerService,
+		toolService:        toolService,
+		modelFilterService: modelFilterService,
+		globalConfig:       globalConfig,
+		logger:             logger,
+		activeChat:         activeChat,
 
 		chatView:    NewChatView(chatService, agentService, modelService, logger, activeChat),
 		historyView: NewHistoryView(chatService),
 		usageView:   NewUsageView(chatService, agentService, modelService),
 		agentView:   NewAgentView(agentService),
-		modelView:   NewModelViewWithMode(modelService, providerService, "view"),
+		modelView:   NewModelViewWithMode(modelService, providerService, modelFilterService, "view"),
 		toolView:    NewToolView(toolService),
 		commandMenu: NewCommandMenu(),
 

@@ -40,6 +40,7 @@ type UI struct {
 	toolService         services.ToolService
 	providerService     services.ProviderService
 	modelRefreshService services.ModelRefreshService
+	modelFilterService  *services.ModelFilterService
 	globalConfig        *config.GlobalConfig
 	logger              *zap.Logger
 	wsUpgrader          websocket.Upgrader
@@ -47,7 +48,7 @@ type UI struct {
 	wsClientsMutex      sync.RWMutex
 }
 
-func NewUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService, providerService services.ProviderService, modelRefreshService services.ModelRefreshService, globalConfig *config.GlobalConfig, logger *zap.Logger) *UI {
+func NewUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService, providerService services.ProviderService, modelRefreshService services.ModelRefreshService, modelFilterService *services.ModelFilterService, globalConfig *config.GlobalConfig, logger *zap.Logger) *UI {
 	ui := &UI{
 		chatService:         chatService,
 		agentService:        agentService,
@@ -55,6 +56,7 @@ func NewUI(chatService services.ChatService, agentService services.AgentService,
 		toolService:         toolService,
 		providerService:     providerService,
 		modelRefreshService: modelRefreshService,
+		modelFilterService:  modelFilterService,
 		globalConfig:        globalConfig,
 		logger:              logger,
 		wsUpgrader: websocket.Upgrader{
@@ -183,9 +185,9 @@ func (u *UI) Run() error {
 		u.logger.Fatal("Failed to parse templates", zap.Error(err))
 	}
 
-	homeController := uiapicontrollers.NewHomeController(u.logger, tmpl, u.chatService, u.agentService, u.modelService, u.toolService)
+	homeController := uiapicontrollers.NewHomeController(u.logger, tmpl, u.chatService, u.agentService, u.modelService, u.modelFilterService, u.toolService)
 	agentController := uiapicontrollers.NewAgentController(u.logger, tmpl, u.agentService, u.toolService, u.providerService)
-	chatController := uiapicontrollers.NewChatController(u.logger, tmpl, u.chatService, u.agentService, u.modelService, u.globalConfig)
+	chatController := uiapicontrollers.NewChatController(u.logger, tmpl, u.chatService, u.agentService, u.modelService, u.providerService, u.modelFilterService, u.globalConfig)
 	toolFactory, err := tools.NewToolFactory()
 	if err != nil {
 		u.logger.Fatal("Failed to initialize tool factory", zap.Error(err))

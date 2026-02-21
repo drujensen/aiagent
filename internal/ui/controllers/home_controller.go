@@ -20,14 +20,14 @@ type HomeController struct {
 	toolService   services.ToolService
 }
 
-func NewHomeController(logger *zap.Logger, tmpl *template.Template, chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService) *HomeController {
+func NewHomeController(logger *zap.Logger, tmpl *template.Template, chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, filterService *services.ModelFilterService, toolService services.ToolService) *HomeController {
 	return &HomeController{
 		logger:        logger,
 		tmpl:          tmpl,
 		chatService:   chatService,
 		agentService:  agentService,
 		modelService:  modelService,
-		filterService: services.NewModelFilterService(),
+		filterService: filterService,
 		toolService:   toolService,
 	}
 }

@@ -64,11 +64,11 @@ func (m ModelListItem) Description() string {
 	return ""
 }
 
-func NewModelView(modelService services.ModelService, providerService services.ProviderService) ModelView {
-	return NewModelViewWithMode(modelService, providerService, "view")
+func NewModelView(modelService services.ModelService, providerService services.ProviderService, filterService *services.ModelFilterService) ModelView {
+	return NewModelViewWithMode(modelService, providerService, filterService, "view")
 }
 
-func NewModelViewWithMode(modelService services.ModelService, providerService services.ProviderService, mode string) ModelView {
+func NewModelViewWithMode(modelService services.ModelService, providerService services.ProviderService, filterService *services.ModelFilterService, mode string) ModelView {
 	delegate := list.NewDefaultDelegate()
 	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("6")).Bold(true)
 	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("7"))
@@ -90,7 +90,7 @@ func NewModelViewWithMode(modelService services.ModelService, providerService se
 	return ModelView{
 		modelService:    modelService,
 		providerService: providerService,
-		filterService:   services.NewModelFilterService(),
+		filterService:   filterService,
 		list:            l,
 		mode:            mode,
 	}

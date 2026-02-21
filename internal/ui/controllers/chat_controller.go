@@ -26,17 +26,21 @@ type ChatController struct {
 	chatService     services.ChatService
 	agentService    services.AgentService
 	modelService    services.ModelService
+	providerService services.ProviderService
+	filterService   *services.ModelFilterService
 	globalConfig    *config.GlobalConfig
 	activeCancelers sync.Map // Maps chatID to context cancelFunc
 }
 
-func NewChatController(logger *zap.Logger, tmpl *template.Template, chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, globalConfig *config.GlobalConfig) *ChatController {
+func NewChatController(logger *zap.Logger, tmpl *template.Template, chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, providerService services.ProviderService, filterService *services.ModelFilterService, globalConfig *config.GlobalConfig) *ChatController {
 	return &ChatController{
 		logger:          logger,
 		tmpl:            tmpl,
 		chatService:     chatService,
 		agentService:    agentService,
 		modelService:    modelService,
+		providerService: providerService,
+		filterService:   filterService,
 		globalConfig:    globalConfig,
 		activeCancelers: sync.Map{},
 	}
@@ -138,6 +142,16 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 	return c.tmpl.ExecuteTemplate(eCtx.Response().Writer, "layout", data)
 }
 
+// EnrichedModelData represents a model with provider and pricing information for display
+type EnrichedModelData struct {
+	ID                  string
+	Name                string
+	ProviderName        string
+	DisplayName         string
+	InputPricePerMille  float64
+	OutputPricePerMille float64
+}
+
 func (c *ChatController) ChatFormHandler(eCtx echo.Context) error {
 	agents, err := c.agentService.ListAgents(eCtx.Request().Context())
 	if err != nil {
@@ -149,6 +163,44 @@ func (c *ChatController) ChatFormHandler(eCtx echo.Context) error {
 	if err != nil {
 		c.logger.Error("Failed to list models", zap.Error(err))
 		return eCtx.String(http.StatusInternalServerError, "Failed to load models")
+	}
+
+	// Filter models to only include chat-compatible ones
+	filteredModels := c.filterService.FilterChatCompatibleModels(models)
+
+	// Enrich model data with provider and pricing information
+	enrichedModels := make([]EnrichedModelData, 0, len(filteredModels))
+	for _, model := range filteredModels {
+		enriched := EnrichedModelData{
+			ID:   model.ID,
+			Name: model.Name,
+		}
+
+		// Get provider information
+		if provider, err := c.providerService.GetProvider(eCtx.Request().Context(), model.ProviderID); err == nil {
+			enriched.ProviderName = provider.Name
+
+			// Find pricing for this specific model
+			for _, pricing := range provider.Models {
+				if pricing.Name == model.ModelName {
+					enriched.InputPricePerMille = pricing.InputPricePerMille
+					enriched.OutputPricePerMille = pricing.OutputPricePerMille
+
+					// Format display name: {provider} - {name} in: ${cost} out: ${cost}
+					inputCost := fmt.Sprintf("$%.2f", pricing.InputPricePerMille)
+					outputCost := fmt.Sprintf("$%.2f", pricing.OutputPricePerMille)
+					enriched.DisplayName = fmt.Sprintf("%s - %s in: %s out: %s", provider.Name, model.Name, inputCost, outputCost)
+					break
+				}
+			}
+		}
+
+		// Fallback if pricing not found
+		if enriched.DisplayName == "" {
+			enriched.DisplayName = model.Name
+		}
+
+		enrichedModels = append(enrichedModels, enriched)
 	}
 
 	var chat *entities.Chat
@@ -211,7 +263,7 @@ func (c *ChatController) ChatFormHandler(eCtx echo.Context) error {
 		"ContentTemplate": "chat_form_content",
 		"Chat":            chatData,
 		"Agents":          agents,
-		"Models":          models,
+		"Models":          enrichedModels,
 		"IsEdit":          isEdit,
 	}
 

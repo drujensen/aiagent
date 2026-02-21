@@ -207,13 +207,15 @@ func main() {
 		return
 	}
 
+	modelFilterService := services.NewModelFilterService()
+
 	if modeStr == "serve" {
-		uiApp := ui.NewUI(chatService, agentService, modelService, toolService, providerService, modelRefreshService, globalConfig, logger)
+		uiApp := ui.NewUI(chatService, agentService, modelService, toolService, providerService, modelRefreshService, modelFilterService, globalConfig, logger)
 		if err := uiApp.Run(); err != nil {
 			logger.Fatal("UI failed", zap.Error(err))
 		}
 	} else {
-		p := tea.NewProgram(tui.NewTUI(chatService, agentService, modelService, providerService, toolService, globalConfig, logger), tea.WithAltScreen(), tea.WithMouseAllMotion())
+		p := tea.NewProgram(tui.NewTUI(chatService, agentService, modelService, providerService, toolService, modelFilterService, globalConfig, logger), tea.WithAltScreen(), tea.WithMouseAllMotion())
 
 		if _, err := p.Run(); err != nil {
 			log.Fatal(err)
