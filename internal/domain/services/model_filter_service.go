@@ -68,12 +68,6 @@ func (s *ModelFilterService) IsChatCompatibleModel(model *entities.Model) bool {
 		return false
 	}
 
-	// For now, skip models with attachment capability (vision/image models)
-	// TODO: Add support for vision models in the future
-	if model.Attachment {
-		return false
-	}
-
 	// Also skip models with "vision" in the name as a fallback
 	if strings.Contains(strings.ToLower(model.ModelName), "vision") {
 		return false
