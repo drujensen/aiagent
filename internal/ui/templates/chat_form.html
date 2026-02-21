@@ -2,7 +2,7 @@
 <div class="chat-welcome">
     {{if not .IsEdit}}
     <h1>How may I help you today?</h1>
-    <form hx-post="/chats" hx-target="#response-message" hx-swap="innerHTML">
+    <form hx-post="/chats" hx-target="#response-message" hx-swap="innerHTML" hx-trigger="submit, keydown[key == 'Enter' && !shiftKey] from:#first-message">
       <div class="form-group" style="margin-bottom: 20px;">
          <textarea name="message" id="first-message" class="form-control message-textarea" placeholder="Type your message here..." rows="6" required></textarea>
       </div>
@@ -201,6 +201,15 @@
 </style>
 
 <script>
-// No quick start functionality - users must configure chats manually
+document.addEventListener('DOMContentLoaded', function() {
+  const textarea = document.getElementById('first-message');
+  if (textarea) {
+    textarea.addEventListener('keydown', function(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+      }
+    });
+  }
+});
 </script>
 {{end}}
