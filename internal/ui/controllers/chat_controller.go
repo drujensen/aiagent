@@ -92,6 +92,23 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusInternalServerError, "Failed to get model")
 	}
 
+	provider, err := c.providerService.GetProvider(eCtx.Request().Context(), model.ProviderID)
+	providerName := string(model.ProviderType)
+	if err == nil {
+		providerName = provider.Name
+	}
+
+	var inputPrice, outputPrice float64
+	if err == nil {
+		for _, pricing := range provider.Models {
+			if pricing.Name == model.ModelName {
+				inputPrice = pricing.InputPricePerMille
+				outputPrice = pricing.OutputPricePerMille
+				break
+			}
+		}
+	}
+
 	availableAgents, err := c.agentService.ListAgents(eCtx.Request().Context())
 	if err != nil {
 		return eCtx.String(http.StatusInternalServerError, "Failed to list agents")
@@ -130,6 +147,9 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 		"ChatName":        chat.Name,
 		"AgentName":       agent.Name,
 		"ModelName":       model.Name,
+		"ProviderName":    providerName,
+		"InputPrice":      inputPrice,
+		"OutputPrice":     outputPrice,
 		"CurrentAgentID":  agent.ID,
 		"CurrentModelID":  model.ID,
 		"AvailableAgents": availableAgents,

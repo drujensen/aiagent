@@ -51,13 +51,21 @@
     margin: 0;
 }
 
+.chat-info {
+    color: #aaa;
+    font-size: 14px;
+    position: absolute;
+    right: 60px;
+    top: 10px;
+    white-space: nowrap;
+}
+
 .chat-cost {
     color: #aaa;
     font-size: 14px;
     position: absolute;
     right: 60px;
-    top: 50%;
-    transform: translateY(-50%);
+    top: 30px;
     border-top: 1px solid #444;
 }
 

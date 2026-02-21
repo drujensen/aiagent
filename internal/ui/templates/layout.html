@@ -32,10 +32,11 @@
             <div class="chat-title">
                 {{if .ChatName}}{{.ChatName}}{{else}}Chat{{end}}
             </div>
+            <div class="chat-info">{{.ProviderName}} - {{.ModelName}} in: ${{printf "%.2f" .InputPrice}} out: ${{printf "%.2f" .OutputPrice}}</div>
            <div class="chat-cost" hx-get="/chat-cost?chat_id={{.ChatID}}" hx-trigger="refreshChatCost from:body" hx-swap="innerHTML">
            {{template "chat_cost_partial" .}}
            </div>
-       {{end}}
+        {{end}}
        <button class="hamburger" aria-label="Toggle Sidebar" hx-toggle-class="active" hx-target=".sidebar" hx-on::after-request="updateSidebarTransform()">
            <i class="fas fa-bars"></i>
        </button>
