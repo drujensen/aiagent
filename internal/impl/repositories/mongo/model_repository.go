@@ -66,7 +66,28 @@ func (r *MongoModelRepository) CreateModel(ctx context.Context, model *entities.
 }
 
 func (r *MongoModelRepository) UpdateModel(ctx context.Context, model *entities.Model) error {
-	update := bson.M{"$set": model}
+	// Create update document excluding _id field (MongoDB doesn't allow updating _id)
+	updateDoc := bson.M{
+		"name":              model.Name,
+		"provider_id":       model.ProviderID,
+		"provider_type":     model.ProviderType,
+		"model_name":        model.ModelName,
+		"api_key":           model.APIKey,
+		"temperature":       model.Temperature,
+		"max_tokens":        model.MaxTokens,
+		"context_window":    model.ContextWindow,
+		"reasoning_effort":  model.ReasoningEffort,
+		"family":            model.Family,
+		"reasoning":         model.Reasoning,
+		"tool_call":         model.ToolCall,
+		"temperature_cap":   model.TemperatureCap,
+		"attachment":        model.Attachment,
+		"structured_output": model.StructuredOutput,
+		"created_at":        model.CreatedAt,
+		"updated_at":        model.UpdatedAt,
+	}
+
+	update := bson.M{"$set": updateDoc}
 	_, err := r.collection.UpdateOne(ctx, bson.M{"_id": model.ID}, update)
 	if err != nil {
 		return errors.InternalErrorf("failed to update model: %v", err)
