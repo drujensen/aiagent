@@ -67,9 +67,9 @@
     </section>
 
     <!-- Hidden element for title polling -->
-    <div id="title-poller"
+    <div id="title-updater"
          hx-get="/chats/{{.ChatID}}/title"
-         hx-trigger="load, every 3s"
+         hx-trigger="refreshTitle from:body"
          hx-swap="none"
          hx-on::after-request="updateTitleIfChanged(event)">
     </div>
@@ -139,16 +139,31 @@ function updateTitleIfChanged(event) {
                 // Trigger sidebar refresh
                 htmx.trigger('body', 'refreshChats');
 
-                // Stop polling by removing the poller element
-                const poller = document.getElementById('title-poller');
-                if (poller) {
-                    poller.remove();
-                }
+                // Title updated successfully
             }
         } catch (e) {
             console.warn('Failed to parse title response:', e);
         }
     }
 }
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (new URLSearchParams(location.search).has('initMessage')) {
+    const params = new URLSearchParams(location.search);
+    const initMsg = params.get('initMessage');
+    history.replaceState({}, '', location.pathname);
+    const textarea = document.getElementById('message-input');
+    if (textarea) {
+      textarea.value = initMsg;
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      const form = document.getElementById('message-form');
+      if (form && window.htmx) {
+        htmx.trigger(form, 'submit');
+      }
+    }
+  }
+});
 </script>
 {{end}}

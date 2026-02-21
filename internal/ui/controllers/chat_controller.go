@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -138,6 +139,22 @@ func (c *ChatController) ChatHandler(eCtx echo.Context) error {
 	title := "Chat"
 	if chat.Name != "" {
 		title = chat.Name
+	}
+
+	// Filter out tool execution notification messages from the chat messages
+	filteredMessages = make([]entities.Message, 0, len(chat.Messages))
+	for _, msg := range chat.Messages {
+		if msg.Role == "assistant" {
+			content := msg.Content
+			// Skip messages that are just tool execution notifications
+			if strings.Contains(content, " tool with parameters:") && strings.HasPrefix(content, "Executing ") {
+				continue // Skip this notification message
+			}
+			if strings.HasPrefix(content, "Executing tool call.") {
+				continue // Skip generic tool execution messages
+			}
+		}
+		filteredMessages = append(filteredMessages, msg)
 	}
 
 	data := map[string]any{
@@ -401,31 +418,7 @@ func (c *ChatController) CreateChatHandler(eCtx echo.Context) error {
 		}
 	}
 
-	// If this is a quick start with message, send the first message
-	if message != "" {
-		userMessage := entities.NewMessage("user", message)
-
-		// Create a cancellable context
-		ctx, cancel := context.WithCancel(eCtx.Request().Context())
-		defer cancel()
-
-		// Store the cancellation function
-		c.activeCancelers.Store(chat.ID, cancel)
-
-		// Send the message and get the AI responses
-		_, err := c.chatService.SendMessage(ctx, chat.ID, userMessage)
-		if err != nil {
-			// If sending fails, still redirect to chat so user can retry
-			c.logger.Warn("Failed to send initial message, redirecting to chat anyway", zap.Error(err), zap.String("chatID", chat.ID))
-		}
-		// Note: SendMessage already generates title synchronously for first exchange
-
-		// Clean up cancellation
-		defer func() {
-			cancel()
-			c.activeCancelers.Delete(chat.ID)
-		}()
-	}
+	// Chat created; message sent asynchronously via frontend
 
 	// For JSON requests, return JSON response
 	if strings.Contains(contentType, "application/json") {
@@ -436,7 +429,13 @@ func (c *ChatController) CreateChatHandler(eCtx echo.Context) error {
 	}
 
 	// For form requests, redirect
-	eCtx.Response().Header().Set("HX-Redirect", "/chats/"+chat.ID)
+	redirectPath := "/chats/" + chat.ID
+	if message != "" {
+		u := redirectPath + "?initMessage=" + url.QueryEscape(message)
+		eCtx.Response().Header().Set("HX-Redirect", u)
+	} else {
+		eCtx.Response().Header().Set("HX-Redirect", redirectPath)
+	}
 	return eCtx.String(http.StatusOK, "Chat created successfully")
 }
 
@@ -653,7 +652,7 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 		messageSessionID, buf.String())
 
 	// Set the header to trigger scrolling to the response and refresh chat cost
-	eCtx.Response().Header().Set("HX-Trigger", "messageReceived, refreshChatCost")
+	eCtx.Response().Header().Set("HX-Trigger", "messageReceived, refreshChatCost, refreshTitle")
 
 	return eCtx.HTML(http.StatusOK, responseHTML)
 }
