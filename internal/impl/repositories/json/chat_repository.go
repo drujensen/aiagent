@@ -98,9 +98,9 @@ func (r *JsonChatRepository) ListChats(ctx context.Context) ([]*entities.Chat, e
 		}
 	}
 
-	// Sort chatsCopy by UpdatedAt in descending order
+	// Sort chatsCopy by CreatedAt in descending order
 	sort.Slice(chatsCopy, func(i, j int) bool {
-		return chatsCopy[i].UpdatedAt.Before(chatsCopy[j].UpdatedAt)
+		return chatsCopy[j].CreatedAt.Before(chatsCopy[i].CreatedAt)
 	})
 
 	return chatsCopy, nil

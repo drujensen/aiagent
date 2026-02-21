@@ -27,7 +27,7 @@ func (r *MongoChatRepository) ListChats(ctx context.Context) ([]*entities.Chat, 
 	var chats []*entities.Chat
 
 	// Define the sort order
-	sortOption := options.Find().SetSort(bson.D{{Key: "updated_at", Value: -1}})
+	sortOption := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}})
 
 	cursor, err := r.collection.Find(ctx, bson.M{}, sortOption)
 	if err != nil {
