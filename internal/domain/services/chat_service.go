@@ -214,9 +214,10 @@ func (s *chatService) SaveMessagesIncrementally(ctx context.Context, chatID stri
 
 	// Append new messages to chat
 	for _, msg := range messages {
-		if msg.Content == "" {
-			msg.Content = "Unknown Error: No response generated"
+		if msg.Role == "assistant" && msg.Content == "" && len(msg.ToolCalls) == 0 {
+			continue
 		}
+
 		chat.Messages = append(chat.Messages, *msg)
 	}
 
