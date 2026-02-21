@@ -69,7 +69,7 @@
     <!-- Hidden element for title polling -->
     <div id="title-updater"
          hx-get="/chats/{{.ChatID}}/title"
-         hx-trigger="refreshTitle from:body"
+         hx-trigger="load, refreshTitle from:body, every 5s"
          hx-swap="none"
          hx-on::after-request="updateTitleIfChanged(event)">
     </div>
@@ -139,7 +139,11 @@ function updateTitleIfChanged(event) {
                 // Trigger sidebar refresh
                 htmx.trigger('body', 'refreshChats');
 
-                // Title updated successfully
+                // Stop polling after successful update
+                const updater = document.getElementById('title-updater');
+                if (updater) {
+                    updater.remove();
+                }
             }
         } catch (e) {
             console.warn('Failed to parse title response:', e);
