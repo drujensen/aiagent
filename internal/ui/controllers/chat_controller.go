@@ -443,18 +443,13 @@ func (c *ChatController) CreateChatHandler(eCtx echo.Context) error {
 func (c *ChatController) UpdateChatHandler(eCtx echo.Context) error {
 	chatID := eCtx.Param("id")
 	agentID := eCtx.FormValue("agent-select")
+	modelID := eCtx.FormValue("model-select")
 	name := eCtx.FormValue("chat-name")
 	if chatID == "" || name == "" {
 		return eCtx.String(http.StatusBadRequest, "Chat ID and name are required")
 	}
 
-	// Get existing chat to preserve model ID
-	existingChat, err := c.chatService.GetChat(eCtx.Request().Context(), chatID)
-	if err != nil {
-		return eCtx.String(http.StatusInternalServerError, "Failed to get chat")
-	}
-
-	_, err = c.chatService.UpdateChat(eCtx.Request().Context(), chatID, agentID, existingChat.ModelID, name)
+	_, err := c.chatService.UpdateChat(eCtx.Request().Context(), chatID, agentID, modelID, name)
 	if err != nil {
 		switch err.(type) {
 		case *errors.NotFoundError:

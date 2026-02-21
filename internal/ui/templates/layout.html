@@ -28,10 +28,13 @@
              <i class="fas fa-robot"></i><div class="logo-title">AI Agents</div>
            </a>
        </div>
-        {{if eq .ContentTemplate "chat_content"}}
-            <div class="chat-title">
-                {{if .ChatName}}{{.ChatName}}{{else}}Chat{{end}}
-            </div>
+         {{if eq .ContentTemplate "chat_content"}}
+             <div class="chat-title-container">
+                 <div class="chat-title">{{if .ChatName}}{{.ChatName}}{{else}}Chat{{end}}</div>
+                 <a class="edit-chat-btn" href="/chats/{{.ChatID}}/edit">
+                     <i class="fas fa-edit"></i>
+                 </a>
+             </div>
             <div class="chat-info">{{.ProviderName}} - {{.ModelName}} in: ${{printf "%.2f" .InputPrice}} out: ${{printf "%.2f" .OutputPrice}}</div>
            <div class="chat-cost" hx-get="/chat-cost?chat_id={{.ChatID}}" hx-trigger="refreshChatCost from:body" hx-swap="innerHTML">
            {{template "chat_cost_partial" .}}

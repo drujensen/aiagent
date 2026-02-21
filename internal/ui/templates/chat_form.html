@@ -59,8 +59,9 @@
              </select>
          </div>
       </div>
-      <button type="submit" class="btn-primary">Update Chat</button>
-    </form>
+       <button type="submit" class="btn-primary">Update Chat</button>
+       <a href="/chats/{{.Chat.ID}}" class="btn-primary">Cancel</a>
+     </form>
     {{end}}
     <div id="response-message"></div>
 </div>
