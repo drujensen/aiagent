@@ -1265,7 +1265,7 @@ func (c ChatView) View() string {
 
 	modelInfo := "No model selected"
 	if c.currentModel != nil {
-		modelInfo = fmt.Sprintf("Model: %s", c.currentModel.Name)
+		modelInfo = fmt.Sprintf("Model: %s - %s", c.currentModel.ProviderType, c.currentModel.Name)
 	}
 
 	footerInfo := agentInfo + " | " + modelInfo
