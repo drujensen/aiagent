@@ -978,6 +978,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			return c, func() tea.Msg { return startAgentSwitchMsg{} }
 		case "ctrl+o":
 			return c, func() tea.Msg { return startModelSwitchMsg{} }
+		case "ctrl+h":
+			return c, func() tea.Msg { return startHistoryMsg{} }
 		case "ctrl+n":
 			return c, func() tea.Msg { return startAutoCreateChatMsg{} }
 		case "ctrl+l":
