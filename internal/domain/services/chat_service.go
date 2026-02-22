@@ -229,9 +229,6 @@ func (s *chatService) SaveMessagesIncrementally(ctx context.Context, chatID stri
 		return err
 	}
 
-	// Publish message history change event for live updates
-	events.PublishMessageHistoryEvent(chatID, messages)
-
 	return nil
 }
 

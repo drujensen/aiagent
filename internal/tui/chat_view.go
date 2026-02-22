@@ -661,20 +661,9 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		}
 	})
 
-	// Subscribe to message history events
-	messageCancel := events.SubscribeToMessageHistoryEvents(func(data events.MessageHistoryEventData) {
-		// Send event to channel (non-blocking)
-		select {
-		case cv.eventChan <- data:
-		default:
-			// Channel full, drop event to avoid blocking
-		}
-	})
-
 	// Combine cancel functions
 	cv.eventCancel = func() {
 		toolCancel()
-		messageCancel()
 	}
 
 	return cv
@@ -813,17 +802,6 @@ func (c *ChatView) updateEditorContent() {
 		}
 	}
 
-	// Add current tool calls being executed if processing
-	if c.isProcessing && len(c.activeChat.Messages) > 0 {
-		lastMsg := c.activeChat.Messages[len(c.activeChat.Messages)-1]
-		if lastMsg.Role == "assistant" && len(lastMsg.ToolCalls) > 0 {
-			sb.WriteString("\n" + c.systemStyle.Render("Executing tools:") + "\n\n")
-			for _, toolCall := range lastMsg.ToolCalls {
-				sb.WriteString(c.systemStyle.Render("  ↳ ") + "🔄 " + toolCall.Function.Name + "\n")
-			}
-		}
-	}
-
 	// Add error as temporary system message if present
 	if c.err != nil {
 		if sb.Len() > 0 {
@@ -890,8 +868,6 @@ func (c *ChatView) listenForEvents() tea.Cmd {
 		switch e := event.(type) {
 		case *entities.ToolCallEvent:
 			return toolCallEventMsg(e)
-		case events.MessageHistoryEventData:
-			return messageHistoryEventMsg(e)
 		default:
 			return nil
 		}
@@ -1127,31 +1103,6 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			}
 			c.tempMessages = append(c.tempMessages, tempMsg)
 			// Update editor content with new tool event
-			c.updateEditorContent()
-		}
-		// Continue listening for more events
-		return c, c.listenForEvents()
-
-	case messageHistoryEventMsg:
-		// Handle message history change event
-		if c.isProcessing && c.activeChat != nil && m.ChatID == c.activeChat.ID {
-			// Sync active chat messages to prevent stale data display
-			messages := make([]entities.Message, len(m.Messages))
-			for i, msg := range m.Messages {
-				messages[i] = *msg
-			}
-			c.activeChat.Messages = messages
-
-			// Only clear temp messages if this is the final message (no tool calls pending)
-			// This prevents tool call results from disappearing during live updates
-			if len(m.Messages) > 0 {
-				lastMsg := m.Messages[len(m.Messages)-1]
-				if lastMsg.Role == "assistant" && len(lastMsg.ToolCalls) == 0 {
-					// This is the final assistant response, clear temp messages
-					c.tempMessages = nil
-				}
-			}
-			// Refresh the editor content with updated message history
 			c.updateEditorContent()
 		}
 		// Continue listening for more events

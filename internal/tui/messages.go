@@ -3,7 +3,6 @@ package tui
 import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/drujensen/aiagent/internal/domain/entities"
-	"github.com/drujensen/aiagent/internal/domain/events"
 )
 
 type (
@@ -12,7 +11,6 @@ type (
 	startAutoCreateChatMsg struct{}
 	cancelSpinnerMsg       struct{}
 	toolCallEventMsg       *entities.ToolCallEvent
-	messageHistoryEventMsg events.MessageHistoryEventData
 )
 
 type (

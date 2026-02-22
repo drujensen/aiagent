@@ -3,7 +3,6 @@ package ui
 import (
 	"bytes"
 	"embed"
-	"encoding/json"
 	"html/template"
 	"io"
 	"mime"
@@ -13,7 +12,6 @@ import (
 	"sync"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
-	"github.com/drujensen/aiagent/internal/domain/events"
 	"github.com/drujensen/aiagent/internal/domain/services"
 	"github.com/drujensen/aiagent/internal/impl/config"
 	"github.com/drujensen/aiagent/internal/impl/tools"
@@ -67,56 +65,7 @@ func NewUI(chatService services.ChatService, agentService services.AgentService,
 		wsClients: make(map[*websocket.Conn]bool),
 	}
 
-	// Start WebSocket event broadcaster
-	go ui.startWebSocketBroadcaster()
-
 	return ui
-}
-
-// startWebSocketBroadcaster listens for message history events and broadcasts them to WebSocket clients
-func (u *UI) startWebSocketBroadcaster() {
-	messageCancel := events.SubscribeToMessageHistoryEvents(func(data events.MessageHistoryEventData) {
-		u.broadcastMessageHistoryEvent(data)
-	})
-
-	defer func() {
-		messageCancel()
-	}()
-
-	// Keep the broadcaster running
-	select {}
-}
-
-// broadcastMessageHistoryEvent sends message history refresh events to all connected WebSocket clients
-func (u *UI) broadcastMessageHistoryEvent(data events.MessageHistoryEventData) {
-	u.wsClientsMutex.RLock()
-	clients := make(map[*websocket.Conn]bool)
-	for client := range u.wsClients {
-		clients[client] = true
-	}
-	u.wsClientsMutex.RUnlock()
-
-	eventData := map[string]interface{}{
-		"type":    "message_history_refresh",
-		"chat_id": data.ChatID,
-	}
-
-	message, err := json.Marshal(eventData)
-	if err != nil {
-		u.logger.Error("Failed to marshal WebSocket message", zap.Error(err))
-		return
-	}
-
-	// Send to clients outside of the lock to avoid holding it during network operations
-	for client := range clients {
-		if err := client.WriteMessage(websocket.TextMessage, message); err != nil {
-			u.logger.Warn("Failed to send WebSocket message to client, removing from clients", zap.Error(err))
-			u.wsClientsMutex.Lock()
-			delete(u.wsClients, client)
-			u.wsClientsMutex.Unlock()
-			client.Close()
-		}
-	}
 }
 
 // handleWebSocket handles WebSocket connections
