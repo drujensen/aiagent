@@ -155,7 +155,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		}
 
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+m.apiKey)
+		req.Header.Set(m.authHeaderName(), m.authHeaderValue())
 
 		var resp *http.Response
 		for attempt := 0; attempt < 3; attempt++ {
@@ -234,10 +234,13 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		for _, tcMap := range message.ToolCalls {
 			var tc entities.ToolCall
 			if id, ok := tcMap["id"].(string); ok {
-				tc.ID = id
+				tc.ID = m.customizeToolCallID(id)
 			}
 			if typ, ok := tcMap["type"].(string); ok {
 				tc.Type = typ
+			}
+			if tc.Type == "" {
+				tc.Type = "function"
 			}
 			if fn, ok := tcMap["function"].(map[string]any); ok {
 				if name, ok := fn["name"].(string); ok {
@@ -278,6 +281,10 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 					m.logger.Error("Failed to save tool call message incrementally", zap.Error(err))
 				}
 			}
+
+			// Append the assistant message with tool calls to the request messages for the next API call
+			assistantMessageAPI := convertToOpenAIMessages([]*entities.Message{toolCallMessage})[0]
+			reqBody["messages"] = append(reqBody["messages"].([]map[string]any), assistantMessageAPI)
 
 			for _, toolCall := range toolCalls {
 				// Check for cancellation before executing tool
@@ -371,11 +378,6 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 					toolMessage["name"] = toolName
 				}
 				reqBody["messages"] = append(reqBody["messages"].([]map[string]any), toolMessage)
-				reqBody["messages"] = append(reqBody["messages"].([]map[string]any), map[string]any{
-					"role":         "tool",
-					"content":      toolResult,
-					"tool_call_id": toolCall.ID,
-				})
 			}
 		} else {
 			// Any other finish_reason is treated as final
@@ -464,6 +466,21 @@ func (m *AIModelIntegration) GetUsage() (*entities.Usage, error) {
 // GetLastUsage returns the usage from the last API call
 func (m *AIModelIntegration) GetLastUsage() (*entities.Usage, error) {
 	return m.lastUsage, nil
+}
+
+// customizeToolCallID allows providers to customize tool call IDs (e.g., for format requirements)
+func (m *AIModelIntegration) customizeToolCallID(originalID string) string {
+	return originalID
+}
+
+// authHeaderName returns the header name for authentication
+func (m *AIModelIntegration) authHeaderName() string {
+	return "Authorization"
+}
+
+// authHeaderValue returns the header value for authentication
+func (m *AIModelIntegration) authHeaderValue() string {
+	return "Bearer " + m.apiKey
 }
 
 // Ensure AIModelIntegration implements AIModelIntegration

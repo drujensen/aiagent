@@ -48,6 +48,75 @@ func generateModelDisplayName(providerName, modelID string) string {
 // Test examples:
 // cleanModelDisplayName("claude-3-5-haiku-20241022") -> "Claude 3 5 Haiku"
 // cleanModelDisplayName("claude-3-5-haiku-latest") -> "Claude 3 5 Haiku"
+
+// modelWithTime holds model data with parsed release time
+type modelWithTime struct {
+	model       modelsdev.ModelData
+	releaseTime time.Time
+}
+
+// filterLatestModelsPerFamily filters models to only include the latest release per family and version
+func filterLatestModelsPerFamily(models map[string]modelsdev.ModelData) map[string]modelsdev.ModelData {
+	familyLatest := make(map[string]modelWithTime)
+	datePattern := regexp.MustCompile(`-(\d{4}-\d{2}-\d{2}|\d{8})$`)
+
+	for _, model := range models {
+		if model.Family == "" {
+			continue // Skip models without family
+		}
+
+		// Extract version from model name for grouping
+		version := ""
+		if matches := regexp.MustCompile(`Claude \w+ ([\d.]+)`).FindStringSubmatch(model.Name); len(matches) > 1 {
+			version = matches[1]
+		}
+
+		// Create group key: family + version
+		groupKey := model.Family
+		if version != "" {
+			groupKey += "-" + version
+		} else {
+			groupKey += "-unknown"
+		}
+
+		// Try to extract date from model ID first
+		var modelTime time.Time
+		if matches := datePattern.FindStringSubmatch(model.ID); len(matches) > 1 {
+			dateStr := matches[1]
+			if len(dateStr) == 8 { // YYYYMMDD format
+				if t, err := time.Parse("20060102", dateStr); err == nil {
+					modelTime = t
+				}
+			} else { // YYYY-MM-DD format
+				if t, err := time.Parse("2006-01-02", dateStr); err == nil {
+					modelTime = t
+				}
+			}
+		}
+
+		// Fall back to release_date if no ID date found
+		if modelTime.IsZero() {
+			if t, err := time.Parse("2006-01-02", model.ReleaseDate); err != nil {
+				continue // Skip models with invalid dates
+			} else {
+				modelTime = t
+			}
+		}
+
+		if existing, exists := familyLatest[groupKey]; !exists || modelTime.After(existing.releaseTime) {
+			familyLatest[groupKey] = modelWithTime{model: model, releaseTime: modelTime}
+		}
+	}
+
+	// Reconstruct map with only latest per group
+	filtered := make(map[string]modelsdev.ModelData)
+	for _, mwt := range familyLatest {
+		filtered[mwt.model.ID] = mwt.model
+	}
+
+	return filtered
+}
+
 // cleanModelDisplayName("gpt-4o-2024-05-13") -> "Gpt 4o"
 
 type ModelRefreshService interface {
@@ -129,6 +198,17 @@ func (s *modelRefreshService) refreshProvider(ctx context.Context, provider *ent
 		return err
 	}
 
+	// Filter Anthropic models to only include the latest per family
+	if anthropicData, exists := (*fetched)["anthropic"]; exists {
+		originalCount := len(anthropicData.Models)
+		anthropicData.Models = filterLatestModelsPerFamily(anthropicData.Models)
+		filteredCount := len(anthropicData.Models)
+		s.logger.Info("Filtered Anthropic models in provider refresh",
+			zap.Int("original_count", originalCount),
+			zap.Int("filtered_count", filteredCount))
+		(*fetched)["anthropic"] = anthropicData
+	}
+
 	providerToUpdate := &entities.Provider{
 		ID:         provider.ID,
 		Name:       provider.Name,
@@ -185,6 +265,17 @@ func (s *modelRefreshService) SyncAllModels(ctx context.Context) error {
 	modelsDevData, err := s.modelsDevClient.Fetch()
 	if err != nil {
 		return fmt.Errorf("failed to fetch models.dev data: %w", err)
+	}
+
+	// Filter Anthropic models to only include the latest per family
+	if anthropicData, exists := (*modelsDevData)["anthropic"]; exists {
+		originalCount := len(anthropicData.Models)
+		anthropicData.Models = filterLatestModelsPerFamily(anthropicData.Models)
+		filteredCount := len(anthropicData.Models)
+		s.logger.Info("Filtered Anthropic models",
+			zap.Int("original_count", originalCount),
+			zap.Int("filtered_count", filteredCount))
+		(*modelsDevData)["anthropic"] = anthropicData
 	}
 
 	// First refresh all providers to get latest pricing data

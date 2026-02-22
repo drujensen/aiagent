@@ -1,6 +1,8 @@
 package integrations
 
 import (
+	"crypto/rand"
+
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
 
@@ -24,6 +26,17 @@ func NewMistralIntegration(baseURL, apiKey, model string, toolRepo interfaces.To
 
 func (m *MistralIntegration) ProviderType() entities.ProviderType {
 	return entities.ProviderMistral
+}
+
+// customizeToolCallID generates a valid 9-character alphanumeric tool call ID for Mistral
+func (m *MistralIntegration) customizeToolCallID(originalID string) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, 9)
+	rand.Read(b)
+	for i := range b {
+		b[i] = charset[b[i]%byte(len(charset))]
+	}
+	return string(b)
 }
 
 var _ interfaces.AIModelIntegration = (*MistralIntegration)(nil)
