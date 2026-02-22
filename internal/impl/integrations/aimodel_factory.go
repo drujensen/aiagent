@@ -31,7 +31,7 @@ func (f *AIModelFactory) CreateModelIntegration(model *entities.Model, provider 
 	// Create provider-specific integration
 	switch provider.Type {
 	case entities.ProviderOpenAI:
-		return NewOpenAIIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
+		return NewOpenAIIntegration(endpoint, apiKey, model, f.toolRepo, f.logger)
 	case entities.ProviderAnthropic:
 		return NewAnthropicIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	case entities.ProviderXAI:

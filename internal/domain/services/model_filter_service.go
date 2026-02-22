@@ -43,20 +43,12 @@ func (s *ModelFilterService) IsChatCompatibleModel(model *entities.Model) bool {
 		return false
 	}
 
-	// Must support temperature (for now - future enhancement to handle models without temperature)
-	if !model.TemperatureCap {
+	// Must support temperature, unless it's a reasoning model (o1, etc.)
+	if !model.TemperatureCap && !model.Reasoning {
 		return false
 	}
 
-	// Skip OpenAI o1 models (use /v1/responses API instead of /v1/chat/completions)
-	if model.ProviderType == entities.ProviderOpenAI && model.Family == "o" {
-		return false
-	}
-
-	// Skip codex models (code completion focused, not suitable for chat)
-	if strings.Contains(model.Family, "codex") {
-		return false
-	}
+	// Note: o1 and codex models now supported via /v1/responses API
 
 	// Skip embedding models (not for chat)
 	if strings.Contains(model.Family, "embedding") {

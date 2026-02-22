@@ -117,9 +117,15 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 
 	// Format request body
 	reqBody := map[string]any{
-		"model":      m.model,
-		"messages":   convertToOpenAIMessages(messages),
-		"max_tokens": options["max_tokens"],
+		"model":    m.model,
+		"messages": convertToOpenAIMessages(messages),
+	}
+
+	// Handle max tokens parameter (may be max_tokens or max_completion_tokens)
+	if maxCompletionTokens, ok := options["max_completion_tokens"]; ok {
+		reqBody["max_completion_tokens"] = maxCompletionTokens
+	} else if maxTokens, ok := options["max_tokens"]; ok {
+		reqBody["max_tokens"] = maxTokens
 	}
 	if temp, ok := options["temperature"]; ok {
 		reqBody["temperature"] = temp
