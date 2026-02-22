@@ -118,6 +118,10 @@ func (t *FileWriteTool) validatePath(path string) (string, error) {
 
 	var fullPath string
 	if filepath.IsAbs(path) {
+		if !strings.HasPrefix(path, workspace) {
+			t.logger.Error("Absolute path is outside workspace", zap.String("path", path))
+			return "", fmt.Errorf("absolute path is outside workspace")
+		}
 		fullPath = path
 	} else {
 		fullPath = filepath.Join(workspace, path)

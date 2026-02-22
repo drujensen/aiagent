@@ -62,6 +62,30 @@ func TestFileWriteTool_WriteOperation(t *testing.T) {
 	if string(fileContent) != content {
 		t.Errorf("Expected file content '%s', got '%s'", content, string(fileContent))
 	}
+
+	// Test 2: Write a new file with absolute path within workspace
+	absPath := filepath.Join(tempDir, "abs_test.txt")
+	content2 := "Absolute path content"
+	argsData2 := map[string]interface{}{
+		"filePath":  absPath,
+		"oldString": "",
+		"newString": content2,
+	}
+	argsBytes2, _ := json.Marshal(argsData2)
+	args2 := string(argsBytes2)
+	_, err2 := tool.Execute(args2)
+	if err2 != nil {
+		t.Fatalf("Failed to write file with absolute path: %v", err2)
+	}
+
+	// Verify
+	fileContent2, err2 := os.ReadFile(absPath)
+	if err2 != nil {
+		t.Fatalf("Failed to read created file: %v", err2)
+	}
+	if string(fileContent2) != content2 {
+		t.Errorf("Expected file content '%s', got '%s'", content2, string(fileContent2))
+	}
 }
 
 func TestFileWriteTool_EditOperation(t *testing.T) {
@@ -177,6 +201,12 @@ func TestFileWriteTool_ErrorCases(t *testing.T) {
 		t.Errorf("Expected error for path outside workspace, got: %v", err)
 	}
 
+	// Test 3b: Invalid absolute path (outside workspace)
+	_, err = tool.Execute(`{"filePath": "/outside.txt", "newString": "test"}`)
+	if err == nil || !strings.Contains(err.Error(), "absolute path is outside workspace") {
+		t.Errorf("Expected error for absolute path outside workspace, got: %v", err)
+	}
+
 	// Test 4: Missing newString for write
 	_, err = tool.Execute(`{"filePath": "test.txt"}`)
 	if err == nil || !strings.Contains(err.Error(), "newString is required for write operation") {
@@ -203,6 +233,39 @@ func TestFileWriteTool_ErrorCases(t *testing.T) {
 	_, err = tool.Execute(`{"filePath": "nonexistent.txt", "oldString": "not found", "newString": "replacement"}`)
 	if err == nil || !strings.Contains(err.Error(), "oldString not found in file") {
 		t.Errorf("Expected error for oldString not found, got: %v", err)
+	}
+
+	// Test 8: Absolute path within workspace (should work)
+	absPath := filepath.Join(tempDir, "abs_test.txt")
+	var args string
+	argsData := map[string]interface{}{
+		"filePath":  absPath,
+		"oldString": "",
+		"newString": "Absolute path test",
+	}
+	argsBytes, _ := json.Marshal(argsData)
+	args = string(argsBytes)
+	result, err := tool.Execute(args)
+	if err != nil {
+		t.Fatalf("Failed to write with absolute path: %v", err)
+	}
+
+	var resultData map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
+		t.Fatalf("Failed to parse JSON result: %v", err)
+	}
+
+	if success, ok := resultData["success"].(bool); !ok || !success {
+		t.Errorf("Expected success=true for absolute path, got %v", resultData["success"])
+	}
+
+	// Verify file was created
+	fileContent, err := os.ReadFile(absPath)
+	if err != nil {
+		t.Fatalf("Failed to read created file: %v", err)
+	}
+	if string(fileContent) != "Absolute path test" {
+		t.Errorf("Expected file content 'Absolute path test', got '%s'", string(fileContent))
 	}
 }
 
