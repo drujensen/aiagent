@@ -322,8 +322,8 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		return nil, errors.CanceledErrorf("message processing was canceled")
 	}
 
-	// Check if we need message compression (at 90% of token limit)
-	compressionThreshold := float64(tokenLimit) * 0.9
+	// Check if we need message compression (at 70% of token limit)
+	compressionThreshold := float64(tokenLimit) * 0.7
 	var messagesToSend []*entities.Message
 
 	// Always start with the system message
@@ -391,7 +391,14 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		if err != nil {
 			return nil, errors.InternalErrorf("failed to get tool %s: %v", toolName, err)
 		}
-		resolvedConfig, err := s.config.ResolveConfiguration((*tool).Configuration())
+		if tool == nil {
+			return nil, errors.InternalErrorf("tool repository returned nil for tool %s", toolName)
+		}
+		config := (*tool).Configuration()
+		if config == nil {
+			config = make(map[string]string)
+		}
+		resolvedConfig, err := s.config.ResolveConfiguration(config)
 		if err != nil {
 			return nil, errors.InternalErrorf("failed to resolve configuration for tool %s: %v", toolName, err)
 		}
@@ -407,18 +414,107 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		return nil, errors.InternalErrorf("failed to initialize AI model: %v", err)
 	}
 
+	// Pre-flight context check to ensure we're under safe limits
+	if messagesToSend == nil || len(messagesToSend) == 0 {
+		return nil, errors.InternalErrorf("no messages to send")
+	}
+
+	totalTokens := 0
+	for _, msg := range messagesToSend {
+		if msg == nil {
+			s.logger.Error("Nil message found in messagesToSend")
+			continue
+		}
+		totalTokens += estimateTokens(msg)
+	}
+	safeLimit := int(float64(tokenLimit) * 0.8) // 80% as absolute maximum
+	if totalTokens > safeLimit {
+		s.logger.Warn("Messages exceed safe limit before sending, trimming", zap.Int("total_tokens", totalTokens), zap.Int("safe_limit", safeLimit))
+		messagesToSend = s.trimMessagesToLimit(messagesToSend, safeLimit)
+	}
+
 	// Create a callback function for incremental message saving
 	messageCallback := func(messages []*entities.Message) error {
 		return s.SaveMessagesIncrementally(ctx, chat.ID, messages)
 	}
 
-	// Use the callback method for incremental saving
-	newMessages, err := aiModel.GenerateResponse(ctx, messagesToSend, tools, options, messageCallback)
-	if err != nil {
-		if strings.Contains(err.Error(), "canceled") {
+	// Use the callback method for incremental saving with retry logic for context errors
+	maxRetries := 2
+	var newMessages []*entities.Message
+	var lastErr error
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		// Ensure messagesToSend is valid before each attempt
+		if messagesToSend == nil || len(messagesToSend) == 0 {
+			return nil, errors.InternalErrorf("messagesToSend became invalid during retry attempt %d", attempt)
+		}
+
+		// Validate all messages are non-nil
+		for i, msg := range messagesToSend {
+			if msg == nil {
+				return nil, errors.InternalErrorf("nil message found at index %d during retry attempt %d", i, attempt)
+			}
+		}
+
+		newMessages, err = aiModel.GenerateResponse(ctx, messagesToSend, tools, options, messageCallback)
+		if err == nil {
+			break // Success
+		}
+
+		lastErr = err
+		if !isContextError(err) || attempt == maxRetries {
+			break // Not a context error or max retries reached
+		}
+
+		// Context error detected - compress more aggressively and retry
+		s.logger.Warn("Context window error detected, compressing and retrying", zap.Error(err), zap.Int("attempt", attempt+1))
+
+		// Force more aggressive compression
+		compressedMessages, originalMessagesReplaced, err := s.compressMessagesAggressively(ctx, chat, model, provider, resolvedAPIKey, int(float64(tokenLimit)*0.5))
+		if err != nil {
+			s.logger.Warn("Failed aggressive compression, using fallback trimming", zap.Error(err))
+			compressedMessages = s.trimMessagesToLimit(messagesToSend, int(float64(tokenLimit)*0.6))
+			originalMessagesReplaced = false
+		} else if originalMessagesReplaced {
+			if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
+				s.logger.Warn("Failed to update chat with aggressive compression", zap.Error(err))
+			}
+		}
+
+		// Ensure we have valid messages to send
+		if compressedMessages == nil || len(compressedMessages) == 0 {
+			s.logger.Error("Compression resulted in empty message list, keeping original messages")
+			compressedMessages = make([]*entities.Message, len(messagesToSend))
+			copy(compressedMessages, messagesToSend)
+		}
+
+		// Validate that all messages are non-nil
+		validMessages := make([]*entities.Message, 0, len(compressedMessages))
+		for i, msg := range compressedMessages {
+			if msg != nil {
+				validMessages = append(validMessages, msg)
+			} else {
+				s.logger.Warn("Skipping nil message during compression", zap.Int("index", i))
+			}
+		}
+
+		if len(validMessages) == 0 {
+			s.logger.Error("All messages became nil after compression, using minimal system message")
+			systemMsg := &entities.Message{
+				Role:    "system",
+				Content: "You are an AI assistant. Previous conversation was compressed due to length.",
+			}
+			validMessages = append(validMessages, systemMsg)
+		}
+
+		messagesToSend = validMessages
+	}
+
+	if lastErr != nil {
+		if strings.Contains(lastErr.Error(), "canceled") {
 			return nil, errors.CanceledErrorf("message processing was canceled")
 		}
-		return nil, errors.InternalErrorf("failed to generate AI response: %v", err)
+		return nil, errors.InternalErrorf("failed to generate AI response after retries: %v", lastErr)
 	}
 
 	// Get usage information for billing
@@ -502,6 +598,10 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 }
 
 func estimateTokens(msg *entities.Message) int {
+	if msg == nil {
+		return 0
+	}
+
 	enc, err := tiktoken.EncodingForModel("gpt-4")
 	if err != nil {
 		return 0
@@ -510,6 +610,19 @@ func estimateTokens(msg *entities.Message) int {
 	tokens := enc.Encode(msg.Content, nil, nil)
 
 	return len(tokens)
+}
+
+// isContextError checks if an error is related to context window limits
+func isContextError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := strings.ToLower(err.Error())
+	return strings.Contains(errStr, "context") ||
+		strings.Contains(errStr, "token limit") ||
+		strings.Contains(errStr, "maximum length") ||
+		strings.Contains(errStr, "too many tokens") ||
+		strings.Contains(errStr, "reduce.*length")
 }
 
 // isSafeSplit checks if splitting at 'split' avoids both orphaned responses and unfinished calls.
@@ -1051,6 +1164,163 @@ func (s *chatService) compressMessages(
 	}
 
 	return finalMessages, true, nil
+}
+
+// compressMessagesAggressively compresses messages more aggressively for context error recovery
+func (s *chatService) compressMessagesAggressively(ctx context.Context, chat *entities.Chat, model *entities.Model, provider *entities.Provider, apiKey string, targetTokenLimit int) ([]*entities.Message, bool, error) {
+	if chat == nil || len(chat.Messages) == 0 {
+		return nil, false, fmt.Errorf("invalid chat or no messages to compress")
+	}
+
+	// Compress to target limit instead of 60%
+	numMessagesToKeep := int(float64(len(chat.Messages)) * 0.4) // Keep only 40%
+	if numMessagesToKeep < 1 {
+		numMessagesToKeep = 1
+	}
+
+	// Use the existing compressMessages logic but with modified parameters
+	return s.compressMessagesWithTarget(ctx, chat, model, provider, apiKey, targetTokenLimit, numMessagesToKeep)
+}
+
+// compressMessagesWithTarget is a helper for compressMessages with custom parameters
+func (s *chatService) compressMessagesWithTarget(ctx context.Context, chat *entities.Chat, model *entities.Model, provider *entities.Provider, apiKey string, targetTokenLimit int, numMessagesToKeep int) ([]*entities.Message, bool, error) {
+	// Calculate summarize end index based on numMessagesToKeep
+	summarizeEndIdx := len(chat.Messages) - numMessagesToKeep
+	if summarizeEndIdx < 1 {
+		summarizeEndIdx = 1
+	}
+
+	// Find safe split point
+	safeFound := false
+	for j := summarizeEndIdx; j >= 1; j-- {
+		if isSafeSplit(chat.Messages, j) {
+			summarizeEndIdx = j
+			safeFound = true
+			break
+		}
+	}
+	if !safeFound {
+		s.logger.Warn("No safe split point found; skipping aggressive compression")
+		return nil, false, nil
+	}
+
+	messagesToSummarize := chat.Messages[:summarizeEndIdx]
+	recentMessagesToKeep := chat.Messages[summarizeEndIdx:]
+
+	// Create summary using AI
+	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
+	aiModel, err := aiModelFactory.CreateModelIntegration(model, provider, apiKey)
+	if err != nil {
+		return nil, false, errors.InternalErrorf("failed to initialize AI model for aggressive summarization: %v", err)
+	}
+
+	summaryPrompt := &entities.Message{
+		Role:    "system",
+		Content: "Create a concise summary of the following conversation that captures all important context, decisions, and information. Focus on key facts, goals, decisions, and relevant details. This is an emergency compression due to context limits - prioritize essential information only.",
+	}
+
+	var historyMsgs []*entities.Message
+	historyMsgs = append(historyMsgs, summaryPrompt)
+	for i := range messagesToSummarize {
+		msg := messagesToSummarize[i]
+		historyMsgs = append(historyMsgs, &msg)
+	}
+
+	options := map[string]any{
+		"temperature": 0.0,
+		"max_tokens":  500, // Smaller summary for emergency compression
+	}
+
+	if ctx.Err() == context.Canceled {
+		return nil, false, errors.CanceledErrorf("aggressive summarization was canceled")
+	}
+
+	summaryResponse, err := aiModel.GenerateResponse(ctx, historyMsgs, nil, options, nil)
+	if err != nil {
+		return nil, false, errors.InternalErrorf("failed to generate aggressive summary: %v", err)
+	}
+
+	if len(summaryResponse) == 0 {
+		return nil, false, fmt.Errorf("no aggressive summary generated")
+	}
+
+	summaryMsg := &entities.Message{
+		ID:        uuid.New().String(),
+		Role:      "assistant",
+		Content:   "[EMERGENCY COMPRESSION] " + summaryResponse[0].Content,
+		Timestamp: time.Now(),
+	}
+
+	// Replace messages
+	chat.Messages = append([]entities.Message{*summaryMsg}, recentMessagesToKeep...)
+
+	// Create final messages list, respecting target token limit
+	var finalMessages []*entities.Message
+	finalMessages = append(finalMessages, summaryMsg)
+
+	currentTokens := estimateTokens(summaryMsg)
+	for i := range recentMessagesToKeep {
+		msgTokens := estimateTokens(&recentMessagesToKeep[i])
+		if currentTokens+msgTokens > targetTokenLimit {
+			break
+		}
+		finalMessages = append(finalMessages, &recentMessagesToKeep[i])
+		currentTokens += msgTokens
+	}
+
+	// Ensure we have at least the summary message
+	if len(finalMessages) == 0 {
+		s.logger.Error("compressMessagesWithTarget resulted in empty message list")
+		return nil, false, fmt.Errorf("compression resulted in no valid messages")
+	}
+
+	// Validate all messages are non-nil
+	validMessages := make([]*entities.Message, 0, len(finalMessages))
+	for _, msg := range finalMessages {
+		if msg != nil {
+			validMessages = append(validMessages, msg)
+		}
+	}
+
+	if len(validMessages) == 0 {
+		s.logger.Error("All messages became nil after compression validation")
+		return nil, false, fmt.Errorf("all messages became invalid after compression")
+	}
+
+	return validMessages, true, nil
+}
+
+// trimMessagesToLimit removes oldest messages until under token limit
+func (s *chatService) trimMessagesToLimit(messages []*entities.Message, maxTokens int) []*entities.Message {
+	if messages == nil || len(messages) <= 1 {
+		return messages // Always keep at least system message
+	}
+
+	if messages[0] == nil {
+		s.logger.Error("System message is nil in trimMessagesToLimit")
+		return messages
+	}
+
+	var result []*entities.Message
+	totalTokens := estimateTokens(messages[0]) // Always include system message
+
+	result = append(result, messages[0])
+
+	// Add messages from oldest to newest until token limit is reached
+	for i := 1; i < len(messages); i++ {
+		if messages[i] == nil {
+			s.logger.Warn("Skipping nil message in trimMessagesToLimit", zap.Int("index", i))
+			continue
+		}
+		msgTokens := estimateTokens(messages[i])
+		if totalTokens+msgTokens > maxTokens {
+			break
+		}
+		result = append(result, messages[i])
+		totalTokens += msgTokens
+	}
+
+	return result
 }
 
 // ensureToolCallResponses validates that every tool call has a corresponding response

@@ -107,6 +107,13 @@ VERIFICATION STEP: CRITICAL - Before claiming any task is complete, you MUST use
 REPEAT VERIFICATION: After every Todo read, if you see any "pending" tasks, immediately execute the next pending task. Do NOT generate any completion messages while pending tasks remain.
 
 IMPORTANT: Continue autonomously until tasks are complete. Do not stop after individual actions - assess completion and proceed with remaining work. For multi-step tasks, use the Todo tool to track progress and ensure nothing is missed.
+
+CONTEXT MANAGEMENT: When working with large codebases or accumulating many tool results:
+- Use FileRead with explicit limits (e.g., limit=500) for initial exploration
+- Call the Compression tool proactively for long-running tasks using summary_type="context_preservation"
+- Read files in chunks using offset/limit when analyzing large files
+- Prefer Directory tool over full project dumps for navigation
+- Compress completed task segments to maintain focus on current work
 		`
 
 	return []entities.Agent{
@@ -136,7 +143,7 @@ Stop researching when:
 ### Tool Usage
 - Use Todo tool for complex research tasks requiring multiple steps
 - Use WebSearch for external information and trends
-- Use local tools (FileRead, Project) for codebase research
+- Use local tools (FileRead, Directory) for codebase research
 - Stop after providing the requested information - do not continue endlessly
 
 ### Communication
@@ -145,7 +152,7 @@ Stop researching when:
 - If information is incomplete, clearly state what you know and what you don't
 - Provide sources and evidence for claims
 - Ask for clarification only when essential` + systemPrompt,
-			Tools:     []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo", "Compression"},
+			Tools:     []string{"WebSearch", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -154,7 +161,7 @@ Stop researching when:
 			Name: "Plan",
 			SystemPrompt: `### Introduction and Role
 
-You are the Plan Agent responsible for creating high-level plans with all tasks needed to complete features or stories.
+You are the Plan Agent responsible for creating high-level plans with all tasks needed to complete features or stories. You focus on analysis and planning - you do NOT implement code or modify files.
 
 ### Planning Workflow
 
@@ -174,14 +181,15 @@ Stop planning when:
 
 ### Tool Usage
 - Use Todo tool to create and manage structured task lists
-- Use Project and FileRead to understand existing work
+- Use FileRead and Directory to understand existing work
+- **DO NOT** use FileWrite, Process, or other modification tools - planning is read-only
 - Stop after delivering the plan - do not expand endlessly
 
 ### Communication
 - Be specific about task scope and effort
 - Clearly indicate task dependencies
 - Focus on actionable items` + systemPrompt,
-			Tools:     []string{"WebSearch", "Project", "FileRead", "FileSearch", "Directory", "Todo", "Compression"},
+			Tools:     []string{"WebSearch", "FileRead", "FileSearch", "Directory", "Todo", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -192,7 +200,7 @@ Stop planning when:
 
 You are the Build Agent responsible for all the coding. It should make sure that it runs the linter, compiler or build and everything is properly working. Always ensure code quality by running appropriate linting/formatting, building, and testing commands using the Process tool.
 
-First, use the Project tool to check AGENTS.md or analyze the codebase for language-specific commands (e.g., lint/format, build, test). If not specified, infer from common conventions and prompt the user to add them to AGENTS.md for future use.
+First, use FileRead to check AGENTS.md or analyze the codebase for language-specific commands (e.g., lint/format, build, test). If not specified, infer from common conventions and prompt the user to add them to AGENTS.md for future use.
 
 Execute these steps automatically after code changes to avoid hallucinations—do not simulate; use actual tool calls.
 
@@ -250,7 +258,7 @@ This precise approach prevents duplicate functions, wrong placements, and other 
 - After making file edits, automatically run the lint/format/build/test cycle using Process tool
 - After tool usage, assess if additional steps are needed to complete the task
 - Continue autonomously - don't stop after individual actions unless the task is fully complete\` + systemPrompt,
-			Tools:     []string{"WebSearch", "Project", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo", "Compression"},
+			Tools:     []string{"WebSearch", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -271,15 +279,7 @@ func DefaultTools() []*entities.ToolData {
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		},
-		{
-			ID:            "575B620F-8E41-4294-ADF7-B04B8ACB8F0D",
-			ToolType:      "Project",
-			Name:          "Project",
-			Description:   "This tool provides project context: reads project details from AGENTS.md and shows directory structure without reading file contents.",
-			Configuration: map[string]string{"project_file": "AGENTS.md"},
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		},
+
 		{
 			ID:            "7A6E93D7-7A8A-4AAE-8EFF-E87976B52C27",
 			ToolType:      "FileRead",

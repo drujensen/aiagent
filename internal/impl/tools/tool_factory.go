@@ -22,15 +22,6 @@ func NewToolFactory() (*ToolFactory, error) {
 	toolFactory := &ToolFactory{}
 	toolFactory.toolFactories = make(map[string]*ToolFactoryEntry)
 
-	toolFactory.toolFactories["Project"] = &ToolFactoryEntry{
-		Name:        "Project",
-		Description: `This tool reads project details from a configurable markdown file to provide context for AI agents.`,
-		ConfigKeys:  []string{"workspace", "project_file"},
-		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
-			return NewProjectTool(name, description, configuration, logger)
-		},
-	}
-
 	toolFactory.toolFactories["Process"] = &ToolFactoryEntry{
 		Name:        "Process",
 		Description: `This tool executes a configured CLI command with support for background processes, timeouts, and full output. The command is executed in the workspace directory. The extraArgs are prepended with the arguments passed to the tool.`,

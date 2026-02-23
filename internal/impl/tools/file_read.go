@@ -137,7 +137,7 @@ func (t *FileReadTool) Execute(arguments string) (string, error) {
 		offset = 1 // 1-indexed
 	}
 	if limit <= 0 {
-		limit = 2000
+		limit = 1000
 	}
 
 	fullPath, err := t.validatePath(filePath)
