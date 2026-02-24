@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"slices"
 	"sort"
 	"time"
 
@@ -18,14 +17,14 @@ import (
 
 type JsonChatRepository struct {
 	filePath string
-	data     []*entities.Chat
+	data     map[string]*entities.Chat
 }
 
 func NewJSONChatRepository(dataDir string) (interfaces.ChatRepository, error) {
 	filePath := filepath.Join(dataDir, ".aiagent", "chats.json")
 	repo := &JsonChatRepository{
 		filePath: filePath,
-		data:     []*entities.Chat{},
+		data:     make(map[string]*entities.Chat),
 	}
 
 	if err := repo.load(); err != nil {
@@ -49,22 +48,22 @@ func (r *JsonChatRepository) load() error {
 		return errors.InternalErrorf("failed to unmarshal chats.json: %v", err)
 	}
 
-	// Validate UUIDs
+	// Convert slice to map
+	r.data = make(map[string]*entities.Chat)
 	for _, chat := range chats {
-		if chat.ID == "" {
-			return errors.InternalErrorf("chat is missing an ID")
-		}
-		if _, err := uuid.Parse(chat.ID); err != nil {
-			return errors.InternalErrorf("chat has an invalid UUID: %v", err)
-		}
+		r.data[chat.ID] = chat
 	}
-
-	r.data = chats
 	return nil
 }
 
 func (r *JsonChatRepository) save() error {
-	data, err := json.MarshalIndent(r.data, "", "  ")
+	// Convert map to slice for JSON serialization
+	chats := make([]*entities.Chat, 0, len(r.data))
+	for _, chat := range r.data {
+		chats = append(chats, chat)
+	}
+
+	data, err := json.MarshalIndent(chats, "", "  ")
 	if err != nil {
 		return errors.InternalErrorf("failed to marshal chats: %v", err)
 	}
@@ -81,11 +80,11 @@ func (r *JsonChatRepository) save() error {
 }
 
 func (r *JsonChatRepository) ListChats(ctx context.Context) ([]*entities.Chat, error) {
-	chatsCopy := make([]*entities.Chat, len(r.data))
-	for i, c := range r.data {
+	chatsCopy := make([]*entities.Chat, 0, len(r.data))
+	for _, c := range r.data {
 		messagesCopy := make([]entities.Message, len(c.Messages))
 		copy(messagesCopy, c.Messages)
-		chatsCopy[i] = &entities.Chat{
+		chatsCopy = append(chatsCopy, &entities.Chat{
 			ID:        c.ID,
 			AgentID:   c.AgentID,
 			ModelID:   c.ModelID,
@@ -95,36 +94,33 @@ func (r *JsonChatRepository) ListChats(ctx context.Context) ([]*entities.Chat, e
 			Active:    c.Active,
 			CreatedAt: c.CreatedAt,
 			UpdatedAt: c.UpdatedAt,
-		}
+		})
 	}
-
-	// Sort chatsCopy by CreatedAt in descending order
 	sort.Slice(chatsCopy, func(i, j int) bool {
-		return chatsCopy[j].CreatedAt.Before(chatsCopy[i].CreatedAt)
+		return chatsCopy[i].UpdatedAt.After(chatsCopy[j].UpdatedAt)
 	})
-
 	return chatsCopy, nil
 }
 
 func (r *JsonChatRepository) GetChat(ctx context.Context, id string) (*entities.Chat, error) {
-	for _, chat := range r.data {
-		if chat.ID == id {
-			messagesCopy := make([]entities.Message, len(chat.Messages))
-			copy(messagesCopy, chat.Messages)
-			return &entities.Chat{
-				ID:        chat.ID,
-				AgentID:   chat.AgentID,
-				ModelID:   chat.ModelID,
-				Name:      chat.Name,
-				Messages:  messagesCopy,
-				Usage:     chat.Usage,
-				Active:    chat.Active,
-				CreatedAt: chat.CreatedAt,
-				UpdatedAt: chat.UpdatedAt,
-			}, nil
-		}
+	chat, exists := r.data[id]
+	if !exists {
+		return nil, errors.NotFoundErrorf("chat not found: %s", id)
 	}
-	return nil, errors.NotFoundErrorf("chat not found: %s", id)
+
+	messagesCopy := make([]entities.Message, len(chat.Messages))
+	copy(messagesCopy, chat.Messages)
+	return &entities.Chat{
+		ID:        chat.ID,
+		AgentID:   chat.AgentID,
+		ModelID:   chat.ModelID,
+		Name:      chat.Name,
+		Messages:  messagesCopy,
+		Usage:     chat.Usage,
+		Active:    chat.Active,
+		CreatedAt: chat.CreatedAt,
+		UpdatedAt: chat.UpdatedAt,
+	}, nil
 }
 
 func (r *JsonChatRepository) CreateChat(ctx context.Context, chat *entities.Chat) error {
@@ -134,29 +130,25 @@ func (r *JsonChatRepository) CreateChat(ctx context.Context, chat *entities.Chat
 	chat.CreatedAt = time.Now()
 	chat.UpdatedAt = chat.CreatedAt
 
-	r.data = append(r.data, chat)
+	r.data[chat.ID] = chat
 	return r.save()
 }
 
 func (r *JsonChatRepository) UpdateChat(ctx context.Context, chat *entities.Chat) error {
-	for i, c := range r.data {
-		if c.ID == chat.ID {
-			chat.UpdatedAt = time.Now()
-			r.data[i] = chat
-			return r.save()
-		}
+	if _, exists := r.data[chat.ID]; !exists {
+		return errors.NotFoundErrorf("chat not found: %s", chat.ID)
 	}
-	return errors.NotFoundErrorf("chat not found: %s", chat.ID)
+	chat.UpdatedAt = time.Now()
+	r.data[chat.ID] = chat
+	return r.save()
 }
 
 func (r *JsonChatRepository) DeleteChat(ctx context.Context, id string) error {
-	for i, c := range r.data {
-		if c.ID == id {
-			r.data = slices.Delete(r.data, i, i+1)
-			return r.save()
-		}
+	if _, exists := r.data[id]; !exists {
+		return errors.NotFoundErrorf("chat not found: %s", id)
 	}
-	return errors.NotFoundErrorf("chat not found: %s", id)
+	delete(r.data, id)
+	return r.save()
 }
 
 var _ interfaces.ChatRepository = (*JsonChatRepository)(nil)

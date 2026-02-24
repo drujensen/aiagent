@@ -672,6 +672,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				Role:    "system",
 			}
 			c.activeChat.Messages = append(c.activeChat.Messages, *errorMsg)
+			c.updateEditorContent()
 		}
 		// Set error for immediate display
 		c.err = m
