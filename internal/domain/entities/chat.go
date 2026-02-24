@@ -62,6 +62,24 @@ func (c *Chat) UpdateUsage() {
 	c.Usage.TotalCost = totalCost
 }
 
+// GetLastRequestUsage returns the token count and cost from the most recent API request
+func (c *Chat) GetLastRequestUsage() (int, float64) {
+	if c == nil || len(c.Messages) == 0 {
+		return 0, 0.0
+	}
+
+	// Find the most recent assistant message (which has the API usage)
+	for i := len(c.Messages) - 1; i >= 0; i-- {
+		msg := c.Messages[i]
+		if msg.Role == "assistant" && msg.Usage != nil {
+			return msg.Usage.TotalTokens, msg.Usage.Cost
+		}
+	}
+
+	// If no assistant message with usage found, return 0
+	return 0, 0.0
+}
+
 // Implement list.Item interface for Bubble Tea
 func (c *Chat) FilterValue() string {
 	return c.Name

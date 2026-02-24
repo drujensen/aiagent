@@ -2,7 +2,6 @@ package tui
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -15,594 +14,11 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/events"
 	"github.com/drujensen/aiagent/internal/domain/services"
+	"github.com/drujensen/aiagent/internal/tui/commands"
 	"github.com/drujensen/aiagent/internal/tui/formatters"
 	"github.com/kujtimiihoxha/vimtea"
 	"go.uber.org/zap"
 )
-
-// formatToolName formats tool names with relevant arguments for display
-func formatToolName(toolName, arguments string) (string, string) {
-	switch toolName {
-	case "FileRead":
-		// Filename will be shown in the result, so return empty suffix
-		return toolName, ""
-	case "FileWrite", "Directory":
-		var args struct {
-			Path string `json:"path"`
-		}
-		if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Path != "" {
-			return toolName, args.Path
-		}
-	case "FileSearch":
-		var args struct {
-			Pattern   string `json:"pattern"`
-			Directory string `json:"directory"`
-		}
-		if err := json.Unmarshal([]byte(arguments), &args); err == nil {
-			detail := args.Pattern
-			if args.Directory != "" && args.Directory != "." {
-				detail += " in " + args.Directory
-			}
-			return toolName, detail
-		}
-	case "Process":
-		var args struct {
-			Command string `json:"command"`
-		}
-		if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Command != "" {
-			// Truncate long commands
-			if len(args.Command) > 50 {
-				args.Command = args.Command[:47] + "..."
-			}
-			return toolName, args.Command
-		}
-	}
-	return toolName, ""
-}
-
-// formatToolResult formats tool execution results for display
-func formatToolResult(toolName, result string, diff string, arguments string) string {
-	switch toolName {
-	case "FileRead":
-		return formatFileReadResult(result, arguments)
-	case "FileWrite":
-		return formatFileWriteResult(result, diff)
-	case "FileSearch":
-		return formatFileSearchResult(result)
-	case "Memory":
-		return formatMemoryResult(result)
-	case "Process":
-		return formatProcessResult(result)
-	case "WebSearch":
-		return formatWebSearchResult(result, arguments)
-	case "Compression":
-		return formatCompressionResult(result)
-	default:
-		// Try to extract summary from JSON responses
-		var jsonResponse struct {
-			Summary string `json:"summary"`
-		}
-		if err := json.Unmarshal([]byte(result), &jsonResponse); err == nil && jsonResponse.Summary != "" {
-			// Return only the summary for TUI display
-			return jsonResponse.Summary
-		}
-		// For non-JSON results or JSON without summary, return as-is
-		return result
-	}
-}
-
-// formatProcessResult formats Process tool results
-func formatProcessResult(result string) string {
-	// First, try to parse as summary format (if tool returns {"summary": "..."})
-	var summaryResponse struct {
-		Summary string `json:"summary"`
-	}
-	if err := json.Unmarshal([]byte(result), &summaryResponse); err == nil && summaryResponse.Summary != "" {
-		// Fix incomplete summaries
-		if summaryResponse.Summary == "Executed: " {
-			return "Executed successfully"
-		}
-		return summaryResponse.Summary
-	}
-
-	// Otherwise, parse as output format
-	var response struct {
-		Output   string `json:"output"`
-		ExitCode int    `json:"exit_code"`
-		Error    string `json:"error"`
-	}
-
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
-		// If parsing fails, return the original result
-		return result
-	}
-
-	if response.Error != "" {
-		return fmt.Sprintf("Failed: %s", response.Error)
-	}
-
-	if response.ExitCode != 0 {
-		return fmt.Sprintf("Failed with exit code %d", response.ExitCode)
-	}
-
-	return "Executed successfully"
-}
-
-// formatWebSearchResult formats WebSearch tool results
-func formatWebSearchResult(result string, arguments string) string {
-	var args struct {
-		Query string `json:"query"`
-	}
-
-	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Query != "" {
-		return fmt.Sprintf("Searched for: %s", args.Query)
-	}
-
-	// Fallback
-	var jsonResponse struct {
-		Summary string `json:"summary"`
-	}
-	if err := json.Unmarshal([]byte(result), &jsonResponse); err == nil && jsonResponse.Summary != "" {
-		return jsonResponse.Summary
-	}
-	return "Web search completed"
-}
-
-// formatCompressionResult formats Compression tool results
-func formatCompressionResult(result string) string {
-	// Parse the JSON result for TUI display
-	var response struct {
-		CompressionInstruction struct {
-			StartMessageIndex int    `json:"start_message_index"`
-			EndMessageIndex   int    `json:"end_message_index"`
-			SummaryType       string `json:"summary_type"`
-			Description       string `json:"description,omitempty"`
-		} `json:"compression_instruction"`
-		Message string `json:"message"`
-	}
-
-	if err := json.Unmarshal([]byte(result), &response); err == nil {
-		// Create a nice TUI display showing the range and type
-		rangeStr := fmt.Sprintf("messages %d-%d", response.CompressionInstruction.StartMessageIndex, response.CompressionInstruction.EndMessageIndex)
-		typeStr := response.CompressionInstruction.SummaryType
-		descStr := ""
-		if response.CompressionInstruction.Description != "" {
-			descStr = fmt.Sprintf(" (%s)", response.CompressionInstruction.Description)
-		}
-		return fmt.Sprintf("🗜️ Compressed %s with type '%s'%s", rangeStr, typeStr, descStr)
-	}
-
-	// For webui or if parsing fails, return the message field
-	var responseFallback struct {
-		Message string `json:"message"`
-	}
-	if err := json.Unmarshal([]byte(result), &responseFallback); err == nil && responseFallback.Message != "" {
-		return responseFallback.Message
-	}
-
-	return result
-}
-
-// getToolStatusIcon returns an appropriate icon based on tool execution status
-func getToolStatusIcon(hasError bool) string {
-	if hasError {
-		return "❌"
-	}
-	return "✅"
-}
-
-// formatFileWriteResult formats FileWrite tool results
-func formatFileWriteResult(result string, diff string) string {
-	var resultData struct {
-		Summary     string `json:"summary"`
-		Success     bool   `json:"success"`
-		Path        string `json:"path"`
-		Occurrences int    `json:"occurrences"`
-		ReplacedAll bool   `json:"replaced_all"`
-		Diff        string `json:"diff"`
-	}
-
-	// First, try to use the diff parameter if available
-	if diff != "" {
-		// Try to parse JSON to get summary
-		if err := json.Unmarshal([]byte(result), &resultData); err == nil && resultData.Summary != "" {
-			var output strings.Builder
-			output.WriteString(resultData.Summary)
-			output.WriteString("\n\n" + formatters.FormatDiff(diff))
-			return output.String()
-		} else {
-			// If JSON parsing fails, create a simple summary
-			var output strings.Builder
-			output.WriteString("File modified successfully\n\n")
-			output.WriteString(formatters.FormatDiff(diff))
-			return output.String()
-		}
-	}
-
-	// If no diff parameter, try to parse the full JSON result
-	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
-		// If parsing fails, try to extract summary from JSON
-		var jsonResponse struct {
-			Summary string `json:"summary"`
-		}
-		if err2 := json.Unmarshal([]byte(result), &jsonResponse); err2 == nil && jsonResponse.Summary != "" {
-			return jsonResponse.Summary
-		}
-		return result // Return raw if parsing fails
-	}
-
-	var output strings.Builder
-
-	// Use the summary from the JSON response
-	output.WriteString(resultData.Summary)
-
-	// Add the diff from JSON if available
-	if resultData.Diff != "" {
-		output.WriteString("\n\n" + formatters.FormatDiff(resultData.Diff))
-	}
-
-	return output.String()
-}
-
-// formatFileSearchResult formats FileSearch tool results
-func formatFileSearchResult(result string) string {
-	var response struct {
-		Summary string `json:"summary"`
-	}
-
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
-		// If parsing fails, return the original result
-		return result
-	}
-
-	// Return only the summary for TUI display
-	return response.Summary
-}
-
-// formatMemoryResult formats Memory tool results
-func formatMemoryResult(result string) string {
-	// Try to parse as different memory result types
-	var output strings.Builder
-
-	// Try parsing as entities array
-	var entities []interface{}
-	if err := json.Unmarshal([]byte(result), &entities); err == nil && len(entities) > 0 {
-		output.WriteString(fmt.Sprintf("Memory Entities (%d created):\n", len(entities)))
-
-		// Show first 5 entities
-		maxEntities := 5
-		for i, entity := range entities {
-			if i >= maxEntities {
-				break
-			}
-
-			if entityMap, ok := entity.(map[string]interface{}); ok {
-				name := entityMap["name"]
-				entityType := entityMap["type"]
-				output.WriteString(fmt.Sprintf("  • %s (%s)\n", name, entityType))
-			}
-		}
-
-		if len(entities) > maxEntities {
-			output.WriteString(fmt.Sprintf("  ... and %d more entities\n", len(entities)-maxEntities))
-		}
-
-		return output.String()
-	}
-
-	// Try parsing as relations array
-	var relations []interface{}
-	if err := json.Unmarshal([]byte(result), &relations); err == nil && len(relations) > 0 {
-		output.WriteString(fmt.Sprintf("Memory Relations (%d created):\n", len(relations)))
-
-		// Show first 5 relations
-		maxRelations := 5
-		for i, relation := range relations {
-			if i >= maxRelations {
-				break
-			}
-
-			if relationMap, ok := relation.(map[string]interface{}); ok {
-				source := relationMap["source"]
-				relationType := relationMap["type"]
-				target := relationMap["target"]
-				output.WriteString(fmt.Sprintf("  • %s --%s--> %s\n", source, relationType, target))
-			}
-		}
-
-		if len(relations) > maxRelations {
-			output.WriteString(fmt.Sprintf("  ... and %d more relations\n", len(relations)-maxRelations))
-		}
-
-		return output.String()
-	}
-
-	// Try parsing as graph structure
-	var graph map[string]interface{}
-	if err := json.Unmarshal([]byte(result), &graph); err == nil {
-		if entities, ok := graph["entities"].([]interface{}); ok {
-			output.WriteString(fmt.Sprintf("Knowledge Graph - Entities (%d):\n", len(entities)))
-
-			// Show first 5 entities
-			maxEntities := 5
-			for i, entity := range entities {
-				if i >= maxEntities {
-					break
-				}
-
-				if entityMap, ok := entity.(map[string]interface{}); ok {
-					name := entityMap["name"]
-					entityType := entityMap["type"]
-					output.WriteString(fmt.Sprintf("  • %s (%s)\n", name, entityType))
-				}
-			}
-
-			if len(entities) > maxEntities {
-				output.WriteString(fmt.Sprintf("  ... and %d more entities\n", len(entities)-maxEntities))
-			}
-		}
-
-		if relations, ok := graph["relations"].([]interface{}); ok {
-			output.WriteString(fmt.Sprintf("\nRelations (%d):\n", len(relations)))
-
-			// Show first 5 relations
-			maxRelations := 5
-			for i, relation := range relations {
-				if i >= maxRelations {
-					break
-				}
-
-				if relationMap, ok := relation.(map[string]interface{}); ok {
-					source := relationMap["source"]
-					relationType := relationMap["type"]
-					target := relationMap["target"]
-					output.WriteString(fmt.Sprintf("  • %s --%s--> %s\n", source, relationType, target))
-				}
-			}
-
-			if len(relations) > maxRelations {
-				output.WriteString(fmt.Sprintf("  ... and %d more relations\n", len(relations)-maxRelations))
-			}
-		}
-
-		if output.Len() > 0 {
-			return output.String()
-		}
-	}
-
-	// Fallback to generic formatting
-	return formatters.FormatGenericResult(result)
-}
-
-// formatDiff formats diff content with colors and proper formatting
-func formatDiff(diff string) string {
-	var diffContent string
-
-	if strings.Contains(diff, "```diff") {
-		// Extract diff content from markdown code block
-		start := strings.Index(diff, "```diff\n")
-		if start == -1 {
-			diffContent = diff
-		} else {
-			start += 8 // Length of "```diff\n"
-			end := strings.Index(diff[start:], "\n```")
-			if end == -1 {
-				diffContent = diff[start:]
-			} else {
-				// Extract the actual diff content (without the closing ```)
-				diffContent = diff[start : start+end]
-			}
-		}
-	} else {
-		// Raw diff content
-		diffContent = diff
-	}
-
-	// Check if this looks like a unified diff
-	hasDiffMarkers := strings.Contains(diffContent, "---") ||
-		strings.Contains(diffContent, "+++") ||
-		strings.Contains(diffContent, "@@")
-
-	if !hasDiffMarkers {
-		// If it doesn't look like a diff, just return the content
-		return diffContent
-	}
-
-	var output strings.Builder
-	output.WriteString("Changes:\n")
-
-	// Define styles for diff elements
-	addStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))     // Green
-	delStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1"))     // Red
-	hunkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))    // Cyan
-	contextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8")) // Gray
-	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("4"))    // Blue
-
-	lines := strings.Split(diffContent, "\n")
-	for _, line := range lines {
-		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
-			output.WriteString(addStyle.Render(line) + "\n")
-		} else if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
-			output.WriteString(delStyle.Render(line) + "\n")
-		} else if strings.HasPrefix(line, "@@") {
-			output.WriteString(hunkStyle.Render(line) + "\n")
-		} else if strings.HasPrefix(line, " ") {
-			output.WriteString(contextStyle.Render(line) + "\n")
-		} else if strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---") {
-			output.WriteString(fileStyle.Render(line) + "\n")
-		} else if line != "" {
-			output.WriteString(line + "\n")
-		}
-	}
-
-	return output.String()
-}
-
-// formatFileReadResult formats FileRead tool results
-func formatFileReadResult(result string, arguments string) string {
-	var response struct {
-		Content string `json:"content"`
-		Error   string `json:"error"`
-	}
-
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
-		// If parsing fails, return the original result
-		return result
-	}
-
-	if response.Error != "" {
-		return fmt.Sprintf("Error reading file: %s", response.Error)
-	}
-
-	// Extract filename from arguments
-	var args struct {
-		FilePath string `json:"filePath"`
-	}
-	var filename string
-	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.FilePath != "" {
-		filename = args.FilePath
-	}
-
-	// Generate TUI-friendly summary with filename and line numbers
-	lines := strings.Split(response.Content, "\n")
-	var summary strings.Builder
-
-	if filename != "" {
-		summary.WriteString(fmt.Sprintf("FileName: %s\n", filename))
-	}
-	summary.WriteString(fmt.Sprintf("📄 File content (%d lines)\n\n", len(lines)))
-
-	previewCount := 20
-	if len(lines) < previewCount {
-		previewCount = len(lines)
-	}
-
-	for i := 0; i < previewCount; i++ {
-		summary.WriteString(fmt.Sprintf("%4d: %s\n", i+1, lines[i]))
-	}
-
-	if len(lines) > 20 {
-		summary.WriteString(fmt.Sprintf("\n... and %d more lines\n", len(lines)-20))
-	}
-
-	return summary.String()
-}
-
-// formatDirectoryResult formats Directory tool results
-func formatDirectoryResult(result string) string {
-	var response struct {
-		Summary string `json:"summary"`
-	}
-
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
-		// If parsing fails, return the original result
-		return result
-	}
-
-	// Return only the summary for TUI display
-	return response.Summary
-}
-
-// formatGenericResult tries to parse generic JSON results
-func formatGenericResult(result string) string {
-	var jsonData map[string]any
-	if err := json.Unmarshal([]byte(result), &jsonData); err != nil {
-		// If not JSON, check if it's a long text and truncate if needed
-		if len(result) > 500 {
-			lines := strings.Split(result, "\n")
-			if len(lines) > 8 {
-				var output strings.Builder
-				for i := 0; i < 8; i++ {
-					output.WriteString(lines[i] + "\n")
-				}
-				output.WriteString(fmt.Sprintf("... and %d more lines", len(lines)-8))
-				return output.String()
-			}
-		}
-		return result // Return raw if not JSON and not too long
-	}
-
-	var output strings.Builder
-	for key, value := range jsonData {
-		// Handle long string values
-		if str, ok := value.(string); ok && len(str) > 200 {
-			lines := strings.Split(str, "\n")
-			if len(lines) > 8 {
-				var truncated strings.Builder
-				for i := 0; i < 8; i++ {
-					truncated.WriteString(lines[i] + "\n")
-				}
-				truncated.WriteString(fmt.Sprintf("... and %d more lines", len(lines)-8))
-				value = truncated.String()
-			}
-		}
-		output.WriteString(fmt.Sprintf("%s: %v\n", key, value))
-	}
-
-	return output.String()
-}
-
-// formatTokenCount formats a token count with comma separators for thousands
-func formatTokenCount(count int) string {
-	if count < 1000 {
-		return fmt.Sprintf("%d", count)
-	}
-
-	// Convert to string and add commas
-	str := fmt.Sprintf("%d", count)
-	var result strings.Builder
-
-	// Process from right to left, adding commas every 3 digits
-	for i, digit := range reversedString(str) {
-		if i > 0 && i%3 == 0 {
-			result.WriteByte(',')
-		}
-		result.WriteByte(byte(digit))
-	}
-
-	return reversedString(result.String())
-}
-
-// reversedString returns the reverse of a string
-func reversedString(s string) string {
-	runes := []rune(s)
-	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
-		runes[i], runes[j] = runes[j], runes[i]
-	}
-	return string(runes)
-}
-
-// getLastRequestUsage returns the token count and cost from the most recent API request
-func getLastRequestUsage(chat *entities.Chat) (int, float64) {
-	if chat == nil || len(chat.Messages) == 0 {
-		return 0, 0.0
-	}
-
-	// Find the most recent assistant message (which has the API usage)
-	for i := len(chat.Messages) - 1; i >= 0; i-- {
-		msg := chat.Messages[i]
-		if msg.Role == "assistant" && msg.Usage != nil {
-			return msg.Usage.TotalTokens, msg.Usage.Cost
-		}
-	}
-
-	// If no assistant message with usage found, return 0
-	return 0, 0.0
-}
-
-func (c *ChatView) getToolByName(name string) entities.Tool {
-	tools, err := c.toolService.ListTools()
-	if err != nil {
-		c.logger.Error("Failed to list tools", zap.Error(err))
-		return nil
-	}
-	for _, tool := range tools {
-		if tool.Name() == name {
-			return tool
-		}
-	}
-	return nil
-}
 
 type ChatView struct {
 	chatService        services.ChatService
@@ -721,6 +137,20 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 	}
 
 	return cv
+}
+
+func (c *ChatView) getToolByName(name string) entities.Tool {
+	tools, err := c.toolService.ListTools()
+	if err != nil {
+		c.logger.Error("Failed to list tools", zap.Error(err))
+		return nil
+	}
+	for _, tool := range tools {
+		if tool.Name() == name {
+			return tool
+		}
+	}
+	return nil
 }
 
 func (c *ChatView) SetActiveChat(chat *entities.Chat) {
@@ -847,8 +277,16 @@ func (c *ChatView) updateEditorContent() {
 			sb.WriteString(c.systemStyle.Render("Tool: ") + "\n")
 			// Display tool call events
 			for _, event := range tempMsg.ToolCallEvents {
-				formattedResult := formatToolResult(event.ToolName, event.Result, event.Diff, event.Arguments)
-				name, suffix := formatToolName(event.ToolName, event.Arguments)
+				tool := c.getToolByName(event.ToolName)
+				var formattedResult, name, suffix string
+				if tool != nil {
+					formattedResult = tool.FormatResult("tui", event.Result, event.Diff, event.Arguments)
+					name, suffix = tool.DisplayName("tui", event.Arguments)
+				} else {
+					formattedResult = event.Result
+					name = event.ToolName
+					suffix = ""
+				}
 				statusIcon := getToolStatusIcon(event.Error != "")
 				displayName := name + ":"
 				if suffix != "" {
@@ -1086,7 +524,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				c.cancel = cancel
 				c.isProcessing = true
 				c.startTime = time.Now()
-				return c, tea.Batch(sendMessageCmd(c.chatService, c.activeChat.ID, message, ctx), c.spinner.Tick)
+				return c, tea.Batch(commands.SendMessageCmd(c.chatService, c.activeChat.ID, message, ctx), c.spinner.Tick)
 			}
 		case "tab", "shift+tab":
 			if c.focused == "textarea" {
@@ -1288,7 +726,7 @@ func (c ChatView) View() string {
 
 		var tokenInfo string
 		// Use per-request usage instead of accumulated totals
-		requestTokens, requestCost := getLastRequestUsage(c.activeChat)
+		requestTokens, requestCost := c.activeChat.GetLastRequestUsage()
 		// Format token count with commas
 		tokenCountStr := formatters.FormatTokenCount(requestTokens)
 		if c.currentModel != nil && c.currentModel.ContextWindow != nil && *c.currentModel.ContextWindow > 0 && requestTokens > 0 {
@@ -1338,68 +776,4 @@ func (c ChatView) View() string {
 	footerPart := footerStyle.Render(lipgloss.JoinHorizontal(lipgloss.Top, leftStyle.Render(instructions), rightStyle.Render(footerInfo)))
 
 	return lipgloss.JoinVertical(lipgloss.Top, editorPart, header, separator, textareaPart, separator, footerPart)
-}
-
-func sendMessageCmd(cs services.ChatService, chatID string, msg *entities.Message, ctx context.Context) tea.Cmd {
-	return func() tea.Msg {
-		// Add a very long timeout to allow for complex operations (1 hour)
-		cmdCtx, cmdCancel := context.WithTimeout(ctx, 1*time.Hour)
-		defer cmdCancel()
-
-		_, err := cs.SendMessage(cmdCtx, chatID, msg)
-		if err != nil {
-			if cmdCtx.Err() == context.Canceled {
-				// User cancelled - try to get partial results
-				getChatCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-				updatedChat, getChatErr := cs.GetChat(getChatCtx, chatID)
-				if getChatErr == nil && len(updatedChat.Messages) > 0 {
-					noticeMsg := &entities.Message{
-						Content: "⚠️  Operation cancelled by user. Showing partial results.",
-						Role:    "system",
-					}
-					updatedChat.Messages = append(updatedChat.Messages, *noticeMsg)
-					return updatedChatMsg(updatedChat)
-				}
-				return errMsg(fmt.Errorf("operation cancelled by user - no results available"))
-			} else if cmdCtx.Err() == context.DeadlineExceeded {
-				// Timeout - try to get partial results
-				getChatCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-				updatedChat, getChatErr := cs.GetChat(getChatCtx, chatID)
-				if getChatErr == nil && len(updatedChat.Messages) > 0 {
-					noticeMsg := &entities.Message{
-						Content: "⚠️  Operation timed out after 1 hour. Showing partial results.",
-						Role:    "system",
-					}
-					updatedChat.Messages = append(updatedChat.Messages, *noticeMsg)
-					return updatedChatMsg(updatedChat)
-				}
-				return errMsg(fmt.Errorf("operation timed out after 1 hour - no results available"))
-			} else {
-				// Other error - get updated chat state and add error message
-				getChatCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				updatedChat, getChatErr := cs.GetChat(getChatCtx, chatID)
-				if getChatErr == nil {
-					// Add error message to chat
-					errorMsg := &entities.Message{
-						Content: "Error: " + err.Error(),
-						Role:    "system",
-					}
-					updatedChat.Messages = append(updatedChat.Messages, *errorMsg)
-					return updatedChatMsg(updatedChat)
-				}
-				return errMsg(err)
-			}
-		}
-		// Use a new context for GetChat in case the original context was cancelled
-		getChatCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		updatedChat, err := cs.GetChat(getChatCtx, chatID)
-		if err != nil {
-			return errMsg(err)
-		}
-		return updatedChatMsg(updatedChat)
-	}
 }
