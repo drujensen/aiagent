@@ -6,11 +6,13 @@ import (
 )
 
 type (
-	updatedChatMsg         *entities.Chat
-	chatCreatedMsg         *entities.Chat
-	startAutoCreateChatMsg struct{}
-	cancelSpinnerMsg       struct{}
-	toolCallEventMsg       *entities.ToolCallEvent
+	updatedChatMsg          *entities.Chat
+	chatCreatedMsg          *entities.Chat
+	startAutoCreateChatMsg  struct{}
+	cancelSpinnerMsg        struct{}
+	toolCallEventMsg        *entities.ToolCallEvent
+	processFinishedEventMsg *entities.ProcessFinishedEvent
+	processFailedEventMsg   *entities.ProcessFailedEvent
 )
 
 type (

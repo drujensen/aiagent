@@ -131,9 +131,31 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		}
 	})
 
+	// Subscribe to process finished events
+	processFinishedCancel := events.SubscribeToProcessFinishedEvents(func(data events.ProcessFinishedEventData) {
+		// Send event to channel (non-blocking)
+		select {
+		case cv.eventChan <- data.Event:
+		default:
+			// Channel full, drop event to avoid blocking
+		}
+	})
+
+	// Subscribe to process failed events
+	processFailedCancel := events.SubscribeToProcessFailedEvents(func(data events.ProcessFailedEventData) {
+		// Send event to channel (non-blocking)
+		select {
+		case cv.eventChan <- data.Event:
+		default:
+			// Channel full, drop event to avoid blocking
+		}
+	})
+
 	// Combine cancel functions
 	cv.eventCancel = func() {
 		toolCancel()
+		processFinishedCancel()
+		processFailedCancel()
 	}
 
 	return cv
@@ -368,6 +390,10 @@ func (c *ChatView) listenForEvents() tea.Cmd {
 		switch e := event.(type) {
 		case *entities.ToolCallEvent:
 			return toolCallEventMsg(e)
+		case *entities.ProcessFinishedEvent:
+			return processFinishedEventMsg(e)
+		case *entities.ProcessFailedEvent:
+			return processFailedEventMsg(e)
 		default:
 			return nil
 		}
@@ -608,6 +634,52 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			c.updateEditorContent()
 		}
 		// Continue listening for more events
+		return c, c.listenForEvents()
+
+	case processFinishedEventMsg:
+		// Handle process finished event
+		if c.isProcessing && c.activeChat != nil && m.ChatID == c.activeChat.ID {
+			c.isProcessing = false
+			c.tempMessages = nil
+			c.toolCallStatus = make(map[string]bool)
+
+			// Fetch updated chat with all messages including AI responses
+			ctx := context.Background()
+			updatedChat, err := c.chatService.GetChat(ctx, m.ChatID)
+			if err != nil {
+				c.err = err
+			} else {
+				c.activeChat = updatedChat
+			}
+
+			c.updateEditorContent()
+		}
+		return c, c.listenForEvents()
+
+	case processFailedEventMsg:
+		// Handle process failed event
+		if c.isProcessing && c.activeChat != nil && m.ChatID == c.activeChat.ID {
+			c.isProcessing = false
+			c.tempMessages = nil
+			c.toolCallStatus = make(map[string]bool)
+
+			// Fetch updated chat with any partially saved messages
+			ctx := context.Background()
+			updatedChat, err := c.chatService.GetChat(ctx, m.ChatID)
+			if err != nil {
+				c.err = err
+			} else {
+				c.activeChat = updatedChat
+			}
+
+			// Add system error message
+			errorMsg := &entities.Message{
+				Content: fmt.Sprintf("System Error: %s", m.Error),
+				Role:    "system",
+			}
+			c.activeChat.Messages = append(c.activeChat.Messages, *errorMsg)
+			c.updateEditorContent()
+		}
 		return c, c.listenForEvents()
 
 	case updatedChatMsg:

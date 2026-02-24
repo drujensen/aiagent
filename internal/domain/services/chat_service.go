@@ -512,8 +512,16 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 
 	if lastErr != nil {
 		if strings.Contains(lastErr.Error(), "canceled") {
+			// Publish process failed event
+			failedEvent := entities.NewProcessFailedEvent(chat.ID, lastErr.Error())
+			events.PublishProcessFailedEvent(failedEvent)
+
 			return nil, errors.CanceledErrorf("message processing was canceled")
 		}
+		// Publish process failed event
+		failedEvent := entities.NewProcessFailedEvent(chat.ID, lastErr.Error())
+		events.PublishProcessFailedEvent(failedEvent)
+
 		return nil, errors.InternalErrorf("failed to generate AI response after retries: %v", lastErr)
 	}
 
@@ -590,10 +598,18 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		s.logger.Warn("Failed to process compression instructions", zap.Error(err))
 	}
 
+	// Publish process finished event
+	finishedEvent := entities.NewProcessFinishedEvent(chat.ID)
+	events.PublishProcessFinishedEvent(finishedEvent)
+
 	// Return the last message (final assistant response)
 	if len(newMessages) > 0 {
 		return newMessages[len(newMessages)-1], nil
 	}
+	// Publish process failed event
+	failedEvent := entities.NewProcessFailedEvent(chat.ID, "no AI response generated")
+	events.PublishProcessFailedEvent(failedEvent)
+
 	return nil, errors.InternalErrorf("no AI response generated")
 }
 

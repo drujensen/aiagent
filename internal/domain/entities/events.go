@@ -33,3 +33,37 @@ func NewToolCallEvent(toolCallID, toolName, arguments, result, errorMsg, diff st
 		Metadata:   metadata,
 	}
 }
+
+// ProcessFinishedEvent represents successful completion of message processing
+type ProcessFinishedEvent struct {
+	ID        string    `json:"id" bson:"_id"`
+	ChatID    string    `json:"chat_id" bson:"chat_id"`
+	Timestamp time.Time `json:"timestamp" bson:"timestamp"`
+}
+
+// NewProcessFinishedEvent creates a new process finished event
+func NewProcessFinishedEvent(chatID string) *ProcessFinishedEvent {
+	return &ProcessFinishedEvent{
+		ID:        uuid.New().String(),
+		ChatID:    chatID,
+		Timestamp: time.Now(),
+	}
+}
+
+// ProcessFailedEvent represents failed message processing
+type ProcessFailedEvent struct {
+	ID        string    `json:"id" bson:"_id"`
+	ChatID    string    `json:"chat_id" bson:"chat_id"`
+	Error     string    `json:"error" bson:"error"`
+	Timestamp time.Time `json:"timestamp" bson:"timestamp"`
+}
+
+// NewProcessFailedEvent creates a new process failed event
+func NewProcessFailedEvent(chatID, errorMsg string) *ProcessFailedEvent {
+	return &ProcessFailedEvent{
+		ID:        uuid.New().String(),
+		ChatID:    chatID,
+		Error:     errorMsg,
+		Timestamp: time.Now(),
+	}
+}
