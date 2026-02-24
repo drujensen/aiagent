@@ -113,12 +113,18 @@ type ProcessArgs struct {
 func (t *ProcessTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing shell command", zap.String("arguments", arguments))
 
-	var args struct {
-		Command    string `json:"command"`
-		WorkingDir string `json:"working_dir"`
-	}
+	var args ProcessArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return `{"output": "", "exit_code": 1, "error": "failed to parse arguments"}`, nil
+		// Fallback to simple parsing if full parsing fails
+		var simpleArgs struct {
+			Command    string `json:"command"`
+			WorkingDir string `json:"working_dir"`
+		}
+		if err2 := json.Unmarshal([]byte(arguments), &simpleArgs); err2 != nil {
+			return `{"output": "", "exit_code": 1, "error": "failed to parse arguments"}`, nil
+		}
+		args.Command = simpleArgs.Command
+		args.Shell = true // Default to shell mode
 	}
 
 	if args.Command == "" {
@@ -134,27 +140,7 @@ func (t *ProcessTool) Execute(arguments string) (string, error) {
 		}
 	}
 
-	workingDir := workspace
-	if args.WorkingDir != "" {
-		workingDir = args.WorkingDir
-	}
-
-	cmd := exec.Command("sh", "-c", args.Command)
-	cmd.Dir = workingDir
-
-	output, err := cmd.CombinedOutput()
-	exitCode := 0
-	errorMsg := ""
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
-		} else {
-			exitCode = 1
-			errorMsg = err.Error()
-		}
-	}
-
-	return fmt.Sprintf(`{"output": %q, "exit_code": %d, "error": %q}`, string(output), exitCode, errorMsg), nil
+	return t.runCommand(args, workspace)
 }
 
 // splitShellArgs splits a command string into arguments, respecting quoted strings and escapes
