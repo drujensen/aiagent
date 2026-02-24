@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"os"
 	"os/exec"
@@ -701,6 +702,70 @@ func (t *ProcessTool) readFromProcess(args ProcessArgs) (string, error) {
 		return "", err
 	}
 	return t.formatReadOutput(jsonOutput)
+}
+
+func (t *ProcessTool) DisplayName(ui string, arguments string) (string, string) {
+	var args struct {
+		Command string `json:"command"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Command != "" {
+		// Truncate long commands
+		cmd := args.Command
+		if len(cmd) > 50 {
+			cmd = cmd[:47] + "..."
+		}
+		return t.Name(), cmd
+	}
+	return t.Name(), ""
+}
+
+func (t *ProcessTool) FormatResult(ui string, result string, diff string, arguments string) string {
+	// Similar to formatProcessResult
+	var summaryResponse struct {
+		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal([]byte(result), &summaryResponse); err == nil && summaryResponse.Summary != "" {
+		if ui == "tui" {
+			if summaryResponse.Summary == "Executed: " {
+				return "Executed successfully"
+			}
+			return summaryResponse.Summary
+		} else if ui == "webui" {
+			return fmt.Sprintf("<div class=\"tool-summary\">%s</div>", html.EscapeString(summaryResponse.Summary))
+		}
+		return summaryResponse.Summary
+	}
+
+	var response struct {
+		Output   string `json:"output"`
+		ExitCode int    `json:"exit_code"`
+		Error    string `json:"error"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		return result
+	}
+
+	if ui == "tui" {
+		if response.Error != "" {
+			return fmt.Sprintf("Failed: %s", response.Error)
+		}
+		if response.ExitCode != 0 {
+			return fmt.Sprintf("Failed with exit code %d", response.ExitCode)
+		}
+		return "Executed successfully"
+	} else if ui == "webui" {
+		var summary string
+		if response.Error != "" {
+			summary = fmt.Sprintf("Failed: %s", response.Error)
+		} else if response.ExitCode != 0 {
+			summary = fmt.Sprintf("Failed with exit code %d", response.ExitCode)
+		} else {
+			summary = "Executed successfully"
+		}
+		return fmt.Sprintf("<div class=\"tool-summary\">%s</div>", html.EscapeString(summary))
+	}
+	return "Executed successfully"
 }
 
 var _ entities.Tool = (*ProcessTool)(nil)

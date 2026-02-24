@@ -452,4 +452,18 @@ func (t *TodoTool) clearTodos(sessionID string) (string, error) {
 	return `{"summary": "Cleared all todos for this session."}`, nil
 }
 
+func (t *TodoTool) DisplayName(ui string, arguments string) (string, string) {
+	return t.Name(), ""
+}
+
+func (t *TodoTool) FormatResult(ui string, result string, diff string, arguments string) string {
+	var response struct {
+		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal([]byte(result), &response); err == nil && response.Summary != "" {
+		return response.Summary
+	}
+	return result
+}
+
 var _ entities.Tool = (*TodoTool)(nil)

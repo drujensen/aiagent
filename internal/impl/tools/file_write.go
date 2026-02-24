@@ -3,6 +3,7 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/tui/formatters"
 
 	"go.uber.org/zap"
 )
@@ -397,6 +399,129 @@ func getBoolField(data map[string]interface{}, key string) bool {
 		}
 	}
 	return false
+}
+
+func (t *FileWriteTool) DisplayName(ui string, arguments string) (string, string) {
+	var args struct {
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Path != "" {
+		return t.Name(), args.Path
+	}
+	return t.Name(), ""
+}
+
+func (t *FileWriteTool) FormatResult(ui string, result string, diff string, arguments string) string {
+	if ui == "tui" {
+		return t.formatResultTUI(result, diff)
+	} else if ui == "webui" {
+		return t.formatResultWebUI(result, diff)
+	}
+	return result
+}
+
+func (t *FileWriteTool) formatResultTUI(result string, diff string) string {
+	// Copy from chat_view.go formatFileWriteResult
+	var resultData struct {
+		Summary     string `json:"summary"`
+		Success     bool   `json:"success"`
+		Path        string `json:"path"`
+		Occurrences int    `json:"occurrences"`
+		ReplacedAll bool   `json:"replaced_all"`
+		Diff        string `json:"diff"`
+	}
+
+	// First, try to use the diff parameter if available
+	if diff != "" {
+		// Try to parse JSON to get summary
+		if err := json.Unmarshal([]byte(result), &resultData); err == nil && resultData.Summary != "" {
+			var output strings.Builder
+			output.WriteString(resultData.Summary)
+			output.WriteString("\n\n" + formatters.FormatDiff(diff))
+			return output.String()
+		} else {
+			// If JSON parsing fails, create a simple summary
+			var output strings.Builder
+			output.WriteString("File modified successfully\n\n")
+			output.WriteString(formatters.FormatDiff(diff))
+			return output.String()
+		}
+	}
+
+	// If no diff parameter, try to parse the full JSON result
+	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
+		// If parsing fails, try to extract summary from JSON
+		var jsonResponse struct {
+			Summary string `json:"summary"`
+		}
+		if err2 := json.Unmarshal([]byte(result), &jsonResponse); err2 == nil && jsonResponse.Summary != "" {
+			return jsonResponse.Summary
+		}
+		return result // Return raw if parsing fails
+	}
+
+	var output strings.Builder
+
+	// Use the summary from the JSON response
+	output.WriteString(resultData.Summary)
+
+	// Add the diff from JSON if available
+	if resultData.Diff != "" {
+		output.WriteString("\n\n" + formatters.FormatDiff(resultData.Diff))
+	}
+
+	return output.String()
+}
+
+func (t *FileWriteTool) formatResultWebUI(result string, diff string) string {
+	// Copy from ui/formatters.go formatFileWriteResult
+	var resultData struct {
+		Summary     string `json:"summary"`
+		Success     bool   `json:"success"`
+		Path        string `json:"path"`
+		Occurrences int    `json:"occurrences"`
+		ReplacedAll bool   `json:"replaced_all"`
+		Diff        string `json:"diff"`
+	}
+
+	var output strings.Builder
+
+	// First, try to use the diff parameter if available
+	if diff != "" {
+		// Try to parse JSON to get summary
+		if err := json.Unmarshal([]byte(result), &resultData); err == nil && resultData.Summary != "" {
+			output.WriteString(fmt.Sprintf("<div class=\"tool-summary\">%s</div>", html.EscapeString(resultData.Summary)))
+			output.WriteString(formatters.FormatDiff(diff)) // Assuming formatters has HTML version
+			return output.String()
+		} else {
+			// If JSON parsing fails, create a simple summary
+			output.WriteString("<div class=\"tool-summary\">File modified successfully</div>")
+			output.WriteString(formatters.FormatDiff(diff))
+			return output.String()
+		}
+	}
+
+	// If no diff parameter, try to parse the full JSON result
+	if err := json.Unmarshal([]byte(result), &resultData); err != nil {
+		// If parsing fails, try to extract summary from JSON
+		var jsonResponse struct {
+			Summary string `json:"summary"`
+		}
+		if err2 := json.Unmarshal([]byte(result), &jsonResponse); err2 == nil && jsonResponse.Summary != "" {
+			return fmt.Sprintf("<div class=\"tool-summary\">%s</div>", html.EscapeString(jsonResponse.Summary))
+		}
+		return formatters.FormatGenericResult(result) // Assuming
+	}
+
+	// Use the summary from the JSON response
+	output.WriteString(fmt.Sprintf("<div class=\"tool-summary\">%s</div>", html.EscapeString(resultData.Summary)))
+
+	// Add the diff from JSON if available
+	if resultData.Diff != "" {
+		output.WriteString(formatters.FormatDiff(resultData.Diff))
+	}
+
+	return output.String()
 }
 
 var _ entities.Tool = (*FileWriteTool)(nil)

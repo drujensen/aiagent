@@ -385,7 +385,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 	}
 
 	// Resolve tool configurations
-	tools := []*entities.Tool{}
+	tools := []entities.Tool{}
 	for _, toolName := range agent.Tools {
 		tool, err := s.toolRepo.GetToolByName(toolName)
 		if err != nil {
@@ -394,7 +394,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		if tool == nil {
 			return nil, errors.InternalErrorf("tool repository returned nil for tool %s", toolName)
 		}
-		config := (*tool).Configuration()
+		config := tool.Configuration()
 		if config == nil {
 			config = make(map[string]string)
 		}
@@ -402,7 +402,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		if err != nil {
 			return nil, errors.InternalErrorf("failed to resolve configuration for tool %s: %v", toolName, err)
 		}
-		(*tool).UpdateConfiguration(resolvedConfig)
+		tool.UpdateConfiguration(resolvedConfig)
 		tools = append(tools, tool)
 	}
 

@@ -54,7 +54,7 @@ func (c *AgentController) AgentFormHandler(eCtx echo.Context) error {
 
 	toolNames := []string{}
 	for _, tool := range tools {
-		toolNames = append(toolNames, (*tool).Name())
+		toolNames = append(toolNames, tool.Name())
 	}
 	sort.Strings(toolNames)
 
@@ -121,7 +121,7 @@ func (c *AgentController) CreateAgentHandler(eCtx echo.Context) error {
 
 	toolNames := []string{}
 	for _, tool := range toolsList {
-		toolNames = append(toolNames, (*tool).Name())
+		toolNames = append(toolNames, tool.Name())
 	}
 
 	// Parse tools from form
@@ -167,7 +167,7 @@ func (c *AgentController) UpdateAgentHandler(eCtx echo.Context) error {
 
 	toolNames := []string{}
 	for _, tool := range toolsList {
-		toolNames = append(toolNames, (*tool).Name())
+		toolNames = append(toolNames, tool.Name())
 	}
 
 	// Parse tools from form

@@ -550,4 +550,13 @@ func containsMatchingString(slice []string, query string) bool {
 	return false
 }
 
+func (t *MemoryTool) DisplayName(ui string, arguments string) (string, string) {
+	return t.Name(), ""
+}
+
+func (t *MemoryTool) FormatResult(ui string, result string, diff string, arguments string) string {
+	// Stub for now
+	return result
+}
+
 var _ entities.Tool = (*MemoryTool)(nil)

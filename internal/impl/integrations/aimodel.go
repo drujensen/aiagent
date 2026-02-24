@@ -96,7 +96,7 @@ func convertToOpenAIMessages(messages []*entities.Message) []map[string]any {
 }
 
 // GenerateResponse generates a response from the OpenAI-compatible API with incremental saving
-func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]any, callback interfaces.MessageCallback) ([]*entities.Message, error) {
+func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []entities.Tool, options map[string]any, callback interfaces.MessageCallback) ([]*entities.Message, error) {
 	// Prepare tool definitions for OpenAI
 	tools := make([]map[string]any, len(toolList))
 	for i, tool := range toolList {
@@ -108,9 +108,9 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 		tools[i] = map[string]any{
 			"type": "function",
 			"function": map[string]any{
-				"name":        (*tool).Name(),
-				"description": (*tool).Description(),
-				"parameters":  (*tool).Schema(),
+				"name":        tool.Name(),
+				"description": tool.Description(),
+				"parameters":  tool.Schema(),
 			},
 		}
 	}
@@ -318,7 +318,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 							}
 						}
 					}
-					result, err := (*tool).Execute(args)
+					result, err := tool.Execute(args)
 					if err != nil {
 						toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
 						toolError = err.Error()

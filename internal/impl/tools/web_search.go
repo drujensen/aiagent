@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"strings"
@@ -205,6 +206,39 @@ func (t *WebSearchTool) Execute(arguments string) (string, error) {
 
 	t.logger.Info("Web search completed", zap.String("query", query), zap.Int("results", len(grokResults)))
 	return string(jsonResult), nil
+}
+
+func (t *WebSearchTool) DisplayName(ui string, arguments string) (string, string) {
+	return t.Name(), ""
+}
+
+func (t *WebSearchTool) FormatResult(ui string, result string, diff string, arguments string) string {
+	var args struct {
+		Query string `json:"query"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Query != "" {
+		if ui == "tui" {
+			return fmt.Sprintf("Searched for: %s", args.Query)
+		} else if ui == "webui" {
+			return fmt.Sprintf("<div class=\"tool-summary\">Searched for: %s</div>", html.EscapeString(args.Query))
+		}
+		return fmt.Sprintf("Searched for: %s", args.Query)
+	}
+	var jsonResponse struct {
+		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal([]byte(result), &jsonResponse); err == nil && jsonResponse.Summary != "" {
+		if ui == "tui" {
+			return jsonResponse.Summary
+		} else if ui == "webui" {
+			return fmt.Sprintf("<div class=\"tool-summary\">%s</div>", html.EscapeString(jsonResponse.Summary))
+		}
+		return jsonResponse.Summary
+	}
+	if ui == "webui" {
+		return "<div class=\"tool-summary\">Web search completed</div>"
+	}
+	return "Web search completed"
 }
 
 var _ entities.Tool = (*WebSearchTool)(nil)

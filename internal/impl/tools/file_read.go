@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"strings"
@@ -184,4 +185,116 @@ func (t *FileReadTool) Execute(arguments string) (string, error) {
 	return fmt.Sprintf(`{"content": %q, "lines": %d, "error": ""}`, content, len(lines)), nil
 }
 
-var _ entities.Tool = (*FileReadTool)(nil)
+func (t *FileReadTool) DisplayName(ui string, arguments string) (string, string) {
+	// For FileRead, filename is shown in result, so return empty suffix
+	return t.Name(), ""
+}
+
+func (t *FileReadTool) FormatResult(ui string, result string, diff string, arguments string) string {
+	if ui == "tui" {
+		return t.formatResultTUI(result, arguments)
+	} else if ui == "webui" {
+		return t.formatResultWebUI(result)
+	}
+	return result // Fallback
+}
+
+func (t *FileReadTool) formatResultTUI(result string, arguments string) string {
+	var response struct {
+		Content string `json:"content"`
+		Error   string `json:"error"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		return result
+	}
+
+	if response.Error != "" {
+		return fmt.Sprintf("Error reading file: %s", response.Error)
+	}
+
+	// Extract filename from arguments
+	var args struct {
+		FilePath string `json:"filePath"`
+	}
+	var filename string
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.FilePath != "" {
+		filename = args.FilePath
+	}
+
+	// Generate TUI-friendly summary with filename and line numbers
+	lines := strings.Split(response.Content, "\n")
+	var summary strings.Builder
+
+	if filename != "" {
+		summary.WriteString(fmt.Sprintf("FileName: %s\n", filename))
+	}
+	summary.WriteString(fmt.Sprintf("📄 File content (%d lines)\n\n", len(lines)))
+
+	previewCount := 20
+	if len(lines) < previewCount {
+		previewCount = len(lines)
+	}
+
+	for i := 0; i < previewCount; i++ {
+		summary.WriteString(fmt.Sprintf("%4d: %s\n", i+1, lines[i]))
+	}
+
+	if len(lines) > 20 {
+		summary.WriteString(fmt.Sprintf("\n... and %d more lines\n", len(lines)-20))
+	}
+
+	return summary.String()
+}
+
+func (t *FileReadTool) formatResultWebUI(result string) string {
+	var response struct {
+		Path    string `json:"path"`
+		Content string `json:"content"`
+		Lines   int    `json:"lines"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		// Fallback to generic
+		return t.formatGenericWebUI(result)
+	}
+
+	// For Web UI, show simple summary without content preview
+	if response.Lines > 0 {
+		fileName := "file"
+		if response.Path != "" {
+			fileName = filepath.Base(response.Path)
+		}
+		return fmt.Sprintf("<div class=\"tool-summary\">📄 %s (%d lines read)</div>", html.EscapeString(fileName), response.Lines)
+	}
+
+	if response.Content != "" {
+		lines := strings.Split(response.Content, "\n")
+		fileName := "file"
+		if response.Path != "" {
+			fileName = filepath.Base(response.Path)
+		}
+		return fmt.Sprintf("<div class=\"tool-summary\">📄 %s (%d lines read)</div>", html.EscapeString(fileName), len(lines))
+	}
+
+	return "<div class=\"tool-summary\">File read successfully</div>"
+}
+
+func (t *FileReadTool) formatGenericWebUI(result string) string {
+	var jsonData map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &jsonData); err != nil {
+		// If not JSON, escape and return
+		return fmt.Sprintf("<div class=\"tool-result\"><pre>%s</pre></div>", html.EscapeString(result))
+	}
+
+	var output strings.Builder
+	output.WriteString("<div class=\"tool-result-json\">")
+	for key, value := range jsonData {
+		output.WriteString(fmt.Sprintf("<div><strong>%s:</strong> %v</div>", html.EscapeString(key), value))
+	}
+	output.WriteString("</div>")
+
+	return output.String()
+}
+
+var _ entities.Tool = (*FileReadTool)(nil) // Confirms interface implementation

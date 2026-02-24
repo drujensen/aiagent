@@ -163,18 +163,18 @@ func (g *GoogleIntegration) cleanSchemaForGemini(schema map[string]any) map[stri
 }
 
 // convertToolsToGeminiFormat converts entities.Tool to Gemini tools format
-func (g *GoogleIntegration) convertToolsToGeminiFormat(toolList []*entities.Tool) []map[string]any {
+func (g *GoogleIntegration) convertToolsToGeminiFormat(toolList []entities.Tool) []map[string]any {
 	if len(toolList) == 0 {
 		return nil
 	}
 
 	functionDeclarations := make([]map[string]any, len(toolList))
 	for i, tool := range toolList {
-		cleanedSchema := g.cleanSchemaForGemini((*tool).Schema())
+		cleanedSchema := g.cleanSchemaForGemini(tool.Schema())
 		schemaBytes, _ := json.Marshal(cleanedSchema)
 		functionDeclarations[i] = map[string]any{
-			"name":        (*tool).Name(),
-			"description": (*tool).Description(),
+			"name":        tool.Name(),
+			"description": tool.Description(),
 			"parameters":  json.RawMessage(schemaBytes),
 		}
 	}
@@ -187,7 +187,7 @@ func (g *GoogleIntegration) convertToolsToGeminiFormat(toolList []*entities.Tool
 }
 
 // GenerateResponse implements native Gemini API with tool call handling
-func (g *GoogleIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]any, callback interfaces.MessageCallback) ([]*entities.Message, error) {
+func (g *GoogleIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []entities.Tool, options map[string]any, callback interfaces.MessageCallback) ([]*entities.Message, error) {
 	var newMessages []*entities.Message
 
 	// Tool call handling loop (similar to OpenAI implementation)
@@ -374,7 +374,7 @@ func (g *GoogleIntegration) GenerateResponse(ctx context.Context, messages []*en
 						}
 					}
 				}
-				result, err := (*tool).Execute(args)
+				result, err := tool.Execute(args)
 				if err != nil {
 					toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
 					toolError = err.Error()

@@ -108,3 +108,42 @@ func containsHelper(s, substr string) bool {
 	}
 	return false
 }
+
+func TestCompressionTool_FormatResult(t *testing.T) {
+	logger := zaptest.NewLogger(t)
+	config := map[string]string{"workspace": "/tmp"}
+
+	tool := NewCompressionTool("test-compression", "Test compression tool", config, logger)
+
+	// Test TUI formatting with valid result
+	result := `{
+		"compression_instruction": {
+			"action": "compress_range",
+			"start_message_index": 5,
+			"end_message_index": 15,
+			"summary_type": "task_cleanup",
+			"description": "Cleaning up old task messages"
+		},
+		"message": "Requested compression of messages 5-15 with type 'task_cleanup'"
+	}`
+
+	formatted := tool.FormatResult("tui", result, "", "")
+	expected := "🗜️ Compressed messages 5-15 with type 'task_cleanup' (Cleaning up old task messages)"
+	if formatted != expected {
+		t.Errorf("Expected TUI format '%s', got '%s'", expected, formatted)
+	}
+
+	// Test webui formatting (should return the message field)
+	webFormatted := tool.FormatResult("webui", result, "", "")
+	expectedWeb := "Requested compression of messages 5-15 with type 'task_cleanup'"
+	if webFormatted != expectedWeb {
+		t.Errorf("Expected webui format '%s', got '%s'", expectedWeb, webFormatted)
+	}
+
+	// Test with invalid JSON (should return original result)
+	invalidResult := "invalid json"
+	fallback := tool.FormatResult("tui", invalidResult, "", "")
+	if fallback != invalidResult {
+		t.Errorf("Expected fallback to return original result, got '%s'", fallback)
+	}
+}

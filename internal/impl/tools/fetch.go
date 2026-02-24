@@ -292,4 +292,12 @@ func (t *FetchTool) doRequest(req *http.Request, headers []string) (string, erro
 	return string(jsonResult), nil
 }
 
+func (t *FetchTool) DisplayName(ui string, arguments string) (string, string) {
+	return t.Name(), ""
+}
+
+func (t *FetchTool) FormatResult(ui string, result string, diff string, arguments string) string {
+	return result
+}
+
 var _ entities.Tool = (*FetchTool)(nil)

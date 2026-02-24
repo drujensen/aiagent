@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/drujensen/aiagent/internal/domain/entities"
 )
 
 type VisionTool struct {
@@ -188,3 +190,13 @@ func EncodeImageToBase64(imagePath string) (string, error) {
 	}
 	return "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(data), nil
 }
+
+func (t *VisionTool) DisplayName(ui string, arguments string) (string, string) {
+	return t.Name(), ""
+}
+
+func (t *VisionTool) FormatResult(ui string, result string, diff string, arguments string) string {
+	return result
+}
+
+var _ entities.Tool = (*VisionTool)(nil)

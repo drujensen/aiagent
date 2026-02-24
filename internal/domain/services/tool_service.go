@@ -11,7 +11,7 @@ import (
 )
 
 type ToolService interface {
-	ListTools() ([]*entities.Tool, error)
+	ListTools() ([]entities.Tool, error)
 
 	ListToolData(ctx context.Context) ([]*entities.ToolData, error)
 	GetToolData(ctx context.Context, id string) (*entities.ToolData, error)
@@ -31,7 +31,7 @@ func NewToolService(toolRepo interfaces.ToolRepository, logger *zap.Logger) *too
 	}
 }
 
-func (s *toolService) ListTools() ([]*entities.Tool, error) {
+func (s *toolService) ListTools() ([]entities.Tool, error) {
 	return s.toolRepo.ListTools()
 }
 

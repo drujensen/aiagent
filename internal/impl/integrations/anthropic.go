@@ -108,7 +108,7 @@ func convertToAnthropicMessages(messages []*entities.Message) []map[string]any {
 }
 
 // GenerateResponse generates a response from the Anthropic API with incremental saving
-func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]any, callback interfaces.MessageCallback) ([]*entities.Message, error) {
+func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []entities.Tool, options map[string]any, callback interfaces.MessageCallback) ([]*entities.Message, error) {
 	// Prepare tool definitions for Anthropic
 	tools := make([]map[string]any, len(toolList))
 	for i, tool := range toolList {
@@ -118,9 +118,9 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 		}
 
 		tools[i] = map[string]any{
-			"name":         (*tool).Name(),
-			"description":  (*tool).Description(),
-			"input_schema": (*tool).Schema(),
+			"name":         tool.Name(),
+			"description":  tool.Description(),
+			"input_schema": tool.Schema(),
 		}
 	}
 
@@ -322,7 +322,7 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 					toolError = err.Error()
 					m.logger.Warn("Failed to get tool", zap.String("toolName", toolName), zap.Error(err))
 				} else if tool != nil {
-					result, err := (*tool).Execute(toolCall.Function.Arguments)
+					result, err := tool.Execute(toolCall.Function.Arguments)
 					if err != nil {
 						toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
 						toolError = err.Error()

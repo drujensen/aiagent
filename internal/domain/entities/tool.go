@@ -49,6 +49,8 @@ type Tool interface {
 	UpdateConfiguration(config map[string]string)
 	Schema() map[string]any
 	Execute(arguments string) (string, error)
+	FormatResult(ui string, result, diff, arguments string) string
+	DisplayName(ui string, arguments string) (string, string)
 }
 
 // ToolItem wraps a Tool to implement bubbles/list.Item

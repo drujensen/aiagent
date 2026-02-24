@@ -16,7 +16,7 @@ import (
 
 type ToolRepository struct {
 	collection    *mongo.Collection
-	toolInstances map[string]*entities.Tool
+	toolInstances map[string]entities.Tool
 	toolFactory   *tools.ToolFactory
 	logger        *zap.Logger
 }
@@ -24,7 +24,7 @@ type ToolRepository struct {
 func NewToolRepository(collection *mongo.Collection, toolFactory *tools.ToolFactory, logger *zap.Logger) (*ToolRepository, error) {
 	toolRepository := &ToolRepository{
 		collection:    collection,
-		toolInstances: make(map[string]*entities.Tool),
+		toolInstances: make(map[string]entities.Tool),
 		toolFactory:   toolFactory,
 		logger:        logger,
 	}
@@ -35,15 +35,15 @@ func NewToolRepository(collection *mongo.Collection, toolFactory *tools.ToolFact
 	return toolRepository, nil
 }
 
-func (t *ToolRepository) ListTools() ([]*entities.Tool, error) {
-	var tools []*entities.Tool
+func (t *ToolRepository) ListTools() ([]entities.Tool, error) {
+	var tools []entities.Tool
 	for _, tool := range t.toolInstances {
 		tools = append(tools, tool)
 	}
 	return tools, nil
 }
 
-func (t *ToolRepository) GetToolByName(name string) (*entities.Tool, error) {
+func (t *ToolRepository) GetToolByName(name string) (entities.Tool, error) {
 	tool, exists := t.toolInstances[name]
 	if !exists {
 		return nil, nil
@@ -51,7 +51,7 @@ func (t *ToolRepository) GetToolByName(name string) (*entities.Tool, error) {
 	return tool, nil
 }
 
-func (t *ToolRepository) RegisterTool(name string, tool *entities.Tool) error {
+func (t *ToolRepository) RegisterTool(name string, tool entities.Tool) error {
 	if _, exists := t.toolInstances[name]; exists {
 		return errors.DuplicateErrorf("tool with the same name already exists")
 	}
@@ -131,7 +131,7 @@ func (t *ToolRepository) DeleteToolData(ctx context.Context, id string) error {
 }
 
 func (t *ToolRepository) reloadToolInstances() error {
-	t.toolInstances = make(map[string]*entities.Tool)
+	t.toolInstances = make(map[string]entities.Tool)
 	toolDataList, err := t.ListToolData(context.Background())
 	if err != nil {
 		t.logger.Error("Failed to load tool instances", zap.Error(err))
@@ -145,7 +145,7 @@ func (t *ToolRepository) reloadToolInstances() error {
 			continue
 		}
 		tool := toolFactoryEntry.Factory(toolData.Name, toolData.Description, toolData.Configuration, t.logger)
-		t.toolInstances[toolData.Name] = &tool
+		t.toolInstances[toolData.Name] = tool
 	}
 	return nil
 }

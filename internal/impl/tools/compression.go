@@ -130,4 +130,44 @@ func (t *CompressionTool) Execute(arguments string) (string, error) {
 	return string(jsonResult), nil
 }
 
+func (t *CompressionTool) DisplayName(ui string, arguments string) (string, string) {
+	return t.Name(), ""
+}
+
+func (t *CompressionTool) FormatResult(ui string, result string, diff string, arguments string) string {
+	if ui == "tui" {
+		// Parse the JSON result for TUI display
+		var response struct {
+			CompressionInstruction struct {
+				StartMessageIndex int    `json:"start_message_index"`
+				EndMessageIndex   int    `json:"end_message_index"`
+				SummaryType       string `json:"summary_type"`
+				Description       string `json:"description,omitempty"`
+			} `json:"compression_instruction"`
+			Message string `json:"message"`
+		}
+
+		if err := json.Unmarshal([]byte(result), &response); err == nil {
+			// Create a nice TUI display showing the range and type
+			rangeStr := fmt.Sprintf("messages %d-%d", response.CompressionInstruction.StartMessageIndex, response.CompressionInstruction.EndMessageIndex)
+			typeStr := response.CompressionInstruction.SummaryType
+			descStr := ""
+			if response.CompressionInstruction.Description != "" {
+				descStr = fmt.Sprintf(" (%s)", response.CompressionInstruction.Description)
+			}
+			return fmt.Sprintf("🗜️ Compressed %s with type '%s'%s", rangeStr, typeStr, descStr)
+		}
+	}
+
+	// For webui or if parsing fails, return the original message or result
+	var response struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(result), &response); err == nil && response.Message != "" {
+		return response.Message
+	}
+
+	return result
+}
+
 var _ entities.Tool = (*CompressionTool)(nil)

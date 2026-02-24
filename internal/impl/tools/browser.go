@@ -229,4 +229,12 @@ func (b *BrowserTool) initializeBrowser() error {
 	return nil
 }
 
+func (t *BrowserTool) DisplayName(ui string, arguments string) (string, string) {
+	return t.Name(), ""
+}
+
+func (t *BrowserTool) FormatResult(ui string, result string, diff string, arguments string) string {
+	return result
+}
+
 var _ entities.Tool = (*BrowserTool)(nil) // Confirms interface implementation

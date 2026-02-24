@@ -6,9 +6,9 @@ import (
 )
 
 type ToolRepository interface {
-	RegisterTool(name string, tool *entities.Tool) error
-	GetToolByName(name string) (*entities.Tool, error)
-	ListTools() ([]*entities.Tool, error)
+	RegisterTool(name string, tool entities.Tool) error
+	GetToolByName(name string) (entities.Tool, error)
+	ListTools() ([]entities.Tool, error)
 
 	CreateToolData(ctx context.Context, toolData *entities.ToolData) error
 	UpdateToolData(ctx context.Context, toolData *entities.ToolData) error

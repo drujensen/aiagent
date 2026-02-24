@@ -190,4 +190,12 @@ func (t *ImageTool) Execute(arguments string) (string, error) {
 	return "Image generation completed, but no data returned", nil
 }
 
+func (t *ImageTool) DisplayName(ui string, arguments string) (string, string) {
+	return t.Name(), ""
+}
+
+func (t *ImageTool) FormatResult(ui string, result string, diff string, arguments string) string {
+	return result
+}
+
 var _ entities.Tool = (*ImageTool)(nil)

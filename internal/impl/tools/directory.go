@@ -3,6 +3,7 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"strings"
@@ -405,6 +406,33 @@ func (t *DirectoryTool) treeToText(tree []TreeEntry, prefix string, currentLines
 		}
 	}
 	return result.String()
+}
+
+func (t *DirectoryTool) DisplayName(ui string, arguments string) (string, string) {
+	var args struct {
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Path != "" {
+		return t.Name(), args.Path
+	}
+	return t.Name(), ""
+}
+
+func (t *DirectoryTool) FormatResult(ui string, result string, diff string, arguments string) string {
+	var response struct {
+		Summary string `json:"summary"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		return result
+	}
+
+	if ui == "tui" {
+		return response.Summary
+	} else if ui == "webui" {
+		return fmt.Sprintf("<div class=\"tool-summary\">%s</div>", html.EscapeString(response.Summary))
+	}
+	return response.Summary
 }
 
 var _ entities.Tool = (*DirectoryTool)(nil)

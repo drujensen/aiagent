@@ -20,7 +20,7 @@ import (
 type JsonToolRepository struct {
 	filePath      string
 	data          []*entities.ToolData
-	toolInstances map[string]*entities.Tool
+	toolInstances map[string]entities.Tool
 	toolFactory   *tools.ToolFactory
 	logger        *zap.Logger
 }
@@ -30,7 +30,7 @@ func NewJSONToolRepository(dataDir string, toolFactory *tools.ToolFactory, logge
 	repo := &JsonToolRepository{
 		filePath:      filePath,
 		data:          []*entities.ToolData{},
-		toolInstances: make(map[string]*entities.Tool),
+		toolInstances: make(map[string]entities.Tool),
 		toolFactory:   toolFactory,
 		logger:        logger,
 	}
@@ -92,7 +92,7 @@ func (r *JsonToolRepository) save() error {
 }
 
 func (r *JsonToolRepository) reloadToolInstances() error {
-	r.toolInstances = make(map[string]*entities.Tool)
+	r.toolInstances = make(map[string]entities.Tool)
 	for _, toolData := range r.data {
 		toolFactoryEntry, err := r.toolFactory.GetFactoryByName(toolData.ToolType)
 		if err != nil {
@@ -100,20 +100,20 @@ func (r *JsonToolRepository) reloadToolInstances() error {
 			continue
 		}
 		tool := toolFactoryEntry.Factory(toolData.Name, toolData.Description, toolData.Configuration, r.logger)
-		r.toolInstances[toolData.Name] = &tool
+		r.toolInstances[toolData.Name] = tool
 	}
 	return nil
 }
 
-func (r *JsonToolRepository) ListTools() ([]*entities.Tool, error) {
-	var tools []*entities.Tool
+func (r *JsonToolRepository) ListTools() ([]entities.Tool, error) {
+	var tools []entities.Tool
 	for _, tool := range r.toolInstances {
 		tools = append(tools, tool)
 	}
 	return tools, nil
 }
 
-func (r *JsonToolRepository) GetToolByName(name string) (*entities.Tool, error) {
+func (r *JsonToolRepository) GetToolByName(name string) (entities.Tool, error) {
 	tool, exists := r.toolInstances[name]
 	if !exists {
 		return nil, nil
@@ -121,7 +121,7 @@ func (r *JsonToolRepository) GetToolByName(name string) (*entities.Tool, error) 
 	return tool, nil
 }
 
-func (r *JsonToolRepository) RegisterTool(name string, tool *entities.Tool) error {
+func (r *JsonToolRepository) RegisterTool(name string, tool entities.Tool) error {
 	if _, exists := r.toolInstances[name]; exists {
 		return errors.DuplicateErrorf("tool with the same name already exists")
 	}

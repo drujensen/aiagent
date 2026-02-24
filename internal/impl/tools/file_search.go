@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"strings"
@@ -269,6 +270,38 @@ func (t *FileSearchTool) searchMultipleFiles(dirPath, pattern, filePattern strin
 	}
 	t.logger.Info("Multiple files searched successfully", zap.String("path", dirPath), zap.Int("files_with_matches", len(results)))
 	return results, nil
+}
+
+func (t *FileSearchTool) DisplayName(ui string, arguments string) (string, string) {
+	var args struct {
+		Pattern   string `json:"pattern"`
+		Directory string `json:"directory"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil {
+		detail := args.Pattern
+		if args.Directory != "" && args.Directory != "." {
+			detail += " in " + args.Directory
+		}
+		return t.Name(), detail
+	}
+	return t.Name(), ""
+}
+
+func (t *FileSearchTool) FormatResult(ui string, result string, diff string, arguments string) string {
+	var response struct {
+		Summary string `json:"summary"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		return result
+	}
+
+	if ui == "tui" {
+		return response.Summary
+	} else if ui == "webui" {
+		return fmt.Sprintf("<div class=\"tool-summary\">%s</div>", html.EscapeString(response.Summary))
+	}
+	return response.Summary
 }
 
 var _ entities.Tool = (*FileSearchTool)(nil)

@@ -15,6 +15,7 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/events"
 	"github.com/drujensen/aiagent/internal/domain/services"
+	"github.com/drujensen/aiagent/internal/tui/formatters"
 	"github.com/kujtimiihoxha/vimtea"
 	"go.uber.org/zap"
 )
@@ -74,6 +75,8 @@ func formatToolResult(toolName, result string, diff string, arguments string) st
 		return formatProcessResult(result)
 	case "WebSearch":
 		return formatWebSearchResult(result, arguments)
+	case "Compression":
+		return formatCompressionResult(result)
 	default:
 		// Try to extract summary from JSON responses
 		var jsonResponse struct {
@@ -145,6 +148,41 @@ func formatWebSearchResult(result string, arguments string) string {
 	return "Web search completed"
 }
 
+// formatCompressionResult formats Compression tool results
+func formatCompressionResult(result string) string {
+	// Parse the JSON result for TUI display
+	var response struct {
+		CompressionInstruction struct {
+			StartMessageIndex int    `json:"start_message_index"`
+			EndMessageIndex   int    `json:"end_message_index"`
+			SummaryType       string `json:"summary_type"`
+			Description       string `json:"description,omitempty"`
+		} `json:"compression_instruction"`
+		Message string `json:"message"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &response); err == nil {
+		// Create a nice TUI display showing the range and type
+		rangeStr := fmt.Sprintf("messages %d-%d", response.CompressionInstruction.StartMessageIndex, response.CompressionInstruction.EndMessageIndex)
+		typeStr := response.CompressionInstruction.SummaryType
+		descStr := ""
+		if response.CompressionInstruction.Description != "" {
+			descStr = fmt.Sprintf(" (%s)", response.CompressionInstruction.Description)
+		}
+		return fmt.Sprintf("🗜️ Compressed %s with type '%s'%s", rangeStr, typeStr, descStr)
+	}
+
+	// For webui or if parsing fails, return the message field
+	var responseFallback struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(result), &responseFallback); err == nil && responseFallback.Message != "" {
+		return responseFallback.Message
+	}
+
+	return result
+}
+
 // getToolStatusIcon returns an appropriate icon based on tool execution status
 func getToolStatusIcon(hasError bool) string {
 	if hasError {
@@ -170,13 +208,13 @@ func formatFileWriteResult(result string, diff string) string {
 		if err := json.Unmarshal([]byte(result), &resultData); err == nil && resultData.Summary != "" {
 			var output strings.Builder
 			output.WriteString(resultData.Summary)
-			output.WriteString("\n\n" + formatDiff(diff))
+			output.WriteString("\n\n" + formatters.FormatDiff(diff))
 			return output.String()
 		} else {
 			// If JSON parsing fails, create a simple summary
 			var output strings.Builder
 			output.WriteString("File modified successfully\n\n")
-			output.WriteString(formatDiff(diff))
+			output.WriteString(formatters.FormatDiff(diff))
 			return output.String()
 		}
 	}
@@ -200,7 +238,7 @@ func formatFileWriteResult(result string, diff string) string {
 
 	// Add the diff from JSON if available
 	if resultData.Diff != "" {
-		output.WriteString("\n\n" + formatDiff(resultData.Diff))
+		output.WriteString("\n\n" + formatters.FormatDiff(resultData.Diff))
 	}
 
 	return output.String()
@@ -333,7 +371,7 @@ func formatMemoryResult(result string) string {
 	}
 
 	// Fallback to generic formatting
-	return formatGenericResult(result)
+	return formatters.FormatGenericResult(result)
 }
 
 // formatDiff formats diff content with colors and proper formatting
@@ -552,10 +590,25 @@ func getLastRequestUsage(chat *entities.Chat) (int, float64) {
 	return 0, 0.0
 }
 
+func (c *ChatView) getToolByName(name string) entities.Tool {
+	tools, err := c.toolService.ListTools()
+	if err != nil {
+		c.logger.Error("Failed to list tools", zap.Error(err))
+		return nil
+	}
+	for _, tool := range tools {
+		if tool.Name() == name {
+			return tool
+		}
+	}
+	return nil
+}
+
 type ChatView struct {
 	chatService        services.ChatService
 	agentService       services.AgentService
 	modelService       services.ModelService
+	toolService        services.ToolService
 	logger             *zap.Logger
 	activeChat         *entities.Chat
 	editor             vimtea.Editor
@@ -581,7 +634,7 @@ type ChatView struct {
 	toolCallStatus     map[string]bool    // Track completion status of tool calls (toolCallID -> completed)
 }
 
-func NewChatView(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, logger *zap.Logger, activeChat *entities.Chat) ChatView {
+func NewChatView(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService, logger *zap.Logger, activeChat *entities.Chat) ChatView {
 	ta := textarea.New()
 	ta.Placeholder = "Type your message..."
 	ta.Focus()
@@ -604,6 +657,7 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		chatService:        chatService,
 		agentService:       agentService,
 		modelService:       modelService,
+		toolService:        toolService,
 		logger:             logger,
 		activeChat:         activeChat,
 		textarea:           ta,
@@ -760,8 +814,16 @@ func (c *ChatView) updateEditorContent() {
 			sb.WriteString(c.systemStyle.Render("Tool: ") + "\n")
 			// Display tool call events
 			for _, event := range message.ToolCallEvents {
-				formattedResult := formatToolResult(event.ToolName, event.Result, event.Diff, event.Arguments)
-				name, suffix := formatToolName(event.ToolName, event.Arguments)
+				tool := c.getToolByName(event.ToolName)
+				var formattedResult, name, suffix string
+				if tool != nil {
+					formattedResult = tool.FormatResult("tui", event.Result, event.Diff, event.Arguments)
+					name, suffix = tool.DisplayName("tui", event.Arguments)
+				} else {
+					formattedResult = event.Result
+					name = event.ToolName
+					suffix = ""
+				}
 				statusIcon := getToolStatusIcon(event.Error != "")
 				displayName := name + ":"
 				if suffix != "" {
@@ -1228,7 +1290,7 @@ func (c ChatView) View() string {
 		// Use per-request usage instead of accumulated totals
 		requestTokens, requestCost := getLastRequestUsage(c.activeChat)
 		// Format token count with commas
-		tokenCountStr := formatTokenCount(requestTokens)
+		tokenCountStr := formatters.FormatTokenCount(requestTokens)
 		if c.currentModel != nil && c.currentModel.ContextWindow != nil && *c.currentModel.ContextWindow > 0 && requestTokens > 0 {
 			percentage := int(float64(requestTokens) / float64(*c.currentModel.ContextWindow) * 100)
 			tokenInfo = fmt.Sprintf("%s %d%% ($%.2f)", tokenCountStr, percentage, requestCost)

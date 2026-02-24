@@ -55,7 +55,7 @@ func NewOpenAIIntegration(baseURL, apiKey string, model *entities.Model, toolRep
 }
 
 // GenerateResponse generates a response using the appropriate OpenAI API based on the endpoint
-func (m *OpenAIIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]any, callback interfaces.MessageCallback) ([]*entities.Message, error) {
+func (m *OpenAIIntegration) GenerateResponse(ctx context.Context, messages []*entities.Message, toolList []entities.Tool, options map[string]any, callback interfaces.MessageCallback) ([]*entities.Message, error) {
 	// Check if this is a responses API endpoint (for all o-series and codex models)
 	if strings.Contains(m.baseURL, "/v1/responses") {
 		return m.generateResponseV2(ctx, messages, toolList, options, callback)
@@ -66,7 +66,7 @@ func (m *OpenAIIntegration) GenerateResponse(ctx context.Context, messages []*en
 }
 
 // generateResponseV2 handles the /v1/responses API for o1 and codex models with proper tool call support
-func (m *OpenAIIntegration) generateResponseV2(ctx context.Context, messages []*entities.Message, toolList []*entities.Tool, options map[string]any, callback interfaces.MessageCallback) ([]*entities.Message, error) {
+func (m *OpenAIIntegration) generateResponseV2(ctx context.Context, messages []*entities.Message, toolList []entities.Tool, options map[string]any, callback interfaces.MessageCallback) ([]*entities.Message, error) {
 	// Prepare tool definitions for OpenAI responses API (flattened format)
 	tools := make([]map[string]any, len(toolList))
 	for i, tool := range toolList {
@@ -76,9 +76,9 @@ func (m *OpenAIIntegration) generateResponseV2(ctx context.Context, messages []*
 
 		tools[i] = map[string]any{
 			"type":        "function",
-			"name":        (*tool).Name(),
-			"description": (*tool).Description(),
-			"parameters":  (*tool).Schema(),
+			"name":        tool.Name(),
+			"description": tool.Description(),
+			"parameters":  tool.Schema(),
 		}
 	}
 
@@ -362,7 +362,7 @@ func (m *OpenAIIntegration) generateResponseV2(ctx context.Context, messages []*
 						}
 					}
 
-					result, err := (*tool).Execute(args)
+					result, err := tool.Execute(args)
 					if err != nil {
 						toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
 						toolError = err.Error()
