@@ -70,9 +70,10 @@ type (
 )
 
 type (
-	startSkillsMsg   struct{}
-	skillSelectedMsg struct{ skillName string }
-	skillsFetchedMsg struct {
+	startSkillsMsg         struct{}
+	startSkillExecutionMsg struct{ skillName string }
+	skillSelectedMsg       struct{ skillName string }
+	skillsFetchedMsg       struct {
 		skills []*entities.Skill
 	}
 	skillsCancelledMsg struct{}

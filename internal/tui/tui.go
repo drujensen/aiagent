@@ -60,7 +60,7 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 		logger:             logger,
 		activeChat:         activeChat,
 
-		chatView:    NewChatView(chatService, agentService, modelService, toolService, logger, activeChat),
+		chatView:    NewChatView(chatService, agentService, modelService, toolService, skillService, logger, activeChat),
 		historyView: NewHistoryView(chatService),
 		usageView:   NewUsageView(chatService, agentService, modelService),
 		agentView:   NewAgentView(agentService),
@@ -275,16 +275,8 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.state = "skills/list"
 		return t, t.skillView.Init()
 	case skillSelectedMsg:
-		ctx := context.Background()
-		err := t.chatService.ExecuteSkill(ctx, msg.skillName)
-		if err != nil {
-			return t, func() tea.Msg { return errMsg(err) }
-		}
 		t.state = "chat/view"
-		if t.activeChat != nil {
-			t.chatView.updateEditorContent()
-		}
-		return t, nil
+		return t, func() tea.Msg { return startSkillExecutionMsg{skillName: msg.skillName} }
 	case skillsCancelledMsg:
 		t.state = "chat/view"
 		if t.activeChat != nil {

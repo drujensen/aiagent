@@ -25,6 +25,7 @@ type ChatView struct {
 	agentService       services.AgentService
 	modelService       services.ModelService
 	toolService        services.ToolService
+	skillService       services.SkillService
 	logger             *zap.Logger
 	activeChat         *entities.Chat
 	editor             vimtea.Editor
@@ -50,7 +51,7 @@ type ChatView struct {
 	toolCallStatus     map[string]bool    // Track completion status of tool calls (toolCallID -> completed)
 }
 
-func NewChatView(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService, logger *zap.Logger, activeChat *entities.Chat) ChatView {
+func NewChatView(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService, skillService services.SkillService, logger *zap.Logger, activeChat *entities.Chat) ChatView {
 	ta := textarea.New()
 	ta.Placeholder = "Type your message..."
 	ta.Focus()
@@ -74,6 +75,7 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		agentService:       agentService,
 		modelService:       modelService,
 		toolService:        toolService,
+		skillService:       skillService,
 		logger:             logger,
 		activeChat:         activeChat,
 		textarea:           ta,
@@ -613,6 +615,41 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			c.spinner, cmd = c.spinner.Update(m)
 			return c, cmd
 		}
+
+	case startSkillExecutionMsg:
+		// Get skill content synchronously (fast operation)
+		ctx := context.Background()
+		content, err := c.skillService.GetSkillContent(ctx, m.skillName)
+		if err != nil {
+			c.err = err
+			return c, nil
+		}
+
+		// Create and add message locally (same as user input)
+		message := &entities.Message{
+			Content: content,
+			Role:    "user",
+		}
+		c.activeChat.Messages = append(c.activeChat.Messages, *message)
+
+		// Initialize processing state
+		c.toolCallStatus = make(map[string]bool)
+		c.updateEditorContent()
+
+		// Scroll to bottom to show new message
+		bottomMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}}
+		newModel, _ := c.editor.Update(bottomMsg)
+		if editor, ok := newModel.(vimtea.Editor); ok {
+			c.editor = editor
+		}
+
+		// Start async processing
+		c.err = nil
+		ctx, cancel := context.WithCancel(context.Background())
+		c.cancel = cancel
+		c.isProcessing = true
+		c.startTime = time.Now()
+		return c, tea.Batch(commands.SendMessageCmd(c.chatService, c.activeChat.ID, message, ctx), c.spinner.Tick)
 
 	case toolCallEventMsg:
 		// Handle real-time tool call event
