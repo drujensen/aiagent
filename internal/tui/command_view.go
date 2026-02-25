@@ -26,10 +26,11 @@ func NewCommandMenu() CommandMenu {
 		CommandItem{name: "new", desc: "Create a new chat (Ctrl+N)"},
 		CommandItem{name: "history", desc: "View chat history (Ctrl+H)"},
 		CommandItem{name: "agents", desc: "View available agents (Ctrl+A)"},
+		CommandItem{name: "skills", desc: "View available skills (Ctrl+S)"},
 		CommandItem{name: "tools", desc: "View available tools (Ctrl+T)"},
-		CommandItem{name: "models", desc: "View available models (Ctrl+M)"},
+		CommandItem{name: "models", desc: "View available models (Ctrl+O)"},
 		CommandItem{name: "usage", desc: "Show usage statistics (Ctrl+U)"},
-		CommandItem{name: "exit", desc: "Exit the application (Ctrl+X)"},
+		CommandItem{name: "exit", desc: "Exit the application (Ctrl+C)"},
 	}
 
 	delegate := list.NewDefaultDelegate()

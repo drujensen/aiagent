@@ -530,6 +530,10 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			return c, nil
 		case "ctrl+s":
 			return c, func() tea.Msg { return startSkillsMsg{} }
+		case "ctrl+u":
+			return c, func() tea.Msg { return startUsageMsg{} }
+		case "ctrl+t":
+			return c, func() tea.Msg { return startToolsMsg{} }
 		case "enter":
 			if c.focused == "textarea" {
 				input := c.textarea.Value()
