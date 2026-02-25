@@ -229,7 +229,13 @@ func (s *modelRefreshService) refreshProvider(ctx context.Context, provider *ent
 		}
 		providerToUpdate.Models = append(providerToUpdate.Models, pricing)
 	} else {
-		for _, modelData := range (*fetched)[string(provider.Type)].Models {
+		// Handle provider key mapping for models.dev
+		providerKey := string(provider.Type)
+		if provider.Type == entities.ProviderTogether {
+			providerKey = "togetherai" // models.dev uses "togetherai" not "together"
+		}
+
+		for _, modelData := range (*fetched)[providerKey].Models {
 			pricing := entities.ModelPricing{
 				Name:                modelData.ID,
 				InputPricePerMille:  modelData.Cost.Input,  // Keep as per million tokens
