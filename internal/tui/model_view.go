@@ -224,18 +224,27 @@ func (v ModelView) fetchModelsCmd() tea.Cmd {
 			}
 		}
 
-		// Sort providers for consistent ordering
+		// Sort providers by name for consistent ordering
 		var providerIDs []string
 		for providerID := range modelsByProvider {
 			providerIDs = append(providerIDs, providerID)
 		}
-		sort.Strings(providerIDs)
+		sort.Slice(providerIDs, func(i, j int) bool {
+			nameI := providerNames[providerIDs[i]]
+			nameJ := providerNames[providerIDs[j]]
+			return nameI < nameJ
+		})
 
 		// Create grouped items
 		var groupedItems []list.Item
 		for _, providerID := range providerIDs {
 			providerName := providerNames[providerID]
 			models := modelsByProvider[providerID]
+
+			// Sort models within provider by name
+			sort.Slice(models, func(i, j int) bool {
+				return models[i].Name < models[j].Name
+			})
 
 			// Add provider header
 			groupedItems = append(groupedItems, ModelListItem{

@@ -74,7 +74,7 @@ func DefaultProviders() []*entities.Provider {
 			Models:     []entities.ModelPricing{},
 		},
 		{
-			ID:         "CB9AB9BA-7ABD-4690-8E5F-1FC35C6F8EE4",
+			ID:         "12345678-1234-1234-1234-123456789012",
 			Name:       "Together AI",
 			Type:       "together",
 			BaseURL:    "https://api.together.xyz",
@@ -90,7 +90,7 @@ func DefaultProviders() []*entities.Provider {
 			Models:     []entities.ModelPricing{},
 		},
 		{
-			ID:         "A7F8E9B2-3C4D-4E5F-6G7H-8I9J0K1L2M3N",
+			ID:         "FE6F981E-CA93-46BE-9B8B-0321A47A64E4",
 			Name:       "Together AI",
 			Type:       "together",
 			BaseURL:    "https://api.together.xyz",
