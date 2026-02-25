@@ -13,6 +13,7 @@ type (
 	toolCallEventMsg        *entities.ToolCallEvent
 	processFinishedEventMsg *entities.ProcessFinishedEvent
 	processFailedEventMsg   *entities.ProcessFailedEvent
+	chatUpdateEventMsg      *entities.ChatUpdateEvent
 )
 
 type (

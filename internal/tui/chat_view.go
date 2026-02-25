@@ -153,11 +153,22 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		}
 	})
 
+	// Subscribe to chat update events
+	chatUpdateCancel := events.SubscribeToChatUpdateEvents(func(data events.ChatUpdateEventData) {
+		// Send event to channel (non-blocking)
+		select {
+		case cv.eventChan <- data.Event:
+		default:
+			// Channel full, drop event to avoid blocking
+		}
+	})
+
 	// Combine cancel functions
 	cv.eventCancel = func() {
 		toolCancel()
 		processFinishedCancel()
 		processFailedCancel()
+		chatUpdateCancel()
 	}
 
 	return cv
@@ -396,6 +407,8 @@ func (c *ChatView) listenForEvents() tea.Cmd {
 			return processFinishedEventMsg(e)
 		case *entities.ProcessFailedEvent:
 			return processFailedEventMsg(e)
+		case *entities.ChatUpdateEvent:
+			return chatUpdateEventMsg(e)
 		default:
 			return nil
 		}
@@ -721,6 +734,22 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		}
 		return c, c.listenForEvents()
 
+	case chatUpdateEventMsg:
+		// Handle chat update event (e.g., usage updates)
+		if c.activeChat != nil && m.ChatID == c.activeChat.ID {
+			if m.UpdateType == "usage" {
+				// Usage has been updated in the service, refresh display
+				// Since activeChat is a pointer to the same object, it should be updated
+				// But to be safe, we can fetch the latest chat
+				ctx := context.Background()
+				updatedChat, err := c.chatService.GetChat(ctx, m.ChatID)
+				if err == nil {
+					c.activeChat = updatedChat
+				}
+			}
+		}
+		return c, c.listenForEvents()
+
 	case updatedChatMsg:
 		c.textarea.Reset()
 		// Check if agent is changing
@@ -837,16 +866,9 @@ func (c ChatView) View() string {
 		titleStyle := lipgloss.NewStyle().PaddingLeft(1).Bold(true).Foreground(lipgloss.Color("15"))
 
 		var tokenInfo string
-		// Use per-request usage instead of accumulated totals
-		requestTokens, requestCost := c.activeChat.GetLastRequestUsage()
-		// Format token count with commas
-		tokenCountStr := formatters.FormatTokenCount(requestTokens)
-		if c.currentModel != nil && c.currentModel.ContextWindow != nil && *c.currentModel.ContextWindow > 0 && requestTokens > 0 {
-			percentage := int(float64(requestTokens) / float64(*c.currentModel.ContextWindow) * 100)
-			tokenInfo = fmt.Sprintf("%s %d%% ($%.2f)", tokenCountStr, percentage, requestCost)
-		} else {
-			tokenInfo = fmt.Sprintf("%s ($%.2f)", tokenCountStr, requestCost)
-		}
+		// Use accumulated totals for display
+		tokenCountStr := formatters.FormatTokenCount(c.activeChat.Usage.TotalTokens)
+		tokenInfo = fmt.Sprintf("Total Tokens: %s ($%.2f)", tokenCountStr, c.activeChat.Usage.TotalCost)
 
 		chatName := "New Chat"
 		if c.activeChat != nil {

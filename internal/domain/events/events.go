@@ -10,6 +10,7 @@ const (
 	ToolCallEventType        uint32 = 1
 	ProcessFinishedEventType uint32 = 2
 	ProcessFailedEventType   uint32 = 3
+	ChatUpdateEventType      uint32 = 4
 )
 
 // ToolCallEventData wraps the ToolCallEvent for publishing
@@ -69,5 +70,25 @@ func PublishProcessFailedEvent(processEvent *entities.ProcessFailedEvent) {
 
 // SubscribeToProcessFailedEvents subscribes to process failed events
 func SubscribeToProcessFailedEvents(handler func(data ProcessFailedEventData)) func() {
+	return event.On(handler)
+}
+
+// ChatUpdateEventData wraps the ChatUpdateEvent for publishing
+type ChatUpdateEventData struct {
+	Event *entities.ChatUpdateEvent
+}
+
+// Type implements the Event interface
+func (c ChatUpdateEventData) Type() uint32 {
+	return ChatUpdateEventType
+}
+
+// PublishChatUpdateEvent publishes a chat update event
+func PublishChatUpdateEvent(chatEvent *entities.ChatUpdateEvent) {
+	event.Emit(ChatUpdateEventData{Event: chatEvent})
+}
+
+// SubscribeToChatUpdateEvents subscribes to chat update events
+func SubscribeToChatUpdateEvents(handler func(data ChatUpdateEventData)) func() {
 	return event.On(handler)
 }

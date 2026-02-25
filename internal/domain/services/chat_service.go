@@ -233,6 +233,12 @@ func (s *chatService) SaveMessagesIncrementally(ctx context.Context, chatID stri
 		return err
 	}
 
+	// Publish usage update event for real-time UI updates (after save so repo is updated)
+	events.PublishChatUpdateEvent(entities.NewChatUpdateEvent(chat.ID, "usage", map[string]interface{}{
+		"total_tokens": chat.Usage.TotalTokens,
+		"total_cost":   chat.Usage.TotalCost,
+	}))
+
 	return nil
 }
 
@@ -473,8 +479,8 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		// Context error detected - compress more aggressively and retry
 		s.logger.Warn("Context window error detected, compressing and retrying", zap.Error(err), zap.Int("attempt", attempt+1))
 
-		// Force more aggressive compression
-		compressedMessages, originalMessagesReplaced, err := s.compressMessagesAggressively(ctx, chat, model, provider, resolvedAPIKey, int(float64(tokenLimit)*0.5))
+		// Force compression with same algorithm
+		compressedMessages, originalMessagesReplaced, err := s.compressMessages(ctx, chat, model, provider, resolvedAPIKey, tokenLimit)
 		if err != nil {
 			s.logger.Warn("Failed aggressive compression, using fallback trimming", zap.Error(err))
 			compressedMessages = s.trimMessagesToLimit(messagesToSend, int(float64(tokenLimit)*0.6))
@@ -1082,8 +1088,8 @@ func (s *chatService) compressMessages(
 	apiKey string,
 	tokenLimit int,
 ) ([]*entities.Message, bool, error) {
-	// Calculate how many messages to summarize (approx 40% of older messages)
-	numMessagesToKeep := int(float64(len(chat.Messages)) * 0.6)
+	// Calculate how many messages to summarize (approx 50% of older messages)
+	numMessagesToKeep := int(float64(len(chat.Messages)) * 0.5)
 	if numMessagesToKeep < 1 {
 		numMessagesToKeep = 1 // Always keep at least the most recent message
 	}
@@ -1157,12 +1163,28 @@ func (s *chatService) compressMessages(
 		return nil, false, fmt.Errorf("no summary generated")
 	}
 
+	// Aggregate usage from compressed messages
+	var totalPrompt, totalCompletion, totalTokens int
+	var totalCost float64
+	for _, msg := range messagesToSummarize {
+		totalPrompt += msg.Usage.PromptTokens
+		totalCompletion += msg.Usage.CompletionTokens
+		totalTokens += msg.Usage.TotalTokens
+		totalCost += msg.Usage.Cost
+	}
+
 	// Create a single message that contains the summary
 	summaryMsg := &entities.Message{
 		ID:        uuid.New().String(),
 		Role:      "assistant",
 		Content:   "Summary of previous conversation: " + summaryResponse[0].Content,
 		Timestamp: time.Now(),
+		Usage: &entities.Usage{
+			PromptTokens:     totalPrompt,
+			CompletionTokens: totalCompletion,
+			TotalTokens:      totalTokens,
+			Cost:             totalCost,
+		},
 	}
 
 	// Create new array with summary message + recent messages to keep
@@ -1184,130 +1206,6 @@ func (s *chatService) compressMessages(
 	}
 
 	return finalMessages, true, nil
-}
-
-// compressMessagesAggressively compresses messages more aggressively for context error recovery
-func (s *chatService) compressMessagesAggressively(ctx context.Context, chat *entities.Chat, model *entities.Model, provider *entities.Provider, apiKey string, targetTokenLimit int) ([]*entities.Message, bool, error) {
-	if chat == nil || len(chat.Messages) == 0 {
-		return nil, false, fmt.Errorf("invalid chat or no messages to compress")
-	}
-
-	// Compress to target limit instead of 60%
-	numMessagesToKeep := int(float64(len(chat.Messages)) * 0.4) // Keep only 40%
-	if numMessagesToKeep < 1 {
-		numMessagesToKeep = 1
-	}
-
-	// Use the existing compressMessages logic but with modified parameters
-	return s.compressMessagesWithTarget(ctx, chat, model, provider, apiKey, targetTokenLimit, numMessagesToKeep)
-}
-
-// compressMessagesWithTarget is a helper for compressMessages with custom parameters
-func (s *chatService) compressMessagesWithTarget(ctx context.Context, chat *entities.Chat, model *entities.Model, provider *entities.Provider, apiKey string, targetTokenLimit int, numMessagesToKeep int) ([]*entities.Message, bool, error) {
-	// Calculate summarize end index based on numMessagesToKeep
-	summarizeEndIdx := len(chat.Messages) - numMessagesToKeep
-	if summarizeEndIdx < 1 {
-		summarizeEndIdx = 1
-	}
-
-	// Find safe split point
-	safeFound := false
-	for j := summarizeEndIdx; j >= 1; j-- {
-		if isSafeSplit(chat.Messages, j) {
-			summarizeEndIdx = j
-			safeFound = true
-			break
-		}
-	}
-	if !safeFound {
-		s.logger.Warn("No safe split point found; skipping aggressive compression")
-		return nil, false, nil
-	}
-
-	messagesToSummarize := chat.Messages[:summarizeEndIdx]
-	recentMessagesToKeep := chat.Messages[summarizeEndIdx:]
-
-	// Create summary using AI
-	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
-	aiModel, err := aiModelFactory.CreateModelIntegration(model, provider, apiKey)
-	if err != nil {
-		return nil, false, errors.InternalErrorf("failed to initialize AI model for aggressive summarization: %v", err)
-	}
-
-	summaryPrompt := &entities.Message{
-		Role:    "system",
-		Content: "Create a concise summary of the following conversation that captures all important context, decisions, and information. Focus on key facts, goals, decisions, and relevant details. This is an emergency compression due to context limits - prioritize essential information only.",
-	}
-
-	var historyMsgs []*entities.Message
-	historyMsgs = append(historyMsgs, summaryPrompt)
-	for i := range messagesToSummarize {
-		msg := messagesToSummarize[i]
-		historyMsgs = append(historyMsgs, &msg)
-	}
-
-	options := map[string]any{
-		"temperature": 0.0,
-		"max_tokens":  500, // Smaller summary for emergency compression
-	}
-
-	if ctx.Err() == context.Canceled {
-		return nil, false, errors.CanceledErrorf("aggressive summarization was canceled")
-	}
-
-	summaryResponse, err := aiModel.GenerateResponse(ctx, historyMsgs, nil, options, nil)
-	if err != nil {
-		return nil, false, errors.InternalErrorf("failed to generate aggressive summary: %v", err)
-	}
-
-	if len(summaryResponse) == 0 {
-		return nil, false, fmt.Errorf("no aggressive summary generated")
-	}
-
-	summaryMsg := &entities.Message{
-		ID:        uuid.New().String(),
-		Role:      "assistant",
-		Content:   "[EMERGENCY COMPRESSION] " + summaryResponse[0].Content,
-		Timestamp: time.Now(),
-	}
-
-	// Replace messages
-	chat.Messages = append([]entities.Message{*summaryMsg}, recentMessagesToKeep...)
-
-	// Create final messages list, respecting target token limit
-	var finalMessages []*entities.Message
-	finalMessages = append(finalMessages, summaryMsg)
-
-	currentTokens := estimateTokens(summaryMsg)
-	for i := range recentMessagesToKeep {
-		msgTokens := estimateTokens(&recentMessagesToKeep[i])
-		if currentTokens+msgTokens > targetTokenLimit {
-			break
-		}
-		finalMessages = append(finalMessages, &recentMessagesToKeep[i])
-		currentTokens += msgTokens
-	}
-
-	// Ensure we have at least the summary message
-	if len(finalMessages) == 0 {
-		s.logger.Error("compressMessagesWithTarget resulted in empty message list")
-		return nil, false, fmt.Errorf("compression resulted in no valid messages")
-	}
-
-	// Validate all messages are non-nil
-	validMessages := make([]*entities.Message, 0, len(finalMessages))
-	for _, msg := range finalMessages {
-		if msg != nil {
-			validMessages = append(validMessages, msg)
-		}
-	}
-
-	if len(validMessages) == 0 {
-		s.logger.Error("All messages became nil after compression validation")
-		return nil, false, fmt.Errorf("all messages became invalid after compression")
-	}
-
-	return validMessages, true, nil
 }
 
 // trimMessagesToLimit removes oldest messages until under token limit

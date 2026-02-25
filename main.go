@@ -84,6 +84,11 @@ func main() {
 	logConfig := zap.NewDevelopmentConfig()
 	logConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	if modeStr == "tui" {
+		// Ensure .aiagent directory exists
+		if err := os.MkdirAll(".aiagent", 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to create .aiagent directory: %v\n", err)
+			os.Exit(1)
+		}
 		logConfig.OutputPaths = []string{".aiagent/aiagent.log"}
 		logConfig.ErrorOutputPaths = []string{".aiagent/aiagent.log"}
 	} else {
@@ -113,7 +118,6 @@ func main() {
 	if err != nil {
 		logger.Fatal("Failed to get current directory", zap.Error(err))
 	}
-	fmt.Printf("dataDir: %s\n", dataDir)
 
 	// Initialize tool factory
 	toolFactory, err := tools.NewToolFactory()

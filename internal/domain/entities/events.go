@@ -67,3 +67,23 @@ func NewProcessFailedEvent(chatID, errorMsg string) *ProcessFailedEvent {
 		Timestamp: time.Now(),
 	}
 }
+
+// ChatUpdateEvent represents updates to chat state (usage, messages, etc.)
+type ChatUpdateEvent struct {
+	ID         string                 `json:"id"`
+	ChatID     string                 `json:"chat_id"`
+	UpdateType string                 `json:"update_type"`
+	Data       map[string]interface{} `json:"data"`
+	Timestamp  time.Time              `json:"timestamp"`
+}
+
+// NewChatUpdateEvent creates a new chat update event
+func NewChatUpdateEvent(chatID, updateType string, data map[string]interface{}) *ChatUpdateEvent {
+	return &ChatUpdateEvent{
+		ID:         uuid.New().String(),
+		ChatID:     chatID,
+		UpdateType: updateType,
+		Data:       data,
+		Timestamp:  time.Now(),
+	}
+}
