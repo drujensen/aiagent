@@ -19,6 +19,7 @@ type TUI struct {
 	modelService       services.ModelService
 	providerService    services.ProviderService
 	toolService        services.ToolService
+	skillService       services.SkillService
 	modelFilterService *services.ModelFilterService
 	globalConfig       *config.GlobalConfig
 	logger             *zap.Logger
@@ -29,6 +30,7 @@ type TUI struct {
 	usageView   UsageView
 	agentView   AgentView
 	modelView   ModelView
+	skillView   SkillView
 	toolView    ToolView
 	commandMenu CommandMenu
 
@@ -36,7 +38,7 @@ type TUI struct {
 	err   error
 }
 
-func NewTUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, providerService services.ProviderService, toolService services.ToolService, modelFilterService *services.ModelFilterService, globalConfig *config.GlobalConfig, logger *zap.Logger) TUI {
+func NewTUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, providerService services.ProviderService, toolService services.ToolService, skillService services.SkillService, modelFilterService *services.ModelFilterService, globalConfig *config.GlobalConfig, logger *zap.Logger) TUI {
 	ctx := context.Background()
 
 	activeChat, err := chatService.GetActiveChat(ctx)
@@ -52,6 +54,7 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 		modelService:       modelService,
 		providerService:    providerService,
 		toolService:        toolService,
+		skillService:       skillService,
 		modelFilterService: modelFilterService,
 		globalConfig:       globalConfig,
 		logger:             logger,
@@ -62,6 +65,7 @@ func NewTUI(chatService services.ChatService, agentService services.AgentService
 		usageView:   NewUsageView(chatService, agentService, modelService),
 		agentView:   NewAgentView(agentService),
 		modelView:   NewModelViewWithMode(modelService, providerService, modelFilterService, "view"),
+		skillView:   NewSkillView(skillService),
 		toolView:    NewToolView(toolService),
 		commandMenu: NewCommandMenu(),
 
@@ -266,6 +270,28 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return t, nil
 
+	// Handle skills view messages
+	case startSkillsMsg:
+		t.state = "skills/list"
+		return t, t.skillView.Init()
+	case skillSelectedMsg:
+		ctx := context.Background()
+		err := t.chatService.ExecuteSkill(ctx, msg.skillName)
+		if err != nil {
+			return t, func() tea.Msg { return errMsg(err) }
+		}
+		t.state = "chat/view"
+		if t.activeChat != nil {
+			t.chatView.updateEditorContent()
+		}
+		return t, nil
+	case skillsCancelledMsg:
+		t.state = "chat/view"
+		if t.activeChat != nil {
+			t.chatView.updateEditorContent()
+		}
+		return t, nil
+
 	// Handle command menu messages
 	case startCommandsMsg:
 		t.state = "chat/commands"
@@ -321,6 +347,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
+			return t, tea.Quit
 		}
 
 	// case errMsg:
@@ -363,6 +390,11 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 
+		t.skillView, cmd = t.skillView.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
 		t.commandMenu, cmd = t.commandMenu.Update(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -385,6 +417,8 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.modelView, cmd = t.modelView.Update(msg)
 	case "tools/list":
 		t.toolView, cmd = t.toolView.Update(msg)
+	case "skills/list":
+		t.skillView, cmd = t.skillView.Update(msg)
 	case "chat/commands":
 		t.commandMenu, cmd = t.commandMenu.Update(msg)
 	}
@@ -405,6 +439,8 @@ func (t TUI) View() string {
 		return t.modelView.View()
 	case "tools/list":
 		return t.toolView.View()
+	case "skills/list":
+		return t.skillView.View()
 	case "chat/commands":
 		return t.commandMenu.View()
 	}

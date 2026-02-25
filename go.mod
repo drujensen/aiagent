@@ -22,6 +22,7 @@ require (
 	github.com/yuin/goldmark v1.7.8
 	go.mongodb.org/mongo-driver v1.17.2
 	go.uber.org/zap v1.27.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -79,7 +80,6 @@ require (
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 replace github.com/kujtimiihoxha/vimtea => github.com/drujensen/vimtea v0.0.0-20260131151026-173ff6c01025

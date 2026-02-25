@@ -68,3 +68,12 @@ type (
 	}
 	modelsCancelledMsg struct{}
 )
+
+type (
+	startSkillsMsg   struct{}
+	skillSelectedMsg struct{ skillName string }
+	skillsFetchedMsg struct {
+		skills []*entities.Skill
+	}
+	skillsCancelledMsg struct{}
+)

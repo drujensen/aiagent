@@ -19,6 +19,20 @@ type mockAgentRepository struct {
 	agents []*entities.Agent
 }
 
+type mockSkillService struct {
+	mock.Mock
+}
+
+func (m *mockSkillService) ListSkills(ctx context.Context) ([]*entities.Skill, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]*entities.Skill), args.Error(1)
+}
+
+func (m *mockSkillService) GetSkillContent(ctx context.Context, skillName string) (string, error) {
+	args := m.Called(ctx, skillName)
+	return args.String(0), args.Error(1)
+}
+
 func (m *mockAgentRepository) ListAgents(ctx context.Context) ([]*entities.Agent, error) {
 	args := m.Called(ctx)
 	return args.Get(0).([]*entities.Agent), args.Error(1)
@@ -50,8 +64,10 @@ func (m *mockAgentRepository) DeleteAgent(ctx context.Context, id string) error 
 
 func TestAgentService_ListAgents(t *testing.T) {
 	mockRepo := new(mockAgentRepository)
+	mockSkill := new(mockSkillService)
 	logger := zap.NewNop()
-	service := NewAgentService(mockRepo, logger)
+	service := NewAgentService(mockRepo, mockSkill, logger)
+	mockSkill.On("ListSkills", mock.Anything).Return([]*entities.Skill{}, nil)
 
 	ctx := context.Background()
 	expectedAgents := []*entities.Agent{
@@ -69,8 +85,10 @@ func TestAgentService_ListAgents(t *testing.T) {
 
 func TestAgentService_GetAgent(t *testing.T) {
 	mockRepo := new(mockAgentRepository)
+	mockSkill := new(mockSkillService)
 	logger := zap.NewNop()
-	service := NewAgentService(mockRepo, logger)
+	service := NewAgentService(mockRepo, mockSkill, logger)
+	mockSkill.On("ListSkills", mock.Anything).Return([]*entities.Skill{}, nil)
 
 	ctx := context.Background()
 	agent := entities.NewAgent("TestAgent", "prompt", []string{"tool1"})
@@ -95,8 +113,10 @@ func TestAgentService_GetAgent(t *testing.T) {
 
 func TestAgentService_CreateAgent(t *testing.T) {
 	mockRepo := new(mockAgentRepository)
+	mockSkill := new(mockSkillService)
 	logger := zap.NewNop()
-	service := NewAgentService(mockRepo, logger)
+	service := NewAgentService(mockRepo, mockSkill, logger)
+	mockSkill.On("ListSkills", mock.Anything).Return([]*entities.Skill{}, nil)
 
 	ctx := context.Background()
 	agent := entities.NewAgent("TestAgent", "prompt", []string{"tool1"})
@@ -135,8 +155,10 @@ func TestAgentService_CreateAgent(t *testing.T) {
 
 func TestAgentService_UpdateAgent(t *testing.T) {
 	mockRepo := new(mockAgentRepository)
+	mockSkill := new(mockSkillService)
 	logger := zap.NewNop()
-	service := NewAgentService(mockRepo, logger)
+	service := NewAgentService(mockRepo, mockSkill, logger)
+	mockSkill.On("ListSkills", mock.Anything).Return([]*entities.Skill{}, nil)
 
 	ctx := context.Background()
 	agent := entities.NewAgent("TestAgent", "prompt", []string{"tool1"})
@@ -171,8 +193,10 @@ func TestAgentService_UpdateAgent(t *testing.T) {
 
 func TestAgentService_DeleteAgent(t *testing.T) {
 	mockRepo := new(mockAgentRepository)
+	mockSkill := new(mockSkillService)
 	logger := zap.NewNop()
-	service := NewAgentService(mockRepo, logger)
+	service := NewAgentService(mockRepo, mockSkill, logger)
+	mockSkill.On("ListSkills", mock.Anything).Return([]*entities.Skill{}, nil)
 
 	ctx := context.Background()
 

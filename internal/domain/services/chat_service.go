@@ -31,6 +31,7 @@ type ChatService interface {
 	SaveMessagesIncrementally(ctx context.Context, chatID string, messages []*entities.Message) error
 	CalculateTotalChatCost(ctx context.Context, chatID string) (float64, error)
 	GenerateAndUpdateTitle(ctx context.Context, chatID string) (*entities.Chat, error)
+	ExecuteSkill(ctx context.Context, skillName string) error
 }
 
 type chatService struct {
@@ -39,6 +40,7 @@ type chatService struct {
 	modelRepo    interfaces.ModelRepository
 	providerRepo interfaces.ProviderRepository
 	toolRepo     interfaces.ToolRepository
+	skillService SkillService
 	config       *config.Config
 	logger       *zap.Logger
 }
@@ -49,6 +51,7 @@ func NewChatService(
 	modelRepo interfaces.ModelRepository,
 	providerRepo interfaces.ProviderRepository,
 	toolRepo interfaces.ToolRepository,
+	skillService SkillService,
 	cfg *config.Config,
 	logger *zap.Logger,
 ) *chatService {
@@ -58,6 +61,7 @@ func NewChatService(
 		modelRepo:    modelRepo,
 		providerRepo: providerRepo,
 		toolRepo:     toolRepo,
+		skillService: skillService,
 		config:       cfg,
 		logger:       logger,
 	}
@@ -1536,4 +1540,31 @@ func (s *chatService) generateFallbackTitle(prompt string) string {
 		}
 	}
 	return "Chat Conversation"
+}
+
+func (s *chatService) ExecuteSkill(ctx context.Context, skillName string) error {
+	// Get active chat
+	chat, err := s.GetActiveChat(ctx)
+	if err != nil {
+		return err
+	}
+	if chat == nil {
+		return errors.ValidationErrorf("no active chat")
+	}
+
+	// Get skill content
+	content, err := s.skillService.GetSkillContent(ctx, skillName)
+	if err != nil {
+		return err
+	}
+
+	// Create user message with skill content
+	message := &entities.Message{
+		Role:    "user",
+		Content: content,
+	}
+
+	// Send the message
+	_, err = s.SendMessage(ctx, chat.ID, message)
+	return err
 }

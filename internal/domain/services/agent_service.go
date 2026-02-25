@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
@@ -20,14 +21,16 @@ type AgentService interface {
 }
 
 type agentService struct {
-	agentRepo interfaces.AgentRepository
-	logger    *zap.Logger
+	agentRepo    interfaces.AgentRepository
+	skillService SkillService
+	logger       *zap.Logger
 }
 
-func NewAgentService(agentRepo interfaces.AgentRepository, logger *zap.Logger) *agentService {
+func NewAgentService(agentRepo interfaces.AgentRepository, skillService SkillService, logger *zap.Logger) *agentService {
 	return &agentService{
-		agentRepo: agentRepo,
-		logger:    logger,
+		agentRepo:    agentRepo,
+		skillService: skillService,
+		logger:       logger,
 	}
 }
 
@@ -48,6 +51,19 @@ func (s *agentService) GetAgent(ctx context.Context, id string) (*entities.Agent
 	agent, err := s.agentRepo.GetAgent(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+
+	// Append available skills to system prompt
+	skills, err := s.skillService.ListSkills(ctx)
+	if err != nil {
+		s.logger.Warn("Failed to list skills for system prompt", zap.Error(err))
+		// Continue without skills
+	} else if len(skills) > 0 {
+		skillsSection := "\n\nAVAILABLE SKILLS:\nThe following skills are available for specialized tasks. Use them when the task matches their description.\n"
+		for _, skill := range skills {
+			skillsSection += fmt.Sprintf("- %s: %s\n", skill.Name, skill.Summary)
+		}
+		agent.SystemPrompt += skillsSection
 	}
 
 	return agent, nil

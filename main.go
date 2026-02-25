@@ -14,6 +14,7 @@ import (
 	"github.com/drujensen/aiagent/internal/impl/database"
 	"github.com/drujensen/aiagent/internal/impl/defaults"
 	"github.com/drujensen/aiagent/internal/impl/modelsdev"
+	"github.com/drujensen/aiagent/internal/impl/repositories"
 	repositoriesJson "github.com/drujensen/aiagent/internal/impl/repositories/json"
 	repositoriesMongo "github.com/drujensen/aiagent/internal/impl/repositories/mongo"
 	"github.com/drujensen/aiagent/internal/impl/tools"
@@ -83,11 +84,6 @@ func main() {
 	logConfig := zap.NewDevelopmentConfig()
 	logConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	if modeStr == "tui" {
-		mkdirErr := os.MkdirAll(".aiagent", 0755)
-		if mkdirErr != nil {
-			fmt.Fprintf(os.Stderr, "Failed to create .aiagent directory: %v\n", mkdirErr)
-			os.Exit(1)
-		}
 		logConfig.OutputPaths = []string{".aiagent/aiagent.log"}
 		logConfig.ErrorOutputPaths = []string{".aiagent/aiagent.log"}
 	} else {
@@ -117,6 +113,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("Failed to get current directory", zap.Error(err))
 	}
+	fmt.Printf("dataDir: %s\n", dataDir)
 
 	// Initialize tool factory
 	toolFactory, err := tools.NewToolFactory()
@@ -185,10 +182,16 @@ func main() {
 	}
 
 	providerService := services.NewProviderService(providerRepo, logger)
-	agentService := services.NewAgentService(agentRepo, logger)
 	modelService := services.NewModelService(modelRepo, logger)
 	toolService := services.NewToolService(toolRepo, logger)
-	chatService := services.NewChatService(chatRepo, agentRepo, modelRepo, providerRepo, toolRepo, cfg, logger)
+
+	// Initialize skill service
+	skillRepo := repositories.NewSkillRepository()
+	skillService := services.NewSkillService(skillRepo, logger)
+
+	agentService := services.NewAgentService(agentRepo, skillService, logger)
+
+	chatService := services.NewChatService(chatRepo, agentRepo, modelRepo, providerRepo, toolRepo, skillService, cfg, logger)
 
 	// Create ModelRefreshService for refresh functionality
 	modelsDevClient := modelsdev.NewModelsDevClient(logger)
@@ -215,7 +218,7 @@ func main() {
 			logger.Fatal("UI failed", zap.Error(err))
 		}
 	} else {
-		p := tea.NewProgram(tui.NewTUI(chatService, agentService, modelService, providerService, toolService, modelFilterService, globalConfig, logger), tea.WithAltScreen(), tea.WithMouseAllMotion())
+		p := tea.NewProgram(tui.NewTUI(chatService, agentService, modelService, providerService, toolService, skillService, modelFilterService, globalConfig, logger), tea.WithAltScreen(), tea.WithMouseAllMotion())
 
 		if _, err := p.Run(); err != nil {
 			log.Fatal(err)

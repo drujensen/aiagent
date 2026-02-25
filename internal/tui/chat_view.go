@@ -513,6 +513,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			c.lineNumbersEnabled = !c.lineNumbersEnabled
 			c.updateEditorContent()
 			return c, nil
+		case "ctrl+s":
+			return c, func() tea.Msg { return startSkillsMsg{} }
 		case "enter":
 			if c.focused == "textarea" {
 				input := c.textarea.Value()
