@@ -11,10 +11,29 @@ import (
 
 // GlobalConfig represents the global configuration settings
 type GlobalConfig struct {
-	DefaultTemperature    float64 `json:"default_temperature"`
-	DefaultMaxTokensRatio float64 `json:"default_max_tokens_ratio"`
-	LastUsedAgent         string  `json:"last_used_agent"`
-	LastUsedModel         string  `json:"last_used_model"`
+	DefaultTemperature    float64                         `json:"default_temperature"`
+	DefaultMaxTokensRatio float64                         `json:"default_max_tokens_ratio"`
+	LastUsedAgent         string                          `json:"last_used_agent"`
+	LastUsedModel         string                          `json:"last_used_model"`
+	Providers             map[string]CustomProviderConfig `json:"providers,omitempty"`
+}
+
+// CustomProviderConfig represents a custom provider configuration
+type CustomProviderConfig struct {
+	Name       string                       `json:"name"`
+	Type       string                       `json:"type"`
+	BaseURL    string                       `json:"base_url"`
+	APIKeyName string                       `json:"api_key_name"`
+	Models     map[string]CustomModelConfig `json:"models"`
+}
+
+// CustomModelConfig represents a custom model configuration
+type CustomModelConfig struct {
+	Name                string  `json:"name"`
+	ContextWindow       int     `json:"context_window"`
+	InputPricePerMille  float64 `json:"input_price_per_mille"`
+	OutputPricePerMille float64 `json:"output_price_per_mille"`
+	MaxOutputTokens     int     `json:"max_output_tokens,omitempty"`
 }
 
 // DefaultGlobalConfig returns the default global configuration
@@ -24,6 +43,36 @@ func DefaultGlobalConfig() *GlobalConfig {
 		DefaultMaxTokensRatio: 0.25,
 		LastUsedAgent:         "",
 		LastUsedModel:         "",
+		Providers: map[string]CustomProviderConfig{
+			"drujensen": {
+				Name:       "Drujensen",
+				Type:       "generic",
+				BaseURL:    "https://ai.drujensen.com",
+				APIKeyName: "DRUJENSEN_API_KEY",
+				Models: map[string]CustomModelConfig{
+					"qwen3-coder:latest": {
+						Name:                "Qwen3 Coder",
+						ContextWindow:       64000,
+						InputPricePerMille:  0,
+						OutputPricePerMille: 0,
+					},
+				},
+			},
+			"ollama": {
+				Name:       "Ollama",
+				Type:       "generic",
+				BaseURL:    "http://localhost:11434",
+				APIKeyName: "",
+				Models: map[string]CustomModelConfig{
+					"llama2:7b": {
+						Name:                "Llama 2 7B",
+						ContextWindow:       4096,
+						InputPricePerMille:  0,
+						OutputPricePerMille: 0,
+					},
+				},
+			},
+		},
 	}
 }
 

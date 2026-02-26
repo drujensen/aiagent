@@ -186,10 +186,64 @@ func (s *modelRefreshService) RefreshProvider(ctx context.Context, providerID st
 }
 
 func (s *modelRefreshService) refreshProvider(ctx context.Context, provider *entities.Provider) error {
-	if provider.Type == entities.ProviderGeneric {
-		s.logger.Debug("Skipping generic provider refresh",
+	// Check if this provider is defined in global config (custom provider)
+	// For custom providers, we need to find the config entry by matching names
+	var customConfig *config.CustomProviderConfig
+	var configKey string
+	for key, cfg := range s.globalConfig.Providers {
+		if cfg.Name == provider.Name && cfg.Type == "generic" {
+			customConfig = &cfg
+			configKey = key
+			break
+		}
+	}
+
+	if customConfig != nil {
+		s.logger.Debug("Using custom provider config",
 			zap.String("provider_id", provider.ID),
-			zap.String("name", provider.Name))
+			zap.String("provider_name", provider.Name),
+			zap.String("config_key", configKey))
+
+		// Update provider with config data
+		providerToUpdate := &entities.Provider{
+			ID:         provider.ID,
+			Name:       customConfig.Name,
+			Type:       entities.ProviderType(customConfig.Type),
+			BaseURL:    customConfig.BaseURL,
+			APIKeyName: customConfig.APIKeyName,
+			Models:     make([]entities.ModelPricing, 0),
+		}
+
+		// Add models from config
+		for modelName, modelConfig := range customConfig.Models {
+			pricing := entities.ModelPricing{
+				Name:                modelName,
+				InputPricePerMille:  modelConfig.InputPricePerMille,
+				OutputPricePerMille: modelConfig.OutputPricePerMille,
+				ContextWindow:       modelConfig.ContextWindow,
+				MaxOutputTokens:     modelConfig.MaxOutputTokens,
+			}
+			providerToUpdate.Models = append(providerToUpdate.Models, pricing)
+		}
+
+		providerToUpdate.UpdatedAt = time.Now()
+		if err := s.providerRepo.UpdateProvider(ctx, providerToUpdate); err != nil {
+			return err
+		}
+
+		s.logger.Info("Updated custom provider from config",
+			zap.String("provider_id", provider.ID),
+			zap.String("provider_name", provider.Name),
+			zap.String("config_key", configKey),
+			zap.Int("models_count", len(providerToUpdate.Models)))
+		return nil
+	}
+
+	// Original logic for built-in providers
+	if provider.Type == entities.ProviderGeneric {
+		s.logger.Debug("Skipping generic provider refresh (no config found)",
+			zap.String("provider_id", provider.ID),
+			zap.String("provider_name", provider.Name))
 		return nil
 	}
 
@@ -218,34 +272,22 @@ func (s *modelRefreshService) refreshProvider(ctx context.Context, provider *ent
 		Models:     make([]entities.ModelPricing, 0),
 	}
 
-	// Handle drujensen provider specially - it doesn't exist in models.dev
-	if provider.Type == entities.ProviderDrujensen {
+	// Handle provider key mapping for models.dev
+	providerKey := string(provider.Type)
+	if provider.Type == entities.ProviderTogether {
+		providerKey = "togetherai" // models.dev uses "togetherai" not "together"
+	}
+
+	for _, modelData := range (*fetched)[providerKey].Models {
 		pricing := entities.ModelPricing{
-			Name:                "qwen3-coder:latest",
-			InputPricePerMille:  0, // 0 pricing as requested
-			OutputPricePerMille: 0, // 0 pricing as requested
-			ContextWindow:       64000,
-			MaxOutputTokens:     0, // Will use ratio fallback
+			Name:                modelData.ID,
+			InputPricePerMille:  modelData.Cost.Input,  // Keep as per million tokens
+			OutputPricePerMille: modelData.Cost.Output, // Keep as per million tokens
+			ContextWindow:       modelData.Limit.Context,
+			MaxOutputTokens:     modelData.Limit.Output,
 		}
+
 		providerToUpdate.Models = append(providerToUpdate.Models, pricing)
-	} else {
-		// Handle provider key mapping for models.dev
-		providerKey := string(provider.Type)
-		if provider.Type == entities.ProviderTogether {
-			providerKey = "togetherai" // models.dev uses "togetherai" not "together"
-		}
-
-		for _, modelData := range (*fetched)[providerKey].Models {
-			pricing := entities.ModelPricing{
-				Name:                modelData.ID,
-				InputPricePerMille:  modelData.Cost.Input,  // Keep as per million tokens
-				OutputPricePerMille: modelData.Cost.Output, // Keep as per million tokens
-				ContextWindow:       modelData.Limit.Context,
-				MaxOutputTokens:     modelData.Limit.Output,
-			}
-
-			providerToUpdate.Models = append(providerToUpdate.Models, pricing)
-		}
 	}
 
 	providerToUpdate.UpdatedAt = time.Now()

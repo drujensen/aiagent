@@ -1,8 +1,6 @@
 package integrations
 
 import (
-	"fmt"
-
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
 
@@ -46,14 +44,11 @@ func (f *AIModelFactory) CreateModelIntegration(model *entities.Model, provider 
 		return NewGroqIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	case entities.ProviderMistral:
 		return NewMistralIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
-	case entities.ProviderOllama:
-		return NewOllamaIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
-	case entities.ProviderDrujensen:
-		return NewDrujensenIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	case entities.ProviderGeneric:
 		// For generic providers, use the OpenAI-compatible API
 		return NewGenericIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	default:
-		return nil, fmt.Errorf("unsupported provider type: %s", provider.Type)
+		// Treat any unknown provider type as generic (OpenAI-compatible)
+		return NewGenericIntegration(endpoint, apiKey, model.ModelName, f.toolRepo, f.logger)
 	}
 }

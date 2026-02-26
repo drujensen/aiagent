@@ -17,28 +17,13 @@ func DefaultProviders() []*entities.Provider {
 			APIKeyName: "ANTHROPIC_API_KEY",
 			Models:     []entities.ModelPricing{},
 		},
-		{
-			ID:         "41A83584-ABEB-4490-921A-D778A296862D",
-			Name:       "Custom Provider",
-			Type:       "generic",
-			BaseURL:    "",
-			APIKeyName: "CUSTOM_API_KEY",
-			Models:     []entities.ModelPricing{},
-		},
+
 		{
 			ID:         "ADEAC984-EBB4-491F-B041-38966A15DE83",
 			Name:       "DeepSeek",
 			Type:       "deepseek",
 			BaseURL:    "https://api.deepseek.com",
 			APIKeyName: "DEEPSEEK_API_KEY",
-			Models:     []entities.ModelPricing{},
-		},
-		{
-			ID:         "511D9293-347A-495E-8C56-1A7B7D2185BB",
-			Name:       "Drujensen",
-			Type:       "drujensen",
-			BaseURL:    "https://ai.drujensen.com",
-			APIKeyName: "DRUJENSEN_API_KEY",
 			Models:     []entities.ModelPricing{},
 		},
 		{

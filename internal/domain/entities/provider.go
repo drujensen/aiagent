@@ -16,8 +16,6 @@ const (
 	ProviderTogether  ProviderType = "together"
 	ProviderGroq      ProviderType = "groq"
 	ProviderMistral   ProviderType = "mistral"
-	ProviderOllama    ProviderType = "ollama"
-	ProviderDrujensen ProviderType = "drujensen"
 	ProviderGeneric   ProviderType = "generic"
 )
 

@@ -165,28 +165,30 @@ func main() {
 		}
 	}
 
+	providerService := services.NewProviderService(providerRepo, logger)
+
 	// Initialize default data
 	if err := initializeDefaults(context.Background(), providerRepo, agentRepo, modelRepo, toolRepo, logger); err != nil {
 		logger.Fatal("Failed to initialize defaults", zap.Error(err))
 	}
 
-	// Check if models exist, if not sync them automatically
-	models, err := modelRepo.ListModels(context.Background())
-	if err != nil {
-		logger.Fatal("Failed to check existing models", zap.Error(err))
+	// Ensure custom providers from config are created
+	if err := providerService.EnsureCustomProviders(context.Background(), globalConfig); err != nil {
+		logger.Fatal("Failed to ensure custom providers", zap.Error(err))
 	}
-	if len(models) == 0 {
-		logger.Info("No models found, performing automatic model sync")
+	modelService := services.NewModelService(modelRepo, logger)
+
+	// Check if we need to refresh models (on first run or when empty)
+	models, err := modelService.ListModels(context.Background())
+	if err == nil && len(models) == 0 {
+		logger.Info("No models found, running initial sync")
 		modelsDevClient := modelsdev.NewModelsDevClient(logger)
-		refreshService := services.NewModelRefreshService(providerRepo, modelRepo, modelsDevClient, globalConfig, logger)
-		if err := refreshService.SyncAllModels(context.Background()); err != nil {
-			logger.Fatal("Failed to sync models automatically", zap.Error(err))
+		initialRefreshService := services.NewModelRefreshService(providerRepo, modelRepo, modelsDevClient, globalConfig, logger)
+		if err := initialRefreshService.SyncAllModels(context.Background()); err != nil {
+			logger.Warn("Failed to sync models on startup", zap.Error(err))
 		}
-		logger.Info("Automatic model sync completed")
 	}
 
-	providerService := services.NewProviderService(providerRepo, logger)
-	modelService := services.NewModelService(modelRepo, logger)
 	toolService := services.NewToolService(toolRepo, logger)
 
 	// Initialize skill service
