@@ -27,9 +27,9 @@ func DefaultGlobalConfig() *GlobalConfig {
 	}
 }
 
-// LoadGlobalConfig loads the global configuration from ~/.config/aiagent/aiagent.json
+// LoadGlobalConfig loads the global configuration from ~/.aiagent/aiagent.json
 func LoadGlobalConfig(logger *zap.Logger) (*GlobalConfig, error) {
-	configDir := filepath.Join(os.Getenv("HOME"), ".config", "aiagent")
+	configDir := filepath.Join(os.Getenv("HOME"), ".aiagent")
 	configPath := filepath.Join(configDir, "aiagent.json")
 
 	// Start with defaults
@@ -56,9 +56,9 @@ func LoadGlobalConfig(logger *zap.Logger) (*GlobalConfig, error) {
 	return config, nil
 }
 
-// SaveGlobalConfig saves the global configuration to ~/.config/aiagent/aiagent.json
+// SaveGlobalConfig saves the global configuration to ~/.aiagent/aiagent.json
 func SaveGlobalConfig(config *GlobalConfig, logger *zap.Logger) error {
-	configDir := filepath.Join(os.Getenv("HOME"), ".config", "aiagent")
+	configDir := filepath.Join(os.Getenv("HOME"), ".aiagent")
 	configPath := filepath.Join(configDir, "aiagent.json")
 
 	// Create directory if it doesn't exist
