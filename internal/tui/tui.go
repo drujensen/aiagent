@@ -207,7 +207,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.chatView.updateEditorContent()
 		t.state = "chat/view"
 		// Save last used agent to global config
-		t.globalConfig.LastUsedAgent = msg.agentID
+		t.globalConfig.LastUsedAgent = agent.Name
 		if err := config.SaveGlobalConfig(t.globalConfig, t.logger); err != nil {
 			t.logger.Error("Failed to save global config", zap.Error(err))
 		}
@@ -239,7 +239,7 @@ func (t TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.chatView.updateEditorContent()
 		t.state = "chat/view"
 		// Save last used model to global config
-		t.globalConfig.LastUsedModel = msg.modelID
+		t.globalConfig.LastUsedModel = model.ModelName
 		if err := config.SaveGlobalConfig(t.globalConfig, t.logger); err != nil {
 			t.logger.Error("Failed to save global config", zap.Error(err))
 		}
@@ -445,11 +445,16 @@ func (t *TUI) autoCreateChatCmd() tea.Cmd {
 		ctx := context.Background()
 
 		// Get last used or default agent
-		agentID := t.globalConfig.LastUsedAgent
-		if agentID != "" {
-			// Validate that the agent exists
-			if _, err := t.agentService.GetAgent(ctx, agentID); err != nil {
-				agentID = "" // Reset if not found
+		agentID := ""
+		lastUsedAgentName := t.globalConfig.LastUsedAgent
+		if lastUsedAgentName != "" {
+			// Find agent by name
+			agents, _ := t.agentService.ListAgents(ctx)
+			for _, a := range agents {
+				if a.Name == lastUsedAgentName {
+					agentID = a.ID
+					break
+				}
 			}
 		}
 		if agentID == "" {
@@ -460,11 +465,16 @@ func (t *TUI) autoCreateChatCmd() tea.Cmd {
 		}
 
 		// Get last used or default model
-		modelID := t.globalConfig.LastUsedModel
-		if modelID != "" {
-			// Validate that the model exists
-			if _, err := t.modelService.GetModel(ctx, modelID); err != nil {
-				modelID = "" // Reset if not found
+		modelID := ""
+		lastUsedModelName := t.globalConfig.LastUsedModel
+		if lastUsedModelName != "" {
+			// Find model by name
+			models, _ := t.modelService.ListModels(ctx)
+			for _, m := range models {
+				if m.ModelName == lastUsedModelName {
+					modelID = m.ID
+					break
+				}
 			}
 		}
 		if modelID == "" {
@@ -476,15 +486,21 @@ func (t *TUI) autoCreateChatCmd() tea.Cmd {
 
 		// Update global config with last used agent and model
 		if agentID != "" {
-			t.globalConfig.LastUsedAgent = agentID
-			if err := config.SaveGlobalConfig(t.globalConfig, t.logger); err != nil {
-				t.logger.Warn("Failed to save global config", zap.Error(err))
+			agent, _ := t.agentService.GetAgent(ctx, agentID)
+			if agent != nil {
+				t.globalConfig.LastUsedAgent = agent.Name
+				if err := config.SaveGlobalConfig(t.globalConfig, t.logger); err != nil {
+					t.logger.Warn("Failed to save global config", zap.Error(err))
+				}
 			}
 		}
 		if modelID != "" {
-			t.globalConfig.LastUsedModel = modelID
-			if err := config.SaveGlobalConfig(t.globalConfig, t.logger); err != nil {
-				t.logger.Warn("Failed to save global config", zap.Error(err))
+			model, _ := t.modelService.GetModel(ctx, modelID)
+			if model != nil {
+				t.globalConfig.LastUsedModel = model.ModelName
+				if err := config.SaveGlobalConfig(t.globalConfig, t.logger); err != nil {
+					t.logger.Warn("Failed to save global config", zap.Error(err))
+				}
 			}
 		}
 

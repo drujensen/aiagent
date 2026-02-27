@@ -276,19 +276,19 @@ func (c *ChatController) ChatFormHandler(eCtx echo.Context) error {
 
 		// Set defaults from last used agent/model
 		if c.globalConfig.LastUsedAgent != "" {
-			// Verify the agent still exists
+			// Find agent by name
 			for _, agent := range agents {
-				if agent.ID == c.globalConfig.LastUsedAgent {
-					chatData.AgentID = c.globalConfig.LastUsedAgent
+				if agent.Name == c.globalConfig.LastUsedAgent {
+					chatData.AgentID = agent.ID
 					break
 				}
 			}
 		}
 		if c.globalConfig.LastUsedModel != "" {
-			// Verify the model still exists
+			// Find model by name
 			for _, model := range models {
-				if model.ID == c.globalConfig.LastUsedModel {
-					chatData.ModelID = c.globalConfig.LastUsedModel
+				if model.ModelName == c.globalConfig.LastUsedModel {
+					chatData.ModelID = model.ID
 					break
 				}
 			}
@@ -361,8 +361,18 @@ func (c *ChatController) CreateChatHandler(eCtx echo.Context) error {
 			// Use defaults if not specified (last used or first available)
 			if agentID == "" {
 				if c.globalConfig.LastUsedAgent != "" {
-					agentID = c.globalConfig.LastUsedAgent
-				} else {
+					// Find agent by name
+					agents, err := c.agentService.ListAgents(eCtx.Request().Context())
+					if err == nil {
+						for _, a := range agents {
+							if a.Name == c.globalConfig.LastUsedAgent {
+								agentID = a.ID
+								break
+							}
+						}
+					}
+				}
+				if agentID == "" {
 					// Use first available agent as default
 					agents, err := c.agentService.ListAgents(eCtx.Request().Context())
 					if err != nil || len(agents) == 0 {
@@ -373,8 +383,18 @@ func (c *ChatController) CreateChatHandler(eCtx echo.Context) error {
 			}
 			if modelID == "" {
 				if c.globalConfig.LastUsedModel != "" {
-					modelID = c.globalConfig.LastUsedModel
-				} else {
+					// Find model by name
+					models, err := c.modelService.ListModels(eCtx.Request().Context())
+					if err == nil {
+						for _, m := range models {
+							if m.ModelName == c.globalConfig.LastUsedModel {
+								modelID = m.ID
+								break
+							}
+						}
+					}
+				}
+				if modelID == "" {
 					// Use first available model as default
 					models, err := c.modelService.ListModels(eCtx.Request().Context())
 					if err != nil || len(models) == 0 {
@@ -405,14 +425,16 @@ func (c *ChatController) CreateChatHandler(eCtx echo.Context) error {
 	}
 
 	// Update global config with last used agent and model
-	if agentID != "" && agentID != c.globalConfig.LastUsedAgent {
-		c.globalConfig.LastUsedAgent = agentID
+	agent, _ := c.agentService.GetAgent(eCtx.Request().Context(), agentID)
+	if agent != nil && agent.Name != c.globalConfig.LastUsedAgent {
+		c.globalConfig.LastUsedAgent = agent.Name
 		if err := config.SaveGlobalConfig(c.globalConfig, c.logger); err != nil {
 			c.logger.Warn("Failed to save global config with last used agent", zap.Error(err))
 		}
 	}
-	if modelID != "" && modelID != c.globalConfig.LastUsedModel {
-		c.globalConfig.LastUsedModel = modelID
+	model, _ := c.modelService.GetModel(eCtx.Request().Context(), modelID)
+	if model != nil && model.ModelName != c.globalConfig.LastUsedModel {
+		c.globalConfig.LastUsedModel = model.ModelName
 		if err := config.SaveGlobalConfig(c.globalConfig, c.logger); err != nil {
 			c.logger.Warn("Failed to save global config with last used model", zap.Error(err))
 		}
@@ -491,6 +513,15 @@ func (c *ChatController) SwitchModelHandler(eCtx echo.Context) error {
 		return eCtx.String(http.StatusInternalServerError, "Failed to switch model")
 	}
 
+	// Update last used model in global config
+	model, _ := c.modelService.GetModel(eCtx.Request().Context(), input.ModelID)
+	if model != nil && model.ModelName != c.globalConfig.LastUsedModel {
+		c.globalConfig.LastUsedModel = model.ModelName
+		if err := config.SaveGlobalConfig(c.globalConfig, c.logger); err != nil {
+			c.logger.Warn("Failed to save global config with last used model", zap.Error(err))
+		}
+	}
+
 	return eCtx.JSON(http.StatusOK, map[string]interface{}{
 		"success": true,
 		"chat":    updatedChat,
@@ -524,6 +555,15 @@ func (c *ChatController) SwitchAgentHandler(eCtx echo.Context) error {
 	updatedChat, err := c.chatService.UpdateChat(eCtx.Request().Context(), chatID, input.AgentID, existingChat.ModelID, existingChat.Name)
 	if err != nil {
 		return eCtx.String(http.StatusInternalServerError, "Failed to switch agent")
+	}
+
+	// Update last used agent in global config
+	agent, _ := c.agentService.GetAgent(eCtx.Request().Context(), input.AgentID)
+	if agent != nil && agent.Name != c.globalConfig.LastUsedAgent {
+		c.globalConfig.LastUsedAgent = agent.Name
+		if err := config.SaveGlobalConfig(c.globalConfig, c.logger); err != nil {
+			c.logger.Warn("Failed to save global config with last used agent", zap.Error(err))
+		}
 	}
 
 	return eCtx.JSON(http.StatusOK, map[string]interface{}{

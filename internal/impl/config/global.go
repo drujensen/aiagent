@@ -13,8 +13,8 @@ import (
 type GlobalConfig struct {
 	DefaultTemperature    float64                         `json:"default_temperature"`
 	DefaultMaxTokensRatio float64                         `json:"default_max_tokens_ratio"`
-	LastUsedAgent         string                          `json:"last_used_agent"`
-	LastUsedModel         string                          `json:"last_used_model"`
+	LastUsedAgent         string                          `json:"last_used_agent"` // Agent name (not ID)
+	LastUsedModel         string                          `json:"last_used_model"` // Model name (not ID)
 	Providers             map[string]CustomProviderConfig `json:"providers,omitempty"`
 }
 
