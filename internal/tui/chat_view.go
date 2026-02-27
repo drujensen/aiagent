@@ -20,6 +20,8 @@ import (
 	"go.uber.org/zap"
 )
 
+type refreshMsg struct{}
+
 type ChatView struct {
 	chatService        services.ChatService
 	agentService       services.AgentService
@@ -125,7 +127,6 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 
 	// Subscribe to tool call events
 	toolCancel := events.SubscribeToToolCallEvents(func(data events.ToolCallEventData) {
-		// Send event to channel (non-blocking)
 		select {
 		case cv.eventChan <- data.Event:
 		default:
@@ -135,7 +136,6 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 
 	// Subscribe to process finished events
 	processFinishedCancel := events.SubscribeToProcessFinishedEvents(func(data events.ProcessFinishedEventData) {
-		// Send event to channel (non-blocking)
 		select {
 		case cv.eventChan <- data.Event:
 		default:
@@ -145,7 +145,6 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 
 	// Subscribe to process failed events
 	processFailedCancel := events.SubscribeToProcessFailedEvents(func(data events.ProcessFailedEventData) {
-		// Send event to channel (non-blocking)
 		select {
 		case cv.eventChan <- data.Event:
 		default:
@@ -155,7 +154,6 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 
 	// Subscribe to chat update events
 	chatUpdateCancel := events.SubscribeToChatUpdateEvents(func(data events.ChatUpdateEventData) {
-		// Send event to channel (non-blocking)
 		select {
 		case cv.eventChan <- data.Event:
 		default:
@@ -243,7 +241,7 @@ func (c *ChatView) SetActiveChat(chat *entities.Chat) {
 }
 
 func (c *ChatView) updateEditorContent() {
-	if c.activeChat == nil || len(c.activeChat.Messages) == 0 {
+	if c.activeChat == nil || (len(c.activeChat.Messages) == 0 && len(c.tempMessages) == 0) {
 		c.editor = vimtea.NewEditor(
 			vimtea.WithContent("How can I help you today?\n"),
 			vimtea.WithEnableModeCommand(true), // Enable command mode for :set commands
@@ -306,32 +304,36 @@ func (c *ChatView) updateEditorContent() {
 		}
 	}
 
-	// Add temporary tool call messages for real-time updates during processing
-	if c.isProcessing && len(c.tempMessages) > 0 {
+	// Add temporary messages for real-time updates
+	if len(c.tempMessages) > 0 {
 		for _, tempMsg := range c.tempMessages {
-			sb.WriteString(c.systemStyle.Render("Tool: ") + "\n")
-			// Display tool call events
-			for _, event := range tempMsg.ToolCallEvents {
-				tool := c.getToolByName(event.ToolName)
-				var formattedResult, name, suffix string
-				if tool != nil {
-					formattedResult = tool.FormatResult("tui", event.Result, event.Diff, event.Arguments)
-					name, suffix = tool.DisplayName("tui", event.Arguments)
-				} else {
-					formattedResult = event.Result
-					name = event.ToolName
-					suffix = ""
-				}
-				statusIcon := getToolStatusIcon(event.Error != "")
-				displayName := name + ":"
-				if suffix != "" {
-					displayName += " " + suffix
-				}
-				sb.WriteString(c.systemStyle.Render("  ↳ ") + statusIcon + " " + displayName + "\n")
-				sb.WriteString(c.systemStyle.Render("    ") + strings.ReplaceAll(formattedResult, "\n", "\n    ") + "\n")
-				if event.Error != "" {
-					errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true) // Red and bold
-					sb.WriteString(errorStyle.Render("    ✗ Error: ") + event.Error + "\n")
+			if tempMsg.Role == "user" {
+				sb.WriteString("\n" + c.userStyle.Render("User: ") + tempMsg.Content + "\n\n")
+			} else if tempMsg.Role == "tool" {
+				sb.WriteString(c.systemStyle.Render("Tool: ") + "\n")
+				// Display tool call events
+				for _, event := range tempMsg.ToolCallEvents {
+					tool := c.getToolByName(event.ToolName)
+					var formattedResult, name, suffix string
+					if tool != nil {
+						formattedResult = tool.FormatResult("tui", event.Result, event.Diff, event.Arguments)
+						name, suffix = tool.DisplayName("tui", event.Arguments)
+					} else {
+						formattedResult = event.Result
+						name = event.ToolName
+						suffix = ""
+					}
+					statusIcon := getToolStatusIcon(event.Error != "")
+					displayName := name + ":"
+					if suffix != "" {
+						displayName += " " + suffix
+					}
+					sb.WriteString(c.systemStyle.Render("  ↳ ") + statusIcon + " " + displayName + "\n")
+					sb.WriteString(c.systemStyle.Render("    ") + strings.ReplaceAll(formattedResult, "\n", "\n    ") + "\n")
+					if event.Error != "" {
+						errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true) // Red and bold
+						sb.WriteString(errorStyle.Render("    ✗ Error: ") + event.Error + "\n")
+					}
 				}
 			}
 		}
@@ -357,8 +359,6 @@ func (c *ChatView) updateEditorContent() {
 		vimtea.WithReadOnly(true),
 		vimtea.WithSelectedStyle(lipgloss.NewStyle().Background(lipgloss.Color("#586e75"))),
 	)
-	// Ensure editor maintains current focus state
-	c.editor.SetFocus(c.focused == "editor")
 
 	// Set editor size: textarea (dynamic) + footer (1) + separators (2) + header (1)
 	if c.width > 0 && c.height > 0 {
@@ -370,12 +370,11 @@ func (c *ChatView) updateEditorContent() {
 		c.editor.SetSize(editorWidth, editorHeight)
 	}
 
-	// Ensure editor is in normal mode and scroll to bottom to show latest messages
+	// Ensure editor maintains current focus state
 	c.editor.SetMode(vimtea.ModeNormal)
 	c.editor.SetFocus(true)
 	_, _ = c.editor.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
 	c.editor.SetFocus(false)
-
 }
 
 func (c ChatView) Init() tea.Cmd {
@@ -439,14 +438,12 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			// Handle mouse wheel events for scrolling the editor
 			switch m.Type {
 			case tea.MouseWheelUp:
-				// Send mouse wheel up to vimtea (moves cursor up)
 				mouseMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}
 				newModel, _ := c.editor.Update(mouseMsg)
 				if editor, ok := newModel.(vimtea.Editor); ok {
 					c.editor = editor
 				}
 			case tea.MouseWheelDown:
-				// Send mouse wheel down to vimtea (moves cursor down)
 				mouseMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
 				newModel, _ := c.editor.Update(mouseMsg)
 				if editor, ok := newModel.(vimtea.Editor); ok {
@@ -493,8 +490,6 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				if c.cancel != nil {
 					c.cancel()
 					c.isProcessing = false
-					// Don't set error immediately - let the sendMessageCmd complete with partial results
-					// Send 'G' key to vimtea to go to bottom
 					bottomMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}}
 					newModel, _ := c.editor.Update(bottomMsg)
 					if editor, ok := newModel.(vimtea.Editor); ok {
@@ -545,10 +540,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 					c.err = fmt.Errorf("no active chat")
 					return c, nil
 				}
-				message := &entities.Message{
-					Content: input,
-					Role:    "user",
-				}
+				message := entities.NewMessage("user", input)
 				c.textarea.Reset()
 				c.textarea.SetHeight(2)
 				editorHeight := c.height - (2 + 1 + 2 + 1)
@@ -556,22 +548,15 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 					editorHeight = 1
 				}
 				c.editor.SetSize(c.width, editorHeight)
-				c.activeChat.Messages = append(c.activeChat.Messages, *message)
+				c.tempMessages = append(c.tempMessages, *message)
 				// Initialize tool call status tracking for this message
 				c.toolCallStatus = make(map[string]bool)
-				c.updateEditorContent()
-				// Scroll to bottom to show the new user message
-				bottomMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}}
-				newModel, _ := c.editor.Update(bottomMsg)
-				if editor, ok := newModel.(vimtea.Editor); ok {
-					c.editor = editor
-				}
 				c.err = nil
 				ctx, cancel := context.WithCancel(context.Background())
 				c.cancel = cancel
 				c.isProcessing = true
 				c.startTime = time.Now()
-				return c, tea.Batch(commands.SendMessageCmd(c.chatService, c.activeChat.ID, message, ctx), c.spinner.Tick)
+				return c, tea.Batch(commands.SendMessageCmd(c.chatService, c.activeChat.ID, message, ctx), c.spinner.Tick, tea.Cmd(func() tea.Msg { return refreshMsg{} }))
 			}
 		case "tab", "shift+tab":
 			if c.focused == "textarea" {
@@ -643,11 +628,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		}
 
 		// Create and add message locally (same as user input)
-		message := &entities.Message{
-			Content: content,
-			Role:    "user",
-		}
-		c.activeChat.Messages = append(c.activeChat.Messages, *message)
+		message := entities.NewMessage("user", content)
+		c.tempMessages = append(c.tempMessages, *message)
 
 		// Initialize processing state
 		c.toolCallStatus = make(map[string]bool)
@@ -796,6 +778,16 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		c.updateEditorContent()
 		c.isProcessing = false
 		c.cancel = nil
+		return c, nil
+
+	case refreshMsg:
+		c.updateEditorContent()
+		// Scroll to bottom to show the new user message
+		bottomMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}}
+		newModel, _ := c.editor.Update(bottomMsg)
+		if editor, ok := newModel.(vimtea.Editor); ok {
+			c.editor = editor
+		}
 		return c, nil
 
 	case errMsg:

@@ -255,8 +255,12 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		return nil, err
 	}
 
-	message.ID = uuid.New().String()
-	message.Timestamp = time.Now()
+	if message.ID == "" {
+		message.ID = uuid.New().String()
+	}
+	if message.Timestamp.IsZero() {
+		message.Timestamp = time.Now()
+	}
 	chat.Messages = append(chat.Messages, *message)
 	chat.UpdatedAt = time.Now()
 
