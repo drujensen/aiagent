@@ -39,11 +39,20 @@ func (r *SkillRepository) DiscoverSkills(ctx context.Context) ([]*entities.Skill
 		return nil, errors.InternalErrorf("failed to get home directory: %v", err)
 	}
 
-	// Scan only ~/.aiagent/skills/
-	skillsPath := filepath.Join(homeDir, ".aiagent", "skills")
-	if err := r.scanSkillsDirectory(skillsPath, skillMap, false); err != nil {
-		// Log warning but continue - don't fail on inaccessible directories
-		fmt.Printf("Warning: failed to scan %s: %v\n", skillsPath, err)
+	// Scan skill directories in priority order
+	skillDirs := []struct {
+		path      string
+		isProject bool
+	}{
+		{filepath.Join(homeDir, ".aiagent", "skills"), false},
+		{filepath.Join(homeDir, ".agents", "skills"), false},
+	}
+
+	for _, dir := range skillDirs {
+		if err := r.scanSkillsDirectory(dir.path, skillMap, dir.isProject); err != nil {
+			// Log warning but continue - don't fail on inaccessible directories
+			fmt.Printf("Warning: failed to scan %s: %v\n", dir.path, err)
+		}
 	}
 
 	// Convert map to slice and sort by name

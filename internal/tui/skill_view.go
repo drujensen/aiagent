@@ -62,13 +62,7 @@ func (v SkillView) Update(msg tea.Msg) (SkillView, tea.Cmd) {
 		v.list, cmd = v.list.Update(msg)
 
 		switch m.String() {
-		case "esc":
-			if v.list.FilterState() != list.Filtering {
-				v.list.SetFilterText("")
-				return v, func() tea.Msg { return skillsCancelledMsg{} }
-			}
-		case "q":
-			v.list.SetFilterText("")
+		case "esc", "q":
 			return v, func() tea.Msg { return skillsCancelledMsg{} }
 		case "enter":
 			if selected, ok := v.list.SelectedItem().(*entities.Skill); ok && selected.Name != "No skills found" {
@@ -87,6 +81,10 @@ func (v SkillView) Update(msg tea.Msg) (SkillView, tea.Cmd) {
 			items = append(items, &entities.Skill{Name: "No skills found"})
 		}
 		v.list.SetItems(items)
+		// Reset cursor to first item after loading
+		if len(items) > 0 {
+			v.list.Select(0)
+		}
 		v.err = nil
 		return v, nil
 

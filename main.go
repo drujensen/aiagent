@@ -197,7 +197,7 @@ func main() {
 
 	agentService := services.NewAgentService(agentRepo, skillService, logger)
 
-	chatService := services.NewChatService(chatRepo, agentRepo, modelRepo, providerRepo, toolRepo, skillService, cfg, logger)
+	chatService := services.NewChatService(chatRepo, agentRepo, agentService, modelRepo, providerRepo, toolRepo, skillService, cfg, logger)
 
 	// Create ModelRefreshService for refresh functionality
 	modelsDevClient := modelsdev.NewModelsDevClient(logger)

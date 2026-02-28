@@ -37,6 +37,7 @@ type ChatService interface {
 type chatService struct {
 	chatRepo     interfaces.ChatRepository
 	agentRepo    interfaces.AgentRepository
+	agentService AgentService
 	modelRepo    interfaces.ModelRepository
 	providerRepo interfaces.ProviderRepository
 	toolRepo     interfaces.ToolRepository
@@ -48,6 +49,7 @@ type chatService struct {
 func NewChatService(
 	chatRepo interfaces.ChatRepository,
 	agentRepo interfaces.AgentRepository,
+	agentService AgentService,
 	modelRepo interfaces.ModelRepository,
 	providerRepo interfaces.ProviderRepository,
 	toolRepo interfaces.ToolRepository,
@@ -58,6 +60,7 @@ func NewChatService(
 	return &chatService{
 		chatRepo:     chatRepo,
 		agentRepo:    agentRepo,
+		agentService: agentService,
 		modelRepo:    modelRepo,
 		providerRepo: providerRepo,
 		toolRepo:     toolRepo,
@@ -292,7 +295,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 	}
 
 	// Get Agent for behavior settings (system prompt, tools)
-	agent, err := s.agentRepo.GetAgent(ctx, chat.AgentID)
+	agent, err := s.agentService.GetAgent(ctx, chat.AgentID)
 	if err != nil {
 		return nil, err
 	}
@@ -1460,10 +1463,11 @@ func (s *chatService) ExecuteSkill(ctx context.Context, skillName string) error 
 		return err
 	}
 
-	// Create user message with skill content
+	// Create user message with skill content and context
+	contextContent := fmt.Sprintf("SKILL ACTIVATED: %s\n\nFollow these instructions to handle the user's request using this specialized skill.\n\n%s", skillName, content)
 	message := &entities.Message{
 		Role:    "user",
-		Content: content,
+		Content: contextContent,
 	}
 
 	// Send the message
