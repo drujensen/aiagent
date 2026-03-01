@@ -18,8 +18,8 @@ type JsonProviderRepository struct {
 	data     []*entities.Provider
 }
 
-func NewJSONProviderRepository(dataDir string) (interfaces.ProviderRepository, error) {
-	filePath := filepath.Join(dataDir, ".aiagent", "providers.json")
+func NewJSONProviderRepository(storageDir string) (interfaces.ProviderRepository, error) {
+	filePath := filepath.Join(storageDir, "providers.json")
 	repo := &JsonProviderRepository{
 		filePath: filePath,
 		data:     []*entities.Provider{},

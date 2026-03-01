@@ -20,8 +20,8 @@ type JsonAgentRepository struct {
 	data     []*entities.Agent
 }
 
-func NewJSONAgentRepository(dataDir string) (interfaces.AgentRepository, error) {
-	filePath := filepath.Join(dataDir, ".aiagent", "agents.json")
+func NewJSONAgentRepository(storageDir string) (interfaces.AgentRepository, error) {
+	filePath := filepath.Join(storageDir, "agents.json")
 	repo := &JsonAgentRepository{
 		filePath: filePath,
 		data:     []*entities.Agent{},

@@ -25,8 +25,8 @@ type JsonToolRepository struct {
 	logger        *zap.Logger
 }
 
-func NewJSONToolRepository(dataDir string, toolFactory *tools.ToolFactory, logger *zap.Logger) (interfaces.ToolRepository, error) {
-	filePath := filepath.Join(dataDir, ".aiagent", "tools.json")
+func NewJSONToolRepository(storageDir string, toolFactory *tools.ToolFactory, logger *zap.Logger) (interfaces.ToolRepository, error) {
+	filePath := filepath.Join(storageDir, "tools.json")
 	repo := &JsonToolRepository{
 		filePath:      filePath,
 		data:          []*entities.ToolData{},

@@ -20,8 +20,8 @@ type JsonTaskRepository struct {
 	data     []*entities.Task
 }
 
-func NewJSONTaskRepository(dataDir string) (interfaces.TaskRepository, error) {
-	filePath := filepath.Join(dataDir, ".aiagent", "tasks.json")
+func NewJSONTaskRepository(storageDir string) (interfaces.TaskRepository, error) {
+	filePath := filepath.Join(storageDir, "tasks.json")
 	repo := &JsonTaskRepository{
 		filePath: filePath,
 		data:     []*entities.Task{},

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"slices"
 
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
@@ -37,11 +38,14 @@ func main() {
 	}
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: aiagent [serve|tui|refresh] [--storage=type]\n")
+		fmt.Fprintf(os.Stderr, "Usage: aiagent [serve|tui|refresh] [--global] [--storage=type]\n")
 		flag.PrintDefaults()
 	}
 
 	storage := flag.String("storage", "file", "Storage type: file or mongo")
+	var global bool
+	flag.BoolVar(&global, "global", false, "Use global storage in home directory (~/.aiagent/storage) instead of local (./.aiagent/storage)")
+	flag.BoolVar(&global, "g", false, "Use global storage in home directory (~/.aiagent/storage) instead of local (./.aiagent/storage)")
 
 	// Preserve the flags by not calling flag.Parse() yet
 	flag.CommandLine.Parse([]string{})
@@ -114,9 +118,21 @@ func main() {
 	var providerRepo interfaces.ProviderRepository
 	var toolRepo interfaces.ToolRepository
 
-	dataDir, err := os.Getwd()
-	if err != nil {
-		logger.Fatal("Failed to get current directory", zap.Error(err))
+	var storageDir string
+	if global {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to get home directory: %v\n", err)
+			os.Exit(1)
+		}
+		storageDir = filepath.Join(homeDir, ".aiagent", "storage")
+	} else {
+		cwd, err := os.Getwd()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to get current directory: %v\n", err)
+			os.Exit(1)
+		}
+		storageDir = filepath.Join(cwd, ".aiagent", "storage")
 	}
 
 	// Initialize tool factory
@@ -143,23 +159,23 @@ func main() {
 		}
 	} else {
 		// Initialize JSON repositories
-		providerRepo, err = repositoriesJson.NewJSONProviderRepository(dataDir)
+		providerRepo, err = repositoriesJson.NewJSONProviderRepository(storageDir)
 		if err != nil {
 			logger.Fatal("Failed to initialize provider repository", zap.Error(err))
 		}
-		toolRepo, err = repositoriesJson.NewJSONToolRepository(dataDir, toolFactory, logger)
+		toolRepo, err = repositoriesJson.NewJSONToolRepository(storageDir, toolFactory, logger)
 		if err != nil {
 			logger.Fatal("Failed to initialize tool repository", zap.Error(err))
 		}
-		agentRepo, err = repositoriesJson.NewJSONAgentRepository(dataDir)
+		agentRepo, err = repositoriesJson.NewJSONAgentRepository(storageDir)
 		if err != nil {
 			logger.Fatal("Failed to initialize agent repository", zap.Error(err))
 		}
-		modelRepo, err = repositoriesJson.NewJSONModelRepository(dataDir)
+		modelRepo, err = repositoriesJson.NewJSONModelRepository(storageDir)
 		if err != nil {
 			logger.Fatal("Failed to initialize model repository", zap.Error(err))
 		}
-		chatRepo, err = repositoriesJson.NewJSONChatRepository(dataDir)
+		chatRepo, err = repositoriesJson.NewJSONChatRepository(storageDir)
 		if err != nil {
 			logger.Fatal("Failed to initialize chat repository", zap.Error(err))
 		}

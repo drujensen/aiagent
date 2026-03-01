@@ -20,8 +20,8 @@ type JsonChatRepository struct {
 	data     map[string]*entities.Chat
 }
 
-func NewJSONChatRepository(dataDir string) (interfaces.ChatRepository, error) {
-	filePath := filepath.Join(dataDir, ".aiagent", "chats.json")
+func NewJSONChatRepository(storageDir string) (interfaces.ChatRepository, error) {
+	filePath := filepath.Join(storageDir, "chats.json")
 	repo := &JsonChatRepository{
 		filePath: filePath,
 		data:     make(map[string]*entities.Chat),

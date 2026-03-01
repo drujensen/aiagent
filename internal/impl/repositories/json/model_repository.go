@@ -20,8 +20,8 @@ type JsonModelRepository struct {
 	data     []*entities.Model
 }
 
-func NewJSONModelRepository(dataDir string) (interfaces.ModelRepository, error) {
-	filePath := filepath.Join(dataDir, ".aiagent", "models.json")
+func NewJSONModelRepository(storageDir string) (interfaces.ModelRepository, error) {
+	filePath := filepath.Join(storageDir, "models.json")
 	repo := &JsonModelRepository{
 		filePath: filePath,
 		data:     []*entities.Model{},

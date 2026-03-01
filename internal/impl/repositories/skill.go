@@ -39,14 +39,32 @@ func (r *SkillRepository) DiscoverSkills(ctx context.Context) ([]*entities.Skill
 		return nil, errors.InternalErrorf("failed to get home directory: %v", err)
 	}
 
+	// Get current working directory for project skills
+	cwd, cwdErr := os.Getwd()
+
 	// Scan skill directories in priority order
 	skillDirs := []struct {
 		path      string
 		isProject bool
-	}{
-		{filepath.Join(homeDir, ".aiagent", "skills"), false},
-		{filepath.Join(homeDir, ".agents", "skills"), false},
+	}{}
+	if cwdErr == nil {
+		skillDirs = append(skillDirs, struct {
+			path      string
+			isProject bool
+		}{filepath.Join(cwd, ".aiagent", "skills"), true})
+	} else {
+		fmt.Printf("Warning: failed to get current directory for project skills: %v\n", cwdErr)
 	}
+	skillDirs = append(skillDirs,
+		struct {
+			path      string
+			isProject bool
+		}{filepath.Join(homeDir, ".aiagent", "skills"), false},
+		struct {
+			path      string
+			isProject bool
+		}{filepath.Join(homeDir, ".agents", "skills"), false},
+	)
 
 	for _, dir := range skillDirs {
 		if err := r.scanSkillsDirectory(dir.path, skillMap, dir.isProject); err != nil {
