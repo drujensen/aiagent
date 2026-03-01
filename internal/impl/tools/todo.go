@@ -16,13 +16,12 @@ import (
 )
 
 type TodoItem struct {
-	Content    string    `json:"content"`
-	Status     string    `json:"status"`   // pending, in_progress, completed, cancelled
-	Priority   string    `json:"priority"` // high, medium, low
-	ID         string    `json:"id"`
-	WorkflowID string    `json:"workflow_id,omitempty"` // Optional grouping for multi-step workflows
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	Content   string    `json:"content"`
+	Status    string    `json:"status"`
+	Priority  string    `json:"priority"`
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type TodoList struct {
@@ -243,13 +242,12 @@ func (t *TodoTool) writeTodos(sessionID string, todos []struct {
 			priority = "medium"
 		}
 		newTodo := TodoItem{
-			Content:    todo.Content,
-			Status:     status,
-			Priority:   priority,
-			ID:         uuid.New().String(),
-			WorkflowID: "", // Not used in schema
-			CreatedAt:  time.Now(),
-			UpdatedAt:  time.Now(),
+			Content:   todo.Content,
+			Status:    status,
+			Priority:  priority,
+			ID:        uuid.New().String(),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
 		}
 		todoList.Todos = append(todoList.Todos, newTodo)
 	}
@@ -318,35 +316,9 @@ func (t *TodoTool) readTodos(sessionID string) (string, error) {
 	var result strings.Builder
 	result.WriteString("📋 Task Plan:\n\n")
 
-	// Group todos by workflow
-	workflows := make(map[string][]TodoItem)
-	orphaned := []TodoItem{}
-
+	// Display todos without workflow grouping
 	for _, todo := range todoList.Todos {
-		if todo.WorkflowID != "" {
-			workflows[todo.WorkflowID] = append(workflows[todo.WorkflowID], todo)
-		} else {
-			orphaned = append(orphaned, todo)
-		}
-	}
-
-	// Display workflows
-	for workflowID, todos := range workflows {
-		result.WriteString(fmt.Sprintf("## %s\n", workflowID))
-		for _, todo := range todos {
-			result.WriteString(t.formatTodo(todo))
-		}
-		result.WriteString("\n")
-	}
-
-	// Display orphaned todos
-	if len(orphaned) > 0 {
-		if len(workflows) > 0 {
-			result.WriteString("## General Tasks\n")
-		}
-		for _, todo := range orphaned {
-			result.WriteString(t.formatTodo(todo))
-		}
+		result.WriteString(t.formatTodo(todo))
 	}
 
 	// JSON for AI processing
@@ -375,6 +347,10 @@ func (t *TodoTool) formatTodo(todo TodoItem) string {
 }
 
 func (t *TodoTool) updateStatus(sessionID, id, status string) (string, error) {
+	if id == "" {
+		return "", fmt.Errorf("ID is required for updating todo status")
+	}
+
 	todoList, err := t.loadTodos(sessionID)
 	if err != nil {
 		return "", err
