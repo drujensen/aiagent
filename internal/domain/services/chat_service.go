@@ -655,7 +655,9 @@ func isContextError(err error) bool {
 		strings.Contains(errStr, "token limit") ||
 		strings.Contains(errStr, "maximum length") ||
 		strings.Contains(errStr, "too many tokens") ||
-		strings.Contains(errStr, "reduce.*length")
+		strings.Contains(errStr, "reduce.*length") ||
+		strings.Contains(errStr, "400") ||
+		strings.Contains(errStr, "bad request")
 }
 
 // isSafeSplit checks if splitting at 'split' avoids both orphaned responses and unfinished calls.
