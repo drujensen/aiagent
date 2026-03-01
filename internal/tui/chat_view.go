@@ -253,14 +253,7 @@ func (c *ChatView) updateEditorContent() {
 		// Ensure editor is not focused initially
 		c.editor.SetFocus(false)
 		// Set editor size to fit screen minus textarea, footer, separators, and header
-		if c.width > 0 && c.height > 0 {
-			editorWidth := c.width
-			editorHeight := c.height - (c.textarea.Height() + 1 + 2 + 1) // textarea (dynamic) + footer (1) + separators (2) + header (1)
-			if editorHeight < 1 {
-				editorHeight = 1
-			}
-			c.editor.SetSize(editorWidth, editorHeight)
-		}
+		c.setEditorSize()
 		return
 	}
 
@@ -362,12 +355,7 @@ func (c *ChatView) updateEditorContent() {
 
 	// Set editor size: textarea (dynamic) + footer (1) + separators (2) + header (1)
 	if c.width > 0 && c.height > 0 {
-		editorWidth := c.width
-		editorHeight := c.height - (c.textarea.Height() + 1 + 2 + 1)
-		if editorHeight < 1 {
-			editorHeight = 1
-		}
-		c.editor.SetSize(editorWidth, editorHeight)
+		c.setEditorSize()
 	}
 
 	// Ensure editor maintains current focus state
@@ -543,11 +531,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				message := entities.NewMessage("user", input)
 				c.textarea.Reset()
 				c.textarea.SetHeight(2)
-				editorHeight := c.height - (2 + 1 + 2 + 1)
-				if editorHeight < 1 {
-					editorHeight = 1
-				}
-				c.editor.SetSize(c.width, editorHeight)
+				c.setEditorSize()
 				c.tempMessages = append(c.tempMessages, *message)
 				// Initialize tool call status tracking for this message
 				c.toolCallStatus = make(map[string]bool)
@@ -592,11 +576,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				if effectiveLines != currentHeight {
 					newHeight := min(5, max(2, effectiveLines))
 					c.textarea.SetHeight(newHeight)
-					editorHeight := c.height - (newHeight + 1 + 2 + 1)
-					if editorHeight < 1 {
-						editorHeight = 1
-					}
-					c.editor.SetSize(c.width, editorHeight)
+					c.setEditorSize()
 				}
 			} else if c.focused == "editor" {
 				// Pass all keystrokes to vimtea editor when focused
@@ -823,12 +803,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		c.height = m.Height
 
 		// Set editor size to fit screen minus textarea, footer, separators, and header
-		editorWidth := c.width
-		editorHeight := c.height - (c.textarea.Height() + 1 + 2 + 1) // textarea (dynamic) + footer (1) + separators (2) + header (1)
-		if editorHeight < 1 {
-			editorHeight = 1
-		}
-		c.editor.SetSize(editorWidth, editorHeight)
+		c.setEditorSize()
 
 		c.textarea.SetWidth(c.width)
 
@@ -839,6 +814,19 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 	}
 
 	return c, tea.Batch(cmds...)
+}
+
+// setEditorSize calculates and sets the editor size based on available screen space
+func (c *ChatView) setEditorSize() {
+	// Set editor size to fit screen minus textarea, footer, separators, and header
+	if c.width > 0 && c.height > 0 {
+		editorWidth := c.width
+		editorHeight := c.height - (c.textarea.Height() + 1 + 2 + 2) // textarea (dynamic) + footer (1) + separators (2) + header (1)
+		if editorHeight < 1 {
+			editorHeight = 1
+		}
+		c.editor.SetSize(editorWidth, editorHeight)
+	}
 }
 
 func (c ChatView) View() string {
