@@ -329,7 +329,13 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		Role:    "system",
 		Content: agent.FullSystemPrompt(),
 	}
-	systemTokens := estimateTokens(systemMessage)
+
+	// Use provider-specific token estimation for system message
+	systemEstimateFunc := estimateTokens
+	if provider.Type == entities.ProviderAnthropic {
+		systemEstimateFunc = estimateAnthropicTokens
+	}
+	systemTokens := systemEstimateFunc(systemMessage)
 	if systemTokens > tokenLimit {
 		return nil, errors.InternalErrorf("system prompt too large for the context window")
 	}
@@ -348,8 +354,15 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 
 	// Check if we need to compress messages
 	totalMessageTokens := systemTokens
+	// Use provider-specific token estimation
+	tokenEstimator := estimateTokens
+	if provider.Type == entities.ProviderAnthropic {
+		tokenEstimator = estimateAnthropicTokens
+		s.logger.Debug("Using Anthropic-specific token estimation")
+	}
+
 	for i := range chat.Messages {
-		totalMessageTokens += estimateTokens(&chat.Messages[i])
+		totalMessageTokens += tokenEstimator(&chat.Messages[i])
 	}
 
 	s.logger.Debug("Total message tokens: ", zap.Float64("total_message_tokens", float64(totalMessageTokens)), zap.Float64("compression_threshold", compressionThreshold))
@@ -436,25 +449,35 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		return nil, errors.InternalErrorf("no messages to send")
 	}
 
+	// Use provider-specific token estimation for pre-flight check
+	var estimateFunc func(*entities.Message) int = estimateTokens
+	if provider.Type == entities.ProviderAnthropic {
+		estimateFunc = estimateAnthropicTokens
+	}
+
 	totalTokens := 0
 	for _, msg := range messagesToSend {
 		if msg == nil {
 			s.logger.Error("Nil message found in messagesToSend")
 			continue
 		}
-		totalTokens += estimateTokens(msg)
+		totalTokens += estimateFunc(msg)
 	}
 
 	// More aggressive pre-flight compression at 75% to prevent API errors
 	preFlightLimit := int(float64(tokenLimit) * 0.75)
 	if totalTokens > preFlightLimit {
-		s.logger.Warn("Messages exceed pre-flight limit, attempting compression", zap.Int("total_tokens", totalTokens), zap.Int("pre_flight_limit", preFlightLimit))
+		s.logger.Warn("Messages exceed pre-flight limit, attempting compression",
+			zap.Int("total_tokens", totalTokens),
+			zap.Int("pre_flight_limit", preFlightLimit),
+			zap.Int("token_limit", tokenLimit))
 
-		// Try compression first
-		compressedMessages, originalMessagesReplaced, err := s.compressMessages(ctx, chat, model, provider, resolvedAPIKey, tokenLimit)
+		// Try compression with the pre-flight limit as target
+		compressedMessages, originalMessagesReplaced, err := s.compressMessages(ctx, chat, model, provider, resolvedAPIKey, preFlightLimit)
 		if err != nil {
 			s.logger.Warn("Pre-flight compression failed, falling back to trimming", zap.Error(err))
-			messagesToSend = s.trimMessagesToLimit(messagesToSend, preFlightLimit)
+			messagesToSend = s.trimMessagesToLimit(messagesToSend, preFlightLimit, provider.Type)
+			s.logger.Info("Pre-flight trimming applied", zap.Int("original_count", len(messagesToSend)), zap.Int("trimmed_count", len(messagesToSend)))
 		} else {
 			if originalMessagesReplaced {
 				if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
@@ -463,7 +486,10 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 			}
 			// Replace messagesToSend with compressed version
 			messagesToSend = append([]*entities.Message{systemMessage}, compressedMessages...)
-			s.logger.Info("Pre-flight compression successful", zap.Int("original_count", len(chat.Messages)), zap.Int("compressed_count", len(compressedMessages)))
+			s.logger.Info("Pre-flight compression successful",
+				zap.Int("original_count", len(chat.Messages)),
+				zap.Int("compressed_count", len(compressedMessages)),
+				zap.Int("target_tokens", preFlightLimit))
 		}
 	}
 
@@ -518,7 +544,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		compressedMessages, originalMessagesReplaced, err := s.compressMessages(ctx, chat, model, provider, resolvedAPIKey, compressionTarget)
 		if err != nil {
 			s.logger.Warn("Failed progressive compression, using fallback trimming", zap.Error(err), zap.Int("target_tokens", compressionTarget))
-			compressedMessages = s.trimMessagesToLimit(messagesToSend, compressionTarget)
+			compressedMessages = s.trimMessagesToLimit(messagesToSend, compressionTarget, provider.Type)
 			originalMessagesReplaced = false
 		} else if originalMessagesReplaced {
 			if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
@@ -671,6 +697,28 @@ func estimateTokens(msg *entities.Message) int {
 	tokens := enc.Encode(msg.Content, nil, nil)
 
 	return len(tokens)
+}
+
+// estimateAnthropicTokens provides a rough token estimate for Anthropic models
+// Anthropic uses different tokenization than OpenAI, approximately 4 chars per token
+func estimateAnthropicTokens(msg *entities.Message) int {
+	if msg == nil {
+		return 0
+	}
+
+	// Rough approximation: ~4 characters per token for English text
+	charCount := len(msg.Content)
+	tokenEstimate := charCount / 4
+
+	// Add some padding for safety and to account for tokenization differences
+	tokenEstimate = int(float64(tokenEstimate) * 1.1)
+
+	// Minimum of 1 token
+	if tokenEstimate < 1 {
+		tokenEstimate = 1
+	}
+
+	return tokenEstimate
 }
 
 // isContextError checks if an error is related to context window limits
@@ -1132,11 +1180,36 @@ func (s *chatService) compressMessages(
 	apiKey string,
 	tokenLimit int,
 ) ([]*entities.Message, bool, error) {
-	// Calculate how many messages to summarize (approx 50% of older messages)
-	numMessagesToKeep := int(float64(len(chat.Messages)) * 0.5)
+	// Use provider-specific token estimation
+	var estimateFunc func(*entities.Message) int = estimateTokens
+	if provider.Type == entities.ProviderAnthropic {
+		estimateFunc = estimateAnthropicTokens
+	}
+	// Calculate current total tokens to determine compression aggressiveness
+	currentTokens := 0
+	for _, msg := range chat.Messages {
+		currentTokens += estimateFunc(&msg)
+	}
+
+	// If we're way over the limit, be more aggressive with compression
+	compressionRatio := 0.5 // Default: keep 50% of messages
+	if currentTokens > tokenLimit*2 {
+		compressionRatio = 0.3 // If 2x over limit, keep only 30%
+	} else if currentTokens > int(float64(tokenLimit)*1.5) {
+		compressionRatio = 0.4 // If 1.5x over limit, keep 40%
+	}
+
+	numMessagesToKeep := int(float64(len(chat.Messages)) * compressionRatio)
 	if numMessagesToKeep < 1 {
 		numMessagesToKeep = 1 // Always keep at least the most recent message
 	}
+
+	s.logger.Debug("Compression calculation",
+		zap.Int("current_tokens", currentTokens),
+		zap.Int("token_limit", tokenLimit),
+		zap.Float64("compression_ratio", compressionRatio),
+		zap.Int("messages_total", len(chat.Messages)),
+		zap.Int("messages_to_keep", numMessagesToKeep))
 
 	// Tentative split point
 	summarizeEndIdx := len(chat.Messages) - numMessagesToKeep
@@ -1235,13 +1308,13 @@ func (s *chatService) compressMessages(
 	chat.Messages = append([]entities.Message{*summaryMsg}, recentMessagesToKeep...)
 
 	// Verify we're not exceeding token limit
-	currentTokens := estimateTokens(summaryMsg)
+	currentTokens = estimateFunc(summaryMsg)
 	var finalMessages []*entities.Message
 	finalMessages = append(finalMessages, summaryMsg)
 
 	// Add as many of the recent messages as possible within token limit
 	for i := range recentMessagesToKeep {
-		msgTokens := estimateTokens(&recentMessagesToKeep[i])
+		msgTokens := estimateFunc(&recentMessagesToKeep[i])
 		if currentTokens+msgTokens > tokenLimit {
 			break
 		}
@@ -1253,7 +1326,7 @@ func (s *chatService) compressMessages(
 }
 
 // trimMessagesToLimit removes oldest messages until under token limit
-func (s *chatService) trimMessagesToLimit(messages []*entities.Message, maxTokens int) []*entities.Message {
+func (s *chatService) trimMessagesToLimit(messages []*entities.Message, maxTokens int, providerType entities.ProviderType) []*entities.Message {
 	if messages == nil || len(messages) <= 1 {
 		return messages // Always keep at least system message
 	}
@@ -1263,8 +1336,14 @@ func (s *chatService) trimMessagesToLimit(messages []*entities.Message, maxToken
 		return messages
 	}
 
+	// Use provider-specific token estimation
+	estimateFunc := estimateTokens
+	if providerType == entities.ProviderAnthropic {
+		estimateFunc = estimateAnthropicTokens
+	}
+
 	var result []*entities.Message
-	totalTokens := estimateTokens(messages[0]) // Always include system message
+	totalTokens := estimateFunc(messages[0]) // Always include system message
 
 	result = append(result, messages[0])
 
@@ -1274,7 +1353,7 @@ func (s *chatService) trimMessagesToLimit(messages []*entities.Message, maxToken
 			s.logger.Warn("Skipping nil message in trimMessagesToLimit", zap.Int("index", i))
 			continue
 		}
-		msgTokens := estimateTokens(messages[i])
+		msgTokens := estimateFunc(messages[i])
 		if totalTokens+msgTokens > maxTokens {
 			break
 		}

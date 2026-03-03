@@ -207,11 +207,9 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 					zap.Int("status_code", resp.StatusCode),
 					zap.String("body", string(body)))
 
-				// Check for context window errors
-				if resp.StatusCode == http.StatusBadRequest {
-					if contextErr := m.parseAnthropicContextError(body); contextErr != nil {
-						return nil, contextErr
-					}
+				// Check for context window errors on any error status
+				if contextErr := m.parseAnthropicContextError(body); contextErr != nil {
+					return nil, contextErr
 				}
 
 				return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
@@ -498,6 +496,7 @@ func (m *AnthropicIntegration) GetLastUsage() (*entities.Usage, error) {
 
 // parseAnthropicContextError checks if the error response is related to context window limits
 func (m *AnthropicIntegration) parseAnthropicContextError(body []byte) error {
+	// Try to parse as structured error first
 	var errorResp struct {
 		Type  string `json:"type"`
 		Error struct {
@@ -506,17 +505,41 @@ func (m *AnthropicIntegration) parseAnthropicContextError(body []byte) error {
 		} `json:"error"`
 	}
 
-	if err := json.Unmarshal(body, &errorResp); err != nil {
-		return nil // Not a valid JSON error response, return nil to let caller handle
-	}
+	if err := json.Unmarshal(body, &errorResp); err == nil {
+		m.logger.Debug("Parsed structured Anthropic error", zap.String("type", errorResp.Type), zap.String("error_type", errorResp.Error.Type), zap.String("message", errorResp.Error.Message))
 
-	if errorResp.Type == "error" && errorResp.Error.Type == "invalid_request_error" {
+		// Check for context-related errors regardless of error type
 		errMsg := strings.ToLower(errorResp.Error.Message)
 		if strings.Contains(errMsg, "too long") ||
 			strings.Contains(errMsg, "token limit") ||
 			strings.Contains(errMsg, "context") ||
-			strings.Contains(errMsg, "maximum length") {
+			strings.Contains(errMsg, "maximum length") ||
+			strings.Contains(errMsg, "context_length_exceeded") ||
+			strings.Contains(errMsg, "prompt is too long") ||
+			strings.Contains(errMsg, "input too long") {
 			return errors.ContextWindowErrorf("Anthropic context window exceeded: %s", errorResp.Error.Message)
+		}
+
+		// Also check for system errors that might indicate context issues
+		if errorResp.Type == "error" && (errorResp.Error.Type == "system_error" || errorResp.Error.Type == "internal_error") {
+			if strings.Contains(errMsg, "context") || strings.Contains(errMsg, "token") || strings.Contains(errMsg, "length") {
+				return errors.ContextWindowErrorf("Anthropic system error (likely context): %s", errorResp.Error.Message)
+			}
+		}
+	} else {
+		// If not structured JSON, check if it's a raw error message that contains context-related text
+		bodyStr := strings.ToLower(string(body))
+		m.logger.Debug("Checking raw Anthropic error for context issues", zap.String("body", bodyStr))
+
+		if strings.Contains(bodyStr, "too long") ||
+			strings.Contains(bodyStr, "token limit") ||
+			strings.Contains(bodyStr, "context") ||
+			strings.Contains(bodyStr, "maximum length") ||
+			strings.Contains(bodyStr, "context_length_exceeded") ||
+			strings.Contains(bodyStr, "prompt is too long") ||
+			strings.Contains(bodyStr, "input too long") ||
+			strings.Contains(bodyStr, "context window") {
+			return errors.ContextWindowErrorf("Anthropic context window exceeded (raw error): %s", string(body))
 		}
 	}
 

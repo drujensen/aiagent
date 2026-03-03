@@ -27,7 +27,7 @@ func TestTrimMessagesToLimit(t *testing.T) {
 	}
 
 	// Test with a very low token limit to force trimming
-	result := cs.trimMessagesToLimit(messages, 10) // Very low limit
+	result := cs.trimMessagesToLimit(messages, 10, entities.ProviderOpenAI) // Very low limit
 
 	// Should always keep at least the system message
 	if len(result) == 0 {
@@ -52,14 +52,14 @@ func TestTrimMessagesToLimitNilInput(t *testing.T) {
 	cs := &chatService{logger: logger}
 
 	// Test with nil input
-	result := cs.trimMessagesToLimit(nil, 100)
+	result := cs.trimMessagesToLimit(nil, 100, entities.ProviderOpenAI)
 	if result != nil {
 		t.Error("trimMessagesToLimit should return nil for nil input")
 	}
 
 	// Test with empty slice
 	empty := []*entities.Message{}
-	result = cs.trimMessagesToLimit(empty, 100)
+	result = cs.trimMessagesToLimit(empty, 100, entities.ProviderOpenAI)
 	if len(result) != 0 {
 		t.Error("trimMessagesToLimit should return empty slice for empty input")
 	}
