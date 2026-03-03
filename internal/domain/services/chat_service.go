@@ -444,10 +444,27 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		}
 		totalTokens += estimateTokens(msg)
 	}
-	safeLimit := int(float64(tokenLimit) * 0.8) // 80% as absolute maximum
-	if totalTokens > safeLimit {
-		s.logger.Warn("Messages exceed safe limit before sending, trimming", zap.Int("total_tokens", totalTokens), zap.Int("safe_limit", safeLimit))
-		messagesToSend = s.trimMessagesToLimit(messagesToSend, safeLimit)
+
+	// More aggressive pre-flight compression at 75% to prevent API errors
+	preFlightLimit := int(float64(tokenLimit) * 0.75)
+	if totalTokens > preFlightLimit {
+		s.logger.Warn("Messages exceed pre-flight limit, attempting compression", zap.Int("total_tokens", totalTokens), zap.Int("pre_flight_limit", preFlightLimit))
+
+		// Try compression first
+		compressedMessages, originalMessagesReplaced, err := s.compressMessages(ctx, chat, model, provider, resolvedAPIKey, tokenLimit)
+		if err != nil {
+			s.logger.Warn("Pre-flight compression failed, falling back to trimming", zap.Error(err))
+			messagesToSend = s.trimMessagesToLimit(messagesToSend, preFlightLimit)
+		} else {
+			if originalMessagesReplaced {
+				if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
+					s.logger.Warn("Failed to update chat with pre-flight compressed messages", zap.Error(err))
+				}
+			}
+			// Replace messagesToSend with compressed version
+			messagesToSend = append([]*entities.Message{systemMessage}, compressedMessages...)
+			s.logger.Info("Pre-flight compression successful", zap.Int("original_count", len(chat.Messages)), zap.Int("compressed_count", len(compressedMessages)))
+		}
 	}
 
 	// Create a callback function for incremental message saving
@@ -486,15 +503,26 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		// Context error detected - compress more aggressively and retry
 		s.logger.Warn("Context window error detected, compressing and retrying", zap.Error(err), zap.Int("attempt", attempt+1))
 
-		// Force compression with same algorithm
-		compressedMessages, originalMessagesReplaced, err := s.compressMessages(ctx, chat, model, provider, resolvedAPIKey, tokenLimit)
+		// Progressive compression: get more aggressive with each retry attempt
+		compressionTarget := tokenLimit
+		switch attempt {
+		case 0:
+			compressionTarget = int(float64(tokenLimit) * 0.7) // First retry: 70%
+		case 1:
+			compressionTarget = int(float64(tokenLimit) * 0.5) // Second retry: 50%
+		default:
+			compressionTarget = int(float64(tokenLimit) * 0.3) // Subsequent retries: 30%
+		}
+
+		// Try compression with progressive targets
+		compressedMessages, originalMessagesReplaced, err := s.compressMessages(ctx, chat, model, provider, resolvedAPIKey, compressionTarget)
 		if err != nil {
-			s.logger.Warn("Failed aggressive compression, using fallback trimming", zap.Error(err))
-			compressedMessages = s.trimMessagesToLimit(messagesToSend, int(float64(tokenLimit)*0.6))
+			s.logger.Warn("Failed progressive compression, using fallback trimming", zap.Error(err), zap.Int("target_tokens", compressionTarget))
+			compressedMessages = s.trimMessagesToLimit(messagesToSend, compressionTarget)
 			originalMessagesReplaced = false
 		} else if originalMessagesReplaced {
 			if err := s.chatRepo.UpdateChat(ctx, chat); err != nil {
-				s.logger.Warn("Failed to update chat with aggressive compression", zap.Error(err))
+				s.logger.Warn("Failed to update chat with progressive compression", zap.Error(err))
 			}
 		}
 
@@ -650,6 +678,13 @@ func isContextError(err error) bool {
 	if err == nil {
 		return false
 	}
+
+	// Check for structured ContextWindowError
+	if _, ok := err.(*errors.ContextWindowError); ok {
+		return true
+	}
+
+	// Fallback to string matching for backward compatibility
 	errStr := strings.ToLower(err.Error())
 	return strings.Contains(errStr, "context") ||
 		strings.Contains(errStr, "token limit") ||

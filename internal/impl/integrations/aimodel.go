@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
+	errors "github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/events"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
 
@@ -185,6 +187,14 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 				m.logger.Error("OpenAI-compatible API error",
 					zap.Int("status_code", resp.StatusCode),
 					zap.String("body", string(body)))
+
+				// Check for context window errors
+				if resp.StatusCode == http.StatusBadRequest {
+					if contextErr := m.parseOpenAIContextError(body); contextErr != nil {
+						return nil, contextErr
+					}
+				}
+
 				return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
 			}
 			break
@@ -481,6 +491,33 @@ func (m *AIModelIntegration) authHeaderName() string {
 // authHeaderValue returns the header value for authentication
 func (m *AIModelIntegration) authHeaderValue() string {
 	return "Bearer " + m.apiKey
+}
+
+// parseOpenAIContextError checks if the error response is related to context window limits
+func (m *AIModelIntegration) parseOpenAIContextError(body []byte) error {
+	var errorResp struct {
+		Error struct {
+			Message string `json:"message"`
+			Type    string `json:"type"`
+		} `json:"error"`
+	}
+
+	if err := json.Unmarshal(body, &errorResp); err != nil {
+		return nil // Not a valid JSON error response, return nil to let caller handle
+	}
+
+	if errorResp.Error.Type == "invalid_request_error" || errorResp.Error.Type == "" {
+		errMsg := strings.ToLower(errorResp.Error.Message)
+		if strings.Contains(errMsg, "maximum context length") ||
+			strings.Contains(errMsg, "too many tokens") ||
+			strings.Contains(errMsg, "token limit") ||
+			strings.Contains(errMsg, "context") ||
+			strings.Contains(errMsg, "reduce.*length") {
+			return errors.ContextWindowErrorf("OpenAI-compatible context window exceeded: %s", errorResp.Error.Message)
+		}
+	}
+
+	return nil
 }
 
 // Ensure AIModelIntegration implements AIModelIntegration

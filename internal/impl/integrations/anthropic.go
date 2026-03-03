@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
+	errors "github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/events"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
 
@@ -204,6 +206,14 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 				m.logger.Error("Anthropic API error",
 					zap.Int("status_code", resp.StatusCode),
 					zap.String("body", string(body)))
+
+				// Check for context window errors
+				if resp.StatusCode == http.StatusBadRequest {
+					if contextErr := m.parseAnthropicContextError(body); contextErr != nil {
+						return nil, contextErr
+					}
+				}
+
 				return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
 			}
 			break
@@ -484,6 +494,33 @@ func (m *AnthropicIntegration) GetUsage() (*entities.Usage, error) {
 // GetLastUsage returns the usage from the last API call
 func (m *AnthropicIntegration) GetLastUsage() (*entities.Usage, error) {
 	return m.lastUsage, nil
+}
+
+// parseAnthropicContextError checks if the error response is related to context window limits
+func (m *AnthropicIntegration) parseAnthropicContextError(body []byte) error {
+	var errorResp struct {
+		Type  string `json:"type"`
+		Error struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+
+	if err := json.Unmarshal(body, &errorResp); err != nil {
+		return nil // Not a valid JSON error response, return nil to let caller handle
+	}
+
+	if errorResp.Type == "error" && errorResp.Error.Type == "invalid_request_error" {
+		errMsg := strings.ToLower(errorResp.Error.Message)
+		if strings.Contains(errMsg, "too long") ||
+			strings.Contains(errMsg, "token limit") ||
+			strings.Contains(errMsg, "context") ||
+			strings.Contains(errMsg, "maximum length") {
+			return errors.ContextWindowErrorf("Anthropic context window exceeded: %s", errorResp.Error.Message)
+		}
+	}
+
+	return nil
 }
 
 // Ensure AnthropicIntegration implements AIModelIntegration
