@@ -356,7 +356,8 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 				}
 
 				// Create tool call event with raw result for UI formatting
-				toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, content, toolError, diff, nil)
+				chatID, _ := options["session_id"].(string)
+				toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, content, toolError, diff, chatID, nil)
 
 				// Publish real-time event for TUI updates
 				events.PublishToolCallEvent(toolEvent)

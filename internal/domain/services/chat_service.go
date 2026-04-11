@@ -806,6 +806,7 @@ func (s *chatService) processCompressionInstructions(ctx context.Context, chat *
 						"",                             // result (will be updated later)
 						"",                             // error
 						"",                             // diff
+						chat.ID,                        // chatID
 						map[string]string{
 							"chat_id": chat.ID,
 							"action":  "start_compression",
@@ -901,6 +902,7 @@ func (s *chatService) executeCompressionInstruction(ctx context.Context, chat *e
 		fmt.Sprintf("Successfully compressed %d messages into 1 summary message", len(messagesToCompress)), // result
 		"", // error
 		fmt.Sprintf("-%d messages", len(messagesToCompress)-1), // diff
+		chat.ID,                                                 // chatID
 		map[string]string{
 			"chat_id":     chat.ID,
 			"action":      "complete_compression",

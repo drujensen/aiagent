@@ -396,7 +396,8 @@ func (g *GoogleIntegration) GenerateResponse(ctx context.Context, messages []*en
 				displayContent = toolResult
 			}
 
-			toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, displayContent, toolError, "", nil)
+			chatID, _ := options["session_id"].(string)
+			toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, displayContent, toolError, "", chatID, nil)
 
 			// Publish event
 			events.PublishToolCallEvent(toolEvent)

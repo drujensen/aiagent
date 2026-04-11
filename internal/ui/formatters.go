@@ -52,6 +52,18 @@ func formatToolNameParts(toolName, arguments string) (string, string) {
 			}
 			return toolName, args.Command
 		}
+	case "Agent":
+		var args struct {
+			AgentName string `json:"agent_name"`
+			Task      string `json:"task"`
+		}
+		if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.AgentName != "" {
+			task := args.Task
+			if len(task) > 60 {
+				task = task[:57] + "..."
+			}
+			return fmt.Sprintf("Launch %s agent", args.AgentName), task
+		}
 	}
 	return toolName, ""
 }
@@ -75,6 +87,8 @@ func formatToolResult(toolName, result string, diff string, arguments string) te
 		return formatMemoryResult(result)
 	case "WebSearch":
 		return formatWebSearchResult(result, arguments)
+	case "Agent":
+		return formatAgentResult(result, arguments)
 	default:
 		// Try to extract summary from JSON responses
 		var jsonResponse struct {
@@ -425,6 +439,31 @@ func formatGenericResult(result string) template.HTML {
 	output.WriteString("</div>")
 
 	return template.HTML(output.String())
+}
+
+// formatAgentResult formats the response from a sub-agent launch
+func formatAgentResult(result, arguments string) template.HTML {
+	var args struct {
+		AgentName string `json:"agent_name"`
+	}
+	json.Unmarshal([]byte(arguments), &args) //nolint:errcheck
+
+	agentName := args.AgentName
+	if agentName == "" {
+		agentName = "Sub-agent"
+	}
+
+	// Render the result as markdown inside a collapsible block
+	rendered, err := renderMarkdown(result)
+	if err != nil || rendered == "" {
+		rendered = template.HTML(fmt.Sprintf("<pre>%s</pre>", html.EscapeString(result)))
+	}
+
+	return template.HTML(fmt.Sprintf(
+		`<details class="agent-result" open><summary class="agent-result-summary">%s response</summary><div class="agent-result-body">%s</div></details>`,
+		html.EscapeString(agentName),
+		rendered,
+	))
 }
 
 // formatDiff formats diff content with HTML styling for Web UI

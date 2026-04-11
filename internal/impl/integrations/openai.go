@@ -389,7 +389,8 @@ func (m *OpenAIIntegration) generateResponseV2(ctx context.Context, messages []*
 				}
 
 				// Create tool call event
-				toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, displayContent, toolError, diff, nil)
+				chatID, _ := options["session_id"].(string)
+				toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, displayContent, toolError, diff, chatID, nil)
 
 				// Publish real-time event for TUI updates
 				events.PublishToolCallEvent(toolEvent)

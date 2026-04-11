@@ -3,6 +3,7 @@ package tools
 import (
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	errors "github.com/drujensen/aiagent/internal/domain/errs"
+	"github.com/drujensen/aiagent/internal/domain/services"
 
 	"go.uber.org/zap"
 )
@@ -16,7 +17,23 @@ type ToolFactoryEntry struct {
 
 type ToolFactory struct {
 	toolFactories map[string]*ToolFactoryEntry
+	chatService   services.ChatService
+	agentService  services.AgentService
+	modelService  services.ModelService
 }
+
+// SetServices wires the application services into the factory so that
+// service-dependent tools (e.g. AgentTool) can access them at execute time.
+// Call this in main after all services have been constructed.
+func (t *ToolFactory) SetServices(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService) {
+	t.chatService = chatService
+	t.agentService = agentService
+	t.modelService = modelService
+}
+
+func (t *ToolFactory) GetChatService() services.ChatService   { return t.chatService }
+func (t *ToolFactory) GetAgentService() services.AgentService { return t.agentService }
+func (t *ToolFactory) GetModelService() services.ModelService { return t.modelService }
 
 func NewToolFactory() (*ToolFactory, error) {
 	toolFactory := &ToolFactory{}
@@ -137,6 +154,16 @@ func NewToolFactory() (*ToolFactory, error) {
 		ConfigKeys:  []string{"workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewCompressionTool(name, description, configuration, logger)
+		},
+	}
+	toolFactory.toolFactories["Agent"] = &ToolFactoryEntry{
+		Name:        "Agent",
+		Description: "Launches a sub-agent by name to complete a specific task and returns its response. Use this to delegate work to specialised agents such as Architect, Coder, QA, or DevOps.",
+		ConfigKeys:  []string{},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			// Services are injected lazily via SetServices(); AgentTool reads
+			// them from the factory at Execute time, not at construction time.
+			return NewAgentTool(name, description, configuration, toolFactory, logger)
 		},
 	}
 	return toolFactory, nil

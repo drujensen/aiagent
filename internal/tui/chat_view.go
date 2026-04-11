@@ -631,7 +631,11 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		return c, tea.Batch(commands.SendMessageCmd(c.chatService, c.activeChat.ID, message, ctx), c.spinner.Tick)
 
 	case toolCallEventMsg:
-		// Handle real-time tool call event
+		// Handle real-time tool call event — skip events belonging to a
+		// different chat (e.g. a sub-agent launched by the Agent tool).
+		if m.ChatID != "" && c.activeChat != nil && m.ChatID != c.activeChat.ID {
+			return c, c.listenForEvents()
+		}
 		if c.isProcessing && c.activeChat != nil {
 			// Mark this tool call as completed
 			if m.ToolCallID != "" {

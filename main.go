@@ -215,6 +215,10 @@ func main() {
 
 	chatService := services.NewChatService(chatRepo, agentRepo, agentService, modelRepo, providerRepo, toolRepo, skillService, cfg, logger)
 
+	// Inject services into the tool factory so that the Agent tool can
+	// delegate work to sub-agents at execution time.
+	toolFactory.SetServices(chatService, agentService, modelService)
+
 	// Create ModelRefreshService for refresh functionality
 	modelsDevClient := modelsdev.NewModelsDevClient(logger)
 	modelRefreshService := services.NewModelRefreshService(providerRepo, modelRepo, modelsDevClient, globalConfig, logger)
