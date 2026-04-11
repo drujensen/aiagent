@@ -45,12 +45,24 @@ type ChatView struct {
 	height             int
 	currentAgent       *entities.Agent
 	currentModel       *entities.Model
-	previousAgentID    string             // Track previous agent ID to detect changes
-	tempMessages       []entities.Message // Temporary messages for real-time tool events
-	eventCancel        func()             // Event subscription cancel function
-	eventChan          chan interface{}   // Channel for receiving events (ToolCallEvent or MessageHistoryEvent)
-	lineNumbersEnabled bool               // Track whether line numbers are enabled
-	toolCallStatus     map[string]bool    // Track completion status of tool calls (toolCallID -> completed)
+	previousAgentID    string                    // Track previous agent ID to detect changes
+	tempMessages       []entities.Message        // Temporary messages for real-time tool events
+	eventCancel        func()                    // Event subscription cancel function
+	eventChan          chan interface{}          // Channel for receiving events (ToolCallEvent or MessageHistoryEvent)
+	lineNumbersEnabled bool                      // Track whether line numbers are enabled
+	toolCallStatus     map[string]bool           // Track completion status of tool calls (toolCallID -> completed)
+	subAgents          map[string]*subAgentState // keyed by sub-chat ID
+	subAgentOrder      []string                  // insertion-ordered sub-chat IDs for stable rendering
+}
+
+// subAgentState tracks the live status of a sub-agent launched by the Agent tool.
+type subAgentState struct {
+	name        string
+	task        string
+	lastMessage string // last tool call seen from this sub-agent
+	done        bool
+	failed      bool
+	failedErr   string
 }
 
 func NewChatView(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService, skillService services.SkillService, logger *zap.Logger, activeChat *entities.Chat) ChatView {
@@ -161,12 +173,21 @@ func NewChatView(chatService services.ChatService, agentService services.AgentSe
 		}
 	})
 
+	// Subscribe to sub-agent lifecycle events
+	subAgentCancel := events.SubscribeToSubAgentEvents(func(data events.SubAgentEventData) {
+		select {
+		case cv.eventChan <- data.Event:
+		default:
+		}
+	})
+
 	// Combine cancel functions
 	cv.eventCancel = func() {
 		toolCancel()
 		processFinishedCancel()
 		processFailedCancel()
 		chatUpdateCancel()
+		subAgentCancel()
 	}
 
 	return cv
@@ -332,6 +353,38 @@ func (c *ChatView) updateEditorContent() {
 		}
 	}
 
+	// Render live sub-agent status section (shown while sub-agents are running)
+	if len(c.subAgents) > 0 {
+		sb.WriteString(c.systemStyle.Render("Agent Calls:") + "\n")
+		for _, subChatID := range c.subAgentOrder {
+			sa, ok := c.subAgents[subChatID]
+			if !ok {
+				continue
+			}
+			var statusIcon string
+			switch {
+			case sa.failed:
+				statusIcon = "✗"
+			case sa.done:
+				statusIcon = "✓"
+			default:
+				statusIcon = "⟳"
+			}
+			task := sa.task
+			if len(task) > 60 {
+				task = task[:60] + "..."
+			}
+			sb.WriteString(c.systemStyle.Render("  ↳ ") + statusIcon + " " + sa.name + ": " + task + "\n")
+			if sa.lastMessage != "" && !sa.done {
+				sb.WriteString(c.systemStyle.Render("      ") + sa.lastMessage + "\n")
+			}
+			if sa.failed && sa.failedErr != "" {
+				errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+				sb.WriteString(c.systemStyle.Render("      ") + errStyle.Render("Error: "+sa.failedErr) + "\n")
+			}
+		}
+	}
+
 	// Add error as temporary system message if present
 	if c.err != nil {
 		if sb.Len() > 0 {
@@ -396,6 +449,8 @@ func (c *ChatView) listenForEvents() tea.Cmd {
 			return processFailedEventMsg(e)
 		case *entities.ChatUpdateEvent:
 			return chatUpdateEventMsg(e)
+		case *entities.SubAgentEvent:
+			return subAgentEventMsg(e)
 		default:
 			return nil
 		}
@@ -631,31 +686,68 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 		return c, tea.Batch(commands.SendMessageCmd(c.chatService, c.activeChat.ID, message, ctx), c.spinner.Tick)
 
 	case toolCallEventMsg:
-		// Handle real-time tool call event — skip events belonging to a
-		// different chat (e.g. a sub-agent launched by the Agent tool).
+		// Route sub-agent tool events to the subAgents map (for live status display).
 		if m.ChatID != "" && c.activeChat != nil && m.ChatID != c.activeChat.ID {
+			if sa, ok := c.subAgents[m.ChatID]; ok {
+				tool := c.getToolByName(m.ToolName)
+				if tool != nil {
+					name, suffix := tool.DisplayName("tui", m.Arguments)
+					if suffix != "" {
+						sa.lastMessage = name + ": " + suffix
+					} else {
+						sa.lastMessage = name
+					}
+				} else {
+					sa.lastMessage = m.ToolName
+				}
+				c.updateEditorContent()
+			}
 			return c, c.listenForEvents()
 		}
 		if c.isProcessing && c.activeChat != nil {
-			// Mark this tool call as completed
 			if m.ToolCallID != "" {
 				c.toolCallStatus[m.ToolCallID] = true
 			}
-
-			// Create a temporary message for the tool call event
 			tempMsg := entities.Message{
 				ID:             m.ID,
 				Role:           "tool",
 				Content:        m.Result,
-				ToolCallID:     "", // Will be set when final message arrives
 				ToolCallEvents: []entities.ToolCallEvent{*m},
 				Timestamp:      m.Timestamp,
 			}
 			c.tempMessages = append(c.tempMessages, tempMsg)
-			// Update editor content with new tool event
 			c.updateEditorContent()
 		}
-		// Continue listening for more events
+		return c, c.listenForEvents()
+
+	case subAgentEventMsg:
+		// Handle sub-agent lifecycle events.
+		if c.activeChat != nil && m.ParentChatID == c.activeChat.ID {
+			if c.subAgents == nil {
+				c.subAgents = make(map[string]*subAgentState)
+			}
+			switch m.Status {
+			case "started":
+				if _, exists := c.subAgents[m.SubChatID]; !exists {
+					c.subAgentOrder = append(c.subAgentOrder, m.SubChatID)
+				}
+				c.subAgents[m.SubChatID] = &subAgentState{
+					name: m.AgentName,
+					task: m.Task,
+				}
+			case "finished":
+				if sa, ok := c.subAgents[m.SubChatID]; ok {
+					sa.done = true
+				}
+			case "failed":
+				if sa, ok := c.subAgents[m.SubChatID]; ok {
+					sa.done = true
+					sa.failed = true
+					sa.failedErr = m.Error
+				}
+			}
+			c.updateEditorContent()
+		}
 		return c, c.listenForEvents()
 
 	case processFinishedEventMsg:
@@ -664,6 +756,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			c.isProcessing = false
 			c.tempMessages = nil
 			c.toolCallStatus = make(map[string]bool)
+			c.subAgents = nil
+			c.subAgentOrder = nil
 
 			// Fetch updated chat with all messages including AI responses
 			ctx := context.Background()
@@ -684,6 +778,8 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 			c.isProcessing = false
 			c.tempMessages = nil
 			c.toolCallStatus = make(map[string]bool)
+			c.subAgents = nil
+			c.subAgentOrder = nil
 
 			// Fetch updated chat with any partially saved messages
 			ctx := context.Background()

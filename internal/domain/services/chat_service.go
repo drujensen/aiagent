@@ -25,6 +25,7 @@ type ChatService interface {
 	GetActiveChat(ctx context.Context) (*entities.Chat, error)
 	SetActiveChat(ctx context.Context, chatID string) error
 	CreateChat(ctx context.Context, agentID, modelID, name string) (*entities.Chat, error)
+	CreateSubChat(ctx context.Context, agentID, modelID, name, parentChatID string) (*entities.Chat, error)
 	UpdateChat(ctx context.Context, id, agentID, modelID, name string) (*entities.Chat, error)
 	DeleteChat(ctx context.Context, id string) error
 	SendMessage(ctx context.Context, id string, message *entities.Message) (*entities.Message, error)
@@ -106,6 +107,28 @@ func (s *chatService) CreateChat(ctx context.Context, agentID, modelID, name str
 	}
 
 	setOtherChatsInactive(ctx, s.chatRepo, chat.ID)
+
+	return chat, nil
+}
+
+// CreateSubChat creates a chat for a sub-agent without changing the active chat.
+// The sub-chat is linked to parentChatID and starts as inactive so it does not
+// interfere with the user's active chat selection.
+func (s *chatService) CreateSubChat(ctx context.Context, agentID, modelID, name, parentChatID string) (*entities.Chat, error) {
+	if agentID == "" {
+		return nil, errors.ValidationErrorf("agent ID is required")
+	}
+	if modelID == "" {
+		return nil, errors.ValidationErrorf("model ID is required")
+	}
+
+	chat := entities.NewChat(agentID, modelID, name)
+	chat.Active = false
+	chat.ParentChatID = parentChatID
+
+	if err := s.chatRepo.CreateChat(ctx, chat); err != nil {
+		return nil, err
+	}
 
 	return chat, nil
 }
@@ -902,7 +925,7 @@ func (s *chatService) executeCompressionInstruction(ctx context.Context, chat *e
 		fmt.Sprintf("Successfully compressed %d messages into 1 summary message", len(messagesToCompress)), // result
 		"", // error
 		fmt.Sprintf("-%d messages", len(messagesToCompress)-1), // diff
-		chat.ID,                                                 // chatID
+		chat.ID, // chatID
 		map[string]string{
 			"chat_id":     chat.ID,
 			"action":      "complete_compression",

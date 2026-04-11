@@ -14,6 +14,7 @@ type (
 	processFinishedEventMsg *entities.ProcessFinishedEvent
 	processFailedEventMsg   *entities.ProcessFailedEvent
 	chatUpdateEventMsg      *entities.ChatUpdateEvent
+	subAgentEventMsg        *entities.SubAgentEvent
 )
 
 type (

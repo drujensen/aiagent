@@ -79,6 +79,32 @@ type ChatUpdateEvent struct {
 	Timestamp  time.Time              `json:"timestamp"`
 }
 
+// SubAgentEvent reports the lifecycle of a sub-agent launched by the Agent tool.
+type SubAgentEvent struct {
+	ID           string    `json:"id"`
+	AgentName    string    `json:"agent_name"`
+	Task         string    `json:"task"`
+	SubChatID    string    `json:"sub_chat_id"`
+	ParentChatID string    `json:"parent_chat_id"`
+	Status       string    `json:"status"` // "started", "finished", "failed"
+	Error        string    `json:"error,omitempty"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+// NewSubAgentEvent creates a SubAgentEvent.
+func NewSubAgentEvent(agentName, task, subChatID, parentChatID, status, errorMsg string) *SubAgentEvent {
+	return &SubAgentEvent{
+		ID:           uuid.New().String(),
+		AgentName:    agentName,
+		Task:         task,
+		SubChatID:    subChatID,
+		ParentChatID: parentChatID,
+		Status:       status,
+		Error:        errorMsg,
+		Timestamp:    time.Now(),
+	}
+}
+
 // NewChatUpdateEvent creates a new chat update event
 func NewChatUpdateEvent(chatID, updateType string, data map[string]interface{}) *ChatUpdateEvent {
 	return &ChatUpdateEvent{

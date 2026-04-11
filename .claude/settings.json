@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go fmt ./...)",
+      "Bash(go vet ./...)",
+      "Bash(go mod tidy)",
+      "Bash(go build .)",
+      "Bash(go test ./...)",
+      "Bash(go test ./... -cover)",
+      "Bash(go test ./... -race)",
+      "Bash(go test ./... -v)",
+      "Bash(go run . refresh)"
+    ]
+  }
+}

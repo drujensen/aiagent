@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
-	"github.com/drujensen/aiagent/internal/domain/events"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
 
 	"github.com/google/uuid"
@@ -347,79 +346,19 @@ func (g *GoogleIntegration) GenerateResponse(ctx context.Context, messages []*en
 			break
 		}
 
-		// Execute tools and create tool response messages
-		for _, toolCall := range toolCalls {
-			toolName := toolCall.Function.Name
-			tool, err := g.toolRepo.GetToolByName(toolName)
-
-			var toolResult string
-			var toolError string
-			if err != nil {
-				toolResult = fmt.Sprintf("Tool %s could not be retrieved: %v", toolName, err)
-				toolError = err.Error()
-				g.logger.Warn("Failed to get tool", zap.String("toolName", toolName), zap.Error(err))
-			} else if tool != nil {
-				// Inject session_id into todowrite tool arguments
-				args := toolCall.Function.Arguments
-				if toolName == "todowrite" {
-					if sessionID, ok := options["session_id"].(string); ok && sessionID != "" {
-						var argsMap map[string]any
-						if err := json.Unmarshal([]byte(args), &argsMap); err == nil {
-							if _, exists := argsMap["session_id"]; !exists {
-								argsMap["session_id"] = sessionID
-								if newArgs, err := json.Marshal(argsMap); err == nil {
-									args = string(newArgs)
-								}
-							}
-						}
-					}
-				}
-				result, err := tool.Execute(args)
-				if err != nil {
-					toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
-					toolError = err.Error()
-					g.logger.Warn("Tool execution failed", zap.String("toolName", toolName), zap.Error(err))
-				} else {
-					toolResult = result
-				}
-			} else {
-				toolResult = fmt.Sprintf("Tool %s not found", toolName)
-				toolError = "Tool not found"
-				g.logger.Warn("Tool not found", zap.String("toolName", toolName))
-			}
-
-			// Create tool response message
-			var displayContent string
-			if toolError != "" {
-				displayContent = fmt.Sprintf("Tool %s failed with error: %s", toolName, toolError)
-			} else {
-				displayContent = toolResult
-			}
-
-			chatID, _ := options["session_id"].(string)
-			toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, displayContent, toolError, "", chatID, nil)
-
-			// Publish event
-			events.PublishToolCallEvent(toolEvent)
-
-			toolResponseMessage := &entities.Message{
-				ID:             uuid.New().String(),
-				Role:           "tool",
-				Content:        displayContent,
-				ToolCallID:     toolCall.ID,
-				ToolCallEvents: []entities.ToolCallEvent{*toolEvent},
-				Timestamp:      time.Now(),
-			}
-			newMessages = append(newMessages, toolResponseMessage)
+		// Execute all tool calls in parallel, then process results in order.
+		toolResults := executeToolsParallel(ctx, toolCalls, g.toolRepo, options, g.logger)
+		for _, r := range toolResults {
+			newMessages = append(newMessages, r.ToolMessage)
 
 			if callback != nil {
-				if err := callback([]*entities.Message{toolResponseMessage}); err != nil {
+				if err := callback([]*entities.Message{r.ToolMessage}); err != nil {
 					g.logger.Error("Failed to save tool response message incrementally", zap.Error(err))
 				}
 			}
 
-			// Append to messages for next iteration
-			messages = append(messages, assistantMessage, toolResponseMessage)
+			// Append to messages for next iteration (Google uses the full messages slice)
+			messages = append(messages, assistantMessage, r.ToolMessage)
 		}
 	}
 

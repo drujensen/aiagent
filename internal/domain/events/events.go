@@ -11,6 +11,7 @@ const (
 	ProcessFinishedEventType uint32 = 2
 	ProcessFailedEventType   uint32 = 3
 	ChatUpdateEventType      uint32 = 4
+	SubAgentEventType        uint32 = 5
 )
 
 // ToolCallEventData wraps the ToolCallEvent for publishing
@@ -90,5 +91,25 @@ func PublishChatUpdateEvent(chatEvent *entities.ChatUpdateEvent) {
 
 // SubscribeToChatUpdateEvents subscribes to chat update events
 func SubscribeToChatUpdateEvents(handler func(data ChatUpdateEventData)) func() {
+	return event.On(handler)
+}
+
+// SubAgentEventData wraps the SubAgentEvent for publishing
+type SubAgentEventData struct {
+	Event *entities.SubAgentEvent
+}
+
+// Type implements the Event interface
+func (s SubAgentEventData) Type() uint32 {
+	return SubAgentEventType
+}
+
+// PublishSubAgentEvent publishes a sub-agent lifecycle event
+func PublishSubAgentEvent(e *entities.SubAgentEvent) {
+	event.Emit(SubAgentEventData{Event: e})
+}
+
+// SubscribeToSubAgentEvents subscribes to sub-agent lifecycle events
+func SubscribeToSubAgentEvents(handler func(data SubAgentEventData)) func() {
 	return event.On(handler)
 }

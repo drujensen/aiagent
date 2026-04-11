@@ -14,15 +14,16 @@ type ChatUsage struct {
 }
 
 type Chat struct {
-	ID        string     `json:"id" bson:"_id"`
-	AgentID   string     `json:"agent_id" bson:"agent_id"`
-	ModelID   string     `json:"model_id" bson:"model_id"`
-	Name      string     `json:"name" bson:"name"`
-	Messages  []Message  `json:"messages" bson:"messages"`
-	Usage     *ChatUsage `json:"usage,omitempty" bson:"usage,omitempty"`
-	CreatedAt time.Time  `json:"created_at" bson:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at" bson:"updated_at"`
-	Active    bool       `json:"active" bson:"active"`
+	ID           string     `json:"id" bson:"_id"`
+	AgentID      string     `json:"agent_id" bson:"agent_id"`
+	ModelID      string     `json:"model_id" bson:"model_id"`
+	Name         string     `json:"name" bson:"name"`
+	Messages     []Message  `json:"messages" bson:"messages"`
+	Usage        *ChatUsage `json:"usage,omitempty" bson:"usage,omitempty"`
+	CreatedAt    time.Time  `json:"created_at" bson:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at" bson:"updated_at"`
+	Active       bool       `json:"active" bson:"active"`
+	ParentChatID string     `json:"parent_chat_id,omitempty" bson:"parent_chat_id,omitempty"`
 }
 
 func NewChat(agentID, modelID, name string) *Chat {

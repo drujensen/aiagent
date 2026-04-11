@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
+	"github.com/drujensen/aiagent/internal/domain/events"
 
 	"go.uber.org/zap"
 )
@@ -98,9 +99,10 @@ func (t *AgentTool) Execute(arguments string) (string, error) {
 	}
 
 	var args struct {
-		AgentName string `json:"agent_name"`
-		Task      string `json:"task"`
-		ModelName string `json:"model_name"`
+		AgentName    string `json:"agent_name"`
+		Task         string `json:"task"`
+		ModelName    string `json:"model_name"`
+		ParentChatID string `json:"parent_chat_id"` // injected by the framework via injectToolArgs
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return "", fmt.Errorf("failed to parse arguments: %w", err)
@@ -136,8 +138,6 @@ func (t *AgentTool) Execute(arguments string) (string, error) {
 
 	// Resolve the model to use for the sub-agent.
 	// Priority: explicit model_name arg > parent chat's model > first available.
-	// We read the active (parent) chat's model BEFORE calling CreateChat, because
-	// CreateChat will make the new sub-agent chat active.
 	var targetModel *entities.Model
 	if args.ModelName != "" {
 		models, err := modelService.ListModels(ctx)
@@ -172,9 +172,10 @@ func (t *AgentTool) Execute(arguments string) (string, error) {
 		}
 	}
 
-	// Create a new chat for the sub-agent
+	// Create a sub-chat for the agent — skips setOtherChatsInactive so the
+	// parent chat remains active and multiple sub-agents can run in parallel.
 	chatTitle := fmt.Sprintf("%s: %s", targetAgent.Name, truncateStr(args.Task, 50))
-	chat, err := chatService.CreateChat(ctx, targetAgent.ID, targetModel.ID, chatTitle)
+	chat, err := chatService.CreateSubChat(ctx, targetAgent.ID, targetModel.ID, chatTitle, args.ParentChatID)
 	if err != nil {
 		return "", fmt.Errorf("failed to create sub-agent chat: %w", err)
 	}
@@ -183,14 +184,28 @@ func (t *AgentTool) Execute(arguments string) (string, error) {
 		zap.String("agent", targetAgent.Name),
 		zap.String("model", targetModel.Name),
 		zap.String("chat_id", chat.ID),
+		zap.String("parent_chat_id", args.ParentChatID),
 	)
 
-	// Send the task and wait for the response
+	// Notify the TUI that a sub-agent has started.
+	events.PublishSubAgentEvent(entities.NewSubAgentEvent(
+		targetAgent.Name, args.Task, chat.ID, args.ParentChatID, "started", "",
+	))
+
+	// Send the task and wait for the sub-agent to complete.
 	msg := entities.NewMessage("user", args.Task)
 	response, err := chatService.SendMessage(ctx, chat.ID, msg)
 	if err != nil {
+		events.PublishSubAgentEvent(entities.NewSubAgentEvent(
+			targetAgent.Name, args.Task, chat.ID, args.ParentChatID, "failed", err.Error(),
+		))
 		return "", fmt.Errorf("sub-agent %q failed: %w", args.AgentName, err)
 	}
+
+	// Notify the TUI that the sub-agent finished.
+	events.PublishSubAgentEvent(entities.NewSubAgentEvent(
+		targetAgent.Name, args.Task, chat.ID, args.ParentChatID, "finished", "",
+	))
 
 	return response.Content, nil
 }

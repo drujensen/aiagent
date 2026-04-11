@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
@@ -95,6 +96,138 @@ func convertToOpenAIMessages(messages []*entities.Message) []map[string]any {
 		apiMessages = append(apiMessages, apiMsg)
 	}
 	return apiMessages
+}
+
+// toolExecResult holds the outcome of a single tool call execution.
+type toolExecResult struct {
+	ToolCall    entities.ToolCall
+	ToolName    string
+	ToolResult  string // raw result sent back to the LLM
+	Content     string // display content sent to the TUI / events
+	ToolError   string
+	Diff        string
+	ToolEvent   *entities.ToolCallEvent
+	ToolMessage *entities.Message
+}
+
+// injectToolArgs injects framework-managed fields (session_id, parent_chat_id) into
+// a tool's JSON argument string. Fields that are already present are not overwritten.
+func injectToolArgs(args, toolName, chatID string) string {
+	if chatID == "" {
+		return args
+	}
+	var m map[string]any
+	if json.Unmarshal([]byte(args), &m) != nil {
+		return args
+	}
+	changed := false
+	if toolName == "todowrite" {
+		if _, exists := m["session_id"]; !exists {
+			m["session_id"] = chatID
+			changed = true
+		}
+	}
+	if _, exists := m["parent_chat_id"]; !exists {
+		m["parent_chat_id"] = chatID
+		changed = true
+	}
+	if !changed {
+		return args
+	}
+	if b, err := json.Marshal(m); err == nil {
+		return string(b)
+	}
+	return args
+}
+
+// extractDiffStatic extracts a diff string from a FileWrite tool result JSON.
+func extractDiffStatic(result string) string {
+	var d struct {
+		Diff string `json:"diff"`
+	}
+	if err := json.Unmarshal([]byte(result), &d); err == nil {
+		return d.Diff
+	}
+	return ""
+}
+
+// executeToolsParallel runs all toolCalls concurrently, publishes ToolCallEvents
+// in real-time as each tool completes, and returns results in the original order.
+func executeToolsParallel(
+	ctx context.Context,
+	toolCalls []entities.ToolCall,
+	toolRepo interfaces.ToolRepository,
+	options map[string]any,
+	logger *zap.Logger,
+) []toolExecResult {
+	chatID, _ := options["session_id"].(string)
+	results := make([]toolExecResult, len(toolCalls))
+	var wg sync.WaitGroup
+
+	for i, toolCall := range toolCalls {
+		wg.Add(1)
+		go func(i int, toolCall entities.ToolCall) {
+			defer wg.Done()
+
+			toolName := toolCall.Function.Name
+			args := injectToolArgs(toolCall.Function.Arguments, toolName, chatID)
+
+			var toolResult, toolError, diff string
+			tool, err := toolRepo.GetToolByName(toolName)
+			if err != nil {
+				toolResult = fmt.Sprintf("Tool %s could not be retrieved: %v", toolName, err)
+				toolError = err.Error()
+				logger.Warn("Failed to get tool", zap.String("toolName", toolName), zap.Error(err))
+			} else if tool != nil {
+				result, execErr := tool.Execute(args)
+				if execErr != nil {
+					toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, execErr)
+					toolError = execErr.Error()
+					logger.Warn("Tool execution failed", zap.String("toolName", toolName), zap.Error(execErr))
+				} else {
+					toolResult = result
+					if toolName == "FileWrite" {
+						diff = extractDiffStatic(result)
+					}
+				}
+			} else {
+				toolResult = fmt.Sprintf("Tool %s not found", toolName)
+				toolError = "Tool not found"
+				logger.Warn("Tool not found", zap.String("toolName", toolName))
+			}
+
+			content := toolResult
+			if toolError != "" {
+				content = fmt.Sprintf("Tool %s failed with error: %s", toolName, toolError)
+			}
+
+			toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, content, toolError, diff, chatID, nil)
+			events.PublishToolCallEvent(toolEvent)
+
+			toolMessage := &entities.Message{
+				ID:             uuid.New().String(),
+				Role:           "tool",
+				Content:        content,
+				ToolCallID:     toolCall.ID,
+				ToolCallEvents: []entities.ToolCallEvent{*toolEvent},
+				Timestamp:      time.Now(),
+			}
+
+			results[i] = toolExecResult{
+				ToolCall:    toolCall,
+				ToolName:    toolName,
+				ToolResult:  toolResult,
+				Content:     content,
+				ToolError:   toolError,
+				Diff:        diff,
+				ToolEvent:   toolEvent,
+				ToolMessage: toolMessage,
+			}
+		}(i, toolCall)
+	}
+
+	wg.Wait()
+	return results
 }
 
 // GenerateResponse generates a response from the OpenAI-compatible API with incremental saving
@@ -296,99 +429,23 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			assistantMessageAPI := convertToOpenAIMessages([]*entities.Message{toolCallMessage})[0]
 			reqBody["messages"] = append(reqBody["messages"].([]map[string]any), assistantMessageAPI)
 
-			for _, toolCall := range toolCalls {
-				// Check for cancellation before executing tool
-				if ctx.Err() == context.Canceled {
-					return nil, fmt.Errorf("operation canceled by user")
-				}
+			// Execute all tool calls in parallel, then process results in order.
+			toolResults := executeToolsParallel(ctx, toolCalls, m.toolRepo, options, m.logger)
+			for _, r := range toolResults {
+				newMessages = append(newMessages, r.ToolMessage)
 
-				toolName := toolCall.Function.Name
-				tool, err := m.toolRepo.GetToolByName(toolName)
-
-				var toolResult string
-				var toolError string
-				var diff string
-				if err != nil {
-					toolResult = fmt.Sprintf("Tool %s could not be retrieved: %v", toolName, err)
-					toolError = err.Error()
-					m.logger.Warn("Failed to get tool", zap.String("toolName", toolName), zap.Error(err))
-				} else if tool != nil {
-					// Inject session_id into todowrite tool arguments
-					args := toolCall.Function.Arguments
-					if toolName == "todowrite" {
-						if sessionID, ok := options["session_id"].(string); ok && sessionID != "" {
-							var argsMap map[string]any
-							if err := json.Unmarshal([]byte(args), &argsMap); err == nil {
-								if _, exists := argsMap["session_id"]; !exists {
-									argsMap["session_id"] = sessionID
-									if newArgs, err := json.Marshal(argsMap); err == nil {
-										args = string(newArgs)
-									}
-								}
-							}
-						}
-					}
-					result, err := tool.Execute(args)
-					if err != nil {
-						toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
-						toolError = err.Error()
-						m.logger.Warn("Tool execution failed", zap.String("toolName", toolName), zap.Error(err))
-					} else {
-						toolResult = result
-						// Extract diff if it's a file write operation
-						if toolName == "FileWrite" {
-							diff = m.extractDiffFromResult(result)
-						}
-					}
-				} else {
-					toolResult = fmt.Sprintf("Tool %s not found", toolName)
-					toolError = "Tool not found"
-					m.logger.Warn("Tool not found", zap.String("toolName", toolName))
-				}
-
-				// Use raw tool result for both AI and UI display
-				var content string
-				if toolError != "" {
-					content = fmt.Sprintf("Tool %s failed with error: %s", toolName, toolError)
-				} else {
-					content = toolResult
-				}
-
-				// Create tool call event with raw result for UI formatting
-				chatID, _ := options["session_id"].(string)
-				toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, content, toolError, diff, chatID, nil)
-
-				// Publish real-time event for TUI updates
-				events.PublishToolCallEvent(toolEvent)
-
-				toolResponseMessage := &entities.Message{
-					ID:             uuid.New().String(),
-					Role:           "tool",
-					Content:        content,
-					ToolCallID:     toolCall.ID,
-					ToolCallEvents: []entities.ToolCallEvent{*toolEvent},
-					Timestamp:      time.Now(),
-				}
-				newMessages = append(newMessages, toolResponseMessage)
-
-				// Save incrementally if callback is provided
 				if callback != nil {
-					if err := callback([]*entities.Message{toolResponseMessage}); err != nil {
+					if err := callback([]*entities.Message{r.ToolMessage}); err != nil {
 						m.logger.Error("Failed to save tool response message incrementally", zap.Error(err))
 					}
 				}
 
-				// Append tool result to messages for next iteration
-				toolMessage := map[string]any{
+				apiMsg := map[string]any{
 					"role":         "tool",
-					"content":      toolResult,
-					"tool_call_id": toolCall.ID,
+					"content":      r.ToolResult,
+					"tool_call_id": r.ToolCall.ID,
 				}
-				// For Google Gemini, add name to function_response
-				if m.ProviderType() == entities.ProviderGoogle {
-					toolMessage["name"] = toolName
-				}
-				reqBody["messages"] = append(reqBody["messages"].([]map[string]any), toolMessage)
+				reqBody["messages"] = append(reqBody["messages"].([]map[string]any), apiMsg)
 			}
 		} else {
 			// Any other finish_reason is treated as final

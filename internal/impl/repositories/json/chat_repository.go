@@ -85,15 +85,16 @@ func (r *JsonChatRepository) ListChats(ctx context.Context) ([]*entities.Chat, e
 		messagesCopy := make([]entities.Message, len(c.Messages))
 		copy(messagesCopy, c.Messages)
 		chatsCopy = append(chatsCopy, &entities.Chat{
-			ID:        c.ID,
-			AgentID:   c.AgentID,
-			ModelID:   c.ModelID,
-			Name:      c.Name,
-			Messages:  messagesCopy,
-			Usage:     c.Usage,
-			Active:    c.Active,
-			CreatedAt: c.CreatedAt,
-			UpdatedAt: c.UpdatedAt,
+			ID:           c.ID,
+			AgentID:      c.AgentID,
+			ModelID:      c.ModelID,
+			Name:         c.Name,
+			Messages:     messagesCopy,
+			Usage:        c.Usage,
+			Active:       c.Active,
+			ParentChatID: c.ParentChatID,
+			CreatedAt:    c.CreatedAt,
+			UpdatedAt:    c.UpdatedAt,
 		})
 	}
 	sort.Slice(chatsCopy, func(i, j int) bool {
@@ -111,15 +112,16 @@ func (r *JsonChatRepository) GetChat(ctx context.Context, id string) (*entities.
 	messagesCopy := make([]entities.Message, len(chat.Messages))
 	copy(messagesCopy, chat.Messages)
 	return &entities.Chat{
-		ID:        chat.ID,
-		AgentID:   chat.AgentID,
-		ModelID:   chat.ModelID,
-		Name:      chat.Name,
-		Messages:  messagesCopy,
-		Usage:     chat.Usage,
-		Active:    chat.Active,
-		CreatedAt: chat.CreatedAt,
-		UpdatedAt: chat.UpdatedAt,
+		ID:           chat.ID,
+		AgentID:      chat.AgentID,
+		ModelID:      chat.ModelID,
+		Name:         chat.Name,
+		Messages:     messagesCopy,
+		Usage:        chat.Usage,
+		Active:       chat.Active,
+		ParentChatID: chat.ParentChatID,
+		CreatedAt:    chat.CreatedAt,
+		UpdatedAt:    chat.UpdatedAt,
 	}, nil
 }
 

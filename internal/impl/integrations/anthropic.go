@@ -12,7 +12,6 @@ import (
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	errors "github.com/drujensen/aiagent/internal/domain/errs"
-	"github.com/drujensen/aiagent/internal/domain/events"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
 
 	"github.com/google/uuid"
@@ -313,92 +312,36 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 				}
 			}
 
-			for _, toolCall := range toolCalls {
-				// Check for cancellation before executing tool
-				if ctx.Err() == context.Canceled {
-					return nil, fmt.Errorf("operation canceled by user")
-				}
+			// Execute all tool calls in parallel, then process results in order.
+			toolResults := executeToolsParallel(ctx, toolCalls, m.toolRepo, options, m.logger)
+			for _, r := range toolResults {
+				newMessages = append(newMessages, r.ToolMessage)
 
-				toolName := toolCall.Function.Name
-				tool, err := m.toolRepo.GetToolByName(toolName)
-
-				var toolResult string
-				var toolError string
-				var diff string
-				if err != nil {
-					toolResult = fmt.Sprintf("Tool %s could not be retrieved: %v", toolName, err)
-					toolError = err.Error()
-					m.logger.Warn("Failed to get tool", zap.String("toolName", toolName), zap.Error(err))
-				} else if tool != nil {
-					result, err := tool.Execute(toolCall.Function.Arguments)
-					if err != nil {
-						toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
-						toolError = err.Error()
-						m.logger.Warn("Tool execution failed", zap.String("toolName", toolName), zap.Error(err))
-					} else {
-						toolResult = result
-						// Extract diff if it's a file write operation
-						if toolName == "FileWrite" {
-							diff = m.extractDiffFromResult(result)
-						}
-					}
-				} else {
-					toolResult = fmt.Sprintf("Tool %s not found", toolName)
-					toolError = "Tool not found"
-					m.logger.Warn("Tool not found", zap.String("toolName", toolName))
-				}
-				// Use raw tool result for both AI and UI display
-				var content string
-				if toolError != "" {
-					content = fmt.Sprintf("Tool %s failed with error: %s", toolName, toolError)
-				} else {
-					content = toolResult
-				}
-
-				// Create tool call event with raw result for UI formatting
-				chatID, _ := options["session_id"].(string)
-				toolEvent := entities.NewToolCallEvent(toolCall.ID, toolName, toolCall.Function.Arguments, content, toolError, diff, chatID, nil)
-
-				// Publish real-time event for TUI updates
-				events.PublishToolCallEvent(toolEvent)
-
-				toolResponseMessage := &entities.Message{
-					ID:             uuid.New().String(),
-					Role:           "tool",
-					Content:        content,
-					ToolCallID:     toolCall.ID,
-					ToolCallEvents: []entities.ToolCallEvent{*toolEvent},
-					Timestamp:      time.Now(),
-				}
-				newMessages = append(newMessages, toolResponseMessage)
-
-				// Save incrementally if callback is provided
 				if callback != nil {
-					if err := callback([]*entities.Message{toolResponseMessage}); err != nil {
+					if err := callback([]*entities.Message{r.ToolMessage}); err != nil {
 						m.logger.Error("Failed to save tool response message incrementally", zap.Error(err))
 					}
 				}
 
-				// Append tool result to apiMessages for next iteration
-				if toolCall.ID != "" {
+				if r.ToolCall.ID != "" {
 					apiMessages = append(apiMessages, map[string]any{
 						"role": "assistant",
 						"content": []map[string]any{
 							{
 								"type":  "tool_use",
-								"id":    toolCall.ID,
-								"name":  toolName,
-								"input": json.RawMessage(toolCall.Function.Arguments),
+								"id":    r.ToolCall.ID,
+								"name":  r.ToolName,
+								"input": json.RawMessage(r.ToolCall.Function.Arguments),
 							},
 						},
 					})
 					apiMessages = append(apiMessages, map[string]any{
-						"role": "user", // Use "user" role to report tool result as per Anthropic's convention
+						"role": "user",
 						"content": []map[string]any{
 							{
 								"type":        "tool_result",
-								"tool_use_id": toolCall.ID,
-								"content":     toolResult,
+								"tool_use_id": r.ToolCall.ID,
+								"content":     r.ToolResult,
 							},
 						},
 					})
