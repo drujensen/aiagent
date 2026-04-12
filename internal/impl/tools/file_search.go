@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -114,7 +115,7 @@ func (t *FileSearchTool) checkFileSize(path string) (bool, error) {
 	return true, nil
 }
 
-func (t *FileSearchTool) Execute(arguments string) (string, error) {
+func (t *FileSearchTool) Execute(ctx context.Context, arguments string) (string, error) {
 	t.logger.Debug("Executing code search", zap.String("arguments", arguments))
 	var rawArgs map[string]interface{}
 	if err := json.Unmarshal([]byte(arguments), &rawArgs); err != nil {
@@ -274,13 +275,13 @@ func (t *FileSearchTool) searchMultipleFiles(dirPath, pattern, filePattern strin
 
 func (t *FileSearchTool) DisplayName(ui string, arguments string) (string, string) {
 	var args struct {
-		Pattern   string `json:"pattern"`
-		Directory string `json:"directory"`
+		Pattern string `json:"pattern"`
+		Path    string `json:"path"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err == nil {
 		detail := args.Pattern
-		if args.Directory != "" && args.Directory != "." {
-			detail += " in " + args.Directory
+		if args.Path != "" && args.Path != "." {
+			detail += " in " + args.Path
 		}
 		return t.Name(), detail
 	}

@@ -362,7 +362,7 @@ func (m *OpenAIIntegration) generateResponseV2(ctx context.Context, messages []*
 						}
 					}
 
-					result, err := tool.Execute(args)
+					result, err := tool.Execute(ctx, args)
 					if err != nil {
 						toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, err)
 						toolError = err.Error()

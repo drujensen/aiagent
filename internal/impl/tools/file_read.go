@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -114,7 +115,7 @@ func (t *FileReadTool) checkFileSize(path string) (bool, error) {
 	return true, nil
 }
 
-func (t *FileReadTool) Execute(arguments string) (string, error) {
+func (t *FileReadTool) Execute(ctx context.Context, arguments string) (string, error) {
 	t.logger.Debug("Executing file read command", zap.String("arguments", arguments))
 	var rawArgs map[string]interface{}
 	if err := json.Unmarshal([]byte(arguments), &rawArgs); err != nil {
@@ -186,7 +187,12 @@ func (t *FileReadTool) Execute(arguments string) (string, error) {
 }
 
 func (t *FileReadTool) DisplayName(ui string, arguments string) (string, string) {
-	// For FileRead, filename is shown in result, so return empty suffix
+	var args struct {
+		FilePath string `json:"filePath"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.FilePath != "" {
+		return t.Name(), args.FilePath
+	}
 	return t.Name(), ""
 }
 

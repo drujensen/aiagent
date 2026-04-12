@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -110,7 +111,7 @@ type ProcessArgs struct {
 	Action     string   `json:"action"`
 }
 
-func (t *ProcessTool) Execute(arguments string) (string, error) {
+func (t *ProcessTool) Execute(ctx context.Context, arguments string) (string, error) {
 	t.logger.Debug("Executing shell command", zap.String("arguments", arguments))
 
 	var args ProcessArgs

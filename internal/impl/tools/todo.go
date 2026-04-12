@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -151,7 +152,7 @@ func (t *TodoTool) saveTodos(sessionID string, todoList *TodoList) error {
 	return os.WriteFile(path, data, 0644)
 }
 
-func (t *TodoTool) Execute(arguments string) (string, error) {
+func (t *TodoTool) Execute(ctx context.Context, arguments string) (string, error) {
 	t.logger.Debug("Executing todo command", zap.String("arguments", arguments))
 	var args struct {
 		Action    string   `json:"action,omitempty"`
@@ -374,6 +375,12 @@ func (t *TodoTool) clearTodos(sessionID string) (string, error) {
 }
 
 func (t *TodoTool) DisplayName(ui string, arguments string) (string, string) {
+	var args struct {
+		Action string `json:"action"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Action != "" {
+		return t.Name(), args.Action
+	}
 	return t.Name(), ""
 }
 

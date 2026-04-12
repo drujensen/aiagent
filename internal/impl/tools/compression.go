@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -78,7 +79,7 @@ func (t *CompressionTool) Schema() map[string]any {
 	}
 }
 
-func (t *CompressionTool) Execute(arguments string) (string, error) {
+func (t *CompressionTool) Execute(ctx context.Context, arguments string) (string, error) {
 	t.logger.Debug("Executing compression command", zap.String("arguments", arguments))
 
 	var args struct {
@@ -131,6 +132,17 @@ func (t *CompressionTool) Execute(arguments string) (string, error) {
 }
 
 func (t *CompressionTool) DisplayName(ui string, arguments string) (string, string) {
+	var args struct {
+		Action            string `json:"action"`
+		StartMessageIndex int    `json:"start_message_index"`
+		EndMessageIndex   int    `json:"end_message_index"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Action != "" {
+		if args.StartMessageIndex > 0 || args.EndMessageIndex > 0 {
+			return t.Name(), fmt.Sprintf("%s messages %d-%d", args.Action, args.StartMessageIndex, args.EndMessageIndex)
+		}
+		return t.Name(), args.Action
+	}
 	return t.Name(), ""
 }
 

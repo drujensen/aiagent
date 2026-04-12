@@ -89,7 +89,7 @@ func (t *AgentTool) Schema() map[string]any {
 	}
 }
 
-func (t *AgentTool) Execute(arguments string) (string, error) {
+func (t *AgentTool) Execute(ctx context.Context, arguments string) (string, error) {
 	chatService := t.factory.GetChatService()
 	agentService := t.factory.GetAgentService()
 	modelService := t.factory.GetModelService()
@@ -113,8 +113,6 @@ func (t *AgentTool) Execute(arguments string) (string, error) {
 	if args.Task == "" {
 		return "", fmt.Errorf("task is required")
 	}
-
-	ctx := context.Background()
 
 	// Find agent by name (case-insensitive)
 	agents, err := agentService.ListAgents(ctx)

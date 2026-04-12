@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -34,7 +35,7 @@ func TestFileWriteTool_WriteOperation(t *testing.T) {
 	}
 	argsBytes, _ := json.Marshal(argsData)
 	args := string(argsBytes)
-	result, err := tool.Execute(args)
+	result, err := tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Failed to write file: %v", err)
 	}
@@ -73,7 +74,7 @@ func TestFileWriteTool_WriteOperation(t *testing.T) {
 	}
 	argsBytes2, _ := json.Marshal(argsData2)
 	args2 := string(argsBytes2)
-	_, err2 := tool.Execute(args2)
+	_, err2 := tool.Execute(context.Background(), args2)
 	if err2 != nil {
 		t.Fatalf("Failed to write file with absolute path: %v", err2)
 	}
@@ -113,7 +114,7 @@ func TestFileWriteTool_EditOperation(t *testing.T) {
 
 	// Test 1: Edit with replace first
 	args := `{"filePath": "edit.txt", "oldString": "Line 2", "newString": "Updated Line", "replaceAll": false}`
-	result, err := tool.Execute(args)
+	result, err := tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Failed to edit file: %v", err)
 	}
@@ -150,7 +151,7 @@ func TestFileWriteTool_EditOperation(t *testing.T) {
 
 	// Test 2: Edit with replace all
 	args = `{"filePath": "edit.txt", "oldString": "Line 2", "newString": "Modified Line 2", "replaceAll": true}`
-	result, err = tool.Execute(args)
+	result, err = tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Failed to edit file with replace all: %v", err)
 	}
@@ -190,35 +191,35 @@ func TestFileWriteTool_ErrorCases(t *testing.T) {
 	tool := NewFileWriteTool("test-file-error", "Test File Error Tool", config, logger)
 
 	// Test 1: Missing filePath
-	_, err = tool.Execute(`{"newString": "test"}`)
+	_, err = tool.Execute(context.Background(), `{"newString": "test"}`)
 	if err == nil || !strings.Contains(err.Error(), "filePath is required") {
 		t.Errorf("Expected error for missing filePath, got: %v", err)
 	}
 
 	// Test 3: Invalid path (outside workspace)
-	_, err = tool.Execute(`{"filePath": "../outside.txt", "newString": "test"}`)
+	_, err = tool.Execute(context.Background(), `{"filePath": "../outside.txt", "newString": "test"}`)
 	if err == nil || !strings.Contains(err.Error(), "path is outside workspace") {
 		t.Errorf("Expected error for path outside workspace, got: %v", err)
 	}
 
 	// Test 3b: Invalid absolute path (outside workspace)
-	_, err = tool.Execute(`{"filePath": "/outside.txt", "newString": "test"}`)
+	_, err = tool.Execute(context.Background(), `{"filePath": "/outside.txt", "newString": "test"}`)
 	if err == nil || !strings.Contains(err.Error(), "absolute path is outside workspace") {
 		t.Errorf("Expected error for absolute path outside workspace, got: %v", err)
 	}
 
 	// Test 4: Missing newString for write
-	_, err = tool.Execute(`{"filePath": "test.txt"}`)
+	_, err = tool.Execute(context.Background(), `{"filePath": "test.txt"}`)
 	if err == nil || !strings.Contains(err.Error(), "newString is required for write operation") {
 		t.Errorf("Expected error for missing newString in write, got: %v", err)
 	}
 
 	// Test 5: Missing oldString for edit
-	_, err = tool.Execute(`{"filePath": "test.txt", "oldString": "old", "newString": "new content"}`)
+	_, err = tool.Execute(context.Background(), `{"filePath": "test.txt", "oldString": "old", "newString": "new content"}`)
 	// This should work as edit
 
 	// Test 6: Missing newString for edit
-	_, err = tool.Execute(`{"filePath": "test.txt", "oldString": "old"}`)
+	_, err = tool.Execute(context.Background(), `{"filePath": "test.txt", "oldString": "old"}`)
 	if err == nil || !strings.Contains(err.Error(), "newString is required for edit operation") {
 		t.Errorf("Expected error for missing newString in edit, got: %v", err)
 	}
@@ -230,7 +231,7 @@ func TestFileWriteTool_ErrorCases(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	_, err = tool.Execute(`{"filePath": "nonexistent.txt", "oldString": "not found", "newString": "replacement"}`)
+	_, err = tool.Execute(context.Background(), `{"filePath": "nonexistent.txt", "oldString": "not found", "newString": "replacement"}`)
 	if err == nil || !strings.Contains(err.Error(), "oldString not found in file") {
 		t.Errorf("Expected error for oldString not found, got: %v", err)
 	}
@@ -245,7 +246,7 @@ func TestFileWriteTool_ErrorCases(t *testing.T) {
 	}
 	argsBytes, _ := json.Marshal(argsData)
 	args = string(argsBytes)
-	result, err := tool.Execute(args)
+	result, err := tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Failed to write with absolute path: %v", err)
 	}
@@ -299,7 +300,7 @@ func main(){fmt.Println("Hello")}`
 
 	// Edit the file to trigger formatting
 	args := `{"filePath": "test.go", "oldString": "package main", "newString": "package main"}`
-	_, err = tool.Execute(args)
+	_, err = tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Failed to edit Go file: %v", err)
 	}

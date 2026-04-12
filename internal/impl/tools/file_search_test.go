@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -42,7 +43,7 @@ func TestFileSearchTool_SearchOperation(t *testing.T) {
 
 	// Test 1: Search for "Hello"
 	args := `{"pattern": "Hello"}`
-	result, err := tool.Execute(args)
+	result, err := tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Failed to search: %v", err)
 	}
@@ -67,7 +68,7 @@ func TestFileSearchTool_SearchOperation(t *testing.T) {
 
 	// Test 2: Search with include pattern
 	args = `{"pattern": "world", "include": "*.txt"}`
-	result, err = tool.Execute(args)
+	result, err = tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Failed to search with include: %v", err)
 	}
@@ -105,7 +106,7 @@ func TestFileSearchTool_SearchOperation(t *testing.T) {
 	}
 	argsBytes, _ := json.Marshal(argsData)
 	args = string(argsBytes)
-	result, err = tool.Execute(args)
+	result, err = tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Failed to search with absolute path: %v", err)
 	}
@@ -141,7 +142,7 @@ func TestFileSearchTool_ErrorCases(t *testing.T) {
 
 	// Test 1: Missing pattern
 	args := `{"path": "."}`
-	result, err := tool.Execute(args)
+	result, err := tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Execute should not return error for missing pattern, got: %v", err)
 	}
@@ -157,7 +158,7 @@ func TestFileSearchTool_ErrorCases(t *testing.T) {
 
 	// Test 2: Path outside workspace
 	args = `{"pattern": "test", "path": "../outside"}`
-	result, err = tool.Execute(args)
+	result, err = tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Execute should not return error for invalid path, got: %v", err)
 	}
@@ -172,7 +173,7 @@ func TestFileSearchTool_ErrorCases(t *testing.T) {
 
 	// Test 3: Absolute path outside workspace
 	args = `{"pattern": "test", "path": "/outside"}`
-	result, err = tool.Execute(args)
+	result, err = tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Execute should not return error for absolute path outside, got: %v", err)
 	}

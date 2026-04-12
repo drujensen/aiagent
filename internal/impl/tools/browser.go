@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -90,7 +91,7 @@ func (b *BrowserTool) Schema() map[string]any {
 	}
 }
 
-func (b *BrowserTool) Execute(arguments string) (string, error) {
+func (b *BrowserTool) Execute(ctx context.Context, arguments string) (string, error) {
 	b.logger.Debug("Executing browser operation", zap.String("arguments", arguments))
 
 	if err := b.initializeBrowser(); err != nil {
@@ -230,6 +231,12 @@ func (b *BrowserTool) initializeBrowser() error {
 }
 
 func (t *BrowserTool) DisplayName(ui string, arguments string) (string, string) {
+	var args struct {
+		URL string `json:"url"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.URL != "" {
+		return t.Name(), args.URL
+	}
 	return t.Name(), ""
 }
 

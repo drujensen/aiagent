@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -22,13 +23,13 @@ func TestTodoTool_PerSessionIsolation(t *testing.T) {
 	// Test write/read for session1
 	session1 := "test-session-1"
 	writeArgs1 := `{"action": "write", "todos": ["Task for session1"], "session_id": "` + session1 + `"}`
-	_, err := tool.Execute(writeArgs1)
+	_, err := tool.Execute(context.Background(), writeArgs1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	readArgs1 := `{"action": "read", "session_id": "` + session1 + `"}`
-	read1, err := tool.Execute(readArgs1)
+	read1, err := tool.Execute(context.Background(), readArgs1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,13 +42,13 @@ func TestTodoTool_PerSessionIsolation(t *testing.T) {
 	// Test write/read for session2
 	session2 := "test-session-2"
 	writeArgs2 := `{"action": "write", "todos": ["Task for session2"], "session_id": "` + session2 + `"}`
-	_, err = tool.Execute(writeArgs2)
+	_, err = tool.Execute(context.Background(), writeArgs2)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	readArgs2 := `{"action": "read", "session_id": "` + session2 + `"}`
-	read2, err := tool.Execute(readArgs2)
+	read2, err := tool.Execute(context.Background(), readArgs2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +59,7 @@ func TestTodoTool_PerSessionIsolation(t *testing.T) {
 	}
 
 	// Verify session1 unchanged
-	read1Again, _ := tool.Execute(readArgs1)
+	read1Again, _ := tool.Execute(context.Background(), readArgs1)
 	var readResult1Again map[string]interface{}
 	json.Unmarshal([]byte(read1Again), &readResult1Again)
 	if len(readResult1Again["todos"].([]interface{})) != 1 {
@@ -82,7 +83,7 @@ func TestTodoTool_Clear(t *testing.T) {
 
 	session := "test-clear-session"
 	writeArgs := `{"action": "write", "todos": ["To be cleared"], "session_id": "` + session + `"}`
-	_, err := tool.Execute(writeArgs)
+	_, err := tool.Execute(context.Background(), writeArgs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +96,7 @@ func TestTodoTool_Clear(t *testing.T) {
 
 	// Clear
 	clearArgs := `{"action": "clear", "session_id": "` + session + `"}`
-	_, err = tool.Execute(clearArgs)
+	_, err = tool.Execute(context.Background(), clearArgs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +108,7 @@ func TestTodoTool_Clear(t *testing.T) {
 
 	// Test clear on non-existent
 	clearArgs2 := `{"action": "clear", "session_id": "nonexistent"}`
-	_, err = tool.Execute(clearArgs2)
+	_, err = tool.Execute(context.Background(), clearArgs2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,14 +125,14 @@ func TestTodoTool_UpdateStatus(t *testing.T) {
 
 	session := "test-update-session"
 	writeArgs := `{"action": "write", "todos": ["Task 1", "Task 2"], "session_id": "` + session + `"}`
-	_, err := tool.Execute(writeArgs)
+	_, err := tool.Execute(context.Background(), writeArgs)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Update status of first task (index 1) to in_progress
 	updateArgs := `{"action": "update_status", "index": 1, "status": "in_progress", "session_id": "` + session + `"}`
-	result, err := tool.Execute(updateArgs)
+	result, err := tool.Execute(context.Background(), updateArgs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +170,7 @@ func TestTodoTool_UpdateStatusInvalidIndex(t *testing.T) {
 
 	// Try to update status with index 0 (should fail)
 	updateArgs := `{"action": "update_status", "index": 0, "status": "completed", "session_id": "` + session + `"}`
-	_, err := tool.Execute(updateArgs)
+	_, err := tool.Execute(context.Background(), updateArgs)
 	if err == nil {
 		t.Fatal("Expected error for invalid index 0")
 	}
@@ -180,14 +181,14 @@ func TestTodoTool_UpdateStatusInvalidIndex(t *testing.T) {
 
 	// Now add todos and try invalid index
 	writeArgs := `{"action": "write", "todos": ["Task 1"], "session_id": "` + session + `"}`
-	_, err = tool.Execute(writeArgs)
+	_, err = tool.Execute(context.Background(), writeArgs)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Try index 2 (out of range)
 	updateArgs2 := `{"action": "update_status", "index": 2, "status": "completed", "session_id": "` + session + `"}`
-	_, err = tool.Execute(updateArgs2)
+	_, err = tool.Execute(context.Background(), updateArgs2)
 	if err == nil {
 		t.Fatal("Expected error for index 2 when only 1 todo")
 	}

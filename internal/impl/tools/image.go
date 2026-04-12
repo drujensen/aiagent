@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -75,7 +76,7 @@ func (t *ImageTool) Schema() map[string]any {
 	}
 }
 
-func (t *ImageTool) Execute(arguments string) (string, error) {
+func (t *ImageTool) Execute(ctx context.Context, arguments string) (string, error) {
 	t.logger.Debug("Executing image generation", zap.String("arguments", arguments))
 	var args struct {
 		Prompt string `json:"prompt"`
@@ -191,6 +192,16 @@ func (t *ImageTool) Execute(arguments string) (string, error) {
 }
 
 func (t *ImageTool) DisplayName(ui string, arguments string) (string, string) {
+	var args struct {
+		Prompt string `json:"prompt"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Prompt != "" {
+		prompt := args.Prompt
+		if len(prompt) > 60 {
+			prompt = prompt[:57] + "..."
+		}
+		return t.Name(), prompt
+	}
 	return t.Name(), ""
 }
 

@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -87,7 +88,7 @@ func (t *WebSearchTool) Schema() map[string]any {
 }
 
 // Execute performs the search and returns both the answer and results.
-func (t *WebSearchTool) Execute(arguments string) (string, error) {
+func (t *WebSearchTool) Execute(ctx context.Context, arguments string) (string, error) {
 	// Log the search query
 	t.logger.Debug("Executing search", zap.String("arguments", arguments))
 
@@ -209,6 +210,12 @@ func (t *WebSearchTool) Execute(arguments string) (string, error) {
 }
 
 func (t *WebSearchTool) DisplayName(ui string, arguments string) (string, string) {
+	var args struct {
+		Query string `json:"query"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Query != "" {
+		return t.Name(), args.Query
+	}
 	return t.Name(), ""
 }
 

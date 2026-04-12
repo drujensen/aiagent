@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"testing"
 
 	"go.uber.org/zap/zaptest"
@@ -52,7 +53,7 @@ func TestCompressionTool_Execute(t *testing.T) {
 		"description": "Test compression"
 	}`
 
-	result, err := tool.Execute(args)
+	result, err := tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
@@ -69,7 +70,7 @@ func TestCompressionTool_Execute(t *testing.T) {
 		"end_message_index": 20
 	}`
 
-	_, err = tool.Execute(invalidArgs)
+	_, err = tool.Execute(context.Background(), invalidArgs)
 	if err == nil {
 		t.Error("Expected error for invalid action")
 	}
@@ -89,7 +90,7 @@ func TestCompressionTool_InvalidRange(t *testing.T) {
 		"summary_type": "task_cleanup"
 	}`
 
-	_, err := tool.Execute(invalidArgs)
+	_, err := tool.Execute(context.Background(), invalidArgs)
 	if err == nil {
 		t.Error("Expected error for invalid range")
 	}

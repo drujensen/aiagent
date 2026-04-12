@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -115,7 +116,7 @@ func (t *DirectoryTool) validatePath(path string) (string, error) {
 	return fullPath, nil
 }
 
-func (t *DirectoryTool) Execute(arguments string) (string, error) {
+func (t *DirectoryTool) Execute(ctx context.Context, arguments string) (string, error) {
 	t.logger.Debug("Executing directory command", zap.String("arguments", arguments))
 	var args struct {
 		Operation   string `json:"operation"`

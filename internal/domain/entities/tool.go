@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,7 +49,7 @@ type Tool interface {
 	Configuration() map[string]string
 	UpdateConfiguration(config map[string]string)
 	Schema() map[string]any
-	Execute(arguments string) (string, error)
+	Execute(ctx context.Context, arguments string) (string, error)
 	FormatResult(ui string, result, diff, arguments string) string
 	DisplayName(ui string, arguments string) (string, string)
 }

@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -137,7 +138,7 @@ func (t *FileWriteTool) validatePath(path string) (string, error) {
 	return fullPath, nil
 }
 
-func (t *FileWriteTool) Execute(arguments string) (string, error) {
+func (t *FileWriteTool) Execute(ctx context.Context, arguments string) (string, error) {
 	t.logger.Debug("Executing file write command", zap.String("arguments", arguments))
 
 	var rawArgs map[string]interface{}
@@ -403,10 +404,10 @@ func getBoolField(data map[string]interface{}, key string) bool {
 
 func (t *FileWriteTool) DisplayName(ui string, arguments string) (string, string) {
 	var args struct {
-		Path string `json:"path"`
+		FilePath string `json:"filePath"`
 	}
-	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Path != "" {
-		return t.Name(), args.Path
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.FilePath != "" {
+		return t.Name(), args.FilePath
 	}
 	return t.Name(), ""
 }

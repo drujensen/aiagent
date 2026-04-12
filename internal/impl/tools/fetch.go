@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -95,7 +96,7 @@ func (t *FetchTool) Schema() map[string]any {
 	}
 }
 
-func (t *FetchTool) Execute(arguments string) (string, error) {
+func (t *FetchTool) Execute(ctx context.Context, arguments string) (string, error) {
 	t.logger.Debug("Executing fetch operation", zap.String("arguments", arguments))
 
 	var rawArgs map[string]interface{}
@@ -293,6 +294,12 @@ func (t *FetchTool) doRequest(req *http.Request, headers []string) (string, erro
 }
 
 func (t *FetchTool) DisplayName(ui string, arguments string) (string, string) {
+	var args struct {
+		URL string `json:"url"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.URL != "" {
+		return t.Name(), args.URL
+	}
 	return t.Name(), ""
 }
 

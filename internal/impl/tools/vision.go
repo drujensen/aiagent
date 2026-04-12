@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -56,7 +57,7 @@ func (v *VisionTool) Schema() map[string]any {
 	}
 }
 
-func (v *VisionTool) Execute(arguments string) (string, error) {
+func (v *VisionTool) Execute(ctx context.Context, arguments string) (string, error) {
 	var args map[string]string
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return "", fmt.Errorf("invalid arguments: %v", err)
@@ -192,6 +193,12 @@ func EncodeImageToBase64(imagePath string) (string, error) {
 }
 
 func (t *VisionTool) DisplayName(ui string, arguments string) (string, string) {
+	var args struct {
+		URL string `json:"url"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.URL != "" {
+		return t.Name(), args.URL
+	}
 	return t.Name(), ""
 }
 

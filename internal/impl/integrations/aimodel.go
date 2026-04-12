@@ -179,7 +179,7 @@ func executeToolsParallel(
 				toolError = err.Error()
 				logger.Warn("Failed to get tool", zap.String("toolName", toolName), zap.Error(err))
 			} else if tool != nil {
-				result, execErr := tool.Execute(args)
+				result, execErr := tool.Execute(ctx, args)
 				if execErr != nil {
 					toolResult = fmt.Sprintf("Tool %s execution failed: %v", toolName, execErr)
 					toolError = execErr.Error()

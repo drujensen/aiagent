@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -37,7 +38,7 @@ func TestFileReadTool_ReadOperation(t *testing.T) {
 
 	// Test 1: Read entire file
 	args := `{"filePath": "test.txt"}`
-	result, err := tool.Execute(args)
+	result, err := tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Failed to read file: %v", err)
 	}
@@ -65,7 +66,7 @@ func TestFileReadTool_ReadOperation(t *testing.T) {
 	}
 	argsBytes, _ := json.Marshal(argsData)
 	args = string(argsBytes)
-	result, err = tool.Execute(args)
+	result, err = tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Failed to read with absolute path: %v", err)
 	}
@@ -96,7 +97,7 @@ func TestFileReadTool_ErrorCases(t *testing.T) {
 
 	// Test 1: Missing filePath
 	args := `{}`
-	result, err := tool.Execute(args)
+	result, err := tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Execute should not return error for missing filePath, got: %v", err)
 	}
@@ -112,7 +113,7 @@ func TestFileReadTool_ErrorCases(t *testing.T) {
 
 	// Test 2: File not found
 	args = `{"filePath": "nonexistent.txt"}`
-	result, err = tool.Execute(args)
+	result, err = tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Execute should not return error for file not found, got: %v", err)
 	}
@@ -127,7 +128,7 @@ func TestFileReadTool_ErrorCases(t *testing.T) {
 
 	// Test 3: Path outside workspace
 	args = `{"filePath": "../outside.txt"}`
-	result, err = tool.Execute(args)
+	result, err = tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Execute should not return error for path outside workspace, got: %v", err)
 	}
@@ -142,7 +143,7 @@ func TestFileReadTool_ErrorCases(t *testing.T) {
 
 	// Test 4: Absolute path outside workspace
 	args = `{"filePath": "/outside.txt"}`
-	result, err = tool.Execute(args)
+	result, err = tool.Execute(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Execute should not return error for absolute path outside workspace, got: %v", err)
 	}

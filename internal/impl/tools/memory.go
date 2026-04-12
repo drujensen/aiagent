@@ -158,7 +158,7 @@ func (t *MemoryTool) Schema() map[string]any {
 	}
 }
 
-func (t *MemoryTool) Execute(arguments string) (string, error) {
+func (t *MemoryTool) Execute(ctx context.Context, arguments string) (string, error) {
 	t.logger.Debug("Executing memory operation", zap.String("arguments", arguments))
 
 	var args struct {
@@ -551,6 +551,16 @@ func containsMatchingString(slice []string, query string) bool {
 }
 
 func (t *MemoryTool) DisplayName(ui string, arguments string) (string, string) {
+	var args struct {
+		Action string `json:"action"`
+		Query  string `json:"query"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.Action != "" {
+		if args.Query != "" {
+			return t.Name(), args.Action + ": " + args.Query
+		}
+		return t.Name(), args.Action
+	}
 	return t.Name(), ""
 }
 

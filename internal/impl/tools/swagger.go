@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -91,7 +92,7 @@ type SwaggerResponse struct {
 	RawSpec   string            `json:"raw_spec,omitempty"`
 }
 
-func (t *SwaggerTool) Execute(arguments string) (string, error) {
+func (t *SwaggerTool) Execute(ctx context.Context, arguments string) (string, error) {
 	t.logger.Debug("Executing Swagger tool", zap.String("arguments", arguments))
 
 	var args struct {
@@ -233,6 +234,12 @@ func (t *SwaggerTool) Execute(arguments string) (string, error) {
 }
 
 func (t *SwaggerTool) DisplayName(ui string, arguments string) (string, string) {
+	var args struct {
+		URL string `json:"url"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err == nil && args.URL != "" {
+		return t.Name(), args.URL
+	}
 	return t.Name(), ""
 }
 
