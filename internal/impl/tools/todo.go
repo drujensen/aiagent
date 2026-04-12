@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
-	"github.com/google/uuid"
 
 	"go.uber.org/zap"
 )
@@ -19,7 +18,6 @@ type TodoItem struct {
 	Content   string    `json:"content"`
 	Status    string    `json:"status"`
 	Priority  string    `json:"priority"`
-	ID        string    `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -92,41 +90,21 @@ func (t *TodoTool) Schema() map[string]any {
 				"type":        "array",
 				"description": "The updated todo list (required for write action)",
 				"items": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"content": map[string]any{
-							"type":        "string",
-							"description": "Brief description of the task",
-						},
-						"status": map[string]any{
-							"type":        "string",
-							"description": "Current status of the task: pending, in_progress, completed, cancelled",
-							"enum":        []string{"pending", "in_progress", "completed", "cancelled"},
-						},
-						"priority": map[string]any{
-							"type":        "string",
-							"description": "Priority level of the task: high, medium, low",
-							"enum":        []string{"high", "medium", "low"},
-						},
-					},
-					"required": []string{"content", "status", "priority"},
+					"type":        "string",
+					"description": "Brief description of the task",
 				},
 			},
-			"id": map[string]any{
-				"type":        "string",
-				"description": "For update_status: the ID of the todo to update",
+			"index": map[string]any{
+				"type":        "integer",
+				"description": "For update_status: the 1-based index of the todo to update",
 			},
 			"status": map[string]any{
 				"type":        "string",
 				"description": "For update_status: new status (pending, in_progress, completed, cancelled)",
 				"enum":        []string{"pending", "in_progress", "completed", "cancelled"},
 			},
-			"session_id": map[string]any{
-				"type":        "string",
-				"description": "Required chat session ID",
-			},
 		},
-		"required": []string{"session_id"},
+		"required": []string{"action"},
 	}
 }
 
@@ -176,15 +154,11 @@ func (t *TodoTool) saveTodos(sessionID string, todoList *TodoList) error {
 func (t *TodoTool) Execute(arguments string) (string, error) {
 	t.logger.Debug("Executing todo command", zap.String("arguments", arguments))
 	var args struct {
-		Action string `json:"action,omitempty"`
-		Todos  []struct {
-			Content  string `json:"content"`
-			Status   string `json:"status"`
-			Priority string `json:"priority"`
-		} `json:"todos"`
-		ID        string `json:"id,omitempty"`
-		Status    string `json:"status,omitempty"`
-		SessionID string `json:"session_id"`
+		Action    string   `json:"action,omitempty"`
+		Todos     []string `json:"todos"`
+		Index     int      `json:"index,omitempty"`
+		Status    string   `json:"status,omitempty"`
+		SessionID string   `json:"session_id"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		t.logger.Error("Failed to parse arguments", zap.Error(err))
@@ -201,7 +175,7 @@ func (t *TodoTool) Execute(arguments string) (string, error) {
 	if action == "" {
 		if len(args.Todos) > 0 {
 			action = "write"
-		} else if args.ID != "" && args.Status != "" {
+		} else if args.Index != 0 && args.Status != "" {
 			action = "update_status"
 		} else {
 			action = "read"
@@ -214,7 +188,7 @@ func (t *TodoTool) Execute(arguments string) (string, error) {
 	case "read":
 		return t.readTodos(sessionID)
 	case "update_status":
-		return t.updateStatus(sessionID, args.ID, args.Status)
+		return t.updateStatus(sessionID, args.Index, args.Status)
 	case "clear":
 		return t.clearTodos(sessionID)
 	default:
@@ -222,30 +196,17 @@ func (t *TodoTool) Execute(arguments string) (string, error) {
 	}
 }
 
-func (t *TodoTool) writeTodos(sessionID string, todos []struct {
-	Content  string `json:"content"`
-	Status   string `json:"status"`
-	Priority string `json:"priority"`
-}) (string, error) {
+func (t *TodoTool) writeTodos(sessionID string, todos []string) (string, error) {
 	todoList, err := t.loadTodos(sessionID)
 	if err != nil {
 		return "", err
 	}
 
-	for _, todo := range todos {
-		status := todo.Status
-		if status == "" {
-			status = "pending"
-		}
-		priority := todo.Priority
-		if priority == "" {
-			priority = "medium"
-		}
+	for _, content := range todos {
 		newTodo := TodoItem{
-			Content:   todo.Content,
-			Status:    status,
-			Priority:  priority,
-			ID:        uuid.New().String(),
+			Content:   content,
+			Status:    "pending",
+			Priority:  "medium",
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
@@ -268,7 +229,7 @@ func (t *TodoTool) writeTodos(sessionID string, todos []struct {
 	// Add the full task plan
 	if len(todoList.Todos) > 0 {
 		result.WriteString("📋 Task Plan:\n\n")
-		for _, todo := range todoList.Todos {
+		for i, todo := range todoList.Todos {
 			checkbox := ""
 			switch todo.Status {
 			case "pending":
@@ -281,7 +242,7 @@ func (t *TodoTool) writeTodos(sessionID string, todos []struct {
 				checkbox = "- [❌]"
 			}
 
-			result.WriteString(fmt.Sprintf("%s %s\n", checkbox, todo.Content))
+			result.WriteString(fmt.Sprintf("%d. %s %s\n", i+1, checkbox, todo.Content))
 		}
 	}
 
@@ -317,8 +278,8 @@ func (t *TodoTool) readTodos(sessionID string) (string, error) {
 	result.WriteString("📋 Task Plan:\n\n")
 
 	// Display todos without workflow grouping
-	for _, todo := range todoList.Todos {
-		result.WriteString(t.formatTodo(todo))
+	for i, todo := range todoList.Todos {
+		result.WriteString(t.formatTodo(i+1, todo))
 	}
 
 	// JSON for AI processing
@@ -330,7 +291,7 @@ func (t *TodoTool) readTodos(sessionID string) (string, error) {
 	return string(jsonResult), nil
 }
 
-func (t *TodoTool) formatTodo(todo TodoItem) string {
+func (t *TodoTool) formatTodo(index int, todo TodoItem) string {
 	checkbox := ""
 	switch todo.Status {
 	case "pending":
@@ -343,55 +304,39 @@ func (t *TodoTool) formatTodo(todo TodoItem) string {
 		checkbox = "- [❌]"
 	}
 
-	return fmt.Sprintf("%s %s\n", checkbox, todo.Content)
+	return fmt.Sprintf("%d. %s %s\n", index, checkbox, todo.Content)
 }
 
-func (t *TodoTool) updateStatus(sessionID, id, status string) (string, error) {
-	if id == "" {
-		return "", fmt.Errorf("ID is required for updating todo status")
-	}
-
+func (t *TodoTool) updateStatus(sessionID string, index int, status string) (string, error) {
 	todoList, err := t.loadTodos(sessionID)
 	if err != nil {
 		return "", err
 	}
 
-	found := false
-	for i := range todoList.Todos {
-		if todoList.Todos[i].ID == id {
-			todoList.Todos[i].Status = status
-			todoList.Todos[i].UpdatedAt = time.Now()
-			found = true
-			break
-		}
+	// Sort todos by CreatedAt ascending
+	sort.Slice(todoList.Todos, func(i, j int) bool {
+		return todoList.Todos[i].CreatedAt.Before(todoList.Todos[j].CreatedAt)
+	})
+
+	if index < 1 || index > len(todoList.Todos) {
+		return "", fmt.Errorf("invalid index %d, must be between 1 and %d", index, len(todoList.Todos))
 	}
 
-	if !found {
-		// Build helpful error message with available IDs
-		var availableIDs []string
-		for _, todo := range todoList.Todos {
-			availableIDs = append(availableIDs, todo.ID)
-		}
-
-		if len(availableIDs) > 0 {
-			return "", fmt.Errorf("todo with id '%s' not found in session '%s'. Available IDs: [%s]", id, sessionID, strings.Join(availableIDs, ", "))
-		} else {
-			return "", fmt.Errorf("todo with id '%s' not found in session '%s'. No todos exist for this session", id, sessionID)
-		}
-	}
+	todoList.Todos[index-1].Status = status
+	todoList.Todos[index-1].UpdatedAt = time.Now()
 
 	if err := t.saveTodos(sessionID, todoList); err != nil {
 		return "", err
 	}
 
-	// Build the response with action message and full task plan
+	// Build the response
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("Updated todo %s to status %s\n\n", id, status))
+	result.WriteString(fmt.Sprintf("Updated todo at index %d to status %s\n\n", index, status))
 
 	// Add the full task plan
 	if len(todoList.Todos) > 0 {
 		result.WriteString("📋 Task Plan:\n\n")
-		for _, todo := range todoList.Todos {
+		for i, todo := range todoList.Todos {
 			checkbox := ""
 			switch todo.Status {
 			case "pending":
@@ -404,7 +349,7 @@ func (t *TodoTool) updateStatus(sessionID, id, status string) (string, error) {
 				checkbox = "- [❌]"
 			}
 
-			result.WriteString(fmt.Sprintf("%s %s\n", checkbox, todo.Content))
+			result.WriteString(fmt.Sprintf("%d. %s %s\n", i+1, checkbox, todo.Content))
 		}
 	}
 

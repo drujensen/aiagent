@@ -21,7 +21,7 @@ func TestTodoTool_PerSessionIsolation(t *testing.T) {
 
 	// Test write/read for session1
 	session1 := "test-session-1"
-	writeArgs1 := `{"action": "write", "todos": [{"content": "Task for session1"}], "session_id": "` + session1 + `"}`
+	writeArgs1 := `{"action": "write", "todos": ["Task for session1"], "session_id": "` + session1 + `"}`
 	_, err := tool.Execute(writeArgs1)
 	if err != nil {
 		t.Fatal(err)
@@ -40,7 +40,7 @@ func TestTodoTool_PerSessionIsolation(t *testing.T) {
 
 	// Test write/read for session2
 	session2 := "test-session-2"
-	writeArgs2 := `{"action": "write", "todos": [{"content": "Task for session2"}], "session_id": "` + session2 + `"}`
+	writeArgs2 := `{"action": "write", "todos": ["Task for session2"], "session_id": "` + session2 + `"}`
 	_, err = tool.Execute(writeArgs2)
 	if err != nil {
 		t.Fatal(err)
@@ -81,7 +81,7 @@ func TestTodoTool_Clear(t *testing.T) {
 	tool := NewTodoTool("Todo", "test", config, logger)
 
 	session := "test-clear-session"
-	writeArgs := `{"action": "write", "todos": [{"content": "To be cleared"}], "session_id": "` + session + `"}`
+	writeArgs := `{"action": "write", "todos": ["To be cleared"], "session_id": "` + session + `"}`
 	_, err := tool.Execute(writeArgs)
 	if err != nil {
 		t.Fatal(err)
@@ -113,7 +113,8 @@ func TestTodoTool_Clear(t *testing.T) {
 	}
 }
 
-func TestTodoTool_AlwaysSessionScoped(t *testing.T) {
+func TestTodoTool_UpdateStatus(t *testing.T) {
+	// Setup
 	wd, _ := os.Getwd()
 	config := map[string]string{"workspace": wd}
 	observedZapCore, _ := observer.New(zap.DebugLevel)
@@ -121,19 +122,74 @@ func TestTodoTool_AlwaysSessionScoped(t *testing.T) {
 
 	tool := NewTodoTool("Todo", "test", config, logger)
 
-	// Global write should fail (no session_id)
-	writeArgsNoSession := `{"action": "write", "todos": [{"content": "Global task"}]}`
-	_, err := tool.Execute(writeArgsNoSession)
-	if err == nil || err.Error() != "session_id is required" {
-		t.Errorf("Expected session_id required error, got %v", err)
+	session := "test-update-session"
+	writeArgs := `{"action": "write", "todos": ["Task 1", "Task 2"], "session_id": "` + session + `"}`
+	_, err := tool.Execute(writeArgs)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	// Session write succeeds
-	session := "test-session"
-	writeArgs := `{"action": "write", "todos": [{"content": "Session task"}], "session_id": "` + session + `"}`
+	// Update status of first task (index 1) to in_progress
+	updateArgs := `{"action": "update_status", "index": 1, "status": "in_progress", "session_id": "` + session + `"}`
+	result, err := tool.Execute(updateArgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify
+	var response map[string]interface{}
+	json.Unmarshal([]byte(result), &response)
+	todos := response["todos"].([]interface{})
+	if len(todos) != 2 {
+		t.Errorf("Expected 2 todos, got %d", len(todos))
+	}
+	task1 := todos[0].(map[string]interface{})
+	if task1["status"] != "in_progress" {
+		t.Errorf("Expected status in_progress, got %s", task1["status"])
+	}
+	task2 := todos[1].(map[string]interface{})
+	if task2["status"] != "pending" {
+		t.Errorf("Expected status pending, got %s", task2["status"])
+	}
+
+	// Cleanup
+	os.Remove(filepath.Join(wd, ".aiagent", "todos_"+session+".json"))
+}
+
+func TestTodoTool_UpdateStatusInvalidIndex(t *testing.T) {
+	// Setup
+	wd, _ := os.Getwd()
+	config := map[string]string{"workspace": wd}
+	observedZapCore, _ := observer.New(zap.DebugLevel)
+	logger := zap.New(observedZapCore)
+
+	tool := NewTodoTool("Todo", "test", config, logger)
+
+	session := "test-invalid-index-session"
+
+	// Try to update status with index 0 (should fail)
+	updateArgs := `{"action": "update_status", "index": 0, "status": "completed", "session_id": "` + session + `"}`
+	_, err := tool.Execute(updateArgs)
+	if err == nil {
+		t.Fatal("Expected error for invalid index 0")
+	}
+	expectedError := "invalid index 0, must be between 1 and 0"
+	if err.Error() != expectedError {
+		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
+	}
+
+	// Now add todos and try invalid index
+	writeArgs := `{"action": "write", "todos": ["Task 1"], "session_id": "` + session + `"}`
 	_, err = tool.Execute(writeArgs)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// Try index 2 (out of range)
+	updateArgs2 := `{"action": "update_status", "index": 2, "status": "completed", "session_id": "` + session + `"}`
+	_, err = tool.Execute(updateArgs2)
+	if err == nil {
+		t.Fatal("Expected error for index 2 when only 1 todo")
 	}
 
 	// Cleanup
