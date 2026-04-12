@@ -346,9 +346,9 @@ func (m *OpenAIIntegration) generateResponseV2(ctx context.Context, messages []*
 					toolError = err.Error()
 					m.logger.Warn("Failed to get tool", zap.String("toolName", toolName), zap.Error(err))
 				} else if tool != nil {
-					// Inject session_id into todowrite tool arguments
+					// Inject session_id into TodoWrite tool arguments
 					args := toolCall.Function.Arguments
-					if toolName == "todowrite" {
+					if toolName == "TodoWrite" {
 						if sessionID, ok := options["session_id"].(string); ok && sessionID != "" {
 							var argsMap map[string]any
 							if err := json.Unmarshal([]byte(args), &argsMap); err == nil {
@@ -370,7 +370,7 @@ func (m *OpenAIIntegration) generateResponseV2(ctx context.Context, messages []*
 					} else {
 						toolResult = result
 						// Extract diff if it's a file write operation
-						if toolName == "FileWrite" {
+						if toolName == "Write" || toolName == "Edit" {
 							diff = m.extractDiffFromResult(result)
 						}
 					}

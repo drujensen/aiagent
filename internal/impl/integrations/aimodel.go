@@ -121,7 +121,7 @@ func injectToolArgs(args, toolName, chatID string) string {
 		return args
 	}
 	changed := false
-	if toolName == "todowrite" {
+	if toolName == "TodoWrite" {
 		if _, exists := m["session_id"]; !exists {
 			m["session_id"] = chatID
 			changed = true
@@ -186,7 +186,7 @@ func executeToolsParallel(
 					logger.Warn("Tool execution failed", zap.String("toolName", toolName), zap.Error(execErr))
 				} else {
 					toolResult = result
-					if toolName == "FileWrite" {
+					if toolName == "Write" || toolName == "Edit" {
 						diff = extractDiffStatic(result)
 					}
 				}

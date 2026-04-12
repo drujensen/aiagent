@@ -587,15 +587,22 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 				c.textarea.Reset()
 				c.textarea.SetHeight(2)
 				c.setEditorSize()
-				c.tempMessages = append(c.tempMessages, *message)
+				c.activeChat.Messages = append(c.activeChat.Messages, *message)
 				// Initialize tool call status tracking for this message
 				c.toolCallStatus = make(map[string]bool)
 				c.err = nil
+				c.updateEditorContent()
+				// Scroll to bottom to show the new user message
+				bottomMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}}
+				newModel, _ := c.editor.Update(bottomMsg)
+				if editor, ok := newModel.(vimtea.Editor); ok {
+					c.editor = editor
+				}
 				ctx, cancel := context.WithCancel(context.Background())
 				c.cancel = cancel
 				c.isProcessing = true
 				c.startTime = time.Now()
-				return c, tea.Batch(commands.SendMessageCmd(c.chatService, c.activeChat.ID, message, ctx), c.spinner.Tick, tea.Cmd(func() tea.Msg { return refreshMsg{} }))
+				return c, tea.Batch(commands.SendMessageCmd(c.chatService, c.activeChat.ID, message, ctx), c.spinner.Tick)
 			}
 		case "tab", "shift+tab":
 			if c.focused == "textarea" {
@@ -664,7 +671,7 @@ func (c ChatView) Update(msg tea.Msg) (ChatView, tea.Cmd) {
 
 		// Create and add message locally (same as user input)
 		message := entities.NewMessage("user", content)
-		c.tempMessages = append(c.tempMessages, *message)
+		c.activeChat.Messages = append(c.activeChat.Messages, *message)
 
 		// Initialize processing state
 		c.toolCallStatus = make(map[string]bool)

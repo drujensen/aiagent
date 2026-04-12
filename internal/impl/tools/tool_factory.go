@@ -39,40 +39,48 @@ func NewToolFactory() (*ToolFactory, error) {
 	toolFactory := &ToolFactory{}
 	toolFactory.toolFactories = make(map[string]*ToolFactoryEntry)
 
-	toolFactory.toolFactories["Process"] = &ToolFactoryEntry{
-		Name:        "Process",
+	toolFactory.toolFactories["Bash"] = &ToolFactoryEntry{
+		Name:        "Bash",
 		Description: `This tool executes a configured CLI command with support for background processes, timeouts, and full output. The command is executed in the workspace directory. The extraArgs are prepended with the arguments passed to the tool.`,
 		ConfigKeys:  []string{"workspace", "command", "extraArgs"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewProcessTool(name, description, configuration, logger)
 		},
 	}
-	toolFactory.toolFactories["FileSearch"] = &ToolFactoryEntry{
-		Name:        "FileSearch",
+	toolFactory.toolFactories["Grep"] = &ToolFactoryEntry{
+		Name:        "Grep",
 		Description: `This tool provides the ability to search for text in files. The workspace directory is prepended to any file paths specified.`,
 		ConfigKeys:  []string{"workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewFileSearchTool(name, description, configuration, logger)
 		},
 	}
-	toolFactory.toolFactories["FileRead"] = &ToolFactoryEntry{
-		Name:        "FileRead",
+	toolFactory.toolFactories["Read"] = &ToolFactoryEntry{
+		Name:        "Read",
 		Description: `This tool provides the ability to read files. The workspace directory is prepended to any file paths specified.`,
 		ConfigKeys:  []string{"workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewFileReadTool(name, description, configuration, logger)
 		},
 	}
-	toolFactory.toolFactories["FileWrite"] = &ToolFactoryEntry{
-		Name:        "FileWrite",
-		Description: `This tool provides file writing and modification operations, including overwriting, editing, inserting, and deleting content in files. The workspace directory is prepended to relative file paths specified. Absolute paths are used as-is.`,
+	toolFactory.toolFactories["Write"] = &ToolFactoryEntry{
+		Name:        "Write",
+		Description: `This tool creates or overwrites files. The workspace directory is prepended to relative file paths specified. Absolute paths are used as-is.`,
 		ConfigKeys:  []string{"workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewFileWriteTool(name, description, configuration, logger)
 		},
 	}
-	toolFactory.toolFactories["Directory"] = &ToolFactoryEntry{
-		Name:        "Directory",
+	toolFactory.toolFactories["Edit"] = &ToolFactoryEntry{
+		Name:        "Edit",
+		Description: `This tool edits existing files by replacing or inserting content. The workspace directory is prepended to relative file paths specified. Absolute paths are used as-is.`,
+		ConfigKeys:  []string{"workspace"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewFileWriteTool(name, description, configuration, logger)
+		},
+	}
+	toolFactory.toolFactories["Glob"] = &ToolFactoryEntry{
+		Name:        "Glob",
 		Description: `This tool provides directory and file management operations, including creating directories, listing directory contents, building directory trees, and moving files or directories. The workspace directory is prepended to any paths specified.`,
 		ConfigKeys:  []string{"workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
@@ -87,8 +95,8 @@ func NewToolFactory() (*ToolFactory, error) {
 			return NewWebSearchTool(name, description, configuration, logger)
 		},
 	}
-	toolFactory.toolFactories["Fetch"] = &ToolFactoryEntry{
-		Name:        "Fetch",
+	toolFactory.toolFactories["WebFetch"] = &ToolFactoryEntry{
+		Name:        "WebFetch",
 		Description: `This tool provides the ability to fetch content from the internet using the HTTP 1.1 protocol. This is useful when paired with the Swagger tool.`,
 		ConfigKeys:  []string{"user_agent"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
@@ -140,8 +148,8 @@ func NewToolFactory() (*ToolFactory, error) {
 			}
 		},
 	}
-	toolFactory.toolFactories["Todo"] = &ToolFactoryEntry{
-		Name:        "Todo",
+	toolFactory.toolFactories["TodoWrite"] = &ToolFactoryEntry{
+		Name:        "TodoWrite",
 		Description: "This tool manages a structured task list for complex tasks, allowing creation, reading, and status updates of todos with workflow grouping support.",
 		ConfigKeys:  []string{"workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {

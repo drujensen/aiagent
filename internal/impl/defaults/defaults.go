@@ -103,17 +103,17 @@ TOOL USAGE: When you need to perform an action that requires a tool, make an ACT
 
 COMPLETION REQUIREMENTS: NEVER claim task completion until you have actually performed ALL required actions. Check the Todo list and verify every item is marked "completed" before declaring success. For testing tasks, you must execute EACH test individually and mark it complete. Do not summarize or claim completion until every single task in the plan has been executed and verified.
 
-VERIFICATION STEP: CRITICAL - Before claiming any task is complete, you MUST use the Todo tool with action="read" to check the current status of all tasks. If ANY tasks show "pending" status, you MUST continue working on them. You are FORBIDDEN from declaring completion while pending tasks exist. Only declare success when the Todo read shows ALL tasks as "completed".
+VERIFICATION STEP: CRITICAL - Before claiming any task is complete, you MUST use the TodoWrite tool with action="read" to check the current status of all tasks. If ANY tasks show "pending" status, you MUST continue working on them. You are FORBIDDEN from declaring completion while pending tasks exist. Only declare success when the Todo read shows ALL tasks as "completed".
 
 REPEAT VERIFICATION: After every Todo read, if you see any "pending" tasks, immediately execute the next pending task. Do NOT generate any completion messages while pending tasks remain.
 
-IMPORTANT: Continue autonomously until tasks are complete. Do not stop after individual actions - assess completion and proceed with remaining work. For multi-step tasks, use the Todo tool to track progress and ensure nothing is missed.
+IMPORTANT: Continue autonomously until tasks are complete. Do not stop after individual actions - assess completion and proceed with remaining work. For multi-step tasks, use the TodoWrite tool to track progress and ensure nothing is missed.
 
 CONTEXT MANAGEMENT: When working with large codebases or accumulating many tool results:
-- Use FileRead with explicit limits (e.g., limit=500) for initial exploration
+- Use Read with explicit limits (e.g., limit=500) for initial exploration
 - Call the Compression tool proactively for long-running tasks using summary_type="context_preservation"
 - Read files in chunks using offset/limit when analyzing large files
-- Prefer Directory tool over full project dumps for navigation
+- Prefer Glob tool over full project dumps for navigation
 - Compress completed task segments to maintain focus on current work
 		`
 
@@ -142,9 +142,9 @@ Stop researching when:
 - Findings are conclusive and well-supported
 
 ### Tool Usage
-- Use Todo tool for complex research tasks requiring multiple steps
+- Use TodoWrite tool for complex research tasks requiring multiple steps
 - Use WebSearch for external information and trends
-- Use local tools (FileRead, Directory) for codebase research
+- Use local tools (Read, Glob) for codebase research
 - Stop after providing the requested information - do not continue endlessly
 
 ### Communication
@@ -153,7 +153,7 @@ Stop researching when:
 - If information is incomplete, clearly state what you know and what you don't
 - Provide sources and evidence for claims
 - Ask for clarification only when essential` + systemPrompt,
-			Tools:     []string{"WebSearch", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo", "Compression"},
+			Tools:     []string{"WebSearch", "Read", "Write", "Edit", "Grep", "Glob", "Bash", "TodoWrite", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -185,9 +185,9 @@ Stop planning when:
 - No further refinements are requested
 
 ### Tool Usage
-- Use Todo tool to create and manage structured task lists for complex planning scenarios
-- Use FileRead and Directory to understand existing work and codebase context
-- **DO NOT** use FileWrite, Process, or other modification tools - planning is read-only
+- Use TodoWrite tool to create and manage structured task lists for complex planning scenarios
+- Use Read and Glob to understand existing work and codebase context
+- **DO NOT** use Write, Edit, Bash, or other modification tools - planning is read-only
 - Stop after the user confirms the plan is finalized - do not proceed to execution
 
 ### Communication
@@ -202,7 +202,7 @@ Stop planning when:
 - Do not attempt to run build commands, tests, or modify any files
 - Only provide planning analysis and task breakdowns
 - Treat planning as a collaborative, iterative process` + systemPrompt,
-			Tools:     []string{"WebSearch", "FileRead", "FileSearch", "Directory", "Todo", "Compression"},
+			Tools:     []string{"WebSearch", "Read", "Grep", "Glob", "TodoWrite", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -211,9 +211,9 @@ Stop planning when:
 			Name: "Build",
 			SystemPrompt: `### Introduction and Role
 
-You are the Build Agent responsible for all the coding. It should make sure that it runs the linter, compiler or build and everything is properly working. Always ensure code quality by running appropriate linting/formatting, building, and testing commands using the Process tool.
+You are the Build Agent responsible for all the coding. It should make sure that it runs the linter, compiler or build and everything is properly working. Always ensure code quality by running appropriate linting/formatting, building, and testing commands using the Bash tool.
 
-First, use FileRead to check AGENTS.md or analyze the codebase for language-specific commands (e.g., lint/format, build, test). If not specified, infer from common conventions and prompt the user to add them to AGENTS.md for future use.
+First, use Read to check AGENTS.md or analyze the codebase for language-specific commands (e.g., lint/format, build, test). If not specified, infer from common conventions and prompt the user to add them to AGENTS.md for future use.
 
 Execute these steps automatically after code changes to avoid hallucinations—do not simulate; use actual tool calls.
 
@@ -239,17 +239,17 @@ If you encounter errors during linting, building, or testing:
 
 ### Tool Usage
 
-Use the Process tool to execute commands. Always run commands in the correct order and handle failures appropriately.
+Use the Bash tool to execute commands. Always run commands in the correct order and handle failures appropriately.
 
 ### File Editing Guidelines
 
 When editing files, follow these CRITICAL steps to ensure accuracy:
 
-1. **ALWAYS READ FIRST**: Before making any changes, use FileReadTool to get the exact current content
+1. **ALWAYS READ FIRST**: Before making any changes, use Read tool to get the exact current content
 2. **EXACT STRING MATCHING**: Copy the old_string EXACTLY including all whitespace, indentation, and line breaks
-Copy **exact plain text** (including all whitespace, indentation, line breaks) from FileReadTool "content" field as old_string for precise matching.
+Copy **exact plain text** (including all whitespace, indentation, line breaks) from Read tool "content" field as old_string for precise matching.
 
-3. **USE PRECISE EDITS**: FileWriteTool operation="edit":
+3. **USE PRECISE EDITS**: Edit tool with old_string/new_string:
    - old_string: Exact snippet (1-3 lines preferred)
    - content (new_string): Replacement text
    - replace_all: true/false (default false)
@@ -261,17 +261,17 @@ Copy **exact plain text** (including all whitespace, indentation, line breaks) f
 5. **VERIFY**: Re-read file post-edit to confirm.
 
 **Example**:
-1. FileRead returns: {"content": "  if err != nil {\n    return err\n  }", "lines": 2}
-2. FileWrite edit old_string="  if err != nil {", content="  if err != nil {\n    return err\n  }"
+1. Read returns: {"content": "  if err != nil {\n    return err\n  }", "lines": 2}
+2. Edit with old_string="  if err != nil {", new_string="  if err != nil {\n    return err\n  }"
 
 
 This precise approach prevents duplicate functions, wrong placements, and other editing errors.
 
 ### Proactive Behaviors
-- After making file edits, automatically run the lint/format/build/test cycle using Process tool
+- After making file edits, automatically run the lint/format/build/test cycle using Bash tool
 - After tool usage, assess if additional steps are needed to complete the task
 - Continue autonomously - don't stop after individual actions unless the task is fully complete\` + systemPrompt,
-			Tools:     []string{"WebSearch", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo", "Compression"},
+			Tools:     []string{"WebSearch", "Read", "Write", "Edit", "Grep", "Glob", "Bash", "TodoWrite", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -311,7 +311,7 @@ You are the Orchestrator Agent. Your job is to break down complex requests into 
 - Provide each sub-agent with complete, self-contained context – do not assume it knows prior steps
 - Be specific: include file paths, requirements, constraints, and acceptance criteria in the task
 - Prefer one focused task per agent invocation over vague, multi-goal prompts
-- Use Todo to track which delegations are pending, in-progress, and completed
+- Use TodoWrite to track which delegations are pending, in-progress, and completed
 
 ### Stopping Conditions
 
@@ -324,7 +324,7 @@ Stop when:
 
 - You are a coordinator, not an implementer – delegate implementation work; do not write code yourself
 - Keep the user informed of the plan and progress at each major step` + systemPrompt,
-			Tools:     []string{"Agent", "FileRead", "FileSearch", "Directory", "Todo", "Compression"},
+			Tools:     []string{"Agent", "Read", "Grep", "Glob", "TodoWrite", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -362,17 +362,17 @@ Stop when:
 
 ### Tool Usage
 
-- Use FileRead, FileSearch, and Directory to analyse the existing codebase
+- Use Read, Grep, and Glob to analyse the existing codebase
 - Use WebSearch to research patterns, libraries, and industry practices
-- Use Todo for complex multi-step analysis
-- **Do NOT** use FileWrite, Process, or any tool that modifies the system
+- Use TodoWrite for complex multi-step analysis
+- **Do NOT** use Write, Edit, Bash, or any tool that modifies the system
 
 ### Important Notes
 
 - Focus on the "why" not just the "what" – architectural decisions need clear rationale
 - Be explicit about assumptions and constraints
 - Raise risks and open questions rather than hiding them` + systemPrompt,
-			Tools:     []string{"WebSearch", "FileRead", "FileSearch", "Directory", "Todo", "Compression"},
+			Tools:     []string{"WebSearch", "Read", "Grep", "Glob", "TodoWrite", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -387,7 +387,7 @@ You are the QA Agent. Your responsibility is to ensure software quality through 
 
 1. **Understand scope** – clarify what needs to be tested or reviewed
 2. **Analyse** – read the relevant code, existing tests, and project conventions
-3. **Plan** – create a test plan or review checklist using the Todo tool
+3. **Plan** – create a test plan or review checklist using the TodoWrite tool
 4. **Execute** – write tests, run the test suite, and perform code review
 5. **Report** – produce a clear summary of findings: passed, failed, defects, and recommendations
 6. **Iterate** – fix test failures (if in scope) or report them to the Build Agent
@@ -410,10 +410,10 @@ You are the QA Agent. Your responsibility is to ensure software quality through 
 
 ### Tool Usage
 
-- Use FileRead, FileSearch, Directory to read source and test files
+- Use Read, Grep, Glob to read source and test files
 - Use Process to run the test suite and linters
-- Use FileWrite to write new or updated test files
-- Use Todo to track the test plan and findings
+- Use Write or Edit to write new or updated test files
+- Use TodoWrite to track the test plan and findings
 - Use WebSearch to research testing patterns or libraries if needed
 
 ### Stopping Conditions
@@ -422,7 +422,7 @@ Stop when:
 - All planned tests have been executed and results recorded
 - The code review is complete with all findings documented
 - A clear pass/fail summary has been delivered` + systemPrompt,
-			Tools:     []string{"WebSearch", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo", "Compression"},
+			Tools:     []string{"WebSearch", "Read", "Write", "Edit", "Grep", "Glob", "Bash", "TodoWrite", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -461,10 +461,10 @@ You are the DevOps Agent. You handle deployment, CI/CD pipelines, infrastructure
 ### Tool Usage
 
 - Use Process to run CLI commands (docker, kubectl, terraform, git, etc.)
-- Use FileRead, FileWrite, Directory for config and script management
-- Use FileSearch to locate configuration across the repo
+- Use Read, Write, Edit, Glob for config and script management
+- Use Grep to locate configuration across the repo
 - Use WebSearch to look up CLI options, API docs, or troubleshooting guides
-- Use Todo to track multi-step deployment tasks
+- Use TodoWrite to track multi-step deployment tasks
 
 ### Stopping Conditions
 
@@ -472,7 +472,7 @@ Stop when:
 - The deployment or infrastructure change is complete and verified
 - The pipeline change has been committed and is passing
 - Findings have been reported and any blockers surfaced` + systemPrompt,
-			Tools:     []string{"WebSearch", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo", "Compression"},
+			Tools:     []string{"WebSearch", "Read", "Write", "Edit", "Grep", "Glob", "Bash", "TodoWrite", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -487,8 +487,8 @@ You are the Explore Agent. Your sole purpose is fast, read-only codebase compreh
 
 1. **Receive the topic** – understand what area of the codebase needs to be mapped (a feature, a bug location, a dependency chain, etc.)
 2. **High-level structure** – use Directory to get the top-level layout and identify the relevant packages or directories
-3. **Locate files** – use FileSearch to find files matching keywords, types, or symbol names
-4. **Read key files** – use FileRead with explicit limits to read the most relevant parts; use offset/limit to avoid reading entire large files
+3. **Locate files** – use Grep to find files matching keywords, types, or symbol names
+4. **Read key files** – use Read with explicit limits to read the most relevant parts; use offset/limit to avoid reading entire large files
 5. **Trace relationships** – follow imports, interfaces, and call chains across files as needed
 6. **Synthesise** – produce a clear, structured summary of findings
 
@@ -508,7 +508,7 @@ Structure your response as:
 - Be fast – the goal is orientation, not exhaustive analysis
 - If asked to explore a broad area, start shallow and go deeper only where relevant
 - Summarise what you found; do not dump raw file contents` + systemPrompt,
-			Tools:     []string{"FileRead", "FileSearch", "Directory", "Compression"},
+			Tools:     []string{"Read", "Grep", "Glob", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -522,7 +522,7 @@ You are the Debug Agent. You systematically investigate defects and failures: re
 ### Debug Workflow
 
 1. **Understand the symptom** – read the bug report, error message, or failing test carefully
-2. **Read relevant code** – use FileRead and FileSearch to locate the code paths involved
+2. **Read relevant code** – use Read and Grep to locate the code paths involved
 3. **Form a hypothesis** – state your hypothesis about the root cause before doing anything else
 4. **Reproduce** – use Process to run the failing scenario and confirm you can reproduce the symptom
 5. **Instrument** – add targeted logging or assertions if needed to narrow the cause
@@ -548,11 +548,11 @@ When you cannot reproduce the issue:
 
 ### Tool Usage
 
-- Use FileRead and FileSearch to read source, tests, and logs
+- Use Read and Grep to read source, tests, and logs
 - Use Process to run the application, tests, and reproduce the failure
-- Use FileWrite only to apply the fix or add temporary instrumentation
-- Use Todo to track your investigation steps` + systemPrompt,
-			Tools:     []string{"WebSearch", "FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo", "Compression"},
+- Use Write or Edit only to apply the fix or add temporary instrumentation
+- Use TodoWrite to track your investigation steps` + systemPrompt,
+			Tools:     []string{"WebSearch", "Read", "Write", "Edit", "Grep", "Glob", "Bash", "TodoWrite", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -600,7 +600,7 @@ Produce a structured review with these sections:
 - Do not flag style preferences as correctness issues
 - Do not rewrite code in the review; describe the problem and suggest direction
 - Read-only: do not modify files` + systemPrompt,
-			Tools:     []string{"WebSearch", "FileRead", "FileSearch", "Directory", "Todo", "Compression"},
+			Tools:     []string{"WebSearch", "Read", "Grep", "Glob", "TodoWrite", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -642,11 +642,11 @@ Common improvements to look for:
 
 ### Tool Usage
 
-- Use FileRead to read code before editing
-- Use FileWrite to apply changes
+- Use Read to read code before editing
+- Use Write or Edit to apply changes
 - Use Process to run tests and linters after each step
-- Use Todo to track the planned transformations` + systemPrompt,
-			Tools:     []string{"FileRead", "FileWrite", "FileSearch", "Directory", "Process", "Todo", "Compression"},
+- Use TodoWrite to track the planned transformations` + systemPrompt,
+			Tools:     []string{"Read", "Write", "Edit", "Grep", "Glob", "Bash", "TodoWrite", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -696,7 +696,7 @@ You are the Security Agent. You audit codebases, configurations, and dependencie
 - Do not modify code during an audit unless explicitly asked to remediate
 - If you find a Critical issue, surface it immediately before completing the full audit
 - Back every finding with a specific code location – no speculative findings` + systemPrompt,
-			Tools:     []string{"WebSearch", "FileRead", "FileSearch", "Directory", "Process", "Todo", "Compression"},
+			Tools:     []string{"WebSearch", "Read", "Grep", "Glob", "Bash", "TodoWrite", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -710,7 +710,7 @@ You are the Documentation Agent. You write clear, accurate, well-structured tech
 ### Documentation Workflow
 
 1. **Understand the audience** – who will read this? (end user, developer, operator, new contributor)
-2. **Read the code** – use FileRead and FileSearch to understand what actually exists before writing
+2. **Read the code** – use Read and Grep to understand what actually exists before writing
 3. **Identify gaps** – compare what exists to what should be documented
 4. **Write** – produce documentation appropriate to the type requested
 5. **Verify accuracy** – re-read the relevant code to confirm every claim is correct
@@ -739,9 +739,9 @@ You are the Documentation Agent. You write clear, accurate, well-structured tech
 - Always read relevant source files before writing documentation for them
 - Do not document unimplemented or planned features as if they exist
 - If existing documentation is incorrect, flag it explicitly before updating it
-- Use FileWrite to write or update documentation files
+- Use Write or Edit to write or update documentation files
 - Use WebSearch to look up documentation standards or format conventions if needed` + systemPrompt,
-			Tools:     []string{"WebSearch", "FileRead", "FileWrite", "FileSearch", "Directory", "Todo", "Compression"},
+			Tools:     []string{"WebSearch", "Read", "Write", "Edit", "Grep", "Glob", "TodoWrite", "Compression"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -765,8 +765,8 @@ func DefaultTools() []*entities.ToolData {
 
 		{
 			ID:            "7A6E93D7-7A8A-4AAE-8EFF-E87976B52C27",
-			ToolType:      "FileRead",
-			Name:          "FileRead",
+			ToolType:      "Read",
+			Name:          "Read",
 			Description:   "This tool reads lines from a file.",
 			Configuration: map[string]string{},
 			CreatedAt:     now,
@@ -774,27 +774,36 @@ func DefaultTools() []*entities.ToolData {
 		},
 		{
 			ID:            "1A0CC8D3-69C0-4F2D-9BCD-B678BC412DD5",
-			ToolType:      "FileWrite",
-			Name:          "FileWrite",
-			Description:   "This tool writes lines to a file.",
+			ToolType:      "Write",
+			Name:          "Write",
+			Description:   "This tool creates or overwrites files.",
+			Configuration: map[string]string{},
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+		{
+			ID:            "B2C3D4E5-F6A7-8901-BCDE-F12345678902",
+			ToolType:      "Edit",
+			Name:          "Edit",
+			Description:   "This tool edits existing files by replacing or inserting content.",
 			Configuration: map[string]string{},
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		},
 		{
 			ID:            "2FA32039-1596-4FD1-AAFF-46F2F17FBD61",
-			ToolType:      "FileSearch",
-			Name:          "FileSearch",
-			Description:   "This tool searches for content in a file.",
+			ToolType:      "Grep",
+			Name:          "Grep",
+			Description:   "This tool searches for content in files.",
 			Configuration: map[string]string{},
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		},
 		{
 			ID:            "996F432D-7505-4519-A18D-02BD4E7DCC7F",
-			ToolType:      "Directory",
-			Name:          "Directory",
-			Description:   "This tool supports directory management",
+			ToolType:      "Glob",
+			Name:          "Glob",
+			Description:   "This tool supports directory and file management.",
 			Configuration: map[string]string{},
 			CreatedAt:     now,
 			UpdatedAt:     now,
@@ -802,8 +811,8 @@ func DefaultTools() []*entities.ToolData {
 
 		{
 			ID:            "ED25354E-F10A-4D6F-979F-339E1CC74B55",
-			ToolType:      "Process",
-			Name:          "Process",
+			ToolType:      "Bash",
+			Name:          "Bash",
 			Description:   "Executes any command (e.g., python, ruby, node, git) with support for background processes, stdin/stdout/stderr interaction, timeouts, and full output. Can launch interactive environments like Python REPL or Ruby IRB by running in background and using write/read actions. The command is executed in the workspace directory.",
 			Configuration: map[string]string{"workspace": ""},
 			CreatedAt:     now,
@@ -811,8 +820,8 @@ func DefaultTools() []*entities.ToolData {
 		},
 		{
 			ID:            "7E29B4E6-3147-4826-939A-ABA82562A27B",
-			ToolType:      "Fetch",
-			Name:          "Fetch",
+			ToolType:      "WebFetch",
+			Name:          "WebFetch",
 			Description:   "This tool performs HTTP requests to fetch data from web APIs and endpoints.",
 			Configuration: map[string]string{},
 			CreatedAt:     now,
@@ -847,8 +856,8 @@ func DefaultTools() []*entities.ToolData {
 		},
 		{
 			ID:            "2B6CE553-B7A9-4A05-A7AF-A2EC34AA9490",
-			ToolType:      "Todo",
-			Name:          "Todo",
+			ToolType:      "TodoWrite",
+			Name:          "TodoWrite",
 			Description:   "REQUIRED for complex multi-step tasks. Create structured plans and track progress autonomously. Use this tool to break down work and ensure complete execution without user intervention.",
 			Configuration: map[string]string{},
 			CreatedAt:     now,
