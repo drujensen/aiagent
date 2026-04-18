@@ -110,7 +110,7 @@ func (u *UI) handleWebSocket(c echo.Context) error {
 const sessionCookieName = "aiagent_session"
 
 func authToken() string {
-	key := os.Getenv("AUTH_KEY")
+	key := os.Getenv("DRUJENSEN_API_KEY")
 	if key == "" {
 		return ""
 	}
