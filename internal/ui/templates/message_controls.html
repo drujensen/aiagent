@@ -9,7 +9,7 @@
       hx-on::after-request="toggleCancelButton(false);"
       hx-on::response-error="handleResponseError(this, event)">
     <input type="hidden" name="chat_id" value="{{.ChatID}}">
-    <textarea name="message" id="message-input" placeholder="Type your message..." rows="3"></textarea>
+    <textarea name="message" id="message-input" placeholder="How can I help you today?" rows="3"></textarea>
     <button type="submit" id="send-button" class="send-button">
         <span class="send-text">
             <i class="fas fa-paper-plane"></i> Send

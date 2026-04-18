@@ -2,11 +2,7 @@
 <main class="content">
     <section class="message-history" id="message-history">
         <div id="messages-container" class="messages-container" data-chat-id="{{.ChatID}}">
-            <div class="message-intro">
-                {{if eq (len .Messages) 0}}
-                    <p>How can I help you today?</p>
-                {{end}}
-            </div>
+            <div class="message-intro"></div>
 
             <!-- Group messages by conversation session (user + responses) -->
             {{$userMsgIndex := 0}}
