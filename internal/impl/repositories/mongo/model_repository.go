@@ -6,6 +6,7 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
+	"github.com/google/uuid"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -58,6 +59,9 @@ func (r *MongoModelRepository) GetModel(ctx context.Context, id string) (*entiti
 }
 
 func (r *MongoModelRepository) CreateModel(ctx context.Context, model *entities.Model) error {
+	if model.ID == "" {
+		model.ID = uuid.New().String()
+	}
 	_, err := r.collection.InsertOne(ctx, model)
 	if err != nil {
 		return errors.InternalErrorf("failed to create model: %v", err)

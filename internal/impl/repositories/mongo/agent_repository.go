@@ -7,6 +7,7 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
+	"github.com/google/uuid"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -59,6 +60,9 @@ func (r *MongoAgentRepository) GetAgent(ctx context.Context, id string) (*entiti
 }
 
 func (r *MongoAgentRepository) CreateAgent(ctx context.Context, agent *entities.Agent) error {
+	if agent.ID == "" {
+		agent.ID = uuid.New().String()
+	}
 	_, err := r.collection.InsertOne(ctx, agent)
 	if err != nil {
 		return errors.InternalErrorf("failed to create agent: %v", err)

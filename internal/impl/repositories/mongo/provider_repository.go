@@ -6,6 +6,7 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
+	"github.com/google/uuid"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -58,6 +59,9 @@ func (r *MongoProviderRepository) GetProvider(ctx context.Context, id string) (*
 }
 
 func (r *MongoProviderRepository) CreateProvider(ctx context.Context, provider *entities.Provider) error {
+	if provider.ID == "" {
+		provider.ID = uuid.New().String()
+	}
 	_, err := r.collection.InsertOne(ctx, provider)
 	if err != nil {
 		return errors.InternalErrorf("failed to create provider: %v", err)

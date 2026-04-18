@@ -7,6 +7,7 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
+	"github.com/google/uuid"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -59,6 +60,9 @@ func (r *MongoTaskRepository) GetTask(ctx context.Context, id string) (*entities
 }
 
 func (r *MongoTaskRepository) CreateTask(ctx context.Context, task *entities.Task) error {
+	if task.ID == "" {
+		task.ID = uuid.New().String()
+	}
 	_, err := r.collection.InsertOne(ctx, task)
 	if err != nil {
 		return errors.InternalErrorf("failed to create task: %v", err)
