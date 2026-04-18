@@ -1,10 +1,9 @@
 {{define "chat_form_content"}}
 <div class="chat-welcome">
     {{if not .IsEdit}}
-    <h1>How may I help you today?</h1>
     <form hx-post="/chats" hx-target="#response-message" hx-swap="innerHTML" hx-trigger="submit, keydown[key == 'Enter' && !shiftKey] from:#first-message">
       <div class="form-group" style="margin-bottom: 20px;">
-         <textarea name="message" id="first-message" class="form-control message-textarea" placeholder="Type your message here..." rows="6" required></textarea>
+         <textarea name="message" id="first-message" class="form-control message-textarea" placeholder="How can I help you today?" rows="6" required></textarea>
       </div>
       <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
          <div class="form-group" style="text-align: left;">
