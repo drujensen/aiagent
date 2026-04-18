@@ -2,13 +2,17 @@ package ui
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"embed"
+	"fmt"
 	"html/template"
 	"io"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
@@ -103,6 +107,79 @@ func (u *UI) handleWebSocket(c echo.Context) error {
 	return nil
 }
 
+const sessionCookieName = "aiagent_session"
+
+func authToken() string {
+	key := os.Getenv("AUTH_KEY")
+	if key == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(key))
+	return fmt.Sprintf("%x", sum)
+}
+
+func (u *UI) authMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	exempt := map[string]bool{
+		"/login":  true,
+		"/logout": true,
+	}
+	return func(c echo.Context) error {
+		token := authToken()
+		if token == "" {
+			return next(c)
+		}
+		path := c.Request().URL.Path
+		if exempt[path] || strings.HasPrefix(path, "/static/") {
+			return next(c)
+		}
+		cookie, err := c.Cookie(sessionCookieName)
+		if err != nil || cookie.Value != token {
+			return c.Redirect(http.StatusFound, "/login")
+		}
+		return next(c)
+	}
+}
+
+func (u *UI) handleLoginGet(tmpl *template.Template) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		return tmpl.ExecuteTemplate(c.Response(), "login", map[string]interface{}{
+			"Error": "",
+		})
+	}
+}
+
+func (u *UI) handleLoginPost(tmpl *template.Template) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		token := authToken()
+		submitted := strings.TrimSpace(c.FormValue("key"))
+		submittedToken := fmt.Sprintf("%x", sha256.Sum256([]byte(submitted)))
+		if token == "" || submittedToken != token {
+			return tmpl.ExecuteTemplate(c.Response(), "login", map[string]interface{}{
+				"Error": "Invalid access key.",
+			})
+		}
+		c.SetCookie(&http.Cookie{
+			Name:     sessionCookieName,
+			Value:    token,
+			Path:     "/",
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		})
+		return c.Redirect(http.StatusFound, "/")
+	}
+}
+
+func (u *UI) handleLogout(c echo.Context) error {
+	c.SetCookie(&http.Cookie{
+		Name:     sessionCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+	return c.Redirect(http.StatusFound, "/login")
+}
+
 func (u *UI) Run() error {
 	funcMap := template.FuncMap{
 		"renderMarkdown":   renderMarkdown,
@@ -149,6 +226,7 @@ func (u *UI) Run() error {
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestID())
 	e.Use(middleware.CORS())
+	e.Use(u.authMiddleware)
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			c.Set("logger", u.logger)
@@ -162,6 +240,11 @@ func (u *UI) Run() error {
 			return next(c)
 		}
 	})
+
+	// Login / logout routes (no auth middleware)
+	e.GET("/login", u.handleLoginGet(tmpl))
+	e.POST("/login", u.handleLoginPost(tmpl))
+	e.GET("/logout", u.handleLogout)
 
 	// serve static files from embedded
 	e.GET("/static/*", func(c echo.Context) error {
