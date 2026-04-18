@@ -855,6 +855,7 @@ a:active, button:active, .message-content:active {
     .logo-title {
         display: none;
     }
+    .chat-info,
     .chat-cost {
         display: none;
     }
