@@ -164,6 +164,7 @@ func (u *UI) handleLoginPost(tmpl *template.Template) echo.HandlerFunc {
 			Path:     "/",
 			HttpOnly: true,
 			SameSite: http.SameSiteLaxMode,
+			MaxAge:   365 * 24 * 60 * 60, // 1 year
 		})
 		return c.Redirect(http.StatusFound, "/")
 	}
