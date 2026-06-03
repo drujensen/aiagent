@@ -81,3 +81,19 @@ Copy `.env.example` to `.env`. Key variables: `OPENAI_API_KEY`, `ANTHROPIC_API_K
 - Struct tags: `json:"fieldName" bson:"fieldName"` on all entities
 - Error wrapping: `fmt.Errorf("failed to %s: %w", operation, err)`
 - Interfaces defined in `domain/`, implementations in `impl/`; never reverse this dependency
+
+## Global Rules
+
+These rules apply to all agents and all tasks in this project. Every agent must follow them.
+
+### 1. Ask Before Acting
+Ask, don't assume. If something is unclear — intent, architecture, requirements, scope — ask before writing a line of code. No silent guesses.
+
+### 2. Simplicity First
+Implement the minimum thing that works. No abstractions, patterns, or features that weren't explicitly requested. Three similar lines of code beats a premature abstraction.
+
+### 3. Surgical Changes Only
+Don't touch unrelated code. If a file isn't part of the current task, leave it exactly as it is.
+
+### 4. Flag Uncertainty
+If you're not confident about something, say so before proceeding. Confidence without certainty causes more damage than admitting a gap. State what you don't know and ask.

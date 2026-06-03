@@ -100,3 +100,121 @@ If issues persist:
 3. **Documentation**: Review [README.md](README.md) and [AIAGENT.md](AIAGENT.md)
 
 Tested by Build Agent on 2026-02-23
+
+---
+
+# ADLC — Agent Development Life Cycle
+
+## The 6 Pillars
+
+Every reviewer scores work against these 6 pillars. A score >= 8/10 is required to advance.
+
+| Pillar | Key Concerns |
+|--------|-------------|
+| **Maintainability** | DDD layer boundaries, naming conventions, struct tags, no duplication, clear interfaces |
+| **Reliability** | Error handling, context propagation, concurrent safety, fault tolerance |
+| **Scalability** | No N+1 queries, stateless services, indexed queries, both storage backends |
+| **Usability** | RESTful API design, TUI/WebSocket behavior, clear error messages, performance |
+| **Security** | API key protection, command injection, path traversal, MongoDB injection, input validation |
+| **Quality** | Test coverage (happy + failure + edge), race-safe, acceptance criteria verified |
+
+## Doer Agents
+
+| Agent | Role | Tools | Model |
+|-------|------|-------|-------|
+| `story-refiner` | Interactive story clarification — explores codebase, asks question batches | Read, Grep, Glob, Bash | sonnet |
+| `planner` | Implementation planning — Reuse Inventory + numbered steps | Read, Grep, Glob, Bash | sonnet |
+| `architect` | Software design — DDD patterns, RESTful API standards | Bash, Read, Glob, Grep, WebSearch, WebFetch | opus |
+| `developer` | Go implementation — step-by-step with test gates | Bash, Read, Edit, Write, Glob, Grep | sonnet |
+| `tester` | Test writing — testify, mock at domain boundaries | Bash, Read, Edit, Write, Glob, Grep | sonnet |
+| `security` | Threat modeling, vulnerability remediation | Bash, Read, Glob, Grep, WebSearch, WebFetch | sonnet |
+| `dba` | Schema design, JSON+MongoDB storage duality | Bash, Read, Edit, Write, Glob, Grep | sonnet |
+| `devops` | CI/CD pipelines, Docker, release automation | Bash, Read, Edit, Write, Glob, Grep | sonnet |
+
+## Reviewer Agents (all read-only)
+
+| Reviewer | Pairs With | Model | Focus |
+|----------|-----------|-------|-------|
+| `architect-reviewer` | architect | opus | Design correctness, DDD compliance, RESTful API |
+| `planner-reviewer` | planner | sonnet | Plan completeness, file path accuracy, step ordering |
+| `developer-reviewer` | developer | sonnet | Code quality, duplication check, layer boundaries |
+| `tester-reviewer` | tester | sonnet | Coverage, failure paths, race safety |
+| `security-reviewer` | security | sonnet | Injection, traversal, key leakage, MongoDB safety |
+| `dba-reviewer` | dba | sonnet | Storage duality, struct tags, backward compatibility |
+| `devops-reviewer` | devops | sonnet | Build targets, secret handling, go version consistency |
+
+## ADLC Pipeline
+
+```
+Story Refinement (interactive loop with user)
+       ↓
+Design → architect-reviewer (loop up to 3x, need >= 8/10)
+       ↓
+Implementation Plan → planner-reviewer (loop up to 3x, need >= 8/10)
+       ↓
+  *** HUMAN APPROVAL CHECKPOINT — type "proceed" to continue ***
+       ↓
+Implementation → developer-reviewer (loop up to 3x, need >= 8/10)
+       ↓
+Testing → tester-reviewer (loop up to 3x, need >= 8/10)
+       ↓
+Security → security-reviewer (loop up to 3x, need >= 8/10)
+       ↓
+Database → dba-reviewer (conditional: if schema changed)
+       ↓
+DevOps → devops-reviewer (conditional: if pipeline/Docker changed)
+       ↓
+Acceptance Criteria Verification
+       ↓
+ADLC Summary Report
+```
+
+## Review Score Card Format
+
+Every reviewer produces this exact format:
+
+```
+| Pillar         | Score | Key Findings |
+|----------------|-------|-------------|
+| Maintainability | X/10 | ...         |
+| Reliability     | X/10 | ...         |
+| Scalability     | X/10 | ...         |
+| Usability       | X/10 | ...         |
+| Security        | X/10 | ...         |
+| Quality         | X/10 | ...         |
+| Overall         | X.X/10 |           |
+
+Verdict: APPROVED (>= 8.0) / REVISE (< 8.0)
+```
+
+## Skills Reference
+
+### Full Pipeline
+| Command | Description |
+|---------|-------------|
+| `/adlc <feature>` | Full pipeline: story → design → plan → implement → test → security → DB → DevOps |
+
+### Pre-Coding
+| Command | Description |
+|---------|-------------|
+| `/refine-story <idea>` | Interactive story clarification with codebase exploration |
+| `/create-story <idea>` | Create a user story with acceptance criteria |
+| `/plan-sprint <feature>` | Break a feature into ordered implementable stories |
+
+### Review Loops
+| Command | Description |
+|---------|-------------|
+| `/design-review <feature>` | architect → architect-reviewer loop |
+| `/peer-review <task>` | developer → developer-reviewer loop |
+| `/test-review <what>` | tester → tester-reviewer loop |
+| `/security-review <what>` | security → security-reviewer loop |
+| `/dba-review <what>` | dba → dba-reviewer loop |
+| `/devops-review <what>` | devops → devops-reviewer loop |
+
+### Standalone
+| Command | Description |
+|---------|-------------|
+| `/review-code <file>` | One-shot code review (no loop) |
+| `/write-tests <file>` | Write tests without review loop |
+| `/security-scan <path>` | One-shot security scan |
+| `/deploy <version>` | Release readiness check |
