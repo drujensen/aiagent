@@ -67,7 +67,8 @@
          hx-get="/chats/{{.ChatID}}/title"
          hx-trigger="load, refreshTitle from:body, every 5s"
          hx-swap="none"
-         hx-on::after-request="updateTitleIfChanged(event)">
+         hx-on::after-request="updateTitleIfChanged(event)"
+         data-current-title="{{.ChatName}}">
     </div>
 </main>
 
@@ -116,28 +117,29 @@ function updateTitleIfChanged(event) {
         try {
             const response = JSON.parse(event.detail.xhr.responseText);
             const newTitle = response.title;
-            const currentTitle = document.title;
+            const updater = document.getElementById('title-updater');
+            const currentTitle = updater ? updater.dataset.currentTitle : '';
 
-            // Extract current chat title from page title (format: "Chat Title - AI Agents")
-            const titleParts = currentTitle.split(' - ');
-            const currentChatTitle = titleParts.length > 1 ? titleParts[0] : 'Chat';
+            if (newTitle && newTitle !== currentTitle) {
+                // Update stored title so subsequent polls compare correctly
+                if (updater) {
+                    updater.dataset.currentTitle = newTitle;
+                }
 
-            if (newTitle && newTitle !== currentChatTitle) {
                 // Update page title
                 document.title = newTitle + ' - AI Agents';
 
-                // Update header title if it exists
-                const headerTitle = document.querySelector('h1');
-                if (headerTitle && headerTitle.textContent === currentChatTitle) {
+                // Update header chat-title div
+                const headerTitle = document.querySelector('.chat-title');
+                if (headerTitle) {
                     headerTitle.textContent = newTitle;
                 }
 
                 // Trigger sidebar refresh
                 htmx.trigger('body', 'refreshChats');
 
-                // Stop polling after successful update
-                const updater = document.getElementById('title-updater');
-                if (updater) {
+                // Stop polling only once the title is no longer a default "New Chat" name
+                if (updater && !newTitle.startsWith('New Chat')) {
                     updater.remove();
                 }
             }
