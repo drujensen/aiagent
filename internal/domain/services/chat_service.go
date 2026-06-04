@@ -1468,11 +1468,6 @@ func (s *chatService) GenerateAndUpdateTitle(ctx context.Context, chatID string)
 		}
 	}
 
-	if firstUser == "" {
-		s.logger.Warn("No user message found for title generation, skipping", zap.String("chat_id", chatID))
-		return nil, fmt.Errorf("no user message found for title generation")
-	}
-
 	userMsgPreview := firstUser
 	if len(userMsgPreview) > 50 {
 		userMsgPreview = userMsgPreview[:50] + "..."
@@ -1575,11 +1570,12 @@ func (s *chatService) generateTitleWithAI(ctx context.Context, modelID, prompt s
 }
 
 func (s *chatService) generateFallbackTitle(prompt string) string {
-	const prefix = "User's first message: "
+	// Extract title from the first user message as fallback
 	lines := strings.Split(prompt, "\n")
 	for _, line := range lines {
-		if strings.HasPrefix(line, prefix) {
-			userMsg := strings.TrimPrefix(line, prefix)
+		if strings.HasPrefix(line, "User: ") {
+			userMsg := strings.TrimPrefix(line, "User: ")
+			userMsg = strings.ReplaceAll(userMsg, "\n", " ")
 			userMsg = strings.TrimSpace(userMsg)
 			if len(userMsg) > 50 {
 				userMsg = userMsg[:50] + "..."

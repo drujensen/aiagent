@@ -691,8 +691,8 @@ func (c *ChatController) SendMessageHandler(eCtx echo.Context) error {
 	responseHTML := fmt.Sprintf(`<div id="message-session-%s" class="message-session">%s</div><div id="next-message-session"></div>`,
 		messageSessionID, buf.String())
 
-	// Set the header to trigger scrolling to the response, refresh chat cost, and update sidebar/title
-	eCtx.Response().Header().Set("HX-Trigger", "messageReceived, refreshChatCost, refreshTitle, refreshChats")
+	// Set the header to trigger scrolling to the response and refresh chat cost
+	eCtx.Response().Header().Set("HX-Trigger", "messageReceived, refreshChatCost, refreshTitle")
 
 	return eCtx.HTML(http.StatusOK, responseHTML)
 }
