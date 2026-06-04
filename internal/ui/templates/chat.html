@@ -62,12 +62,14 @@
         {{template "message_controls" .}}
     </section>
 
-    <!-- Hidden element for title polling -->
+    <!-- Hidden element for title update; fires on page load and when refreshTitle is triggered -->
     <div id="title-updater"
          hx-get="/chats/{{.ChatID}}/title"
-         hx-trigger="load, refreshTitle from:body, every 5s"
+         hx-trigger="load, refreshTitle from:body"
          hx-swap="none"
-         hx-on::after-request="updateTitleIfChanged(event)">
+         hx-on::after-request="updateTitleIfChanged(event)"
+         hx-on::after-swap="event.stopPropagation()"
+         data-current-title="{{.ChatName}}">
     </div>
 </main>
 
@@ -116,27 +118,25 @@ function updateTitleIfChanged(event) {
         try {
             const response = JSON.parse(event.detail.xhr.responseText);
             const newTitle = response.title;
-            const currentTitle = document.title;
+            const updater = document.getElementById('title-updater');
+            // Compare against the full stored name to avoid false positives from
+            // splitting "New Chat - 2026-06-04 14:23" on ' - '
+            const currentTitle = updater ? updater.dataset.currentTitle : '';
 
-            // Extract current chat title from page title (format: "Chat Title - AI Agents")
-            const titleParts = currentTitle.split(' - ');
-            const currentChatTitle = titleParts.length > 1 ? titleParts[0] : 'Chat';
-
-            if (newTitle && newTitle !== currentChatTitle) {
+            if (newTitle && newTitle !== currentTitle && !newTitle.startsWith('New Chat')) {
                 // Update page title
                 document.title = newTitle + ' - AI Agents';
 
-                // Update header title if it exists
-                const headerTitle = document.querySelector('h1');
-                if (headerTitle && headerTitle.textContent === currentChatTitle) {
+                // Update header chat-title div
+                const headerTitle = document.querySelector('.chat-title');
+                if (headerTitle) {
                     headerTitle.textContent = newTitle;
                 }
 
                 // Trigger sidebar refresh
                 htmx.trigger('body', 'refreshChats');
 
-                // Stop polling after successful update
-                const updater = document.getElementById('title-updater');
+                // Remove the updater — we have a real title now
                 if (updater) {
                     updater.remove();
                 }

@@ -1511,27 +1511,27 @@ func (s *chatService) generateTitleWithAI(ctx context.Context, modelID, prompt s
 	model, err := s.modelRepo.GetModel(ctx, modelID)
 	if err != nil {
 		s.logger.Error("Failed to get model for title generation", zap.Error(err))
-		return s.generateFallbackTitle(prompt), nil
+		return "", fmt.Errorf("failed to get model: %w", err)
 	}
 
 	provider, err := s.providerRepo.GetProvider(ctx, model.ProviderID)
 	if err != nil {
 		s.logger.Error("Failed to get provider for title generation", zap.Error(err))
-		return s.generateFallbackTitle(prompt), nil
+		return "", fmt.Errorf("failed to get provider: %w", err)
 	}
 
 	apiKeyReference := "#{" + provider.APIKeyName + "}#"
 	apiKey, err := s.config.ResolveEnvironmentVariable(apiKeyReference)
 	if err != nil {
 		s.logger.Error("Failed to resolve API key for title generation", zap.Error(err))
-		return s.generateFallbackTitle(prompt), nil
+		return "", fmt.Errorf("failed to resolve API key: %w", err)
 	}
 
 	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
 	aiModel, err := aiModelFactory.CreateModelIntegration(model, provider, apiKey)
 	if err != nil {
 		s.logger.Error("Failed to create AI model for title generation", zap.Error(err))
-		return s.generateFallbackTitle(prompt), nil
+		return "", fmt.Errorf("failed to create model integration: %w", err)
 	}
 
 	// Create title generation prompt
@@ -1543,19 +1543,19 @@ func (s *chatService) generateTitleWithAI(ctx context.Context, modelID, prompt s
 	// Generate title with moderate temperature for better creativity while maintaining consistency
 	options := map[string]any{
 		"temperature": 0.3,
-		"max_tokens":  30, // Shorter for titles
+		"max_tokens":  100,
 	}
 
 	s.logger.Debug("Calling AI for title generation")
 	response, err := aiModel.GenerateResponse(ctx, []*entities.Message{titlePrompt}, nil, options, nil)
 	if err != nil {
-		s.logger.Warn("AI title generation failed, using fallback", zap.Error(err))
-		return s.generateFallbackTitle(prompt), nil
+		s.logger.Warn("AI title generation failed", zap.Error(err))
+		return "", fmt.Errorf("AI title generation failed: %w", err)
 	}
 
 	if len(response) == 0 || response[0].Content == "" {
-		s.logger.Warn("AI returned empty title, using fallback")
-		return s.generateFallbackTitle(prompt), nil
+		s.logger.Warn("AI returned empty title")
+		return "", fmt.Errorf("AI returned empty title")
 	}
 
 	// Clean up the title
@@ -1567,25 +1567,6 @@ func (s *chatService) generateTitleWithAI(ctx context.Context, modelID, prompt s
 
 	s.logger.Info("AI generated title", zap.String("title", title))
 	return title, nil
-}
-
-func (s *chatService) generateFallbackTitle(prompt string) string {
-	// Extract title from the first user message as fallback
-	lines := strings.Split(prompt, "\n")
-	for _, line := range lines {
-		if strings.HasPrefix(line, "User: ") {
-			userMsg := strings.TrimPrefix(line, "User: ")
-			userMsg = strings.ReplaceAll(userMsg, "\n", " ")
-			userMsg = strings.TrimSpace(userMsg)
-			if len(userMsg) > 50 {
-				userMsg = userMsg[:50] + "..."
-			}
-			if userMsg != "" {
-				return userMsg
-			}
-		}
-	}
-	return "Chat Conversation"
 }
 
 func (s *chatService) ExecuteSkill(ctx context.Context, skillName string) error {
