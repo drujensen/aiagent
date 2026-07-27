@@ -153,14 +153,27 @@ func extractDiffStatic(result string) string {
 
 // executeToolsParallel runs all toolCalls concurrently, publishes ToolCallEvents
 // in real-time as each tool completes, and returns results in the original order.
+// toolList is the set of tool instances GenerateResponse's caller minted for
+// this chat turn (see ChatService.SendMessage / ToolRepository.GetToolForChat)
+// and is checked first by name; toolRepo.GetToolByName is only a fallback for
+// a tool call whose name isn't in that per-turn set (should not happen in
+// normal operation, since toolList is built from the same agent.Tools list
+// the model was given, but a defensive fallback costs nothing and keeps this
+// function correct if that ever changes).
 func executeToolsParallel(
 	ctx context.Context,
 	toolCalls []entities.ToolCall,
+	toolList []entities.Tool,
 	toolRepo interfaces.ToolRepository,
 	options map[string]any,
 	logger *zap.Logger,
 ) []toolExecResult {
 	chatID, _ := options["session_id"].(string)
+	toolsByName := make(map[string]entities.Tool, len(toolList))
+	for _, t := range toolList {
+		toolsByName[t.Name()] = t
+	}
+
 	results := make([]toolExecResult, len(toolCalls))
 	var wg sync.WaitGroup
 
@@ -173,7 +186,13 @@ func executeToolsParallel(
 			args := injectToolArgs(toolCall.Function.Arguments, toolName, chatID)
 
 			var toolResult, toolError, diff string
-			tool, err := toolRepo.GetToolByName(toolName)
+			var tool entities.Tool
+			var err error
+			if t, ok := toolsByName[toolName]; ok {
+				tool = t
+			} else {
+				tool, err = toolRepo.GetToolByName(toolName)
+			}
 			if err != nil {
 				toolResult = fmt.Sprintf("Tool %s could not be retrieved: %v", toolName, err)
 				toolError = err.Error()
@@ -430,7 +449,7 @@ func (m *AIModelIntegration) GenerateResponse(ctx context.Context, messages []*e
 			reqBody["messages"] = append(reqBody["messages"].([]map[string]any), assistantMessageAPI)
 
 			// Execute all tool calls in parallel, then process results in order.
-			toolResults := executeToolsParallel(ctx, toolCalls, m.toolRepo, options, m.logger)
+			toolResults := executeToolsParallel(ctx, toolCalls, toolList, m.toolRepo, options, m.logger)
 			for _, r := range toolResults {
 				newMessages = append(newMessages, r.ToolMessage)
 

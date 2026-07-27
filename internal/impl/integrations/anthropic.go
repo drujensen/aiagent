@@ -313,7 +313,7 @@ func (m *AnthropicIntegration) GenerateResponse(ctx context.Context, messages []
 			}
 
 			// Execute all tool calls in parallel, then process results in order.
-			toolResults := executeToolsParallel(ctx, toolCalls, m.toolRepo, options, m.logger)
+			toolResults := executeToolsParallel(ctx, toolCalls, toolList, m.toolRepo, options, m.logger)
 			for _, r := range toolResults {
 				newMessages = append(newMessages, r.ToolMessage)
 

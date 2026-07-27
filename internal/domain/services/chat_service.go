@@ -438,25 +438,20 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 		options["reasoning_effort"] = model.ReasoningEffort
 	}
 
-	// Resolve tool configurations
+	// Mint a tool instance scoped to this chat turn for each of the agent's
+	// tools, with configuration already resolved. GetToolForChat mints a
+	// fresh instance per call (so concurrent chat turns never share, and
+	// never race on, a tool's configuration) except for tools marked
+	// Stateful, which return the existing shared singleton instead -
+	// minting a fresh instance for those would break state that must
+	// persist across turns (an open browser page, tracked background
+	// processes, a DB handle).
 	tools := []entities.Tool{}
 	for _, toolName := range agent.Tools {
-		tool, err := s.toolRepo.GetToolByName(toolName)
+		tool, err := s.toolRepo.GetToolForChat(ctx, toolName, nil)
 		if err != nil {
 			return nil, errors.InternalErrorf("failed to get tool %s: %v", toolName, err)
 		}
-		if tool == nil {
-			return nil, errors.InternalErrorf("tool repository returned nil for tool %s", toolName)
-		}
-		config := tool.Configuration()
-		if config == nil {
-			config = make(map[string]string)
-		}
-		resolvedConfig, err := s.config.ResolveConfiguration(config)
-		if err != nil {
-			return nil, errors.InternalErrorf("failed to resolve configuration for tool %s: %v", toolName, err)
-		}
-		tool.UpdateConfiguration(resolvedConfig)
 		tools = append(tools, tool)
 	}
 

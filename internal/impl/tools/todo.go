@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
@@ -32,6 +33,12 @@ type TodoTool struct {
 	description   string
 	configuration map[string]string
 	logger        *zap.Logger
+	// mu serializes the load->modify->save cycle across all sessions. This
+	// tool is a shared singleton (see ToolFactoryEntry.Stateful) reachable
+	// concurrently under fan-out; without this, two concurrent writes to
+	// the same session's todo file can race in a way go test -race cannot
+	// detect (it's a file, not shared memory), silently losing one write.
+	mu sync.Mutex
 }
 
 func NewTodoTool(name, description string, configuration map[string]string, logger *zap.Logger) *TodoTool {
@@ -153,6 +160,9 @@ func (t *TodoTool) saveTodos(sessionID string, todoList *TodoList) error {
 }
 
 func (t *TodoTool) Execute(ctx context.Context, arguments string) (string, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	t.logger.Debug("Executing todo command", zap.String("arguments", arguments))
 	var args struct {
 		Action    string   `json:"action,omitempty"`

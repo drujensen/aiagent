@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
 
@@ -19,8 +20,15 @@ type BrowserTool struct {
 	description   string
 	configuration map[string]string
 	logger        *zap.Logger
-	browser       *rod.Browser
-	page          *rod.Page
+	// mu serializes Execute end-to-end (not just the browser/page fields) -
+	// this tool is a shared singleton (see ToolFactoryEntry.Stateful)
+	// reachable concurrently under fan-out, and rod page navigation is
+	// inherently a serial, stateful sequence (navigate then act on the
+	// result), so a coarser per-action critical section is appropriate here
+	// rather than only guarding individual field reads/writes.
+	mu      sync.Mutex
+	browser *rod.Browser
+	page    *rod.Page
 }
 
 func NewBrowserTool(name, description string, configuration map[string]string, logger *zap.Logger) *BrowserTool {
@@ -92,6 +100,9 @@ func (b *BrowserTool) Schema() map[string]any {
 }
 
 func (b *BrowserTool) Execute(ctx context.Context, arguments string) (string, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	b.logger.Debug("Executing browser operation", zap.String("arguments", arguments))
 
 	if err := b.initializeBrowser(); err != nil {

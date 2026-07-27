@@ -347,7 +347,7 @@ func (g *GoogleIntegration) GenerateResponse(ctx context.Context, messages []*en
 		}
 
 		// Execute all tool calls in parallel, then process results in order.
-		toolResults := executeToolsParallel(ctx, toolCalls, g.toolRepo, options, g.logger)
+		toolResults := executeToolsParallel(ctx, toolCalls, toolList, g.toolRepo, options, g.logger)
 		for _, r := range toolResults {
 			newMessages = append(newMessages, r.ToolMessage)
 

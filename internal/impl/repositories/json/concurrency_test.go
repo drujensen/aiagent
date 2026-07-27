@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -21,6 +22,51 @@ func testLogger() *zap.Logger {
 func newTestToolFactory(t *testing.T) (*tools.ToolFactory, error) {
 	t.Helper()
 	return tools.NewToolFactory()
+}
+
+// identityConfigResolver is a test double that returns configuration
+// unresolved (no #{VAR}# expansion) - sufficient for tests that don't
+// exercise placeholder resolution itself.
+type identityConfigResolver struct{}
+
+func (identityConfigResolver) ResolveEnvironmentVariable(value string) (string, error) {
+	return value, nil
+}
+
+func (identityConfigResolver) ResolveConfiguration(config map[string]string) (map[string]string, error) {
+	resolved := make(map[string]string, len(config))
+	for k, v := range config {
+		resolved[k] = v
+	}
+	return resolved, nil
+}
+
+// envConfigResolver is a test double mirroring impl/config.Config's real
+// #{VAR}# expansion behavior (without importing the impl/config package
+// into this domain-adjacent test, which would defeat the point of the
+// Phase 0b layer-boundary fix): a value of the form "#{NAME}#" resolves to
+// os.Getenv("NAME"); anything else passes through unchanged.
+type envConfigResolver struct{}
+
+func (r *envConfigResolver) ResolveEnvironmentVariable(value string) (string, error) {
+	const prefix, suffix = "#{", "}#"
+	if strings.HasPrefix(value, prefix) && strings.HasSuffix(value, suffix) {
+		varName := strings.TrimSuffix(strings.TrimPrefix(value, prefix), suffix)
+		return os.Getenv(varName), nil
+	}
+	return value, nil
+}
+
+func (r *envConfigResolver) ResolveConfiguration(config map[string]string) (map[string]string, error) {
+	resolved := make(map[string]string, len(config))
+	for k, v := range config {
+		rv, err := r.ResolveEnvironmentVariable(v)
+		if err != nil {
+			return nil, err
+		}
+		resolved[k] = rv
+	}
+	return resolved, nil
 }
 
 const concurrencyGoroutines = 50
@@ -191,7 +237,7 @@ func TestJsonToolRepository_ConcurrentAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create tool factory: %v", err)
 	}
-	repo, err := NewJSONToolRepository(storageDir, toolFactory, testLogger())
+	repo, err := NewJSONToolRepository(storageDir, toolFactory, identityConfigResolver{}, testLogger())
 	if err != nil {
 		t.Fatalf("failed to create repo: %v", err)
 	}
