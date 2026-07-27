@@ -31,6 +31,12 @@ type Task struct {
 	CreatedAt time.Time    `json:"created_at" bson:"created_at"`
 	UpdatedAt time.Time    `json:"updated_at" bson:"updated_at"`
 	DueDate   *time.Time   `json:"due_date,omitempty" bson:"due_date,omitempty"`
+	// PlanID and AssignedAgentID are additive, optional fields for the
+	// Plan/Task fan-out orchestration pipeline; both omitempty so existing
+	// tasks.json data and the existing todo-style usage of Task are
+	// unaffected.
+	PlanID          string `json:"plan_id,omitempty" bson:"plan_id,omitempty"`
+	AssignedAgentID string `json:"assigned_agent_id,omitempty" bson:"assigned_agent_id,omitempty"`
 }
 
 func NewTask(name, content string, priority TaskPriority) *Task {

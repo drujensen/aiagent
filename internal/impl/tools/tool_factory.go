@@ -27,6 +27,8 @@ type ToolFactory struct {
 	chatService   services.ChatService
 	agentService  services.AgentService
 	modelService  services.ModelService
+	planService   services.PlanService
+	taskService   services.TaskService
 }
 
 // SetServices wires the application services into the factory so that
@@ -38,9 +40,20 @@ func (t *ToolFactory) SetServices(chatService services.ChatService, agentService
 	t.modelService = modelService
 }
 
+// SetPlanServices wires the Plan/Task orchestration services into the
+// factory, for the same reason and at the same point as SetServices (a
+// future tool - e.g. a Skill-driven planning tool in a later phase - needs
+// access to these at execute time).
+func (t *ToolFactory) SetPlanServices(planService services.PlanService, taskService services.TaskService) {
+	t.planService = planService
+	t.taskService = taskService
+}
+
 func (t *ToolFactory) GetChatService() services.ChatService   { return t.chatService }
 func (t *ToolFactory) GetAgentService() services.AgentService { return t.agentService }
 func (t *ToolFactory) GetModelService() services.ModelService { return t.modelService }
+func (t *ToolFactory) GetPlanService() services.PlanService   { return t.planService }
+func (t *ToolFactory) GetTaskService() services.TaskService   { return t.taskService }
 
 func NewToolFactory() (*ToolFactory, error) {
 	toolFactory := &ToolFactory{}
