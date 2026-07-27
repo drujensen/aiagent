@@ -154,7 +154,7 @@ func main() {
 		chatRepo = repositoriesMongo.NewMongoChatRepository(db.Collection("chats"))
 		providerRepo = repositoriesMongo.NewMongoProviderRepository(db.Collection("providers"))
 		modelRepo = repositoriesMongo.NewMongoModelRepository(db.Collection("models"))
-		toolRepo, err = repositoriesMongo.NewToolRepository(db.Collection("tools"), toolFactory, logger)
+		toolRepo, err = repositoriesMongo.NewToolRepository(db.Collection("tools"), toolFactory, cfg, logger)
 		if err != nil {
 			logger.Fatal("Failed to initialize tool repository", zap.Error(err))
 		}
@@ -168,7 +168,7 @@ func main() {
 		if err != nil {
 			logger.Fatal("Failed to initialize provider repository", zap.Error(err))
 		}
-		toolRepo, err = repositoriesJson.NewJSONToolRepository(storageDir, toolFactory, logger)
+		toolRepo, err = repositoriesJson.NewJSONToolRepository(storageDir, toolFactory, cfg, logger)
 		if err != nil {
 			logger.Fatal("Failed to initialize tool repository", zap.Error(err))
 		}

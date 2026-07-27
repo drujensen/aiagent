@@ -22,18 +22,20 @@ type ToolRepository struct {
 	// reads on the old map, and never re-enters ListToolData while
 	// holding a lock ListToolData itself does not need), then swaps it in
 	// under a brief write lock.
-	mu            sync.RWMutex
-	toolInstances map[string]entities.Tool
-	toolFactory   *tools.ToolFactory
-	logger        *zap.Logger
+	mu             sync.RWMutex
+	toolInstances  map[string]entities.Tool
+	toolFactory    *tools.ToolFactory
+	configResolver interfaces.ConfigResolver
+	logger         *zap.Logger
 }
 
-func NewToolRepository(collection *mongo.Collection, toolFactory *tools.ToolFactory, logger *zap.Logger) (*ToolRepository, error) {
+func NewToolRepository(collection *mongo.Collection, toolFactory *tools.ToolFactory, configResolver interfaces.ConfigResolver, logger *zap.Logger) (*ToolRepository, error) {
 	toolRepository := &ToolRepository{
-		collection:    collection,
-		toolInstances: make(map[string]entities.Tool),
-		toolFactory:   toolFactory,
-		logger:        logger,
+		collection:     collection,
+		toolInstances:  make(map[string]entities.Tool),
+		toolFactory:    toolFactory,
+		configResolver: configResolver,
+		logger:         logger,
 	}
 	// Load initial tool instances
 	if err := toolRepository.reloadToolInstances(); err != nil {
@@ -179,8 +181,15 @@ func (t *ToolRepository) reloadToolInstances() error {
 			t.logger.Warn("Skipping tool due to unknown type", zap.String("tool_type", toolData.ToolType), zap.Error(err))
 			continue
 		}
-		configCopy := copyToolData(toolData).Configuration
-		tool := toolFactoryEntry.Factory(toolData.Name, toolData.Description, configCopy, t.logger)
+		// Resolve #{VAR}# placeholders once here, at singleton-construction
+		// time - see JsonToolRepository.reloadToolInstances for the full
+		// rationale (identical for both backends).
+		resolvedConfig, err := t.resolveConfig(toolData.Configuration)
+		if err != nil {
+			t.logger.Warn("Skipping tool due to unresolvable configuration", zap.String("tool_name", toolData.Name), zap.Error(err))
+			continue
+		}
+		tool := toolFactoryEntry.Factory(toolData.Name, toolData.Description, resolvedConfig, t.logger)
 		newInstances[toolData.Name] = tool
 	}
 
@@ -188,6 +197,61 @@ func (t *ToolRepository) reloadToolInstances() error {
 	t.toolInstances = newInstances
 	t.mu.Unlock()
 	return nil
+}
+
+// resolveConfig merges override on top of base (override wins on key
+// collision) and resolves #{VAR}# placeholders in the result. Both maps are
+// left untouched; the returned map is always a fresh allocation.
+func (t *ToolRepository) resolveConfig(base map[string]string, override ...map[string]string) (map[string]string, error) {
+	merged := make(map[string]string, len(base))
+	for k, v := range base {
+		merged[k] = v
+	}
+	for _, o := range override {
+		for k, v := range o {
+			merged[k] = v
+		}
+	}
+	return t.configResolver.ResolveConfiguration(merged)
+}
+
+// GetToolForChat mints a tool instance scoped to one chat turn, with its
+// configuration already resolved - see the interface doc comment for the
+// Stateful-tool exception.
+func (t *ToolRepository) GetToolForChat(ctx context.Context, name string, config map[string]string) (entities.Tool, error) {
+	var toolData entities.ToolData
+	err := t.collection.FindOne(ctx, bson.M{"name": name}).Decode(&toolData)
+	if err == mongo.ErrNoDocuments {
+		return nil, errors.NotFoundErrorf("tool not found: %s", name)
+	}
+	if err != nil {
+		return nil, errors.InternalErrorf("failed to get toolData for %s: %v", name, err)
+	}
+
+	factoryEntry, err := t.toolFactory.GetFactoryByName(toolData.ToolType)
+	if err != nil {
+		return nil, err
+	}
+
+	if factoryEntry.Stateful {
+		// Never mint a fresh instance for a stateful tool - see
+		// JsonToolRepository.GetToolForChat for the full rationale
+		// (identical for both backends).
+		t.mu.RLock()
+		defer t.mu.RUnlock()
+		instance, exists := t.toolInstances[name]
+		if !exists {
+			return nil, errors.NotFoundErrorf("tool instance not found: %s", name)
+		}
+		return instance, nil
+	}
+
+	resolvedConfig, err := t.resolveConfig(toolData.Configuration, config)
+	if err != nil {
+		return nil, errors.InternalErrorf("failed to resolve configuration for tool %s: %v", name, err)
+	}
+
+	return factoryEntry.Factory(toolData.Name, toolData.Description, resolvedConfig, t.logger), nil
 }
 
 var _ interfaces.ToolRepository = (*ToolRepository)(nil)

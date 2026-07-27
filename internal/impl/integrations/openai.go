@@ -69,6 +69,7 @@ func (m *OpenAIIntegration) GenerateResponse(ctx context.Context, messages []*en
 func (m *OpenAIIntegration) generateResponseV2(ctx context.Context, messages []*entities.Message, toolList []entities.Tool, options map[string]any, callback interfaces.MessageCallback) ([]*entities.Message, error) {
 	// Prepare tool definitions for OpenAI responses API (flattened format)
 	tools := make([]map[string]any, len(toolList))
+	toolsByName := make(map[string]entities.Tool, len(toolList))
 	for i, tool := range toolList {
 		if ctx.Err() != nil {
 			return nil, fmt.Errorf("operation canceled by user")
@@ -80,6 +81,7 @@ func (m *OpenAIIntegration) generateResponseV2(ctx context.Context, messages []*
 			"description": tool.Description(),
 			"parameters":  tool.Schema(),
 		}
+		toolsByName[tool.Name()] = tool
 	}
 
 	// Convert initial messages to input format and extract instructions
@@ -336,7 +338,13 @@ func (m *OpenAIIntegration) generateResponseV2(ctx context.Context, messages []*
 				}
 
 				toolName := toolCall.Function.Name
-				tool, err := m.toolRepo.GetToolByName(toolName)
+				var tool entities.Tool
+				var err error
+				if t, ok := toolsByName[toolName]; ok {
+					tool = t
+				} else {
+					tool, err = m.toolRepo.GetToolByName(toolName)
+				}
 
 				var toolResult string
 				var toolError string

@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -33,7 +34,13 @@ type ProcessTool struct {
 	description   string
 	configuration map[string]string // Includes "workspace"
 	logger        *zap.Logger
-	processes     map[int]*ProcessInfo // Track background processes by PID
+	// mu guards processes only - this tool is a shared singleton (see
+	// ToolFactoryEntry.Stateful) reachable concurrently under fan-out, and
+	// processes is the only in-memory state that needs protecting. Locked
+	// around individual map accesses, not the whole Execute body, so
+	// concurrent tool calls that don't touch the same PID aren't serialized.
+	mu        sync.Mutex
+	processes map[int]*ProcessInfo // Track background processes by PID
 }
 
 func NewProcessTool(name, description string, configuration map[string]string, logger *zap.Logger) *ProcessTool {
@@ -260,7 +267,9 @@ func (t *ProcessTool) runCommand(args ProcessArgs, workspace string) (string, er
 		}
 		go io.Copy(pi.StdoutBuffer, stdout)
 		go io.Copy(pi.StderrBuffer, stderr)
+		t.mu.Lock()
 		t.processes[pid] = pi
+		t.mu.Unlock()
 		t.logger.Info("Background command started",
 			zap.String("command", args.Command),
 			zap.Strings("arguments", cmdArgs),
@@ -380,7 +389,9 @@ func (t *ProcessTool) checkStatus(pid int) (string, error) {
 		t.logger.Error("PID is required for status check")
 		return "", fmt.Errorf("PID is required for status check")
 	}
+	t.mu.Lock()
 	pi, exists := t.processes[pid]
+	t.mu.Unlock()
 	if !exists {
 		resp := ProcessResponse{
 			Command: "status",
@@ -392,7 +403,9 @@ func (t *ProcessTool) checkStatus(pid int) (string, error) {
 		pi.Stdin.Close()
 		pi.Stdout.Close()
 		pi.Stderr.Close()
+		t.mu.Lock()
 		delete(t.processes, pid)
+		t.mu.Unlock()
 		resp := ProcessResponse{
 			Command: "status",
 			PID:     pid,
@@ -415,7 +428,9 @@ func (t *ProcessTool) killProcess(pid int) (string, error) {
 		t.logger.Error("PID is required for kill")
 		return "", fmt.Errorf("PID is required for kill")
 	}
+	t.mu.Lock()
 	pi, exists := t.processes[pid]
+	t.mu.Unlock()
 	if !exists {
 		resp := ProcessResponse{
 			Command: "kill",
@@ -431,7 +446,9 @@ func (t *ProcessTool) killProcess(pid int) (string, error) {
 		return "", err
 	}
 	pi.Stdin.Close()
+	t.mu.Lock()
 	delete(t.processes, pid)
+	t.mu.Unlock()
 	resp := ProcessResponse{
 		Command: "kill",
 		PID:     pid,
@@ -648,7 +665,9 @@ func (t *ProcessTool) writeToProcess(args ProcessArgs) (string, error) {
 	if args.PID == 0 {
 		return "", fmt.Errorf("PID required for write")
 	}
+	t.mu.Lock()
 	pi, exists := t.processes[args.PID]
+	t.mu.Unlock()
 	if !exists {
 		return "", fmt.Errorf("process not found")
 	}
@@ -670,7 +689,9 @@ func (t *ProcessTool) readFromProcess(args ProcessArgs) (string, error) {
 	if args.PID == 0 {
 		return "", fmt.Errorf("PID required for read")
 	}
+	t.mu.Lock()
 	pi, exists := t.processes[args.PID]
+	t.mu.Unlock()
 	if !exists {
 		return "", fmt.Errorf("process not found")
 	}

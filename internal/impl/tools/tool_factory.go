@@ -13,6 +13,13 @@ type ToolFactoryEntry struct {
 	Description string
 	ConfigKeys  []string
 	Factory     func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool
+	// Stateful marks a tool type whose instances hold state that must
+	// persist across Execute calls within one chat (a background-process
+	// registry, a live browser connection, a database handle) or whose
+	// constructor acquires an external resource. Stateful tools opt out of
+	// per-chat-turn minting (ToolRepository.GetToolForChat) and remain the
+	// single shared singleton created by reloadToolInstances.
+	Stateful bool
 }
 
 type ToolFactory struct {
@@ -43,6 +50,7 @@ func NewToolFactory() (*ToolFactory, error) {
 		Name:        "Bash",
 		Description: `This tool executes a configured CLI command with support for background processes, timeouts, and full output. The command is executed in the workspace directory. The extraArgs are prepended with the arguments passed to the tool.`,
 		ConfigKeys:  []string{"workspace", "command", "extraArgs"},
+		Stateful:    true, // tracks background processes by PID across turns
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewProcessTool(name, description, configuration, logger)
 		},
@@ -115,6 +123,7 @@ func NewToolFactory() (*ToolFactory, error) {
 		Name:        "Memory",
 		Description: `This tool manages a knowledge graph with entities, relations, and observations, allowing creation, modification, deletion, and querying of structured data.`,
 		ConfigKeys:  []string{"mongo_uri", "mongo_collection"},
+		Stateful:    true, // constructor opens a Mongo connection
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewMemoryTool(name, description, configuration, logger)
 		},
@@ -123,6 +132,7 @@ func NewToolFactory() (*ToolFactory, error) {
 		Name:        "Browser",
 		Description: `This tool provides headless browser control using the Rod library for navigation and interaction.`,
 		ConfigKeys:  []string{"headless", "workspace"},
+		Stateful:    true, // holds a live browser/page connection across turns
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewBrowserTool(name, description, configuration, logger)
 		},
@@ -152,6 +162,7 @@ func NewToolFactory() (*ToolFactory, error) {
 		Name:        "TodoWrite",
 		Description: "This tool manages a structured task list for complex tasks, allowing creation, reading, and status updates of todos with workflow grouping support.",
 		ConfigKeys:  []string{"workspace"},
+		Stateful:    true, // serializes its own per-session file read-modify-write internally
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewTodoTool(name, description, configuration, logger)
 		},

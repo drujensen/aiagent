@@ -209,6 +209,17 @@ func (t *MemoryTool) Execute(ctx context.Context, arguments string) (string, err
 	}
 }
 
+// loadGraph and saveGraph together form a read-modify-write cycle on the
+// single "graph" document. This tool is a shared singleton (see
+// ToolFactoryEntry.Stateful) reachable concurrently under fan-out, so two
+// concurrent graph mutations can race and one can silently overwrite the
+// other's changes - go test -race cannot detect this since the race is on
+// the Mongo document, not in-process memory. Explicitly out of scope for
+// Milestone 1 (per the consensus plan): fixing it requires either an atomic
+// Mongo update expressing the mutation server-side (e.g. $addToSet/$push
+// rather than a full-document $set) or an in-process mutex serializing
+// load/save pairs, both larger changes than this phase's scope. Tracked as
+// an M1.5/M2 follow-up.
 func (t *MemoryTool) loadGraph(ctx context.Context) (*KnowledgeGraph, error) {
 	var graph KnowledgeGraph
 	err := t.collection.FindOne(ctx, bson.M{"_id": "graph"}).Decode(&graph)
