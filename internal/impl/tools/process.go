@@ -43,6 +43,31 @@ type ProcessTool struct {
 	processes map[int]*ProcessInfo // Track background processes by PID
 }
 
+// denyListedCommands is a best-effort deterrent - not a guaranteed block,
+// since a quoted or variable-expanded shell string can still defeat a plain
+// substring match - against merge and force-push operations reachable
+// through this general-purpose shell tool. The actual enforcement boundary
+// is a repo-level branch protection rule requiring PR review before merge.
+var denyListedCommands = []string{
+	"gh pr merge",
+	"gh pr merge --auto",
+	"git push --force",
+	"git push -f",
+	"git push --force-with-lease",
+}
+
+// checkDenyList normalizes whitespace and case before matching, so
+// "GH   PR   MERGE" or extra spacing doesn't slip past the same patterns.
+func checkDenyList(command string) error {
+	normalized := strings.Join(strings.Fields(strings.ToLower(command)), " ")
+	for _, denied := range denyListedCommands {
+		if strings.Contains(normalized, denied) {
+			return fmt.Errorf("command rejected: matches denied pattern %q - merge and force-push operations are not permitted via this tool", denied)
+		}
+	}
+	return nil
+}
+
 func NewProcessTool(name, description string, configuration map[string]string, logger *zap.Logger) *ProcessTool {
 	return &ProcessTool{
 		name:          name,
@@ -137,6 +162,22 @@ func (t *ProcessTool) Execute(ctx context.Context, arguments string) (string, er
 
 	if args.Command == "" {
 		return `{"output": "", "exit_code": 1, "error": "command is required"}`, nil
+	}
+
+	if err := checkDenyList(args.Command); err != nil {
+		t.logger.Warn("blocked command matching deny-list", zap.String("command", args.Command))
+		resp := ProcessResponse{
+			Command: args.Command,
+			Status:  "rejected",
+		}
+		data, marshalErr := json.Marshal(struct {
+			ProcessResponse
+			Error string `json:"error"`
+		}{ProcessResponse: resp, Error: err.Error()})
+		if marshalErr != nil {
+			return `{"output": "", "exit_code": 1, "error": "command rejected by deny-list"}`, nil
+		}
+		return string(data), nil
 	}
 
 	workspace := t.configuration["workspace"]
