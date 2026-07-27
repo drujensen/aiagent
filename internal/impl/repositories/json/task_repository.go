@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
@@ -16,6 +17,7 @@ import (
 )
 
 type JsonTaskRepository struct {
+	mu       sync.RWMutex
 	filePath string
 	data     []*entities.Task
 }
@@ -34,6 +36,28 @@ func NewJSONTaskRepository(storageDir string) (interfaces.TaskRepository, error)
 	return repo, nil
 }
 
+// copyTask performs a full copy including DueDate *time.Time, which a bare
+// struct copy (taskCopy := *t) would otherwise still alias.
+func copyTask(t *entities.Task) *entities.Task {
+	var dueDateCopy *time.Time
+	if t.DueDate != nil {
+		d := *t.DueDate
+		dueDateCopy = &d
+	}
+	return &entities.Task{
+		ID:        t.ID,
+		Name:      t.Name,
+		Content:   t.Content,
+		Status:    t.Status,
+		Priority:  t.Priority,
+		CreatedAt: t.CreatedAt,
+		UpdatedAt: t.UpdatedAt,
+		DueDate:   dueDateCopy,
+	}
+}
+
+// load and save are only ever called by exported methods that already hold
+// r.mu, so neither acquires the lock itself.
 func (r *JsonTaskRepository) load() error {
 	data, err := os.ReadFile(r.filePath)
 	if os.IsNotExist(err) {
@@ -72,64 +96,54 @@ func (r *JsonTaskRepository) save() error {
 		return errors.InternalErrorf("failed to create directory: %v", err)
 	}
 
-	if err := os.WriteFile(r.filePath, data, 0644); err != nil {
-		return errors.InternalErrorf("failed to write tasks.json: %v", err)
-	}
-
-	return nil
+	return atomicWriteFile(r.filePath, data)
 }
 
 func (r *JsonTaskRepository) ListTasks(ctx context.Context) ([]*entities.Task, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	tasksCopy := make([]*entities.Task, len(r.data))
 	for i, t := range r.data {
-		tasksCopy[i] = &entities.Task{
-			ID:        t.ID,
-			Name:      t.Name,
-			Content:   t.Content,
-			Status:    t.Status,
-			Priority:  t.Priority,
-			CreatedAt: t.CreatedAt,
-			UpdatedAt: t.UpdatedAt,
-			DueDate:   t.DueDate,
-		}
+		tasksCopy[i] = copyTask(t)
 	}
 	return tasksCopy, nil
 }
 
 func (r *JsonTaskRepository) GetTask(ctx context.Context, id string) (*entities.Task, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	for _, task := range r.data {
 		if task.ID == id {
-			return &entities.Task{
-				ID:        task.ID,
-				Name:      task.Name,
-				Content:   task.Content,
-				Status:    task.Status,
-				Priority:  task.Priority,
-				CreatedAt: task.CreatedAt,
-				UpdatedAt: task.UpdatedAt,
-				DueDate:   task.DueDate,
-			}, nil
+			return copyTask(task), nil
 		}
 	}
 	return nil, errors.NotFoundErrorf("task not found: %s", id)
 }
 
 func (r *JsonTaskRepository) CreateTask(ctx context.Context, task *entities.Task) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if task.ID == "" {
 		task.ID = uuid.New().String()
 	}
 	task.CreatedAt = time.Now()
 	task.UpdatedAt = task.CreatedAt
 
-	r.data = append(r.data, task)
+	r.data = append(r.data, copyTask(task))
 	return r.save()
 }
 
 func (r *JsonTaskRepository) UpdateTask(ctx context.Context, task *entities.Task) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	for i, t := range r.data {
 		if t.ID == task.ID {
 			task.UpdatedAt = time.Now()
-			r.data[i] = task
+			r.data[i] = copyTask(task)
 			return r.save()
 		}
 	}
@@ -137,6 +151,9 @@ func (r *JsonTaskRepository) UpdateTask(ctx context.Context, task *entities.Task
 }
 
 func (r *JsonTaskRepository) DeleteTask(ctx context.Context, id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	for i, t := range r.data {
 		if t.ID == id {
 			r.data = slices.Delete(r.data, i, i+1)
