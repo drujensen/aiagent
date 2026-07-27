@@ -19,7 +19,7 @@ func TestGetToolForChat_DistinctInstances(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create tool factory: %v", err)
 	}
-	repo, err := NewJSONToolRepository(storageDir, toolFactory, identityConfigResolver{}, testLogger())
+	repo, err := NewJSONToolRepository(storageDir, toolFactory, identityConfigResolver{}, nil, testLogger())
 	if err != nil {
 		t.Fatalf("failed to create repo: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestGetToolForChat_ResolvesConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create tool factory: %v", err)
 	}
-	repo, err := NewJSONToolRepository(storageDir, toolFactory, &envConfigResolver{}, testLogger())
+	repo, err := NewJSONToolRepository(storageDir, toolFactory, &envConfigResolver{}, nil, testLogger())
 	if err != nil {
 		t.Fatalf("failed to create repo: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestGetToolForChat_StatefulToolConfigResolvedAtConstruction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create tool factory: %v", err)
 	}
-	repo, err := NewJSONToolRepository(storageDir, toolFactory, &envConfigResolver{}, testLogger())
+	repo, err := NewJSONToolRepository(storageDir, toolFactory, &envConfigResolver{}, nil, testLogger())
 	if err != nil {
 		t.Fatalf("failed to create repo: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestProcessTool_ConcurrentExecute(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create tool factory: %v", err)
 	}
-	repo, err := NewJSONToolRepository(storageDir, toolFactory, identityConfigResolver{}, testLogger())
+	repo, err := NewJSONToolRepository(storageDir, toolFactory, identityConfigResolver{}, nil, testLogger())
 	if err != nil {
 		t.Fatalf("failed to create repo: %v", err)
 	}
@@ -208,7 +208,7 @@ func TestBrowserTool_ConcurrentExecute(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create tool factory: %v", err)
 	}
-	repo, err := NewJSONToolRepository(storageDir, toolFactory, identityConfigResolver{}, testLogger())
+	repo, err := NewJSONToolRepository(storageDir, toolFactory, identityConfigResolver{}, nil, testLogger())
 	if err != nil {
 		t.Fatalf("failed to create repo: %v", err)
 	}

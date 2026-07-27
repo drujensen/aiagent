@@ -20,6 +20,7 @@ import (
 	repositoriesJson "github.com/drujensen/aiagent/internal/impl/repositories/json"
 	repositoriesMongo "github.com/drujensen/aiagent/internal/impl/repositories/mongo"
 	"github.com/drujensen/aiagent/internal/impl/tools"
+	mcpTools "github.com/drujensen/aiagent/internal/impl/tools/mcp"
 	"github.com/drujensen/aiagent/internal/tui"
 	"github.com/drujensen/aiagent/internal/ui"
 
@@ -142,6 +143,18 @@ func main() {
 		logger.Fatal("Failed to initialize tool factory", zap.Error(err))
 	}
 
+	// Load configured MCP servers (client-only for Milestone 1) and build a
+	// ToolSource per server. An empty/missing config is the common case and
+	// yields no tool sources - existing installs are unaffected.
+	mcpServers, err := config.LoadMCPServers(logger)
+	if err != nil {
+		logger.Fatal("Failed to load MCP server configuration", zap.Error(err))
+	}
+	toolSources := make([]tools.ToolSource, 0, len(mcpServers))
+	for _, serverConfig := range mcpServers {
+		toolSources = append(toolSources, mcpTools.NewToolSource(serverConfig, logger))
+	}
+
 	if *storage == "mongo" {
 		db, err := database.NewMongoDB(cfg.MongoURI, "aiagent", logger)
 		if err != nil {
@@ -154,7 +167,7 @@ func main() {
 		chatRepo = repositoriesMongo.NewMongoChatRepository(db.Collection("chats"))
 		providerRepo = repositoriesMongo.NewMongoProviderRepository(db.Collection("providers"))
 		modelRepo = repositoriesMongo.NewMongoModelRepository(db.Collection("models"))
-		toolRepo, err = repositoriesMongo.NewToolRepository(db.Collection("tools"), toolFactory, cfg, logger)
+		toolRepo, err = repositoriesMongo.NewToolRepository(db.Collection("tools"), toolFactory, cfg, toolSources, logger)
 		if err != nil {
 			logger.Fatal("Failed to initialize tool repository", zap.Error(err))
 		}
@@ -168,7 +181,7 @@ func main() {
 		if err != nil {
 			logger.Fatal("Failed to initialize provider repository", zap.Error(err))
 		}
-		toolRepo, err = repositoriesJson.NewJSONToolRepository(storageDir, toolFactory, cfg, logger)
+		toolRepo, err = repositoriesJson.NewJSONToolRepository(storageDir, toolFactory, cfg, toolSources, logger)
 		if err != nil {
 			logger.Fatal("Failed to initialize tool repository", zap.Error(err))
 		}

@@ -237,7 +237,7 @@ func TestJsonToolRepository_ConcurrentAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create tool factory: %v", err)
 	}
-	repo, err := NewJSONToolRepository(storageDir, toolFactory, identityConfigResolver{}, testLogger())
+	repo, err := NewJSONToolRepository(storageDir, toolFactory, identityConfigResolver{}, nil, testLogger())
 	if err != nil {
 		t.Fatalf("failed to create repo: %v", err)
 	}
