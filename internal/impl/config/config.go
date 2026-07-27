@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/drujensen/aiagent/internal/domain/interfaces"
+
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 )
@@ -14,6 +16,8 @@ type Config struct {
 	MongoURI string
 	logger   *zap.Logger
 }
+
+var _ interfaces.ConfigResolver = (*Config)(nil)
 
 var (
 	configInstance *Config

@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/drujensen/aiagent/internal/domain/interfaces"
+
 	"go.uber.org/zap"
 )
 
@@ -18,42 +20,15 @@ type ModelsDevClient struct {
 	client    *http.Client
 }
 
-type ModelsDevResponse map[string]ProviderData
-
-type ProviderData struct {
-	ID      string               `json:"id"`
-	Name    string               `json:"name"`
-	Type    string               `json:"type"`
-	BaseURL string               `json:"api"`
-	Env     []string             `json:"env"`
-	Models  map[string]ModelData `json:"models"`
-}
-
-type ModelData struct {
-	ID               string    `json:"id"`
-	Name             string    `json:"name"`
-	Family           string    `json:"family"`
-	Attachment       bool      `json:"attachment"`
-	Reasoning        bool      `json:"reasoning"`
-	ToolCall         bool      `json:"tool_call"`
-	Temperature      bool      `json:"temperature"`
-	StructuredOutput bool      `json:"structured_output"`
-	Cost             CostData  `json:"cost"`
-	Limit            LimitData `json:"limit"`
-	ReleaseDate      string    `json:"release_date"`
-}
-
-type CostData struct {
-	Input      float64  `json:"input"`
-	Output     float64  `json:"output"`
-	CacheRead  *float64 `json:"cache_read,omitempty"`
-	CacheWrite *float64 `json:"cache_write,omitempty"`
-}
-
-type LimitData struct {
-	Context int `json:"context"`
-	Output  int `json:"output"`
-}
+// ModelsDevResponse, ProviderData, ModelData, CostData, and LimitData are
+// owned by the domain layer (internal/domain/interfaces) so domain services
+// can depend on their shape without importing internal/impl/modelsdev.
+// Aliased here so existing callers of this package are unaffected.
+type ModelsDevResponse = interfaces.ModelsDevResponse
+type ProviderData = interfaces.ProviderData
+type ModelData = interfaces.ModelData
+type CostData = interfaces.CostData
+type LimitData = interfaces.LimitData
 
 type ModelsDevCache struct {
 	Version     int                     `json:"version"`
@@ -213,4 +188,4 @@ func (c *ModelsDevClient) GetLastRefreshTime() (*time.Time, error) {
 	return &cache.LastRefresh, nil
 }
 
-var _ *ModelsDevClient = (*ModelsDevClient)(nil)
+var _ interfaces.ModelsDevClient = (*ModelsDevClient)(nil)

@@ -11,8 +11,6 @@ import (
 	errors "github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/events"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
-	"github.com/drujensen/aiagent/internal/impl/config"
-	"github.com/drujensen/aiagent/internal/impl/integrations"
 
 	"github.com/google/uuid"
 	"github.com/pkoukk/tiktoken-go"
@@ -36,15 +34,16 @@ type ChatService interface {
 }
 
 type chatService struct {
-	chatRepo     interfaces.ChatRepository
-	agentRepo    interfaces.AgentRepository
-	agentService AgentService
-	modelRepo    interfaces.ModelRepository
-	providerRepo interfaces.ProviderRepository
-	toolRepo     interfaces.ToolRepository
-	skillService SkillService
-	config       *config.Config
-	logger       *zap.Logger
+	chatRepo       interfaces.ChatRepository
+	agentRepo      interfaces.AgentRepository
+	agentService   AgentService
+	modelRepo      interfaces.ModelRepository
+	providerRepo   interfaces.ProviderRepository
+	toolRepo       interfaces.ToolRepository
+	skillService   SkillService
+	config         interfaces.ConfigResolver
+	aiModelFactory interfaces.AIModelFactory
+	logger         *zap.Logger
 }
 
 func NewChatService(
@@ -55,19 +54,21 @@ func NewChatService(
 	providerRepo interfaces.ProviderRepository,
 	toolRepo interfaces.ToolRepository,
 	skillService SkillService,
-	cfg *config.Config,
+	cfg interfaces.ConfigResolver,
+	aiModelFactory interfaces.AIModelFactory,
 	logger *zap.Logger,
 ) *chatService {
 	return &chatService{
-		chatRepo:     chatRepo,
-		agentRepo:    agentRepo,
-		agentService: agentService,
-		modelRepo:    modelRepo,
-		providerRepo: providerRepo,
-		toolRepo:     toolRepo,
-		skillService: skillService,
-		config:       cfg,
-		logger:       logger,
+		chatRepo:       chatRepo,
+		agentRepo:      agentRepo,
+		agentService:   agentService,
+		modelRepo:      modelRepo,
+		providerRepo:   providerRepo,
+		toolRepo:       toolRepo,
+		skillService:   skillService,
+		config:         cfg,
+		aiModelFactory: aiModelFactory,
+		logger:         logger,
 	}
 }
 
@@ -460,7 +461,7 @@ func (s *chatService) SendMessage(ctx context.Context, id string, message *entit
 	}
 
 	// Create AI model integration based on provider type
-	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
+	aiModelFactory := s.aiModelFactory
 	aiModel, err := aiModelFactory.CreateModelIntegration(model, provider, resolvedAPIKey)
 	if err != nil {
 		s.logger.Error("Failed to create AI model integration", zap.String("model_id", model.ID), zap.Error(err))
@@ -1024,7 +1025,7 @@ func (s *chatService) createSummaryFromMessages(ctx context.Context, messages []
 		return nil, fmt.Errorf("failed to resolve API key: %v", err)
 	}
 
-	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
+	aiModelFactory := s.aiModelFactory
 	aiModel, err := aiModelFactory.CreateModelIntegration(model, provider, apiKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create AI model: %v", err)
@@ -1260,7 +1261,7 @@ func (s *chatService) compressMessages(
 	recentMessagesToKeep := chat.Messages[summarizeEndIdx:]
 
 	// Create AI model for summarization, using model for context window
-	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
+	aiModelFactory := s.aiModelFactory
 	aiModel, err := aiModelFactory.CreateModelIntegration(model, provider, apiKey)
 	if err != nil {
 		return nil, false, errors.InternalErrorf("failed to initialize AI model for summarization: %v", err)
@@ -1527,7 +1528,7 @@ func (s *chatService) generateTitleWithAI(ctx context.Context, modelID, prompt s
 		return s.generateFallbackTitle(prompt), nil
 	}
 
-	aiModelFactory := integrations.NewAIModelFactory(s.toolRepo, s.logger)
+	aiModelFactory := s.aiModelFactory
 	aiModel, err := aiModelFactory.CreateModelIntegration(model, provider, apiKey)
 	if err != nil {
 		s.logger.Error("Failed to create AI model for title generation", zap.Error(err))

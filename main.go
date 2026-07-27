@@ -14,6 +14,7 @@ import (
 	"github.com/drujensen/aiagent/internal/impl/config"
 	"github.com/drujensen/aiagent/internal/impl/database"
 	"github.com/drujensen/aiagent/internal/impl/defaults"
+	"github.com/drujensen/aiagent/internal/impl/integrations"
 	"github.com/drujensen/aiagent/internal/impl/modelsdev"
 	"github.com/drujensen/aiagent/internal/impl/repositories"
 	repositoriesJson "github.com/drujensen/aiagent/internal/impl/repositories/json"
@@ -213,7 +214,8 @@ func main() {
 
 	agentService := services.NewAgentService(agentRepo, skillService, logger)
 
-	chatService := services.NewChatService(chatRepo, agentRepo, agentService, modelRepo, providerRepo, toolRepo, skillService, cfg, logger)
+	aiModelFactory := integrations.NewAIModelFactory(toolRepo, logger)
+	chatService := services.NewChatService(chatRepo, agentRepo, agentService, modelRepo, providerRepo, toolRepo, skillService, cfg, aiModelFactory, logger)
 
 	// Inject services into the tool factory so that the Agent tool can
 	// delegate work to sub-agents at execution time.

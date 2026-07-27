@@ -7,7 +7,6 @@ import (
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/errs"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
-	"github.com/drujensen/aiagent/internal/impl/config"
 
 	"go.uber.org/zap"
 )
@@ -15,7 +14,7 @@ import (
 type ProviderService interface {
 	ListProviders(ctx context.Context) ([]*entities.Provider, error)
 	GetProvider(ctx context.Context, id string) (*entities.Provider, error)
-	EnsureCustomProviders(ctx context.Context, globalConfig *config.GlobalConfig) error
+	EnsureCustomProviders(ctx context.Context, globalConfig *interfaces.GlobalConfig) error
 }
 
 type providerService struct {
@@ -46,7 +45,7 @@ func (s *providerService) GetProvider(ctx context.Context, id string) (*entities
 	return provider, nil
 }
 
-func (s *providerService) EnsureCustomProviders(ctx context.Context, globalConfig *config.GlobalConfig) error {
+func (s *providerService) EnsureCustomProviders(ctx context.Context, globalConfig *interfaces.GlobalConfig) error {
 	// Get existing providers to check for duplicates
 	existingProviders, err := s.providerRepo.ListProviders(ctx)
 	if err != nil {
