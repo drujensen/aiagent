@@ -873,5 +873,14 @@ func DefaultTools() []*entities.ToolData {
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		},
+		{
+			ID:            "F3A4B5C6-D7E8-4901-9ABC-DE3456789012",
+			ToolType:      "GitPR",
+			Name:          "GitPR",
+			Description:   "Creates a branch (aiagent/auto/* only), commits, pushes, and opens a pull request via the gh CLI. Has no merge, auto-merge, or squash action.",
+			Configuration: map[string]string{"workspace": ""},
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
 	}
 }

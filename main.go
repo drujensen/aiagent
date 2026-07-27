@@ -325,20 +325,31 @@ func initializeDefaults(ctx context.Context, providerRepo interfaces.ProviderRep
 		logger.Info("Initialized agents with default data")
 	}
 
-	// Check and populate tools
+	// Check and populate tools. Unlike providers/agents above, this seeding
+	// is an idempotent per-tool upsert (by ID) rather than an all-or-nothing
+	// first-run check: an already-initialized installation's tools.json
+	// never has len(tools) == 0 again, so a new default tool type added in
+	// a later release (e.g. GitPR) would otherwise never reach existing
+	// installs. Existing tools are left untouched; only tools missing from
+	// the store are created.
 	tools, err := toolRepo.ListToolData(ctx)
 	if err != nil {
 		logger.Error("Failed to list tools", zap.Error(err))
 		return err
 	}
-	if len(tools) == 0 {
-		for _, tool := range defaults.DefaultTools() {
-			if err := toolRepo.CreateToolData(ctx, tool); err != nil {
-				logger.Error("Failed to create default tool", zap.String("tool", tool.Name), zap.Error(err))
-				return err
-			}
+	existingToolIDs := make(map[string]bool, len(tools))
+	for _, tool := range tools {
+		existingToolIDs[tool.ID] = true
+	}
+	for _, tool := range defaults.DefaultTools() {
+		if existingToolIDs[tool.ID] {
+			continue
 		}
-		logger.Info("Initialized tools with default data")
+		if err := toolRepo.CreateToolData(ctx, tool); err != nil {
+			logger.Error("Failed to create default tool", zap.String("tool", tool.Name), zap.Error(err))
+			return err
+		}
+		logger.Info("Added missing default tool", zap.String("tool", tool.Name))
 	}
 
 	return nil

@@ -188,6 +188,14 @@ func NewToolFactory() (*ToolFactory, error) {
 			return NewCompressionTool(name, description, configuration, logger)
 		},
 	}
+	toolFactory.toolFactories["GitPR"] = &ToolFactoryEntry{
+		Name:        "GitPR",
+		Description: `This tool creates a branch (aiagent/auto/* only), commits, pushes, and opens a pull request via the gh CLI. It has no merge, auto-merge, or squash action.`,
+		ConfigKeys:  []string{"workspace"},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			return NewGitPRTool(name, description, configuration, logger)
+		},
+	}
 	toolFactory.toolFactories["Agent"] = &ToolFactoryEntry{
 		Name:        "Agent",
 		Description: "Launches a sub-agent by name to complete a specific task and returns its response. Use this to delegate work to specialised agents such as Architect, Coder, QA, or DevOps.",
