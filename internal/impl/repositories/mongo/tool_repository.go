@@ -2,6 +2,7 @@ package repositories_mongo
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
@@ -15,7 +16,13 @@ import (
 )
 
 type ToolRepository struct {
-	collection    *mongo.Collection
+	collection *mongo.Collection
+	// mu guards toolInstances only. reloadToolInstances builds its
+	// replacement map without holding mu (so it never blocks concurrent
+	// reads on the old map, and never re-enters ListToolData while
+	// holding a lock ListToolData itself does not need), then swaps it in
+	// under a brief write lock.
+	mu            sync.RWMutex
 	toolInstances map[string]entities.Tool
 	toolFactory   *tools.ToolFactory
 	logger        *zap.Logger
@@ -36,14 +43,20 @@ func NewToolRepository(collection *mongo.Collection, toolFactory *tools.ToolFact
 }
 
 func (t *ToolRepository) ListTools() ([]entities.Tool, error) {
-	var tools []entities.Tool
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	var toolList []entities.Tool
 	for _, tool := range t.toolInstances {
-		tools = append(tools, tool)
+		toolList = append(toolList, tool)
 	}
-	return tools, nil
+	return toolList, nil
 }
 
 func (t *ToolRepository) GetToolByName(name string) (entities.Tool, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	tool, exists := t.toolInstances[name]
 	if !exists {
 		return nil, nil
@@ -52,11 +65,33 @@ func (t *ToolRepository) GetToolByName(name string) (entities.Tool, error) {
 }
 
 func (t *ToolRepository) RegisterTool(name string, tool entities.Tool) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	if _, exists := t.toolInstances[name]; exists {
 		return errors.DuplicateErrorf("tool with the same name already exists")
 	}
 	t.toolInstances[name] = tool
 	return nil
+}
+
+func copyToolData(td *entities.ToolData) *entities.ToolData {
+	var configCopy map[string]string
+	if td.Configuration != nil {
+		configCopy = make(map[string]string, len(td.Configuration))
+		for k, v := range td.Configuration {
+			configCopy[k] = v
+		}
+	}
+	return &entities.ToolData{
+		ID:            td.ID,
+		Name:          td.Name,
+		Description:   td.Description,
+		ToolType:      td.ToolType,
+		Configuration: configCopy,
+		CreatedAt:     td.CreatedAt,
+		UpdatedAt:     td.UpdatedAt,
+	}
 }
 
 func (r *ToolRepository) ListToolData(ctx context.Context) ([]*entities.ToolData, error) {
@@ -131,22 +166,27 @@ func (t *ToolRepository) DeleteToolData(ctx context.Context, id string) error {
 }
 
 func (t *ToolRepository) reloadToolInstances() error {
-	t.toolInstances = make(map[string]entities.Tool)
 	toolDataList, err := t.ListToolData(context.Background())
 	if err != nil {
 		t.logger.Error("Failed to load tool instances", zap.Error(err))
 		return errors.InternalErrorf("failed to load tool instances: %v", err)
 	}
 
+	newInstances := make(map[string]entities.Tool)
 	for _, toolData := range toolDataList {
 		toolFactoryEntry, err := t.toolFactory.GetFactoryByName(toolData.ToolType)
 		if err != nil {
 			t.logger.Warn("Skipping tool due to unknown type", zap.String("tool_type", toolData.ToolType), zap.Error(err))
 			continue
 		}
-		tool := toolFactoryEntry.Factory(toolData.Name, toolData.Description, toolData.Configuration, t.logger)
-		t.toolInstances[toolData.Name] = tool
+		configCopy := copyToolData(toolData).Configuration
+		tool := toolFactoryEntry.Factory(toolData.Name, toolData.Description, configCopy, t.logger)
+		newInstances[toolData.Name] = tool
 	}
+
+	t.mu.Lock()
+	t.toolInstances = newInstances
+	t.mu.Unlock()
 	return nil
 }
 

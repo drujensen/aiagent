@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
+	"sync"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/errs"
@@ -14,6 +16,7 @@ import (
 )
 
 type JsonProviderRepository struct {
+	mu       sync.RWMutex
 	filePath string
 	data     []*entities.Provider
 }
@@ -32,6 +35,21 @@ func NewJSONProviderRepository(storageDir string) (interfaces.ProviderRepository
 	return repo, nil
 }
 
+func copyProvider(p *entities.Provider) *entities.Provider {
+	return &entities.Provider{
+		ID:         p.ID,
+		Name:       p.Name,
+		Type:       p.Type,
+		BaseURL:    p.BaseURL,
+		APIKeyName: p.APIKeyName,
+		Models:     slices.Clone(p.Models),
+		CreatedAt:  p.CreatedAt,
+		UpdatedAt:  p.UpdatedAt,
+	}
+}
+
+// load and save are only ever called by exported methods that already hold
+// r.mu, so neither acquires the lock itself.
 func (r *JsonProviderRepository) load() error {
 	data, err := os.ReadFile(r.filePath)
 	if os.IsNotExist(err) {
@@ -75,49 +93,36 @@ func (r *JsonProviderRepository) save() error {
 		return errors.InternalErrorf("failed to create directory: %v", err)
 	}
 
-	if err := os.WriteFile(r.filePath, data, 0644); err != nil {
-		return errors.InternalErrorf("failed to write providers.json: %v", err)
-	}
-
-	return nil
+	return atomicWriteFile(r.filePath, data)
 }
 
 func (r *JsonProviderRepository) ListProviders(ctx context.Context) ([]*entities.Provider, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	providersCopy := make([]*entities.Provider, len(r.data))
 	for i, p := range r.data {
-		providersCopy[i] = &entities.Provider{
-			ID:         p.ID,
-			Name:       p.Name,
-			Type:       p.Type,
-			BaseURL:    p.BaseURL,
-			APIKeyName: p.APIKeyName,
-			Models:     p.Models,
-			CreatedAt:  p.CreatedAt,
-			UpdatedAt:  p.UpdatedAt,
-		}
+		providersCopy[i] = copyProvider(p)
 	}
 	return providersCopy, nil
 }
 
 func (r *JsonProviderRepository) GetProvider(ctx context.Context, id string) (*entities.Provider, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	for _, provider := range r.data {
 		if provider.ID == id {
-			return &entities.Provider{
-				ID:         provider.ID,
-				Name:       provider.Name,
-				Type:       provider.Type,
-				BaseURL:    provider.BaseURL,
-				APIKeyName: provider.APIKeyName,
-				Models:     provider.Models,
-				CreatedAt:  provider.CreatedAt,
-				UpdatedAt:  provider.UpdatedAt,
-			}, nil
+			return copyProvider(provider), nil
 		}
 	}
 	return nil, errors.NotFoundErrorf("provider not found: %s", id)
 }
 
 func (r *JsonProviderRepository) CreateProvider(ctx context.Context, provider *entities.Provider) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if provider.ID == "" {
 		provider.ID = uuid.New().String()
 	}
@@ -129,14 +134,17 @@ func (r *JsonProviderRepository) CreateProvider(ctx context.Context, provider *e
 		}
 	}
 
-	r.data = append(r.data, provider)
+	r.data = append(r.data, copyProvider(provider))
 	return r.save()
 }
 
 func (r *JsonProviderRepository) UpdateProvider(ctx context.Context, provider *entities.Provider) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	for i, existing := range r.data {
 		if existing.ID == provider.ID {
-			r.data[i] = provider
+			r.data[i] = copyProvider(provider)
 			return r.save()
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
@@ -16,6 +17,7 @@ import (
 )
 
 type JsonAgentRepository struct {
+	mu       sync.RWMutex
 	filePath string
 	data     []*entities.Agent
 }
@@ -34,6 +36,19 @@ func NewJSONAgentRepository(storageDir string) (interfaces.AgentRepository, erro
 	return repo, nil
 }
 
+func copyAgent(a *entities.Agent) *entities.Agent {
+	return &entities.Agent{
+		ID:           a.ID,
+		Name:         a.Name,
+		SystemPrompt: a.SystemPrompt,
+		Tools:        slices.Clone(a.Tools),
+		CreatedAt:    a.CreatedAt,
+		UpdatedAt:    a.UpdatedAt,
+	}
+}
+
+// load and save are only ever called by exported methods that already hold
+// r.mu, so neither acquires the lock itself.
 func (r *JsonAgentRepository) load() error {
 	data, err := os.ReadFile(r.filePath)
 	if os.IsNotExist(err) {
@@ -72,60 +87,54 @@ func (r *JsonAgentRepository) save() error {
 		return errors.InternalErrorf("failed to create directory: %v", err)
 	}
 
-	if err := os.WriteFile(r.filePath, data, 0644); err != nil {
-		return errors.InternalErrorf("failed to write agents.json: %v", err)
-	}
-
-	return nil
+	return atomicWriteFile(r.filePath, data)
 }
 
 func (r *JsonAgentRepository) ListAgents(ctx context.Context) ([]*entities.Agent, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	agentsCopy := make([]*entities.Agent, len(r.data))
 	for i, a := range r.data {
-		agentsCopy[i] = &entities.Agent{
-			ID:           a.ID,
-			Name:         a.Name,
-			SystemPrompt: a.SystemPrompt,
-			Tools:        slices.Clone(a.Tools),
-			CreatedAt:    a.CreatedAt,
-			UpdatedAt:    a.UpdatedAt,
-		}
+		agentsCopy[i] = copyAgent(a)
 	}
 	return agentsCopy, nil
 }
 
 func (r *JsonAgentRepository) GetAgent(ctx context.Context, id string) (*entities.Agent, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	for _, agent := range r.data {
 		if agent.ID == id {
-			return &entities.Agent{
-				ID:           agent.ID,
-				Name:         agent.Name,
-				SystemPrompt: agent.SystemPrompt,
-				Tools:        slices.Clone(agent.Tools),
-				CreatedAt:    agent.CreatedAt,
-				UpdatedAt:    agent.UpdatedAt,
-			}, nil
+			return copyAgent(agent), nil
 		}
 	}
 	return nil, errors.NotFoundErrorf("agent not found: %s", id)
 }
 
 func (r *JsonAgentRepository) CreateAgent(ctx context.Context, agent *entities.Agent) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if agent.ID == "" {
 		agent.ID = uuid.New().String()
 	}
 	agent.CreatedAt = time.Now()
 	agent.UpdatedAt = agent.CreatedAt
 
-	r.data = append(r.data, agent)
+	r.data = append(r.data, copyAgent(agent))
 	return r.save()
 }
 
 func (r *JsonAgentRepository) UpdateAgent(ctx context.Context, agent *entities.Agent) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	for i, a := range r.data {
 		if a.ID == agent.ID {
 			agent.UpdatedAt = time.Now()
-			r.data[i] = agent
+			r.data[i] = copyAgent(agent)
 			return r.save()
 		}
 	}
@@ -133,6 +142,9 @@ func (r *JsonAgentRepository) UpdateAgent(ctx context.Context, agent *entities.A
 }
 
 func (r *JsonAgentRepository) DeleteAgent(ctx context.Context, id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	for i, a := range r.data {
 		if a.ID == id {
 			r.data = slices.Delete(r.data, i, i+1)
