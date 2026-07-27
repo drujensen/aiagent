@@ -74,14 +74,6 @@ func DefaultProviders() []*entities.Provider {
 			APIKeyName: "XAI_API_KEY",
 			Models:     []entities.ModelPricing{},
 		},
-		{
-			ID:         "FE6F981E-CA93-46BE-9B8B-0321A47A64E4",
-			Name:       "Together AI",
-			Type:       "together",
-			BaseURL:    "https://api.together.xyz",
-			APIKeyName: "TOGETHER_API_KEY",
-			Models:     []entities.ModelPricing{},
-		},
 	}
 }
 

@@ -1,0 +1,29 @@
+[
+  {
+    "id": "aaaaaaaa-0000-0000-0000-000000000001",
+    "name": "gpt-4o",
+    "provider_id": "1E4697B3-233F-4004-B513-692E5F6EABE6",
+    "provider_type": "openai",
+    "model_name": "gpt-4o",
+    "api_key": "",
+    "reasoning_effort": ""
+  },
+  {
+    "id": "bbbbbbbb-0000-0000-0000-000000000001",
+    "name": "deepseek-r1",
+    "provider_id": "12345678-1234-1234-1234-123456789012",
+    "provider_type": "together",
+    "model_name": "deepseek-ai/DeepSeek-R1",
+    "api_key": "",
+    "reasoning_effort": ""
+  },
+  {
+    "id": "cccccccc-0000-0000-0000-000000000001",
+    "name": "deepseek-r1",
+    "provider_id": "FE6F981E-CA93-46BE-9B8B-0321A47A64E4",
+    "provider_type": "together",
+    "model_name": "deepseek-ai/DeepSeek-R1",
+    "api_key": "",
+    "reasoning_effort": ""
+  }
+]

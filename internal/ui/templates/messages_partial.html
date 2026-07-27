@@ -1,8 +1,0 @@
-{{define "messages_partial"}}
-<div id="temp-user-message" hx-swap-oob="true" class="message user-message">
-  <div class="message-content">{{renderMarkdown .UserMessage.Content}}</div>
-</div>
-<div id="temp-thinking-message" hx-swap-oob="true" class="message agent-message">
-  {{renderMarkdown .AIMessage.Content}}
-</div>
-{{end}}

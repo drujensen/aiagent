@@ -158,6 +158,10 @@ func main() {
 			logger.Fatal("Failed to initialize tool repository", zap.Error(err))
 		}
 	} else {
+		if err := repositoriesJson.MigrateDuplicateProviders(storageDir, logger); err != nil {
+			logger.Fatal("Failed to migrate duplicate providers", zap.Error(err))
+		}
+
 		// Initialize JSON repositories
 		providerRepo, err = repositoriesJson.NewJSONProviderRepository(storageDir)
 		if err != nil {
