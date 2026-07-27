@@ -1,0 +1,31 @@
+{{define "skills_list_content"}}
+<div class="container mt-4">
+    <h1>Skills</h1>
+    <p>Skills discovered from ~/.aiagent/skills, ~/.agents/skills, and the built-in pipeline skills</p>
+
+    <div class="skill-list">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>License</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Skills}}
+                <tr>
+                    <td>{{.Name}}</td>
+                    <td>{{.Summary}}</td>
+                    <td>{{if .License}}{{.License}}{{else}}<em>&mdash;</em>{{end}}</td>
+                </tr>
+                {{else}}
+                <tr>
+                    <td colspan="3">No skills found.</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{end}}

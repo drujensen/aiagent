@@ -286,7 +286,7 @@ func main() {
 	modelFilterService := services.NewModelFilterService()
 
 	if modeStr == "serve" {
-		uiApp := ui.NewUI(chatService, agentService, modelService, toolService, providerService, modelRefreshService, modelFilterService, globalConfig, logger)
+		uiApp := ui.NewUI(chatService, agentService, modelService, toolService, providerService, modelRefreshService, modelFilterService, skillService, globalConfig, logger)
 		if err := uiApp.Run(); err != nil {
 			logger.Fatal("UI failed", zap.Error(err))
 		}
