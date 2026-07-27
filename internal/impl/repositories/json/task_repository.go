@@ -45,14 +45,16 @@ func copyTask(t *entities.Task) *entities.Task {
 		dueDateCopy = &d
 	}
 	return &entities.Task{
-		ID:        t.ID,
-		Name:      t.Name,
-		Content:   t.Content,
-		Status:    t.Status,
-		Priority:  t.Priority,
-		CreatedAt: t.CreatedAt,
-		UpdatedAt: t.UpdatedAt,
-		DueDate:   dueDateCopy,
+		ID:              t.ID,
+		Name:            t.Name,
+		Content:         t.Content,
+		Status:          t.Status,
+		Priority:        t.Priority,
+		CreatedAt:       t.CreatedAt,
+		UpdatedAt:       t.UpdatedAt,
+		DueDate:         dueDateCopy,
+		PlanID:          t.PlanID,
+		AssignedAgentID: t.AssignedAgentID,
 	}
 }
 

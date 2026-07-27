@@ -119,6 +119,8 @@ func main() {
 	var chatRepo interfaces.ChatRepository
 	var providerRepo interfaces.ProviderRepository
 	var toolRepo interfaces.ToolRepository
+	var planRepo interfaces.PlanRepository
+	var taskRepo interfaces.TaskRepository
 
 	var storageDir string
 	if global {
@@ -171,6 +173,8 @@ func main() {
 		if err != nil {
 			logger.Fatal("Failed to initialize tool repository", zap.Error(err))
 		}
+		planRepo = repositoriesMongo.NewMongoPlanRepository(db.Collection("plans"))
+		taskRepo = repositoriesMongo.NewMongoTaskRepository(db.Collection("tasks"))
 	} else {
 		if err := repositoriesJson.MigrateDuplicateProviders(storageDir, logger); err != nil {
 			logger.Fatal("Failed to migrate duplicate providers", zap.Error(err))
@@ -196,6 +200,14 @@ func main() {
 		chatRepo, err = repositoriesJson.NewJSONChatRepository(storageDir)
 		if err != nil {
 			logger.Fatal("Failed to initialize chat repository", zap.Error(err))
+		}
+		planRepo, err = repositoriesJson.NewJSONPlanRepository(storageDir)
+		if err != nil {
+			logger.Fatal("Failed to initialize plan repository", zap.Error(err))
+		}
+		taskRepo, err = repositoriesJson.NewJSONTaskRepository(storageDir)
+		if err != nil {
+			logger.Fatal("Failed to initialize task repository", zap.Error(err))
 		}
 	}
 
@@ -237,6 +249,14 @@ func main() {
 	// Inject services into the tool factory so that the Agent tool can
 	// delegate work to sub-agents at execution time.
 	toolFactory.SetServices(chatService, agentService, modelService)
+
+	// Wire the Plan/Task orchestration stack. taskService/taskRepo were
+	// previously constructed nowhere in main.go; PlanService is what
+	// finally puts them to use, decomposing a Plan into Tasks and
+	// dispatching each to a sub-agent chat.
+	taskService := services.NewTaskService(taskRepo, logger)
+	planService := services.NewPlanService(planRepo, taskRepo, agentService, modelService, chatService, logger)
+	toolFactory.SetPlanServices(planService, taskService)
 
 	// Create ModelRefreshService for refresh functionality
 	modelsDevClient := modelsdev.NewModelsDevClient(logger)
