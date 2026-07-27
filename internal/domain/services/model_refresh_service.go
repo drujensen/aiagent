@@ -9,8 +9,6 @@ import (
 
 	"github.com/drujensen/aiagent/internal/domain/entities"
 	"github.com/drujensen/aiagent/internal/domain/interfaces"
-	"github.com/drujensen/aiagent/internal/impl/config"
-	"github.com/drujensen/aiagent/internal/impl/modelsdev"
 	"go.uber.org/zap"
 )
 
@@ -51,12 +49,12 @@ func generateModelDisplayName(providerName, modelID string) string {
 
 // modelWithTime holds model data with parsed release time
 type modelWithTime struct {
-	model       modelsdev.ModelData
+	model       interfaces.ModelData
 	releaseTime time.Time
 }
 
 // filterLatestModelsPerFamily filters models to only include the latest release per family and version
-func filterLatestModelsPerFamily(models map[string]modelsdev.ModelData) map[string]modelsdev.ModelData {
+func filterLatestModelsPerFamily(models map[string]interfaces.ModelData) map[string]interfaces.ModelData {
 	familyLatest := make(map[string]modelWithTime)
 	datePattern := regexp.MustCompile(`-(\d{4}-\d{2}-\d{2}|\d{8})$`)
 
@@ -109,7 +107,7 @@ func filterLatestModelsPerFamily(models map[string]modelsdev.ModelData) map[stri
 	}
 
 	// Reconstruct map with only latest per group
-	filtered := make(map[string]modelsdev.ModelData)
+	filtered := make(map[string]interfaces.ModelData)
 	for _, mwt := range familyLatest {
 		filtered[mwt.model.ID] = mwt.model
 	}
@@ -129,16 +127,16 @@ type ModelRefreshService interface {
 type modelRefreshService struct {
 	providerRepo    interfaces.ProviderRepository
 	modelRepo       interfaces.ModelRepository
-	modelsDevClient *modelsdev.ModelsDevClient
-	globalConfig    *config.GlobalConfig
+	modelsDevClient interfaces.ModelsDevClient
+	globalConfig    *interfaces.GlobalConfig
 	logger          *zap.Logger
 }
 
 func NewModelRefreshService(
 	providerRepo interfaces.ProviderRepository,
 	modelRepo interfaces.ModelRepository,
-	modelsDevClient *modelsdev.ModelsDevClient,
-	globalConfig *config.GlobalConfig,
+	modelsDevClient interfaces.ModelsDevClient,
+	globalConfig *interfaces.GlobalConfig,
 	logger *zap.Logger,
 ) *modelRefreshService {
 	return &modelRefreshService{
@@ -188,7 +186,7 @@ func (s *modelRefreshService) RefreshProvider(ctx context.Context, providerID st
 func (s *modelRefreshService) refreshProvider(ctx context.Context, provider *entities.Provider) error {
 	// Check if this provider is defined in global config (custom provider)
 	// For custom providers, we need to find the config entry by matching names
-	var customConfig *config.CustomProviderConfig
+	var customConfig *interfaces.CustomProviderConfig
 	var configKey string
 	for key, cfg := range s.globalConfig.Providers {
 		if cfg.Name == provider.Name && cfg.Type == "generic" {
@@ -362,7 +360,7 @@ func (s *modelRefreshService) SyncAllModels(ctx context.Context) error {
 	return nil
 }
 
-func (s *modelRefreshService) syncProviderModels(ctx context.Context, provider *entities.Provider, modelsDevData *modelsdev.ModelsDevResponse) (int, int, int, error) {
+func (s *modelRefreshService) syncProviderModels(ctx context.Context, provider *entities.Provider, modelsDevData *interfaces.ModelsDevResponse) (int, int, int, error) {
 	// Get existing models for this provider
 	existingModels, err := s.modelRepo.GetModelsByProvider(ctx, provider.ID)
 	if err != nil {
@@ -381,7 +379,7 @@ func (s *modelRefreshService) syncProviderModels(ctx context.Context, provider *
 	// Process each model in provider pricing data
 	for _, pricing := range provider.Models {
 		// Get the full model metadata from models.dev data
-		var modelData modelsdev.ModelData
+		var modelData interfaces.ModelData
 		if providerData, exists := (*modelsDevData)[string(provider.Type)]; exists {
 			if md, exists := providerData.Models[pricing.Name]; exists {
 				modelData = md

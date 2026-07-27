@@ -6,35 +6,18 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/drujensen/aiagent/internal/domain/interfaces"
+
 	"go.uber.org/zap"
 )
 
-// GlobalConfig represents the global configuration settings
-type GlobalConfig struct {
-	DefaultTemperature    float64                         `json:"default_temperature"`
-	DefaultMaxTokensRatio float64                         `json:"default_max_tokens_ratio"`
-	LastUsedAgent         string                          `json:"last_used_agent"` // Agent name (not ID)
-	LastUsedModel         string                          `json:"last_used_model"` // Model name (not ID)
-	Providers             map[string]CustomProviderConfig `json:"providers,omitempty"`
-}
-
-// CustomProviderConfig represents a custom provider configuration
-type CustomProviderConfig struct {
-	Name       string                       `json:"name"`
-	Type       string                       `json:"type"`
-	BaseURL    string                       `json:"base_url"`
-	APIKeyName string                       `json:"api_key_name"`
-	Models     map[string]CustomModelConfig `json:"models"`
-}
-
-// CustomModelConfig represents a custom model configuration
-type CustomModelConfig struct {
-	Name                string  `json:"name"`
-	ContextWindow       int     `json:"context_window"`
-	InputPricePerMille  float64 `json:"input_price_per_mille"`
-	OutputPricePerMille float64 `json:"output_price_per_mille"`
-	MaxOutputTokens     int     `json:"max_output_tokens,omitempty"`
-}
+// GlobalConfig, CustomProviderConfig, and CustomModelConfig are owned by the
+// domain layer (internal/domain/interfaces) so domain services can depend on
+// their shape without importing internal/impl. Aliased here so existing
+// callers of this package keep using config.GlobalConfig etc. unchanged.
+type GlobalConfig = interfaces.GlobalConfig
+type CustomProviderConfig = interfaces.CustomProviderConfig
+type CustomModelConfig = interfaces.CustomModelConfig
 
 // DefaultGlobalConfig returns the default global configuration
 func DefaultGlobalConfig() *GlobalConfig {

@@ -21,6 +21,8 @@ func NewAIModelFactory(toolRepo interfaces.ToolRepository, logger *zap.Logger) *
 	}
 }
 
+var _ interfaces.AIModelFactory = (*AIModelFactory)(nil)
+
 // CreateModelIntegration creates an AI model integration based on the model configuration
 func (f *AIModelFactory) CreateModelIntegration(model *entities.Model, provider *entities.Provider, apiKey string) (interfaces.AIModelIntegration, error) {
 	// Use provider's base URL as endpoint
