@@ -882,5 +882,14 @@ func DefaultTools() []*entities.ToolData {
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		},
+		{
+			ID:            "04B5C6D7-E8F9-4012-ABCD-EF4567890123",
+			ToolType:      "Skill",
+			Name:          "Skill",
+			Description:   "Invokes a named pipeline skill (e.g. research, design, plan) against a target chat by injecting the skill's instructions as a message into that chat.",
+			Configuration: map[string]string{},
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
 	}
 }

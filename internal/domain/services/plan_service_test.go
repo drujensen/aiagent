@@ -104,8 +104,8 @@ func (m *mockChatServiceForPlan) GenerateAndUpdateTitle(ctx context.Context, cha
 	return nil, args.Error(1)
 }
 
-func (m *mockChatServiceForPlan) ExecuteSkill(ctx context.Context, skillName string) error {
-	args := m.Called(ctx, skillName)
+func (m *mockChatServiceForPlan) ExecuteSkill(ctx context.Context, chatID, skillName string) error {
+	args := m.Called(ctx, chatID, skillName)
 	return args.Error(0)
 }
 

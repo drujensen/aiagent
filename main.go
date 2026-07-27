@@ -237,8 +237,15 @@ func main() {
 
 	toolService := services.NewToolService(toolRepo, logger)
 
-	// Initialize skill service
-	skillRepo := repositories.NewSkillRepository()
+	// Initialize skill service. MaterializeBuiltinSkills always overwrites
+	// the managed ~/.aiagent/skills/aiagent-builtin/ subdirectory to match
+	// the embedded skills/ tree on every run; failure is non-fatal (skill
+	// discovery already tolerates missing directories) but logged, since
+	// the research/design/plan pipeline skills won't be available without it.
+	skillRepo := repositories.NewSkillRepository(embeddedSkillsFS)
+	if err := skillRepo.MaterializeBuiltinSkills(); err != nil {
+		logger.Warn("Failed to materialize builtin skills", zap.Error(err))
+	}
 	skillService := services.NewSkillService(skillRepo, logger)
 
 	agentService := services.NewAgentService(agentRepo, skillService, logger)
@@ -249,6 +256,7 @@ func main() {
 	// Inject services into the tool factory so that the Agent tool can
 	// delegate work to sub-agents at execution time.
 	toolFactory.SetServices(chatService, agentService, modelService)
+	toolFactory.SetSkillService(skillService)
 
 	// Wire the Plan/Task orchestration stack. taskService/taskRepo were
 	// previously constructed nowhere in main.go; PlanService is what
