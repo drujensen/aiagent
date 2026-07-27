@@ -1,0 +1,26 @@
+[
+  {
+    "id": "1E4697B3-233F-4004-B513-692E5F6EABE6",
+    "name": "OpenAI",
+    "type": "openai",
+    "base_url": "https://api.openai.com",
+    "api_key_name": "OPENAI_API_KEY",
+    "models": []
+  },
+  {
+    "id": "12345678-1234-1234-1234-123456789012",
+    "name": "Together AI",
+    "type": "together",
+    "base_url": "https://api.together.xyz",
+    "api_key_name": "TOGETHER_API_KEY",
+    "models": []
+  },
+  {
+    "id": "FE6F981E-CA93-46BE-9B8B-0321A47A64E4",
+    "name": "Together AI",
+    "type": "together",
+    "base_url": "https://api.together.xyz",
+    "api_key_name": "TOGETHER_API_KEY",
+    "models": []
+  }
+]

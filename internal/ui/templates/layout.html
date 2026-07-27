@@ -13,7 +13,6 @@
    <link rel="apple-touch-icon" href="/static/img/apple-touch-icon-152x152.png" sizes="152x152">
    <link rel="apple-touch-icon" href="/static/img/apple-touch-icon-120x120.png" sizes="120x120">
    <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">
-   <link rel="apple-touch-startup-image" href="/static/img/launch.png">
    <link rel="stylesheet" href="/static/css/basic.css">
    <link rel="stylesheet" href="/static/css/styles.css">
    <link rel="stylesheet" href="/static/css/layout.css">
@@ -58,6 +57,8 @@
                      {{template "chat_form_content" .}}
                  {{else if eq .ContentTemplate "chat_content"}}
                      {{template "chat_content" .}}
+                 {{else if eq .ContentTemplate "providers_list_content"}}
+                     {{template "providers_list_content" .}}
                  {{end}}
            </main>
            <aside class="sidebar col col-3">
