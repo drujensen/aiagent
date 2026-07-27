@@ -2,7 +2,9 @@ package repositories
 
 import (
 	"context"
+	"embed"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,6 +16,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// builtinSkillsEmbedRoot is the top-level directory name inside the
+// embedded FS passed to NewSkillRepository - it matches the go:embed
+// pattern ("skills") declared in embedded_skills.go at the repo root.
+const builtinSkillsEmbedRoot = "skills"
+
+// builtinSkillsManagedDirName is the subdirectory under ~/.aiagent/skills/
+// that builtin skills are materialized into. It is a distinct namespace
+// from the user's own ~/.aiagent/skills/<name>/ skills so a materialized
+// builtin skill can never collide with (or be silently overwritten by) a
+// user-authored skill of the same name, and vice versa.
+const builtinSkillsManagedDirName = "aiagent-builtin"
+
 // SkillFrontmatter represents the YAML frontmatter in SKILL.md
 type SkillFrontmatter struct {
 	Name          string            `yaml:"name"`
@@ -24,10 +38,12 @@ type SkillFrontmatter struct {
 	AllowedTools  []string          `yaml:"allowed-tools,omitempty"`
 }
 
-type SkillRepository struct{}
+type SkillRepository struct {
+	embeddedSkills embed.FS
+}
 
-func NewSkillRepository() interfaces.SkillRepository {
-	return &SkillRepository{}
+func NewSkillRepository(embeddedSkills embed.FS) interfaces.SkillRepository {
+	return &SkillRepository{embeddedSkills: embeddedSkills}
 }
 
 func (r *SkillRepository) DiscoverSkills(ctx context.Context) ([]*entities.Skill, error) {
@@ -64,6 +80,14 @@ func (r *SkillRepository) DiscoverSkills(ctx context.Context) ([]*entities.Skill
 			path      string
 			isProject bool
 		}{filepath.Join(homeDir, ".agents", "skills"), false},
+		// Scanned last (lowest priority): if a user has their own skill
+		// under ~/.aiagent/skills/<name>/ with the same name as a builtin
+		// one, the earlier-scanned user skill wins per scanSkillsDirectory's
+		// existing-entry rule below - the managed copy never overwrites it.
+		struct {
+			path      string
+			isProject bool
+		}{filepath.Join(homeDir, ".aiagent", "skills", builtinSkillsManagedDirName), false},
 	)
 
 	for _, dir := range skillDirs {
@@ -215,3 +239,42 @@ func (r *SkillRepository) Save(skill *entities.Skill) error {
 
 	return nil
 }
+
+// MaterializeBuiltinSkills copies every file under the embedded skills/
+// tree into ~/.aiagent/skills/aiagent-builtin/, always overwriting so the
+// managed subdirectory exactly matches the embedded version on every run.
+// Users are not expected to hand-edit files under aiagent-builtin/; doing
+// so is not detected and any local edits are silently replaced the next
+// time this runs - that tradeoff is what avoids needing "detect user
+// modification" logic entirely.
+func (r *SkillRepository) MaterializeBuiltinSkills() error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return errors.InternalErrorf("failed to get home directory: %v", err)
+	}
+	managedDir := filepath.Join(homeDir, ".aiagent", "skills", builtinSkillsManagedDirName)
+
+	return fs.WalkDir(r.embeddedSkills, builtinSkillsEmbedRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(builtinSkillsEmbedRoot, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(managedDir, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0755)
+		}
+		data, err := r.embeddedSkills.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("failed to read embedded file %s: %w", path, err)
+		}
+		if err := os.WriteFile(target, data, 0644); err != nil {
+			return fmt.Errorf("failed to write %s: %w", target, err)
+		}
+		return nil
+	})
+}
+
+var _ interfaces.SkillRepository = (*SkillRepository)(nil)

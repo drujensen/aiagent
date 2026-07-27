@@ -30,7 +30,7 @@ type ChatService interface {
 	SaveMessagesIncrementally(ctx context.Context, chatID string, messages []*entities.Message) error
 	CalculateTotalChatCost(ctx context.Context, chatID string) (float64, error)
 	GenerateAndUpdateTitle(ctx context.Context, chatID string) (*entities.Chat, error)
-	ExecuteSkill(ctx context.Context, skillName string) error
+	ExecuteSkill(ctx context.Context, chatID, skillName string) error
 }
 
 type chatService struct {
@@ -1565,14 +1565,17 @@ func (s *chatService) generateTitleWithAI(ctx context.Context, modelID, prompt s
 	return title, nil
 }
 
-func (s *chatService) ExecuteSkill(ctx context.Context, skillName string) error {
-	// Get active chat
-	chat, err := s.GetActiveChat(ctx)
+func (s *chatService) ExecuteSkill(ctx context.Context, chatID, skillName string) error {
+	// Get the target chat. Callers pass this explicitly rather than relying
+	// on GetActiveChat, since CreateSubChat sets sub-chats Active = false -
+	// a sub-chat created for fan-out (e.g. via AgentTool/PlanService) would
+	// never be reachable through the "active chat" concept.
+	chat, err := s.GetChat(ctx, chatID)
 	if err != nil {
 		return err
 	}
 	if chat == nil {
-		return errors.ValidationErrorf("no active chat")
+		return errors.ValidationErrorf("chat not found")
 	}
 
 	// Get skill content

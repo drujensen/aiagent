@@ -29,6 +29,7 @@ type ToolFactory struct {
 	modelService  services.ModelService
 	planService   services.PlanService
 	taskService   services.TaskService
+	skillService  services.SkillService
 }
 
 // SetServices wires the application services into the factory so that
@@ -41,12 +42,17 @@ func (t *ToolFactory) SetServices(chatService services.ChatService, agentService
 }
 
 // SetPlanServices wires the Plan/Task orchestration services into the
-// factory, for the same reason and at the same point as SetServices (a
-// future tool - e.g. a Skill-driven planning tool in a later phase - needs
-// access to these at execute time).
+// factory, for the same reason and at the same point as SetServices.
 func (t *ToolFactory) SetPlanServices(planService services.PlanService, taskService services.TaskService) {
 	t.planService = planService
 	t.taskService = taskService
+}
+
+// SetSkillService wires SkillService into the factory so SkillTool can
+// enumerate available skills at Schema() time, for the same reason and at
+// the same point as SetServices.
+func (t *ToolFactory) SetSkillService(skillService services.SkillService) {
+	t.skillService = skillService
 }
 
 func (t *ToolFactory) GetChatService() services.ChatService   { return t.chatService }
@@ -54,6 +60,7 @@ func (t *ToolFactory) GetAgentService() services.AgentService { return t.agentSe
 func (t *ToolFactory) GetModelService() services.ModelService { return t.modelService }
 func (t *ToolFactory) GetPlanService() services.PlanService   { return t.planService }
 func (t *ToolFactory) GetTaskService() services.TaskService   { return t.taskService }
+func (t *ToolFactory) GetSkillService() services.SkillService { return t.skillService }
 
 func NewToolFactory() (*ToolFactory, error) {
 	toolFactory := &ToolFactory{}
@@ -194,6 +201,16 @@ func NewToolFactory() (*ToolFactory, error) {
 		ConfigKeys:  []string{"workspace"},
 		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
 			return NewGitPRTool(name, description, configuration, logger)
+		},
+	}
+	toolFactory.toolFactories["Skill"] = &ToolFactoryEntry{
+		Name:        "Skill",
+		Description: "Invokes a named pipeline skill (e.g. research, design, plan) against a target chat by injecting the skill's instructions as a message into that chat.",
+		ConfigKeys:  []string{},
+		Factory: func(name, description string, configuration map[string]string, logger *zap.Logger) entities.Tool {
+			// Services are injected lazily via SetServices()/SetSkillService();
+			// SkillTool reads them from the factory at Execute time.
+			return NewSkillTool(name, description, configuration, toolFactory, logger)
 		},
 	}
 	toolFactory.toolFactories["Agent"] = &ToolFactoryEntry{
