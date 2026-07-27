@@ -26,15 +26,21 @@ type ToolRepository struct {
 	toolInstances  map[string]entities.Tool
 	toolFactory    *tools.ToolFactory
 	configResolver interfaces.ConfigResolver
-	logger         *zap.Logger
+	// toolSources supplies dynamically-discovered tools (currently: MCP
+	// servers) that have no ToolData row and are merged in at read time -
+	// see JsonToolRepository for the full rationale (identical for both
+	// backends). Set once at construction; not guarded by mu.
+	toolSources []tools.ToolSource
+	logger      *zap.Logger
 }
 
-func NewToolRepository(collection *mongo.Collection, toolFactory *tools.ToolFactory, configResolver interfaces.ConfigResolver, logger *zap.Logger) (*ToolRepository, error) {
+func NewToolRepository(collection *mongo.Collection, toolFactory *tools.ToolFactory, configResolver interfaces.ConfigResolver, toolSources []tools.ToolSource, logger *zap.Logger) (*ToolRepository, error) {
 	toolRepository := &ToolRepository{
 		collection:     collection,
 		toolInstances:  make(map[string]entities.Tool),
 		toolFactory:    toolFactory,
 		configResolver: configResolver,
+		toolSources:    toolSources,
 		logger:         logger,
 	}
 	// Load initial tool instances
@@ -44,26 +50,53 @@ func NewToolRepository(collection *mongo.Collection, toolFactory *tools.ToolFact
 	return toolRepository, nil
 }
 
+// findInSources looks up a tool by name across all configured tool sources -
+// see JsonToolRepository.findInSources for the full rationale (identical for
+// both backends).
+func (t *ToolRepository) findInSources(ctx context.Context, name string) (entities.Tool, error) {
+	for _, source := range t.toolSources {
+		sourceTools, err := source.ListTools(ctx)
+		if err != nil {
+			t.logger.Warn("Failed to list tools from source, skipping", zap.String("source", source.Name()), zap.Error(err))
+			continue
+		}
+		for _, tool := range sourceTools {
+			if tool.Name() == name {
+				return tool, nil
+			}
+		}
+	}
+	return nil, nil
+}
+
 func (t *ToolRepository) ListTools() ([]entities.Tool, error) {
 	t.mu.RLock()
-	defer t.mu.RUnlock()
-
 	var toolList []entities.Tool
 	for _, tool := range t.toolInstances {
 		toolList = append(toolList, tool)
+	}
+	t.mu.RUnlock()
+
+	for _, source := range t.toolSources {
+		sourceTools, err := source.ListTools(context.Background())
+		if err != nil {
+			t.logger.Warn("Failed to list tools from source, skipping", zap.String("source", source.Name()), zap.Error(err))
+			continue
+		}
+		toolList = append(toolList, sourceTools...)
 	}
 	return toolList, nil
 }
 
 func (t *ToolRepository) GetToolByName(name string) (entities.Tool, error) {
 	t.mu.RLock()
-	defer t.mu.RUnlock()
-
 	tool, exists := t.toolInstances[name]
-	if !exists {
-		return nil, nil
+	t.mu.RUnlock()
+	if exists {
+		return tool, nil
 	}
-	return tool, nil
+
+	return t.findInSources(context.Background(), name)
 }
 
 func (t *ToolRepository) RegisterTool(name string, tool entities.Tool) error {
@@ -222,6 +255,16 @@ func (t *ToolRepository) GetToolForChat(ctx context.Context, name string, config
 	var toolData entities.ToolData
 	err := t.collection.FindOne(ctx, bson.M{"name": name}).Decode(&toolData)
 	if err == mongo.ErrNoDocuments {
+		// Not a native, factory-built tool - check configured tool sources
+		// (MCP servers) - see JsonToolRepository.GetToolForChat for the full
+		// rationale (identical for both backends).
+		sourceTool, sourceErr := t.findInSources(ctx, name)
+		if sourceErr != nil {
+			return nil, sourceErr
+		}
+		if sourceTool != nil {
+			return sourceTool, nil
+		}
 		return nil, errors.NotFoundErrorf("tool not found: %s", name)
 	}
 	if err != nil {

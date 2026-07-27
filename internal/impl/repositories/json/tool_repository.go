@@ -30,10 +30,16 @@ type JsonToolRepository struct {
 	toolInstances  map[string]entities.Tool
 	toolFactory    *tools.ToolFactory
 	configResolver interfaces.ConfigResolver
-	logger         *zap.Logger
+	// toolSources supplies dynamically-discovered tools (currently: MCP
+	// servers) that have no ToolData row and are merged in at read time by
+	// ListTools/GetToolByName/GetToolForChat, alongside the native,
+	// factory-built tools in toolInstances. Set once at construction; not
+	// guarded by mu since it's never mutated afterward.
+	toolSources []tools.ToolSource
+	logger      *zap.Logger
 }
 
-func NewJSONToolRepository(storageDir string, toolFactory *tools.ToolFactory, configResolver interfaces.ConfigResolver, logger *zap.Logger) (interfaces.ToolRepository, error) {
+func NewJSONToolRepository(storageDir string, toolFactory *tools.ToolFactory, configResolver interfaces.ConfigResolver, toolSources []tools.ToolSource, logger *zap.Logger) (interfaces.ToolRepository, error) {
 	filePath := filepath.Join(storageDir, "tools.json")
 	repo := &JsonToolRepository{
 		filePath:       filePath,
@@ -41,6 +47,7 @@ func NewJSONToolRepository(storageDir string, toolFactory *tools.ToolFactory, co
 		toolInstances:  make(map[string]entities.Tool),
 		toolFactory:    toolFactory,
 		configResolver: configResolver,
+		toolSources:    toolSources,
 		logger:         logger,
 	}
 
@@ -53,6 +60,26 @@ func NewJSONToolRepository(storageDir string, toolFactory *tools.ToolFactory, co
 	}
 
 	return repo, nil
+}
+
+// findInSources looks up a tool by name across all configured tool sources
+// (currently: MCP servers), returning the first match. Each call re-fetches
+// the source's tool list, since MCP tool sets can change between calls
+// (e.g. a server restart) and this repository does not cache them.
+func (r *JsonToolRepository) findInSources(ctx context.Context, name string) (entities.Tool, error) {
+	for _, source := range r.toolSources {
+		sourceTools, err := source.ListTools(ctx)
+		if err != nil {
+			r.logger.Warn("Failed to list tools from source, skipping", zap.String("source", source.Name()), zap.Error(err))
+			continue
+		}
+		for _, t := range sourceTools {
+			if t.Name() == name {
+				return t, nil
+			}
+		}
+	}
+	return nil, nil
 }
 
 func copyToolData(t *entities.ToolData) *entities.ToolData {
@@ -175,6 +202,17 @@ func (r *JsonToolRepository) GetToolForChat(ctx context.Context, name string, co
 	r.mu.RUnlock()
 
 	if toolData == nil {
+		// Not a native, factory-built tool - check configured tool sources
+		// (MCP servers). Source-provided tools have no ToolData row and no
+		// per-turn config resolution of their own; the instance returned by
+		// the source is used directly.
+		sourceTool, err := r.findInSources(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		if sourceTool != nil {
+			return sourceTool, nil
+		}
 		return nil, errors.NotFoundErrorf("tool not found: %s", name)
 	}
 
@@ -209,24 +247,32 @@ func (r *JsonToolRepository) GetToolForChat(ctx context.Context, name string, co
 
 func (r *JsonToolRepository) ListTools() ([]entities.Tool, error) {
 	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	var toolList []entities.Tool
 	for _, tool := range r.toolInstances {
 		toolList = append(toolList, tool)
+	}
+	r.mu.RUnlock()
+
+	for _, source := range r.toolSources {
+		sourceTools, err := source.ListTools(context.Background())
+		if err != nil {
+			r.logger.Warn("Failed to list tools from source, skipping", zap.String("source", source.Name()), zap.Error(err))
+			continue
+		}
+		toolList = append(toolList, sourceTools...)
 	}
 	return toolList, nil
 }
 
 func (r *JsonToolRepository) GetToolByName(name string) (entities.Tool, error) {
 	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	tool, exists := r.toolInstances[name]
-	if !exists {
-		return nil, nil
+	r.mu.RUnlock()
+	if exists {
+		return tool, nil
 	}
-	return tool, nil
+
+	return r.findInSources(context.Background(), name)
 }
 
 func (r *JsonToolRepository) RegisterTool(name string, tool entities.Tool) error {
