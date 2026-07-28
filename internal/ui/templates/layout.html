@@ -59,6 +59,8 @@
                      {{template "chat_content" .}}
                  {{else if eq .ContentTemplate "providers_list_content"}}
                      {{template "providers_list_content" .}}
+                 {{else if eq .ContentTemplate "skills_list_content"}}
+                     {{template "skills_list_content" .}}
                  {{end}}
            </main>
            <aside class="sidebar col col-3">

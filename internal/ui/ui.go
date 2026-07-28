@@ -43,6 +43,7 @@ type UI struct {
 	providerService     services.ProviderService
 	modelRefreshService services.ModelRefreshService
 	modelFilterService  *services.ModelFilterService
+	skillService        services.SkillService
 	globalConfig        *config.GlobalConfig
 	logger              *zap.Logger
 	wsUpgrader          websocket.Upgrader
@@ -50,7 +51,7 @@ type UI struct {
 	wsClientsMutex      sync.RWMutex
 }
 
-func NewUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService, providerService services.ProviderService, modelRefreshService services.ModelRefreshService, modelFilterService *services.ModelFilterService, globalConfig *config.GlobalConfig, logger *zap.Logger) *UI {
+func NewUI(chatService services.ChatService, agentService services.AgentService, modelService services.ModelService, toolService services.ToolService, providerService services.ProviderService, modelRefreshService services.ModelRefreshService, modelFilterService *services.ModelFilterService, skillService services.SkillService, globalConfig *config.GlobalConfig, logger *zap.Logger) *UI {
 	ui := &UI{
 		chatService:         chatService,
 		agentService:        agentService,
@@ -59,6 +60,7 @@ func NewUI(chatService services.ChatService, agentService services.AgentService,
 		providerService:     providerService,
 		modelRefreshService: modelRefreshService,
 		modelFilterService:  modelFilterService,
+		skillService:        skillService,
 		globalConfig:        globalConfig,
 		logger:              logger,
 		wsUpgrader: websocket.Upgrader{
@@ -221,6 +223,7 @@ func (u *UI) Run() error {
 	}
 	toolController := uiapicontrollers.NewToolController(u.logger, tmpl, u.toolService, toolFactory)
 	providerController := uiapicontrollers.NewProviderController(u.logger, tmpl, u.providerService, u.modelRefreshService)
+	skillController := uiapicontrollers.NewSkillController(u.logger, tmpl, u.skillService)
 
 	e := echo.New()
 	e.Use(middleware.Logger())
@@ -280,6 +283,7 @@ func (u *UI) Run() error {
 	chatController.RegisterRoutes(e)
 	toolController.RegisterRoutes(e)
 	providerController.RegisterRoutes(e)
+	skillController.RegisterRoutes(e)
 
 	// WebSocket endpoint for real-time updates
 	e.GET("/ws", u.handleWebSocket)
